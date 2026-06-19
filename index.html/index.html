@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArenaX v2 - 5개 AI 모델 비교 및 토론</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            color: white;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6b7280;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #3B82F6;
+            border-bottom: 3px solid #3B82F6;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            margin-bottom: 8px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #3B82F6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563EB;
+        }
+
+        .btn-primary:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+        }
+
+        .btn-orange {
+            background: #f97316;
+            color: white;
+        }
+
+        .btn-orange:hover {
+            background: #ea580c;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 32px 16px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e5e7eb;
+            border-top-color: #3B82F6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .responses-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .response-card {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid;
+        }
+
+        .response-header {
+            padding: 12px;
+            font-weight: 600;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .response-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .response-content {
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .ai-openai { border-left-color: #3B82F6; }
+        .ai-anthropic { border-left-color: #a855f7; }
+        .ai-google { border-left-color: #fcd34d; }
+        .ai-xai { border-left-color: #ef4444; }
+        .ai-perplexity { border-left-color: #10b981; }
+
+        .color-openai { background: #3B82F6; }
+        .color-anthropic { background: #a855f7; }
+        .color-google { background: #fcd34d; color: #333; }
+        .color-xai { background: #ef4444; }
+        .color-perplexity { background: #10b981; }
+
+        .debate-info {
+            background: #dbeafe;
+            border-left: 4px solid #3B82F6;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .debate-turn {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid;
+        }
+
+        .turn-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .turn-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .turn-role {
+            background: #f3f4f6;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        .turn-content {
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        @media (min-width: 768px) {
+            .responses-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .responses-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 ArenaX v2</h1>
+            <p style="font-size: 12px; margin-top: 4px;">5개 AI 모델 비교 & 토론</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('compare')">💬 AI 비교</button>
+            <button class="tab" onclick="switchTab('debate')">🎯 AI 토론</button>
+        </div>
+
+        <div class="content">
+            <!-- Compare Tab -->
+            <div id="compare" class="tab-content active">
+                <div class="input-group">
+                    <textarea id="compareInput" placeholder="질문을 입력하세요..."></textarea>
+                    <button class="btn-primary" onclick="handleCompare()">📤 전송</button>
+                </div>
+
+                <div id="compareError" class="error" style="display: none;"></div>
+
+                <div id="compareLoading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 12px; font-size: 13px;">AI 모델들의 응답을 기다리는 중...</p>
+                </div>
+
+                <div id="compareResponses" class="responses-grid"></div>
+            </div>
+
+            <!-- Debate Tab -->
+            <div id="debate" class="tab-content">
+                <div id="debateInputGroup" class="input-group">
+                    <textarea id="debateInput" placeholder="토론할 주제를 입력하세요..."></textarea>
+                    <button class="btn-orange" onclick="handleDebateStart()">🔥 토론 시작하기</button>
+                </div>
+
+                <div id="debateError" class="error" style="display: none;"></div>
+
+                <div id="debateLoading" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 12px; font-size: 13px;">AI 모델들이 토론 중...</p>
+                </div>
+
+                <div id="debateContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 백엔드 API URL - 프론트엔드와 동일한 도메인에서 /api 경로로 요청
+        const API_URL = 'https://8000-igncn9tjzo7vu4tuo0i0d-033c063a.sg1.manus.computer';
+        const AI_COLORS = {
+            'OpenAI': '#3B82F6',
+            'Anthropic': '#a855f7',
+            'Google': '#fcd34d',
+            'xAI': '#ef4444',
+            'Perplexity': '#10b981',
+        };
+
+        let debateSessionId = generateUUID();
+        let debateTopic = '';
+        let debateRound = 0;
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function handleCompare() {
+            const message = document.getElementById('compareInput').value.trim();
+            if (!message) return;
+
+            const errorEl = document.getElementById('compareError');
+            const loadingEl = document.getElementById('compareLoading');
+            const responsesEl = document.getElementById('compareResponses');
+
+            errorEl.style.display = 'none';
+            loadingEl.style.display = 'block';
+            responsesEl.innerHTML = '';
+
+            try {
+                const request = new Request(`${API_URL}/compare/stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message }),
+                });
+
+                const response = await fetch(request);
+                if (!response.ok) throw new Error('응답 오류');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                const responses = {};
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    const lines = text.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const chunk = JSON.parse(line.substring(6));
+                                const { model, chunk: chunkText } = chunk;
+
+                                if (!responses[model]) {
+                                    responses[model] = '';
+                                    renderResponseCard(model, responses);
+                                }
+
+                                responses[model] += chunkText;
+                                updateResponseCard(model, responses[model]);
+                            } catch (e) {
+                                // 파싱 오류 무시
+                            }
+                        }
+                    }
+                }
+
+                loadingEl.style.display = 'none';
+            } catch (error) {
+                errorEl.textContent = '오류: ' + error.message;
+                errorEl.style.display = 'block';
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        function renderResponseCard(model, responses) {
+            const responsesEl = document.getElementById('compareResponses');
+            const card = document.createElement('div');
+            card.className = `response-card ai-${model.toLowerCase()}`;
+            card.id = `response-${model}`;
+            card.innerHTML = `
+                <div class="response-header" style="background: ${AI_COLORS[model]}20;">
+                    <div class="response-dot" style="background: ${AI_COLORS[model]};"></div>
+                    <span style="color: ${AI_COLORS[model]};">${model}</span>
+                </div>
+                <div class="response-content" id="content-${model}"></div>
+            `;
+            responsesEl.appendChild(card);
+        }
+
+        function updateResponseCard(model, content) {
+            const contentEl = document.getElementById(`content-${model}`);
+            if (contentEl) {
+                contentEl.textContent = content;
+            }
+        }
+
+        async function handleDebateStart() {
+            const topic = document.getElementById('debateInput').value.trim();
+            if (!topic) return;
+
+            debateTopic = topic;
+            debateRound = 1;
+
+            const errorEl = document.getElementById('debateError');
+            const loadingEl = document.getElementById('debateLoading');
+            const contentEl = document.getElementById('debateContent');
+            const inputGroup = document.getElementById('debateInputGroup');
+
+            errorEl.style.display = 'none';
+            loadingEl.style.display = 'block';
+            contentEl.innerHTML = '';
+            inputGroup.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_URL}/debate/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: debateSessionId,
+                        topic,
+                        action: 'start',
+                    }),
+                });
+
+                if (!response.ok) throw new Error('토론 시작 오류');
+
+                const data = await response.json();
+                renderDebateTurns(data.turns);
+
+                loadingEl.style.display = 'none';
+            } catch (error) {
+                errorEl.textContent = '오류: ' + error.message;
+                errorEl.style.display = 'block';
+                loadingEl.style.display = 'none';
+                inputGroup.style.display = 'block';
+            }
+        }
+
+        function renderDebateTurns(turns) {
+            const contentEl = document.getElementById('debateContent');
+            contentEl.innerHTML = `
+                <div class="debate-info">🎯 라운드 ${debateRound} | 주제: ${debateTopic}</div>
+            `;
+
+            turns.forEach(turn => {
+                const turnEl = document.createElement('div');
+                turnEl.className = `debate-turn ai-${turn.model.toLowerCase()}`;
+                turnEl.style.borderLeftColor = AI_COLORS[turn.model];
+
+                turnEl.innerHTML = `
+                    <div class="turn-header">
+                        <div class="turn-dot" style="background: ${AI_COLORS[turn.model]};"></div>
+                        <span style="color: ${AI_COLORS[turn.model]};">${turn.model}</span>
+                        <span class="turn-role">${turn.role}</span>
+                    </div>
+                    <div class="turn-content">${turn.content}</div>
+                `;
+
+                contentEl.appendChild(turnEl);
+            });
+
+            const continueBtn = document.createElement('button');
+            continueBtn.className = 'btn-primary';
+            continueBtn.style.marginTop = '16px';
+            continueBtn.textContent = '🔄 토론 더 하기';
+            continueBtn.onclick = handleDebateContinue;
+
+            contentEl.appendChild(continueBtn);
+        }
+
+        async function handleDebateContinue() {
+            const loadingEl = document.getElementById('debateLoading');
+            const contentEl = document.getElementById('debateContent');
+
+            loadingEl.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_URL}/debate/continue`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: debateSessionId,
+                        topic: debateTopic,
+                        action: 'continue',
+                    }),
+                });
+
+                if (!response.ok) throw new Error('토론 계속 오류');
+
+                const data = await response.json();
+                debateRound = data.round;
+                contentEl.innerHTML = '';
+                renderDebateTurns(data.turns);
+
+                loadingEl.style.display = 'none';
+            } catch (error) {
+                const errorEl = document.getElementById('debateError');
+                errorEl.textContent = '오류: ' + error.message;
+                errorEl.style.display = 'block';
+                loadingEl.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
