@@ -36,20 +36,64 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
+# 서버 시작 시 키 로딩 상태를 바로 확인할 수 있도록 로그 출력
+print(
+    f"[BOOT] OPENROUTER_API_KEY loaded: {bool(OPENROUTER_API_KEY)}, "
+    f"length: {len(OPENROUTER_API_KEY)}, "
+    f"prefix: {OPENROUTER_API_KEY[:8] if OPENROUTER_API_KEY else 'N/A'}"
+)
+
+# ============================================================
+# 페르소나 설계 원칙
+# ------------------------------------------------------------
+# 억지로 캐릭터(성격, 말투, 밈 등)를 부여하지 않습니다.
+# 각 회사/모델이 실제로 강점을 보이는 답변 방식에 집중하도록만 안내합니다.
+# 톤은 자연스러운 존댓말로 통일하고, 강조하는 "관점"만 다르게 둡니다.
+# ============================================================
 PERSONAS = {
-    "OpenAI": "당신은 차갑고 객관적인 T성향의 팩트폭격기입니다. 감정을 배제하고 논리적, 데이터 기반으로 날카롭게 대답하세요.",
-    "Anthropic": "당신은 따뜻하고 공감 능력이 뛰어난 F성향의 철학자입니다. 인간 중심적이고 감성적인 관점에서 대답하세요.",
-    "Google": "당신은 트렌디하고 유쾌한 MZ세대 크리에이터입니다. 밈(Meme)이나 비유를 적극 활용해 톡톡 튀게 대답하세요.",
-    "xAI": "당신은 냉소적이고 비판적인 아웃사이더입니다. 세상의 모순을 꼬집고 약간의 위트있는 비꼬기를 섞어 대답하세요.",
-    "Perplexity": "당신은 깐깐한 학자입니다. 오직 검증된 사실과 출처, 역사적 근거를 바탕으로 진지하게 대답하세요.",
+    "OpenAI": "당신은 범용적이고 체계적인 설명에 강합니다. 질문의 핵심을 구조적으로 정리하고, 단계적으로 이해하기 쉽게 설명하는 데 집중해서 대답하세요.",
+    "Anthropic": "당신은 신중하고 다각도의 분석에 강합니다. 한 가지 결론으로 단정하기보다, 여러 관점과 trade-off를 균형 있게 짚어가며 대답하세요.",
+    "Google": "당신은 실용적이고 최신 정보에 기반한 답변에 강합니다. 핵심만 간결하게 추리고, 실제로 적용 가능한 정보 위주로 대답하세요.",
+    "xAI": "당신은 직설적이고 가감 없는 분석에 강합니다. 돌려 말하지 않고 핵심 의견을 명확하게, 최신 맥락을 반영해 대답하세요.",
+    "Perplexity": "당신은 사실 검증과 근거 제시에 강합니다. 가능한 한 구체적인 근거나 출처가 될 만한 정보를 함께 제시하며 신뢰도 높게 대답하세요.",
 }
 
+# ============================================================
+# 모델 매핑 안내 (2026-06-20 기준 OpenRouter 무료 카탈로그 확인)
+# ------------------------------------------------------------
+#  - OpenAI   : gpt-oss-120b → OpenAI가 직접 공개한 오픈웨이트 모델 (실제 일치)
+#  - Google   : Gemma 4 31B → Google DeepMind가 직접 공개한 오픈소스 모델 (실제 일치)
+#  - xAI      : Grok 4 Fast(free) → xAI 모델이지만 한시적 무료 프로모션이라
+#               언제든 유료로 전환되거나 사라질 수 있음 (실패 시 FALLBACK_MODEL로 자동 대체)
+#  - Anthropic: Claude는 OpenRouter에 무료 버전이 전혀 없음 → 대체 오픈소스 모델 사용
+#  - Perplexity: Sonar 계열은 전부 유료 → 대체 오픈소스 모델 사용
+#
+# UI에는 회사 라벨을 그대로 두되, Anthropic/Perplexity 자리는 실제로는
+# 해당 회사 모델이 아니라는 점을 IS_REAL_COMPANY_MODEL로 프론트에 전달합니다.
+#
+# 모델 ID는 OpenRouter 정책에 따라 자주 바뀝니다. 문제가 생기면
+# https://openrouter.ai/models 에서 Price=Free로 필터링해 최신 ID로 교체하세요.
+# (404가 뜨면 ID가 죽은 것, 429가 뜨면 한도 초과)
+# ============================================================
+
 MODEL_MAPPING = {
-    "OpenAI": "openrouter/free",
-    "Anthropic": "openrouter/free",
-    "Google": "openrouter/free",
-    "xAI": "openrouter/free",
-    "Perplexity": "openrouter/free",
+    "OpenAI": "openai/gpt-oss-120b:free",
+    "Anthropic": "nvidia/nemotron-3-super-120b-a12b:free",
+    "Google": "google/gemma-4-31b-it:free",
+    "xAI": "x-ai/grok-4-fast:free",
+    "Perplexity": "deepseek/deepseek-r1:free",
+}
+
+# xAI의 Grok 무료 슬러그가 프로모션 종료 등으로 죽었을 때 자동으로 전환할 모델
+FALLBACK_MODEL = "openai/gpt-oss-20b:free"
+
+# 실제로 해당 회사가 만든 모델인지 여부 (프론트엔드 안내 문구용)
+IS_REAL_COMPANY_MODEL = {
+    "OpenAI": True,
+    "Anthropic": False,
+    "Google": True,
+    "xAI": True,
+    "Perplexity": False,
 }
 
 class CompareRequest(BaseModel):
@@ -64,9 +108,31 @@ class DebateRequest(BaseModel):
 def hash_message(message: str) -> str:
     return hashlib.md5(message.encode()).hexdigest()
 
+async def _post_with_fallback(client: httpx.AsyncClient, payload: dict, model_name: str):
+    """OpenRouter에 요청을 보내고, 모델 ID가 죽은 경우(404/400) 폴백 모델로 1회 재시도."""
+    response = await client.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=HEADERS,
+        json=payload,
+    )
+    if response.status_code in (400, 404) and payload["model"] != FALLBACK_MODEL:
+        body = response.text
+        print(
+            f"[MODEL FALLBACK] label={model_name} "
+            f"{payload['model']} -> {FALLBACK_MODEL} "
+            f"(status={response.status_code}, body={body[:300]})"
+        )
+        payload = {**payload, "model": FALLBACK_MODEL}
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=HEADERS,
+            json=payload,
+        )
+    return response
+
 async def call_ai_model(model_name: str, prompt: str, persona: str) -> str:
     payload = {
-        "model": MODEL_MAPPING.get(model_name, "google/gemma-2-9b-it:free"),
+        "model": MODEL_MAPPING.get(model_name, "openai/gpt-oss-120b:free"),
         "messages": [
             {"role": "system", "content": persona},
             {"role": "user", "content": prompt}
@@ -75,13 +141,16 @@ async def call_ai_model(model_name: str, prompt: str, persona: str) -> str:
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post("https://openrouter.ai/api/v1/chat/completions", headers=HEADERS, json=payload)
+            response = await _post_with_fallback(client, payload, model_name)
             if response.status_code == 200:
                 data = response.json()
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "[응답 없음]")
             else:
+                body = response.text
+                print(f"[CALL ERROR] model={model_name} status={response.status_code} body={body[:500]}")
                 return f"[API 오류 {response.status_code}]"
     except Exception as e:
+        print(f"[CALL EXCEPTION] model={model_name} error={str(e)}")
         return f"[통신 오류: {str(e)}]"
 
 @app.post("/compare/stream")
@@ -89,69 +158,102 @@ async def stream_compare(data: CompareRequest):
     if data.model_name not in MODEL_MAPPING:
         raise HTTPException(status_code=400, detail="Invalid model_name")
 
-    payload = {
-        "model": MODEL_MAPPING[data.model_name],
+    model_name = data.model_name
+    base_payload = {
+        "model": MODEL_MAPPING[model_name],
         "messages": [
-            {"role": "system", "content": PERSONAS[data.model_name]},
+            {"role": "system", "content": PERSONAS[model_name]},
             {"role": "user", "content": data.message},
         ],
         "stream": True,
     }
 
     async def generate():
-        model_name = data.model_name
         error_event = (
             f"data: {json.dumps({'model': model_name, 'error': 'API 한도 초과 또는 오류가 발생했습니다.'}, ensure_ascii=False)}\n\n"
         )
 
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                async with client.stream(
-                    "POST",
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=HEADERS,
-                    json=payload,
-                ) as response:
-                    if response.status_code != 200:
-                        yield error_event
-                        return
+                current_payload = base_payload
+                attempted_fallback = False
 
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        if line.startswith("data: ") and line != "data: [DONE]":
-                            try:
-                                raw_data = json.loads(line[6:])
-                                if raw_data.get("error"):
-                                    yield error_event
-                                    return
-                                if raw_data.get("choices"):
-                                    delta = raw_data["choices"][0].get("delta", {})
-                                    if "content" in delta:
-                                        custom_data = {
-                                            "model": model_name,
-                                            "chunk": delta["content"],
-                                        }
-                                        yield f"data: {json.dumps(custom_data, ensure_ascii=False)}\n\n"
-                            except json.JSONDecodeError:
-                                yield error_event
-                                return
-                        else:
-                            stripped = line.strip()
-                            if stripped.startswith("{"):
+                while True:
+                    async with client.stream(
+                        "POST",
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=HEADERS,
+                        json=current_payload,
+                    ) as response:
+                        if response.status_code != 200:
+                            body = await response.aread()
+                            print(
+                                f"[STREAM ERROR] label={model_name} "
+                                f"requested_model={current_payload['model']} "
+                                f"status={response.status_code} body={body[:500]}"
+                            )
+                            # 모델 ID가 죽었을 가능성(404/400) → 폴백 모델로 1회만 재시도
+                            if response.status_code in (400, 404) and not attempted_fallback and current_payload["model"] != FALLBACK_MODEL:
+                                attempted_fallback = True
+                                current_payload = {**current_payload, "model": FALLBACK_MODEL}
+                                continue
+                            yield error_event
+                            return
+
+                        had_error = False
+                        async for line in response.aiter_lines():
+                            if not line:
+                                continue
+                            if line.startswith("data: ") and line != "data: [DONE]":
                                 try:
-                                    raw_data = json.loads(stripped)
+                                    raw_data = json.loads(line[6:])
                                     if raw_data.get("error"):
-                                        yield error_event
-                                        return
+                                        print(f"[STREAM INLINE ERROR] label={model_name} raw={raw_data}")
+                                        had_error = True
+                                        break
+                                    if raw_data.get("choices"):
+                                        delta = raw_data["choices"][0].get("delta", {})
+                                        if "content" in delta:
+                                            custom_data = {
+                                                "model": model_name,
+                                                "chunk": delta["content"],
+                                            }
+                                            yield f"data: {json.dumps(custom_data, ensure_ascii=False)}\n\n"
                                 except json.JSONDecodeError:
-                                    pass
-        except httpx.HTTPError:
+                                    print(f"[STREAM JSON ERROR] label={model_name} line={line[:200]}")
+                                    had_error = True
+                                    break
+                            else:
+                                stripped = line.strip()
+                                if stripped.startswith("{"):
+                                    try:
+                                        raw_data = json.loads(stripped)
+                                        if raw_data.get("error"):
+                                            print(f"[STREAM INLINE ERROR] label={model_name} raw={raw_data}")
+                                            had_error = True
+                                            break
+                                    except json.JSONDecodeError:
+                                        pass
+
+                        if had_error:
+                            yield error_event
+                        return
+        except httpx.HTTPError as e:
+            print(f"[STREAM HTTP EXCEPTION] label={model_name} error={str(e)}")
             yield error_event
-        except Exception:
+        except Exception as e:
+            print(f"[STREAM EXCEPTION] label={model_name} error={str(e)}")
             yield error_event
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+@app.get("/models/info")
+async def models_info():
+    """프론트엔드에서 각 회사 라벨이 실제 그 회사 모델인지 보여주기 위한 메타데이터."""
+    return {
+        "mapping": MODEL_MAPPING,
+        "is_real_company_model": IS_REAL_COMPANY_MODEL,
+    }
 
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest):
@@ -213,9 +315,14 @@ async def debate_continue(request: DebateRequest):
 async def health():
     return {"status": "ok"}
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
 @app.get("/")
 def serve_home():
-    return FileResponse("index.html")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return FileResponse(os.path.join(base_dir, "index.html"))
+
+if __name__ == "__main__":
+    import uvicorn
+    # 렌더(Render)는 PORT 환경변수로 실제 사용할 포트를 지정해줍니다.
+    # 고정된 8000 포트만 쓰면 렌더에서 헬스체크/라우팅이 실패할 수 있습니다.
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
