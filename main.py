@@ -2,15 +2,18 @@ from fastapi.responses import FileResponse
 import asyncio
 import hashlib
 import json
+import os
 import random
-from datetime import datetime
-from typing import AsyncGenerator, Dict
+from typing import Dict
 
 import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+load_dotenv()
 
 app = FastAPI(title="ArenaX v2 Backend")
 
@@ -25,7 +28,7 @@ app.add_middleware(
 QUERY_CACHE: Dict[str, Dict] = {}
 DEBATE_SESSIONS: Dict[str, Dict] = {}
 
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 HEADERS = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
     "HTTP-Referer": "https://arenax.com",
@@ -51,6 +54,7 @@ MODEL_MAPPING = {
 
 class CompareRequest(BaseModel):
     message: str
+    model_name: str
 
 class DebateRequest(BaseModel):
     session_id: str
@@ -81,69 +85,45 @@ async def call_ai_model(model_name: str, prompt: str, persona: str) -> str:
         return f"[통신 오류: {str(e)}]"
 
 @app.post("/compare/stream")
-async def compare_stream(request: CompareRequest):
-    message = request.message
-    cache_key = hash_message(message)
+async def stream_compare(data: CompareRequest):
+    if data.model_name not in MODEL_MAPPING:
+        raise HTTPException(status_code=400, detail="Invalid model_name")
 
-    async def stream_generator():
-        if cache_key in QUERY_CACHE:
-            cached_data = QUERY_CACHE[cache_key]
-            for model_name in PERSONAS.keys():
-                response_text = cached_data["responses"].get(model_name, "")
-                for chunk in response_text.split(" "):
-                    if chunk:
-                        yield f"data: {json.dumps({'model': model_name, 'chunk': chunk + ' '})}\n\n"
-                        await asyncio.sleep(0.02)
-        else:
-            responses_dict = {}
-            for model_name in PERSONAS.keys():
-                full_text = ""
-                payload = {
-                    "model": MODEL_MAPPING.get(model_name, "google/gemma-2-9b-it:free"),
-                    "messages": [
-                        {"role": "system", "content": PERSONAS[model_name]},
-                        {"role": "user", "content": message}
-                    ],
-                    "stream": True
-                }
+    payload = {
+        "model": MODEL_MAPPING[data.model_name],
+        "messages": [
+            {"role": "system", "content": PERSONAS[data.model_name]},
+            {"role": "user", "content": data.message},
+        ],
+        "stream": True,
+    }
 
-                try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        async with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions", headers=HEADERS, json=payload) as response:
-                            if response.status_code != 200:
-                                err_msg = f"[API 오류 {response.status_code}] "
-                                yield f"data: {json.dumps({'model': model_name, 'chunk': err_msg})}\n\n"
-                                full_text += err_msg
-                            else:
-                                async for line in response.aiter_lines():
-                                    if line.startswith("data: ") and "[DONE]" not in line:
-                                        try:
-                                            data = json.loads(line[6:])
-                                            content = data["choices"][0]["delta"].get("content", "")
-                                            if content:
-                                                yield f"data: {json.dumps({'model': model_name, 'chunk': content})}\n\n"
-                                                full_text += content
-                                        except Exception:
-                                            continue
-                except Exception as e:
-                    err_msg = f"[통신 오류: {str(e)}] "
-                    yield f"data: {json.dumps({'model': model_name, 'chunk': err_msg})}\n\n"
-                    full_text += err_msg
+    async def generate():
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
+                "POST",
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=HEADERS,
+                json=payload,
+            ) as response:
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data: ") and line != "data: [DONE]":
+                        try:
+                            raw_data = json.loads(line[6:])
+                            if raw_data.get("choices"):
+                                delta = raw_data["choices"][0].get("delta", {})
+                                if "content" in delta:
+                                    custom_data = {
+                                        "model": data.model_name,
+                                        "chunk": delta["content"],
+                                    }
+                                    yield f"data: {json.dumps(custom_data, ensure_ascii=False)}\n\n"
+                        except json.JSONDecodeError:
+                            pass
 
-                responses_dict[model_name] = full_text
-                await asyncio.sleep(0.5)
-
-            QUERY_CACHE[cache_key] = {
-                "comparisonId": random.randint(1000, 9999),
-                "responses": responses_dict,
-                "timestamp": datetime.now().isoformat()
-            }
-
-    return StreamingResponse(
-        stream_generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest):
