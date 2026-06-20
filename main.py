@@ -109,12 +109,24 @@ def hash_message(message: str) -> str:
     return hashlib.md5(message.encode()).hexdigest()
 
 async def _post_with_fallback(client: httpx.AsyncClient, payload: dict, model_name: str):
-    """OpenRouter에 요청을 보내고, 모델 ID가 죽은 경우(404/400) 폴백 모델로 1회 재시도."""
+    """OpenRouter에 요청을 보내고, 429면 잠깐 대기 후 재시도, 모델 ID가 죽은 경우(404/400)면 폴백 모델로 재시도."""
     response = await client.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers=HEADERS,
         json=payload,
     )
+
+    if response.status_code == 429:
+        retry_after = response.headers.get("retry-after")
+        wait_seconds = float(retry_after) if retry_after else 2.0
+        print(f"[RATE LIMIT] label={model_name} model={payload['model']} waiting {wait_seconds}s")
+        await asyncio.sleep(min(wait_seconds, 5.0))
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=HEADERS,
+            json=payload,
+        )
+
     if response.status_code in (400, 404) and payload["model"] != FALLBACK_MODEL:
         body = response.text
         print(
@@ -177,6 +189,7 @@ async def stream_compare(data: CompareRequest):
             async with httpx.AsyncClient(timeout=60.0) as client:
                 current_payload = base_payload
                 attempted_fallback = False
+                attempted_retry_429 = False
 
                 while True:
                     async with client.stream(
@@ -192,6 +205,13 @@ async def stream_compare(data: CompareRequest):
                                 f"requested_model={current_payload['model']} "
                                 f"status={response.status_code} body={body[:500]}"
                             )
+                            # 429(레이트리밋): 잠깐 대기 후 같은 모델로 1회 재시도
+                            if response.status_code == 429 and not attempted_retry_429:
+                                attempted_retry_429 = True
+                                retry_after = response.headers.get("retry-after")
+                                wait_seconds = float(retry_after) if retry_after else 2.0
+                                await asyncio.sleep(min(wait_seconds, 5.0))
+                                continue
                             # 모델 ID가 죽었을 가능성(404/400) → 폴백 모델로 1회만 재시도
                             if response.status_code in (400, 404) and not attempted_fallback and current_payload["model"] != FALLBACK_MODEL:
                                 attempted_fallback = True
