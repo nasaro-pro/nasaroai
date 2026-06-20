@@ -350,6 +350,18 @@
             event.target.classList.add('active');
         }
 
+        function applyStreamChunk(responses, chunk) {
+            const { model: resModel, chunk: chunkText, error } = chunk;
+            if (!resModel) return;
+
+            if (error) {
+                responses[resModel] = error;
+            } else if (chunkText) {
+                responses[resModel] += chunkText;
+            }
+            updateResponseCard(resModel, responses[resModel]);
+        }
+
         async function streamCompareModel(model, message, responses) {
             const response = await fetch(`${API_URL}/compare/stream`, {
                 method: 'POST',
@@ -357,7 +369,13 @@
                 body: JSON.stringify({ message, model_name: model }),
             });
 
-            if (!response.ok) throw new Error(`${model} 응답 오류`);
+            if (!response.ok) {
+                applyStreamChunk(responses, {
+                    model,
+                    error: 'API 한도 초과 또는 오류가 발생했습니다.',
+                });
+                return;
+            }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -374,10 +392,7 @@
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
-                            const chunk = JSON.parse(line.substring(6));
-                            const { model: resModel, chunk: chunkText } = chunk;
-                            responses[resModel] += chunkText;
-                            updateResponseCard(resModel, responses[resModel]);
+                            applyStreamChunk(responses, JSON.parse(line.substring(6)));
                         } catch (e) {
                             // 파싱 오류 무시
                         }
@@ -405,15 +420,24 @@
                 renderResponseCard(model, responses);
             });
 
-            const results = await Promise.allSettled(
-                models.map(model => streamCompareModel(model, message, responses))
-            );
+            const failures = [];
+            for (const model of models) {
+                try {
+                    await streamCompareModel(model, message, responses);
+                } catch (error) {
+                    failures.push(`${model}: ${error.message}`);
+                    applyStreamChunk(responses, {
+                        model,
+                        error: 'API 한도 초과 또는 오류가 발생했습니다.',
+                    });
+                }
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
 
             loadingEl.style.display = 'none';
 
-            const failures = results.filter(r => r.status === 'rejected');
             if (failures.length > 0) {
-                errorEl.textContent = '일부 모델 오류: ' + failures.map(f => f.reason.message).join(', ');
+                errorEl.textContent = '일부 모델 오류: ' + failures.join(', ');
                 errorEl.style.display = 'block';
             }
         }

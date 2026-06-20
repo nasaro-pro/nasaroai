@@ -99,29 +99,57 @@ async def stream_compare(data: CompareRequest):
     }
 
     async def generate():
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream(
-                "POST",
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=HEADERS,
-                json=payload,
-            ) as response:
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    if line.startswith("data: ") and line != "data: [DONE]":
-                        try:
-                            raw_data = json.loads(line[6:])
-                            if raw_data.get("choices"):
-                                delta = raw_data["choices"][0].get("delta", {})
-                                if "content" in delta:
-                                    custom_data = {
-                                        "model": data.model_name,
-                                        "chunk": delta["content"],
-                                    }
-                                    yield f"data: {json.dumps(custom_data, ensure_ascii=False)}\n\n"
-                        except json.JSONDecodeError:
-                            pass
+        model_name = data.model_name
+        error_event = (
+            f"data: {json.dumps({'model': model_name, 'error': 'API 한도 초과 또는 오류가 발생했습니다.'}, ensure_ascii=False)}\n\n"
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream(
+                    "POST",
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=HEADERS,
+                    json=payload,
+                ) as response:
+                    if response.status_code != 200:
+                        yield error_event
+                        return
+
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data: ") and line != "data: [DONE]":
+                            try:
+                                raw_data = json.loads(line[6:])
+                                if raw_data.get("error"):
+                                    yield error_event
+                                    return
+                                if raw_data.get("choices"):
+                                    delta = raw_data["choices"][0].get("delta", {})
+                                    if "content" in delta:
+                                        custom_data = {
+                                            "model": model_name,
+                                            "chunk": delta["content"],
+                                        }
+                                        yield f"data: {json.dumps(custom_data, ensure_ascii=False)}\n\n"
+                            except json.JSONDecodeError:
+                                yield error_event
+                                return
+                        else:
+                            stripped = line.strip()
+                            if stripped.startswith("{"):
+                                try:
+                                    raw_data = json.loads(stripped)
+                                    if raw_data.get("error"):
+                                        yield error_event
+                                        return
+                                except json.JSONDecodeError:
+                                    pass
+        except httpx.HTTPError:
+            yield error_event
+        except Exception:
+            yield error_event
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
