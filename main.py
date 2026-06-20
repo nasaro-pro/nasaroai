@@ -45,11 +45,11 @@ PERSONAS = {
 }
 
 MODEL_MAPPING = {
-    "OpenAI": "meta-llama/llama-3.3-70b-instruct:free",
-    "Anthropic": "mistralai/mistral-7b-instruct:free",
-    "Google": "google/gemma-2-9b-it:free",
-    "xAI": "qwen/qwen-2.5-72b-instruct:free",
-    "Perplexity": "microsoft/phi-3-mini-128k-instruct:free"
+    "OpenAI": "openrouter/free",
+    "Anthropic": "openrouter/free",
+    "Google": "openrouter/free",
+    "xAI": "openrouter/free",
+    "Perplexity": "openrouter/free",
 }
 
 class CompareRequest(BaseModel):
