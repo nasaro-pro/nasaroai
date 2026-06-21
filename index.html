@@ -15,7 +15,7 @@
             min-height: 100vh;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
             background: #f6f7f9;
-            color: #1f2937;
+            color: #111827;
         }
 
         .app {
@@ -109,6 +109,7 @@
 
         .button-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 8px;
             margin-top: 10px;
         }
@@ -125,7 +126,7 @@
 
         button:disabled {
             cursor: not-allowed;
-            opacity: 0.6;
+            opacity: 0.55;
         }
 
         .primary {
@@ -162,14 +163,14 @@
             color: #1e40af;
         }
 
-        .grid {
+        /* Compare keeps the wide grid view because the goal is simultaneous side-by-side comparison. */
+        .compare-grid {
             display: grid;
             grid-template-columns: 1fr;
             gap: 12px;
         }
 
-        .card,
-        .turn {
+        .compare-card {
             background: #fff;
             border: 1px solid #e5e7eb;
             border-left: 4px solid #9ca3af;
@@ -177,8 +178,7 @@
             overflow: hidden;
         }
 
-        .card-header,
-        .turn-header {
+        .compare-card-header {
             display: flex;
             align-items: center;
             gap: 8px;
@@ -197,17 +197,7 @@
             flex: 0 0 auto;
         }
 
-        .badge {
-            margin-left: auto;
-            border-radius: 4px;
-            background: #f3f4f6;
-            color: #6b7280;
-            padding: 3px 7px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        .content {
+        .compare-content {
             min-height: 120px;
             max-height: 300px;
             overflow-y: auto;
@@ -218,31 +208,166 @@
             line-height: 1.65;
         }
 
-        .turn {
-            margin-bottom: 12px;
+        /* Debate uses a separate one-way deck carousel instead of the compare grid. */
+        .debate-stage {
+            position: relative;
+            overflow: hidden;
+            min-height: 390px;
+            margin-top: 14px;
         }
 
-        .turn .content {
-            max-height: none;
+        .debate-card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: min(780px, 86%);
+            min-height: 320px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-left: 5px solid #9ca3af;
+            border-radius: 8px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+            transition: transform 300ms ease-out, opacity 300ms ease-out;
+            overflow: hidden;
         }
 
-        .debug {
-            padding: 0 12px 12px;
+        .debate-card.active {
+            transform: translateX(0) scale(1);
+            opacity: 1;
+            z-index: 3;
+        }
+
+        .debate-card.exit-left {
+            transform: translateX(-110%) scale(0.94);
+            opacity: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .debate-card.preview-next {
+            transform: translateX(calc(100% + 18px)) scale(0.92);
+            opacity: 0.72;
+            z-index: 2;
+            cursor: pointer;
+            width: min(780px, 86%);
+        }
+
+        .debate-card.hidden-card {
+            transform: translateX(130%) scale(0.92);
+            opacity: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .debate-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 14px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .debate-badge {
+            margin-left: auto;
+            border-radius: 4px;
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 3px 7px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .debate-card-body {
+            max-height: 260px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 14px;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .debate-preview-body {
+            padding: 14px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #4b5563;
+        }
+
+        .debate-debug {
+            padding: 0 14px 14px;
             color: #6b7280;
             font-size: 11px;
             line-height: 1.5;
             word-break: break-word;
         }
 
+        .new-arrival {
+            display: none;
+            position: absolute;
+            right: 18px;
+            top: 12px;
+            z-index: 5;
+            border-radius: 999px;
+            background: #f97316;
+            color: #fff;
+            padding: 5px 9px;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .new-arrival.visible {
+            display: inline-block;
+        }
+
+        .deck-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            min-height: 18px;
+            margin-top: 8px;
+        }
+
+        .deck-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #d1d5db;
+        }
+
+        .deck-dot.active {
+            background: #2563eb;
+        }
+
         @media (min-width: 760px) {
-            .grid {
+            .compare-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
         @media (min-width: 1080px) {
-            .grid {
+            .compare-grid {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            main {
+                padding: 12px;
+            }
+
+            .debate-stage {
+                min-height: 410px;
+            }
+
+            .debate-card {
+                width: 91%;
+            }
+
+            .debate-card.preview-next {
+                transform: translateX(calc(100% + 8px)) scale(0.92);
             }
         }
     </style>
@@ -251,7 +376,7 @@
     <div class="app">
         <header>
             <h1>ArenaX</h1>
-            <p>AI 모델 비교와 토론 실험실</p>
+            <p>AI 모델 비교와 순차 토론 실험실</p>
         </header>
 
         <div class="tabs">
@@ -269,19 +394,26 @@
                 </div>
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
-                <div id="compareResponses" class="grid"></div>
+                <div id="compareResponses" class="compare-grid"></div>
             </section>
 
             <section id="debatePanel" class="panel">
                 <div id="debateComposer" class="composer">
-                    <textarea id="debateInput" placeholder="토론 주제를 입력하세요."></textarea>
+                    <textarea id="debateInput" placeholder="처음에는 토론 주제를 입력하고, 토론 시작 후에는 새 질문/의견을 입력하세요."></textarea>
                     <div class="button-row">
                         <button id="debateStartButton" class="secondary" type="button">토론 시작</button>
+                        <button id="debateContinueButton" class="primary" type="button" disabled>다음 라운드</button>
+                        <button id="debateAddInputButton" class="muted" type="button" disabled>새 질문 추가</button>
                     </div>
                 </div>
                 <div id="debateError" class="notice error"></div>
                 <div id="debateLoading" class="notice info"></div>
-                <div id="debateContent"></div>
+                <div id="debateContent">
+                    <div id="debateStage" class="debate-stage" style="display:none;">
+                        <span id="newArrival" class="new-arrival">새 답변 도착</span>
+                    </div>
+                    <div id="deckIndicators" class="deck-indicators"></div>
+                </div>
             </section>
         </main>
     </div>
@@ -294,14 +426,26 @@
             Google: "#ca8a04",
             xAI: "#dc2626",
             Perplexity: "#059669",
+            meta: "#0f766e",
+            qwen: "#0891b2",
+            nvidia: "#65a30d",
+            deepseek: "#9333ea",
+            Unknown: "#6b7280",
         };
-        const MODELS = Object.keys(AI_COLORS);
+        const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity"];
 
-        let debateSessionId = crypto.randomUUID ? crypto.randomUUID() : generateUUID();
+        let debateSessionId = createUUID();
         let debateTopic = "";
-        let debateRound = 0;
+        let debateStarted = false;
+        let debateInFlight = false;
+        let queuedDuringFlight = false;
+        let debateCards = [];
+        let activeCardIndex = 0;
+        let userMovedDeck = false;
+        let touchStartX = 0;
 
-        function generateUUID() {
+        function createUUID() {
+            if (crypto.randomUUID) return crypto.randomUUID();
             return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
                 const random = Math.random() * 16 | 0;
                 const value = char === "x" ? random : (random & 0x3) | 0x8;
@@ -316,11 +460,16 @@
         }
 
         function colorFor(label) {
-            return AI_COLORS[label] || "#6b7280";
+            return AI_COLORS[label] || AI_COLORS.Unknown;
         }
 
         function safeLabel(value, fallback = "Unknown") {
             return typeof value === "string" && value.trim() ? value : fallback;
+        }
+
+        function summarizeOneLine(text) {
+            const clean = String(text || "").replace(/\s+/g, " ").trim();
+            return clean.length > 64 ? `${clean.slice(0, 64)}...` : clean || "답변 작성 중...";
         }
 
         document.querySelectorAll(".tab").forEach(tab => {
@@ -334,24 +483,26 @@
 
         document.getElementById("compareButton").addEventListener("click", handleCompare);
         document.getElementById("debateStartButton").addEventListener("click", handleDebateStart);
+        document.getElementById("debateContinueButton").addEventListener("click", () => handleDebateContinue());
+        document.getElementById("debateAddInputButton").addEventListener("click", handleAddUserInput);
 
-        function renderResponseCard(model) {
+        function renderCompareCard(model) {
             const color = colorFor(model);
             const card = document.createElement("article");
-            card.className = "card";
+            card.className = "compare-card";
             card.id = `response-${model}`;
             card.style.borderLeftColor = color;
             card.innerHTML = `
-                <div class="card-header" style="color: ${color};">
+                <div class="compare-card-header" style="color: ${color};">
                     <span class="dot" style="background: ${color};"></span>
                     <span>${model}</span>
                 </div>
-                <div id="content-${model}" class="content"></div>
+                <div id="content-${model}" class="compare-content"></div>
             `;
             document.getElementById("compareResponses").appendChild(card);
         }
 
-        function updateResponseCard(model, content) {
+        function updateCompareCard(model, content) {
             const element = document.getElementById(`content-${model}`);
             if (element) element.textContent = content;
         }
@@ -365,7 +516,7 @@
             } else if (payload.chunk) {
                 responses[model] += payload.chunk;
             }
-            updateResponseCard(model, responses[model]);
+            updateCompareCard(model, responses[model]);
         }
 
         async function streamCompareModel(model, message, responses) {
@@ -415,23 +566,24 @@
 
             button.disabled = true;
             showNotice("compareError", "");
-            showNotice("compareLoading", "AI 모델들이 답변을 생성하는 중입니다.");
+            showNotice("compareLoading", "AI 모델들이 동시에 답변을 생성하는 중입니다.");
             responsesElement.innerHTML = "";
 
             MODELS.forEach(model => {
                 responses[model] = "";
-                renderResponseCard(model);
+                renderCompareCard(model);
             });
 
+            // Compare intentionally stays parallel and grid-based; debate is sequential and carousel-based.
             const failures = [];
-            for (const model of MODELS) {
+            await Promise.all(MODELS.map(async model => {
                 try {
                     await streamCompareModel(model, message, responses);
                 } catch (error) {
                     failures.push(`${model}: ${error.message}`);
                     applyStreamChunk(responses, { model, error: "[API 오류 네트워크 실패]" });
                 }
-            }
+            }));
 
             if (failures.length > 0) {
                 showNotice("compareError", `일부 모델 오류: ${failures.join(", ")}`);
@@ -441,100 +593,250 @@
             button.disabled = false;
         }
 
-        async function handleDebateStart() {
-            const topic = document.getElementById("debateInput").value.trim();
-            if (!topic) return;
-
-            debateTopic = topic;
-            debateRound = 1;
-
-            document.getElementById("debateStartButton").disabled = true;
-            document.getElementById("debateContent").innerHTML = "";
-            document.getElementById("debateComposer").style.display = "none";
-            showNotice("debateError", "");
-            showNotice("debateLoading", "AI 모델들이 토론을 준비하는 중입니다.");
-
-            try {
-                const response = await fetch(`${API_URL}/debate/start`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ session_id: debateSessionId, topic }),
-                });
-
-                if (!response.ok) throw new Error(`토론 시작 실패 (${response.status})`);
-
-                const data = await response.json();
-                debateRound = data.round || 1;
-                renderDebateTurns(data.turns || []);
-            } catch (error) {
-                showNotice("debateError", `오류: ${error.message}`);
-                document.getElementById("debateComposer").style.display = "block";
-            } finally {
-                showNotice("debateLoading", "");
-                document.getElementById("debateStartButton").disabled = false;
-            }
+        function setDebateButtons() {
+            document.getElementById("debateStartButton").disabled = debateInFlight;
+            document.getElementById("debateContinueButton").disabled = !debateStarted || debateInFlight;
+            document.getElementById("debateAddInputButton").disabled = !debateStarted;
         }
 
-        function renderDebateTurns(turns) {
-            const contentElement = document.getElementById("debateContent");
-            contentElement.innerHTML = `<div class="notice info" style="display:block;">라운드 ${debateRound} | 주제: ${debateTopic}</div>`;
+        function appendLoadingCard(roundNumber, speakerIndex) {
+            debateCards.push({
+                id: `loading-${roundNumber}-${speakerIndex}-${Date.now()}`,
+                loading: true,
+                round_number: roundNumber,
+                speaker_index: speakerIndex,
+                model: `${speakerIndex}번`,
+                role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 반박" : "3번 종합",
+                content: "답변 작성 중...",
+            });
+            if (!userMovedDeck) activeCardIndex = debateCards.length - 1;
+            renderDebateDeck();
+        }
 
+        function replaceLoadingCards(roundNumber, turns) {
             turns.forEach(turn => {
-                const model = safeLabel(turn.model || turn.actual_label);
-                const color = colorFor(model);
-                const turnElement = document.createElement("article");
-                turnElement.className = "turn";
-                turnElement.style.borderLeftColor = color;
-                turnElement.innerHTML = `
-                    <div class="turn-header" style="color: ${color};">
-                        <span class="dot" style="background: ${color};"></span>
-                        <span>${model}</span>
-                        <span class="badge">${turn.role || "입장"}</span>
-                    </div>
-                    <div class="content"></div>
-                    <div class="debug">
-                        요청: ${turn.requested_label || "-"} / 실제: ${turn.actual_label || model}<br>
-                        요청 모델: ${turn.requested_model || "-"}<br>
-                        실제 모델: ${turn.actual_model || "-"}<br>
-                        실제 회사 모델: ${turn.is_real_company_model ? "예" : "아니오"}
-                    </div>
-                `;
-                turnElement.querySelector(".content").textContent = turn.content || "";
-                contentElement.appendChild(turnElement);
+                debateCards = debateCards.filter(card => !(
+                    card.loading &&
+                    card.round_number === roundNumber &&
+                    card.speaker_index === turn.speaker_index
+                ));
+                debateCards.push({
+                    ...turn,
+                    id: `${turn.round_number}-${turn.speaker_index}-${turn.actual_model || turn.model}`,
+                    loading: false,
+                });
             });
 
-            const continueButton = document.createElement("button");
-            continueButton.className = "primary";
-            continueButton.type = "button";
-            continueButton.textContent = "다음 라운드";
-            continueButton.addEventListener("click", handleDebateContinue);
-            contentElement.appendChild(continueButton);
+            if (!userMovedDeck) {
+                activeCardIndex = Math.max(0, debateCards.length - 1);
+            } else if (activeCardIndex < debateCards.length - 1) {
+                document.getElementById("newArrival").classList.add("visible");
+            }
+            renderDebateDeck();
         }
 
-        async function handleDebateContinue(event) {
-            const button = event.currentTarget;
-            button.disabled = true;
+        function renderDebateDeck() {
+            const stage = document.getElementById("debateStage");
+            const indicator = document.getElementById("deckIndicators");
+            stage.style.display = debateCards.length ? "block" : "none";
+            stage.querySelectorAll(".debate-card").forEach(card => card.remove());
+
+            debateCards.forEach((card, index) => {
+                const label = safeLabel(card.model || card.actual_label);
+                const color = colorFor(label);
+                const element = document.createElement("article");
+                element.className = "debate-card";
+                element.style.borderLeftColor = color;
+
+                if (index < activeCardIndex) {
+                    element.classList.add("exit-left");
+                } else if (index === activeCardIndex) {
+                    element.classList.add("active");
+                } else if (index === activeCardIndex + 1) {
+                    element.classList.add("preview-next");
+                    element.addEventListener("click", advanceDeck);
+                } else {
+                    element.classList.add("hidden-card");
+                }
+
+                const body = index === activeCardIndex ? card.content : summarizeOneLine(card.content);
+                element.innerHTML = `
+                    <div class="debate-card-header" style="color: ${color};">
+                        <span class="dot" style="background: ${color};"></span>
+                        <span>${card.round_number || "-"}라운드 · ${label}</span>
+                        <span class="debate-badge">${card.role || "발언"}</span>
+                    </div>
+                    <div class="${index === activeCardIndex ? "debate-card-body" : "debate-preview-body"}"></div>
+                    ${index === activeCardIndex ? `
+                        <div class="debate-debug">
+                            요청: ${card.requested_label || "-"} / 실제: ${card.actual_label || label}<br>
+                            요청 모델: ${card.requested_model || "-"}<br>
+                            실제 모델: ${card.actual_model || "-"}<br>
+                            실제 회사 모델: ${card.is_real_company_model ? "예" : "아니오"}
+                        </div>
+                    ` : ""}
+                `;
+                element.querySelector(index === activeCardIndex ? ".debate-card-body" : ".debate-preview-body").textContent = body;
+
+                element.addEventListener("touchstart", event => {
+                    touchStartX = event.touches[0].clientX;
+                }, { passive: true });
+
+                element.addEventListener("touchend", event => {
+                    const touchEndX = event.changedTouches[0].clientX;
+                    if (touchStartX - touchEndX > 45) advanceDeck();
+                }, { passive: true });
+
+                stage.appendChild(element);
+            });
+
+            indicator.innerHTML = debateCards.map((_, index) => {
+                const active = index === activeCardIndex ? " active" : "";
+                return `<span class="deck-dot${active}"></span>`;
+            }).join("");
+        }
+
+        function advanceDeck() {
+            if (activeCardIndex >= debateCards.length - 1) return;
+            activeCardIndex += 1;
+            userMovedDeck = true;
+            document.getElementById("newArrival").classList.remove("visible");
+            renderDebateDeck();
+        }
+
+        async function requestDebate(endpoint, payload, options = {}) {
+            debateInFlight = true;
+            setDebateButtons();
             showNotice("debateError", "");
-            showNotice("debateLoading", "다음 라운드를 생성하는 중입니다.");
+            showNotice("debateLoading", options.loadingText || "토론 라운드를 순차 생성하는 중입니다.");
+
+            const expectedRound = options.expectedRound || 1;
+            const expectedSpeaker = options.expectedSpeaker || 1;
+            if (options.showLoadingCard) appendLoadingCard(expectedRound, expectedSpeaker);
 
             try {
-                const response = await fetch(`${API_URL}/debate/continue`, {
+                const response = await fetch(`${API_URL}${endpoint}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ session_id: debateSessionId, topic: debateTopic }),
+                    body: JSON.stringify(payload),
                 });
 
-                if (!response.ok) throw new Error(`토론 계속 실패 (${response.status})`);
+                if (!response.ok) throw new Error(`요청 실패 (${response.status})`);
 
                 const data = await response.json();
-                debateRound = data.round || debateRound + 1;
-                renderDebateTurns(data.turns || []);
+                if (data.queued) {
+                    queuedDuringFlight = true;
+                    showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
+                    return data;
+                }
+
+                replaceLoadingCards(data.round || expectedRound, data.turns || []);
+                return data;
             } catch (error) {
                 showNotice("debateError", `오류: ${error.message}`);
-                button.disabled = false;
+                debateCards = debateCards.filter(card => !(
+                    card.loading &&
+                    card.round_number === expectedRound &&
+                    card.speaker_index === expectedSpeaker
+                ));
+                renderDebateDeck();
+                return null;
             } finally {
+                debateInFlight = false;
                 showNotice("debateLoading", "");
+                setDebateButtons();
             }
+        }
+
+        async function handleDebateStart() {
+            const input = document.getElementById("debateInput");
+            const topic = input.value.trim();
+            if (!topic || debateInFlight) return;
+
+            debateSessionId = createUUID();
+            debateTopic = topic;
+            debateStarted = true;
+            debateCards = [];
+            activeCardIndex = 0;
+            userMovedDeck = false;
+            queuedDuringFlight = false;
+            input.value = "";
+            input.placeholder = "새 질문/의견을 입력한 뒤 '새 질문 추가'를 누르세요.";
+            setDebateButtons();
+
+            await runDebateRoundSequence("/debate/start", {
+                session_id: debateSessionId,
+                topic: debateTopic,
+            }, 1);
+        }
+
+        async function runDebateRoundSequence(firstEndpoint, firstPayload, expectedRound) {
+            for (let speakerIndex = 1; speakerIndex <= 3; speakerIndex += 1) {
+                const endpoint = speakerIndex === 1 ? firstEndpoint : "/debate/continue";
+                const payload = speakerIndex === 1
+                    ? firstPayload
+                    : { session_id: debateSessionId, topic: debateTopic };
+                const data = await requestDebate(endpoint, payload, {
+                    expectedRound,
+                    expectedSpeaker: speakerIndex,
+                    showLoadingCard: true,
+                    loadingText: `${speakerIndex}번 발언자를 생성하는 중입니다. /debate는 순차 호출, /compare는 병렬 스트리밍입니다.`,
+                });
+                if (!data || data.queued || !data.turns || !data.turns.length) break;
+            }
+
+            if (queuedDuringFlight && !debateInFlight) {
+                queuedDuringFlight = false;
+                await handleDebateContinue();
+            }
+        }
+
+        async function handleDebateContinue(userInput = null) {
+            if (!debateStarted || debateInFlight) return;
+            const nextRound = Math.max(0, ...debateCards.map(card => card.round_number || 0)) + 1;
+            await runDebateRoundSequence("/debate/continue", {
+                session_id: debateSessionId,
+                topic: debateTopic,
+                user_input: userInput,
+            }, nextRound);
+        }
+
+        async function handleAddUserInput() {
+            if (!debateStarted) return;
+            const input = document.getElementById("debateInput");
+            const userInput = input.value.trim();
+            if (!userInput) return;
+            input.value = "";
+
+            if (debateInFlight) {
+                document.getElementById("debateAddInputButton").disabled = true;
+                try {
+                    const response = await fetch(`${API_URL}/debate/continue`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            session_id: debateSessionId,
+                            topic: debateTopic,
+                            user_input: userInput,
+                        }),
+                    });
+                    if (!response.ok) throw new Error(`큐잉 실패 (${response.status})`);
+                    const data = await response.json();
+                    if (data.queued) {
+                        queuedDuringFlight = true;
+                        showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
+                    } else if (data.turns && data.turns.length) {
+                        replaceLoadingCards(data.round, data.turns);
+                    }
+                } catch (error) {
+                    showNotice("debateError", `오류: ${error.message}`);
+                } finally {
+                    setTimeout(setDebateButtons, 800);
+                }
+                return;
+            }
+
+            await handleDebateContinue(userInput);
         }
     </script>
 </body>

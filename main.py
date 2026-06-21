@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import random
-from collections.abc import AsyncIterator, Callable
+import re
+import time
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
 import httpx
@@ -25,13 +27,40 @@ OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 MODEL_REFRESH_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
-MAX_MODEL_CANDIDATES_PER_LABEL = 3
+MODEL_CACHE_TTL_SECONDS = 600
+MAX_MODEL_CANDIDATES_PER_LABEL = 5
 HEALTHCHECK_CONCURRENCY = 2
 HEALTHCHECK_DELAY_SECONDS = 1.0
 
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
 LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
 
+SPEECH_MODEL_WHITELIST = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-coder:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "deepseek/deepseek-r1:free",
+]
+
+SUMMARY_MODEL_WHITELIST = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-coder:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "deepseek/deepseek-r1:free",
+]
+
+META_RESPONSE_KEYWORDS = [
+    "safe",
+    "unsafe",
+    "user safety",
+    "policy",
+    "classification",
+    "i cannot",
+    "i can't comply",
+    "as an ai",
+]
 
 app = FastAPI(title="ArenaX Backend")
 
@@ -42,7 +71,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 COMPANY_PREFIXES: dict[str, str] = {
     "OpenAI": "openai/",
@@ -56,33 +84,31 @@ COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
 
 PERSONAS: dict[str, str] = {
     "OpenAI": (
-        "당신은 범용적이고 체계적인 설명에 강합니다. 질문의 핵심을 구조적으로 정리하고, "
-        "단계적으로 이해하기 쉽게 답변하세요."
+        "당신은 범용적이고 체계적인 설명에 강합니다. 핵심을 구조적으로 정리하고, "
+        "한국어로 명확하고 실용적으로 답변하세요."
     ),
     "Anthropic": (
-        "당신은 신중하고 다각도의 분석에 강합니다. 하나의 결론으로 성급히 좁히기보다 "
-        "여러 관점과 trade-off를 균형 있게 짚어가며 답변하세요."
+        "당신은 신중하고 다각도의 분석에 강합니다. 여러 관점과 trade-off를 균형 있게 "
+        "짚으면서 한국어로 답변하세요."
     ),
     "Google": (
-        "당신은 실용적이고 최신 정보 기반의 답변에 강합니다. 핵심을 간결하게 추리고 "
-        "실제로 적용 가능한 정보 위주로 답변하세요."
+        "당신은 실용적이고 적용 가능한 정보 정리에 강합니다. 핵심을 간결하게 추리고 "
+        "한국어로 실행 가능한 관점을 제시하세요."
     ),
     "xAI": (
         "당신은 직설적이고 날카로운 분석에 강합니다. 돌려 말하지 말고 핵심 의견을 "
-        "명확하게 제시하세요."
+        "한국어로 분명하게 제시하세요."
     ),
     "Perplexity": (
-        "당신은 사실 검증과 근거 제시에 강합니다. 가능한 한 구체적인 근거와 확인할 만한 "
-        "정보를 함께 제시하세요."
+        "당신은 사실 검증과 근거 제시에 강합니다. 확인 가능한 근거와 논리 구조를 함께 "
+        "한국어로 제시하세요."
     ),
 }
-
 
 MODEL_MAPPING: dict[str, str] = {}
 FALLBACK_MODEL_MAPPING: dict[str, str] = {}
 MODEL_CANDIDATES: dict[str, list[str]] = {}
 IS_REAL_COMPANY_MODEL: dict[str, bool] = {}
-MODEL_LABEL_BY_ID: dict[str, str] = {}
 
 
 @dataclass
@@ -90,10 +116,14 @@ class ModelCacheState:
     loaded: bool = False
     source: str = "not_loaded"
     error: str | None = None
+    refreshed_at: float = 0.0
+    free_model_ids: set[str] = field(default_factory=set)
     free_models_by_label: dict[str, list[str]] = field(default_factory=dict)
+    all_free_models: list[str] = field(default_factory=list)
 
 
 MODEL_CACHE_STATE = ModelCacheState()
+MODEL_CACHE_LOCK = asyncio.Lock()
 
 
 class CompareRequest(BaseModel):
@@ -104,9 +134,12 @@ class CompareRequest(BaseModel):
 class DebateRequest(BaseModel):
     session_id: str
     topic: str
+    user_input: str | None = None
 
 
 class DebateTurn(BaseModel):
+    round_number: int
+    speaker_index: int
     model: str
     actual_label: str
     requested_label: str
@@ -118,10 +151,20 @@ class DebateTurn(BaseModel):
     failed_candidates: list[str] = Field(default_factory=list)
 
 
+class UserInputHistoryItem(BaseModel):
+    round_number: int
+    content: str
+
+
 class DebateSession(BaseModel):
     topic: str
-    round: int = 1
-    turns: list[DebateTurn] = Field(default_factory=list)
+    round_number: int = 0
+    current_round_turns: list[DebateTurn] = Field(default_factory=list)
+    round_speaker_labels: list[str] = Field(default_factory=list)
+    previous_summary: str = ""
+    pending_user_input: str | None = None
+    user_input_history: list[UserInputHistoryItem] = Field(default_factory=list)
+    failed_candidates: list[str] = Field(default_factory=list)
 
 
 class ModelCallResult(BaseModel):
@@ -137,6 +180,7 @@ class ModelCallResult(BaseModel):
 
 
 DEBATE_SESSIONS: dict[str, DebateSession] = {}
+DEBATE_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 def build_openrouter_headers() -> dict[str, str]:
@@ -180,66 +224,91 @@ def unique(items: list[str]) -> list[str]:
     return result
 
 
-def choose_distributed_substitutes(
-    label: str,
-    all_free_models: list[str],
-    already_assigned: set[str],
-    limit: int,
-) -> list[str]:
-    preferred = [
-        model_id
-        for model_id in all_free_models
-        if model_id not in already_assigned and not model_id.startswith(COMPANY_PREFIXES[label])
-    ]
-    if len(preferred) < limit:
-        preferred.extend(
-            model_id
-            for model_id in all_free_models
-            if model_id not in preferred and not model_id.startswith(COMPANY_PREFIXES[label])
+def dump_model(model: BaseModel) -> dict:
+    if hasattr(model, "model_dump"):
+        return model.model_dump()  # type: ignore[attr-defined]
+    return model.dict()
+
+
+def qwen_model_score(model_id: str) -> tuple[int, int, str]:
+    numbers = [int(value) for value in re.findall(r"\d+", model_id)]
+    biggest_number = max(numbers) if numbers else 0
+    coder_bonus = 1000 if "coder" in model_id else 0
+    instruct_bonus = 100 if "instruct" in model_id or "chat" in model_id else 0
+    return coder_bonus + instruct_bonus + biggest_number, sum(numbers), model_id
+
+
+def resolve_whitelist_model(model_id: str, free_model_ids: set[str], all_free_models: list[str]) -> str | None:
+    if model_id in free_model_ids:
+        return model_id
+    if model_id == "qwen/qwen3-coder:free":
+        qwen_candidates = [
+            candidate
+            for candidate in all_free_models
+            if candidate.startswith("qwen/") and candidate.endswith(":free")
+        ]
+        if qwen_candidates:
+            return sorted(qwen_candidates, key=qwen_model_score, reverse=True)[0]
+    return None
+
+
+def whitelist_substitutes_for_label(label: str, whitelist: list[str]) -> list[str]:
+    own_prefix = COMPANY_PREFIXES[label]
+    candidates: list[str] = []
+    for model_id in whitelist:
+        resolved_model = resolve_whitelist_model(
+            model_id,
+            MODEL_CACHE_STATE.free_model_ids,
+            MODEL_CACHE_STATE.all_free_models,
         )
-    return unique(preferred)[:limit]
+        if not resolved_model:
+            continue
+        if resolved_model.startswith(own_prefix):
+            continue
+        candidates.append(resolved_model)
+    return unique(candidates)
 
 
-def apply_model_cache(free_models_by_label: dict[str, list[str]], all_free_models: list[str], source: str) -> None:
+def random_free_substitutes_for_label(label: str, limit: int) -> list[str]:
+    own_prefix = COMPANY_PREFIXES[label]
+    pool = [
+        model_id
+        for model_id in MODEL_CACHE_STATE.all_free_models
+        if not model_id.startswith(own_prefix)
+    ]
+    if not pool:
+        return []
+    return random.sample(pool, min(limit, len(pool)))
+
+
+def build_candidates_for_label(label: str, whitelist: list[str]) -> list[str]:
+    same_company = unique(MODEL_CACHE_STATE.free_models_by_label.get(label, []))
+    substitutes = whitelist_substitutes_for_label(label, whitelist)
+    if not substitutes:
+        substitutes = random_free_substitutes_for_label(label, MAX_MODEL_CANDIDATES_PER_LABEL)
+
+    candidates = unique(same_company + substitutes)
+    if not candidates:
+        candidates = [LAST_RESORT_MODEL]
+    return candidates[:MAX_MODEL_CANDIDATES_PER_LABEL]
+
+
+def rebuild_model_mappings(source: str) -> None:
     MODEL_MAPPING.clear()
     FALLBACK_MODEL_MAPPING.clear()
     MODEL_CANDIDATES.clear()
     IS_REAL_COMPANY_MODEL.clear()
-    MODEL_LABEL_BY_ID.clear()
-
-    assigned_primary_models: set[str] = set()
 
     for label in COMPANY_LABELS:
-        same_company_candidates = unique(free_models_by_label.get(label, []))[:MAX_MODEL_CANDIDATES_PER_LABEL]
-        has_real_company_model = bool(same_company_candidates)
-
-        if has_real_company_model:
-            candidates = same_company_candidates
-        else:
-            candidates = choose_distributed_substitutes(
-                label=label,
-                all_free_models=all_free_models,
-                already_assigned=assigned_primary_models,
-                limit=MAX_MODEL_CANDIDATES_PER_LABEL,
-            )
-
-        if not candidates:
-            candidates = [LAST_RESORT_MODEL]
-
-        candidates = unique(candidates)[:MAX_MODEL_CANDIDATES_PER_LABEL]
+        candidates = build_candidates_for_label(label, SPEECH_MODEL_WHITELIST)
         MODEL_CANDIDATES[label] = candidates
         MODEL_MAPPING[label] = candidates[0]
         FALLBACK_MODEL_MAPPING[label] = candidates[1] if len(candidates) > 1 else candidates[0]
-        IS_REAL_COMPANY_MODEL[label] = has_real_company_model
-        assigned_primary_models.add(candidates[0])
-
-        for model_id in candidates:
-            MODEL_LABEL_BY_ID[model_id] = label_for_model_id(model_id)
+        IS_REAL_COMPANY_MODEL[label] = candidates[0].startswith(COMPANY_PREFIXES[label])
 
     MODEL_CACHE_STATE.loaded = True
     MODEL_CACHE_STATE.source = source
-    MODEL_CACHE_STATE.error = None
-    MODEL_CACHE_STATE.free_models_by_label = free_models_by_label
+    MODEL_CACHE_STATE.refreshed_at = time.time()
 
 
 async def refresh_model_cache() -> None:
@@ -250,16 +319,17 @@ async def refresh_model_cache() -> None:
             payload = response.json()
     except Exception as exc:
         logger.exception("Failed to fetch OpenRouter model catalog. Using last-resort fallback.")
-        fallback_by_label = {"OpenAI": [LAST_RESORT_MODEL]}
-        apply_model_cache(fallback_by_label, [LAST_RESORT_MODEL], source="last_resort")
+        MODEL_CACHE_STATE.free_model_ids = {LAST_RESORT_MODEL}
+        MODEL_CACHE_STATE.all_free_models = [LAST_RESORT_MODEL]
+        MODEL_CACHE_STATE.free_models_by_label = {"OpenAI": [LAST_RESORT_MODEL]}
         MODEL_CACHE_STATE.error = str(exc)
+        rebuild_model_mappings("last_resort")
         return
 
-    models = payload.get("data", [])
     free_models_by_label: dict[str, list[str]] = {label: [] for label in COMPANY_LABELS}
     all_free_models: list[str] = []
 
-    for model in models:
+    for model in payload.get("data", []):
         model_id = model.get("id")
         if not isinstance(model_id, str) or not is_free_model(model):
             continue
@@ -272,24 +342,34 @@ async def refresh_model_cache() -> None:
 
     if not all_free_models:
         logger.warning("OpenRouter catalog returned no free models. Using last-resort fallback.")
-        fallback_by_label = {"OpenAI": [LAST_RESORT_MODEL]}
-        apply_model_cache(fallback_by_label, [LAST_RESORT_MODEL], source="last_resort_empty_catalog")
+        all_free_models = [LAST_RESORT_MODEL]
+        free_models_by_label = {"OpenAI": [LAST_RESORT_MODEL]}
+
+    MODEL_CACHE_STATE.free_model_ids = set(all_free_models)
+    MODEL_CACHE_STATE.all_free_models = unique(all_free_models)
+    MODEL_CACHE_STATE.free_models_by_label = free_models_by_label
+    MODEL_CACHE_STATE.error = None
+    rebuild_model_mappings("openrouter_catalog")
+    logger.info("Loaded OpenRouter free model cache: %s", MODEL_CANDIDATES)
+
+
+async def ensure_model_cache_fresh() -> None:
+    is_empty = not MODEL_CACHE_STATE.loaded or not MODEL_CACHE_STATE.free_model_ids
+    is_stale = time.time() - MODEL_CACHE_STATE.refreshed_at > MODEL_CACHE_TTL_SECONDS
+    if not is_empty and not is_stale:
         return
 
-    apply_model_cache(free_models_by_label, unique(all_free_models), source="openrouter_catalog")
-    logger.info("Loaded OpenRouter free model cache: %s", MODEL_CANDIDATES)
+    async with MODEL_CACHE_LOCK:
+        is_empty = not MODEL_CACHE_STATE.loaded or not MODEL_CACHE_STATE.free_model_ids
+        is_stale = time.time() - MODEL_CACHE_STATE.refreshed_at > MODEL_CACHE_TTL_SECONDS
+        if is_empty or is_stale:
+            await refresh_model_cache()
 
 
 @app.on_event("startup")
 async def startup() -> None:
     log_openrouter_key_status()
     await refresh_model_cache()
-
-
-def ensure_model_cache() -> None:
-    if MODEL_CACHE_STATE.loaded:
-        return
-    apply_model_cache({"OpenAI": [LAST_RESORT_MODEL]}, [LAST_RESORT_MODEL], source="lazy_last_resort")
 
 
 def sse(payload: dict) -> str:
@@ -303,7 +383,13 @@ def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
     ]
 
 
-def build_chat_payload(model_id: str, persona: str, prompt: str, stream: bool, max_tokens: int | None = None) -> dict:
+def build_chat_payload(
+    model_id: str,
+    persona: str,
+    prompt: str,
+    stream: bool,
+    max_tokens: int | None = None,
+) -> dict:
     payload: dict = {
         "model": model_id,
         "messages": build_messages(persona, prompt),
@@ -314,26 +400,34 @@ def build_chat_payload(model_id: str, persona: str, prompt: str, stream: bool, m
     return payload
 
 
-def build_opening_prompt(topic: str, previous_content: str | None) -> str:
-    previous_section = f"\n이전 발언:\n{previous_content}\n" if previous_content else ""
-    return (
-        f"{previous_section}주제: {topic}\n\n"
-        "위 내용을 참고하되, 당신의 관점에서 이 주제에 대한 명확하고 설득력 있는 첫 주장을 하세요."
-    )
+def contains_korean(text: str) -> bool:
+    return bool(re.search(r"[가-힣]", text))
 
 
-def build_rebuttal_prompt(topic: str, summary: str, previous_content: str | None) -> str:
-    previous_section = f"\n직전 발언:\n{previous_content}\n" if previous_content else ""
-    return (
-        f"지금까지의 토론 요약:\n{summary}\n\n"
-        f"{previous_section}주제: {topic}\n\n"
-        "위 내용을 참고하여 당신의 관점에서 반박하거나 새로운 논점을 제시하세요."
-    )
+def is_meta_or_invalid_response(content: str, prompt: str = "") -> bool:
+    stripped = content.strip()
+    lowered = stripped.lower()
+    has_meta_keyword = any(keyword in lowered for keyword in META_RESPONSE_KEYWORDS)
 
+    if len(stripped) < 20 and has_meta_keyword:
+        return True
 
-def candidates_for_label(label: str) -> list[str]:
-    ensure_model_cache()
-    return MODEL_CANDIDATES.get(label) or [LAST_RESORT_MODEL]
+    if len(stripped) >= 20 and contains_korean(prompt) and not contains_korean(stripped):
+        words = re.findall(r"[a-zA-Z']+", lowered)
+        only_word_like = bool(words) and re.fullmatch(r"[\s,a-zA-Z'/-]+", stripped) is not None
+        meta_word_set = {
+            "safe",
+            "unsafe",
+            "policy",
+            "classification",
+            "cannot",
+            "comply",
+            "safety",
+        }
+        if only_word_like and 1 <= len(words) <= 3 and all(word in meta_word_set for word in words):
+            return True
+
+    return False
 
 
 def should_try_next_candidate(status_code: int) -> bool:
@@ -346,12 +440,6 @@ def extract_content(payload: dict) -> str:
         return ""
     message = choices[0].get("message") or {}
     return str(message.get("content") or "")
-
-
-def dump_model(model: BaseModel) -> dict:
-    if hasattr(model, "model_dump"):
-        return model.model_dump()  # type: ignore[attr-defined]
-    return model.dict()
 
 
 def make_failed_result(
@@ -373,12 +461,18 @@ def make_failed_result(
     )
 
 
-async def call_ai_model(label: str, prompt: str) -> ModelCallResult:
+async def call_ai_model(
+    label: str,
+    prompt: str,
+    whitelist: list[str] | None = None,
+    max_tokens: int | None = None,
+) -> ModelCallResult:
     if label not in COMPANY_LABELS:
         raise HTTPException(status_code=400, detail="Invalid model label")
 
+    await ensure_model_cache_fresh()
     persona = PERSONAS[label]
-    candidates = candidates_for_label(label)
+    candidates = build_candidates_for_label(label, whitelist or SPEECH_MODEL_WHITELIST)
     requested_model = candidates[0]
     failed_candidates: list[str] = []
 
@@ -388,7 +482,7 @@ async def call_ai_model(label: str, prompt: str) -> ModelCallResult:
                 response = await client.post(
                     OPENROUTER_CHAT_URL,
                     headers=build_openrouter_headers(),
-                    json=build_chat_payload(model_id, persona, prompt, stream=False),
+                    json=build_chat_payload(model_id, persona, prompt, stream=False, max_tokens=max_tokens),
                 )
             except httpx.HTTPError as exc:
                 logger.warning("OpenRouter request failed label=%s model=%s error=%s", label, model_id, exc)
@@ -396,13 +490,12 @@ async def call_ai_model(label: str, prompt: str) -> ModelCallResult:
                 continue
 
             if response.status_code != 200:
-                body_preview = response.text[:300]
                 logger.warning(
                     "OpenRouter returned non-200 label=%s model=%s status=%s body=%s",
                     label,
                     model_id,
                     response.status_code,
-                    body_preview,
+                    response.text[:300],
                 )
                 failed_candidates.append(model_id)
                 if should_try_next_candidate(response.status_code):
@@ -422,8 +515,9 @@ async def call_ai_model(label: str, prompt: str) -> ModelCallResult:
                 failed_candidates.append(model_id)
                 continue
 
-            if not content.strip():
+            if not content.strip() or is_meta_or_invalid_response(content, prompt):
                 failed_candidates.append(model_id)
+                logger.warning("Invalid/meta response skipped label=%s model=%s content=%s", label, model_id, content[:80])
                 continue
 
             actual_label = label_for_model_id(model_id)
@@ -447,14 +541,228 @@ async def call_ai_model(label: str, prompt: str) -> ModelCallResult:
     )
 
 
+def format_prior_turns(turns: list[DebateTurn]) -> str:
+    return "\n\n".join(
+        f"{turn.speaker_index}번 발언자({turn.actual_label}) 원문:\n{turn.content}"
+        for turn in turns
+    )
+
+
+def build_round_prompt(
+    topic: str,
+    round_number: int,
+    speaker_index: int,
+    prior_turns: list[DebateTurn],
+    previous_summary: str,
+    user_input: str | None,
+) -> str:
+    if round_number == 1 and speaker_index == 1:
+        return (
+            f"주제: {topic}\n\n"
+            "당신은 1번 발언자입니다. 다른 발언자의 내용은 아직 없습니다. "
+            "주제만 보고 첫 주장을 한국어로 명확하게 제시하세요."
+        )
+
+    if speaker_index == 1:
+        if user_input:
+            return (
+                f"지금까지 토론 요약: {previous_summary or '아직 요약이 없습니다.'}\n\n"
+                f"사용자가 추가로 다음 질문/의견을 남겼습니다: '{user_input}'\n\n"
+                "이 질문/의견을 반드시 반영하여 답변하세요.\n\n"
+                f"주제: {topic}"
+            )
+        return (
+            f"이전 라운드 요약:\n{previous_summary or '아직 요약이 없습니다.'}\n\n"
+            f"주제: {topic}\n\n"
+            "당신은 새 라운드의 1번 발언자입니다. 이전 라운드 요약을 바탕으로 "
+            "반복을 피하고 새로운 주장이나 관점을 한국어로 제시하세요."
+        )
+
+    role_instruction = "반박/보완" if speaker_index == 2 else "반박하거나 종합"
+    return (
+        f"주제: {topic}\n\n"
+        f"현재 라운드에서 당신보다 앞선 모든 발언의 전체 원문입니다.\n\n"
+        f"{format_prior_turns(prior_turns)}\n\n"
+        f"당신은 {speaker_index}번 발언자입니다. 위 원문 전체를 직접 참고하여 "
+        f"{role_instruction}하는 답변을 한국어로 제시하세요."
+    )
+
+
+def build_summary_prompt(existing_summary: str, turns: list[DebateTurn]) -> str:
+    previous = existing_summary or "이전 누적 요약은 없습니다."
+    return (
+        f"기존 누적 요약:\n{previous}\n\n"
+        "직전 라운드의 전체 원문입니다.\n\n"
+        f"{format_prior_turns(turns)}\n\n"
+        "위 내용을 의미 있게 압축해 누적 요약을 갱신하세요. "
+        "'1번(라벨)은 ~라고 주장했고, 2번(라벨)은 ~라고 반박했고, 3번(라벨)은 ~라고 종합했다' "
+        "형태가 드러나야 합니다. 글자수로 자르지 말고 한국어 문단으로 요약하세요."
+    )
+
+
+async def summarize_previous_round(session: DebateSession) -> None:
+    if not session.current_round_turns:
+        return
+
+    summary_label = "OpenAI"
+    result = await call_ai_model(
+        summary_label,
+        build_summary_prompt(session.previous_summary, session.current_round_turns),
+        whitelist=SUMMARY_MODEL_WHITELIST,
+        max_tokens=500,
+    )
+    if result.success:
+        session.previous_summary = result.content
+    else:
+        fallback_lines = [
+            f"{turn.speaker_index}번({turn.actual_label})은 {turn.content}"
+            for turn in session.current_round_turns
+        ]
+        session.previous_summary = (session.previous_summary + "\n\n" + "\n".join(fallback_lines)).strip()
+        session.failed_candidates.extend(result.failed_candidates)
+
+
+def get_debate_lock(session_id: str) -> asyncio.Lock:
+    if session_id not in DEBATE_LOCKS:
+        DEBATE_LOCKS[session_id] = asyncio.Lock()
+    return DEBATE_LOCKS[session_id]
+
+
+def append_pending_user_input(session: DebateSession, content: str, target_round: int) -> None:
+    clean_content = content.strip()
+    if not clean_content:
+        return
+    if session.pending_user_input:
+        session.pending_user_input = f"{session.pending_user_input}\n\n{clean_content}"
+    else:
+        session.pending_user_input = clean_content
+    session.user_input_history.append(UserInputHistoryItem(round_number=target_round, content=clean_content))
+
+
+def result_to_debate_turn(
+    round_number: int,
+    speaker_index: int,
+    requested_label: str,
+    result: ModelCallResult,
+) -> DebateTurn:
+    role_by_index = {
+        1: "1번 주장",
+        2: "2번 반박",
+        3: "3번 종합",
+    }
+    return DebateTurn(
+        round_number=round_number,
+        speaker_index=speaker_index,
+        model=result.actual_label,
+        actual_label=result.actual_label,
+        requested_label=requested_label,
+        actual_model=result.actual_model,
+        requested_model=result.requested_model,
+        is_real_company_model=result.is_real_company_model,
+        role=role_by_index.get(speaker_index, "발언"),
+        content=result.content,
+        failed_candidates=result.failed_candidates,
+    )
+
+
+async def produce_debate_speaker(
+    session: DebateSession,
+    round_number: int,
+    speaker_index: int,
+    requested_label: str,
+    prior_turns: list[DebateTurn],
+    round_user_input: str | None,
+) -> DebateTurn | None:
+    requested_labels = [requested_label] + [label for label in COMPANY_LABELS if label != requested_label]
+    prompt = build_round_prompt(
+        topic=session.topic,
+        round_number=round_number,
+        speaker_index=speaker_index,
+        prior_turns=prior_turns,
+        previous_summary=session.previous_summary,
+        user_input=round_user_input if speaker_index == 1 else None,
+    )
+
+    for label in requested_labels[:MAX_MODEL_CANDIDATES_PER_LABEL]:
+        result = await call_ai_model(label, prompt, whitelist=SPEECH_MODEL_WHITELIST)
+        session.failed_candidates.extend(result.failed_candidates)
+        if result.success:
+            return result_to_debate_turn(round_number, speaker_index, requested_label, result)
+        logger.info("Debate speaker failed requested_label=%s speaker=%s error=%s", label, speaker_index, result.error)
+    return None
+
+
+async def prepare_next_round_if_needed(session: DebateSession) -> str | None:
+    if session.round_number == 0:
+        session.round_number = 1
+        session.current_round_turns = []
+        session.round_speaker_labels = random.sample(COMPANY_LABELS, 3)
+        round_user_input = session.pending_user_input
+        session.pending_user_input = None
+        return round_user_input
+
+    if len(session.current_round_turns) < 3:
+        return None
+
+    if session.round_number > 0:
+        await summarize_previous_round(session)
+
+    session.round_number += 1
+    round_user_input = session.pending_user_input
+    session.pending_user_input = None
+    session.current_round_turns = []
+    session.round_speaker_labels = random.sample(COMPANY_LABELS, 3)
+    return round_user_input
+
+
+async def run_debate_step(session: DebateSession) -> list[DebateTurn]:
+    round_user_input = await prepare_next_round_if_needed(session)
+    speaker_index = len(session.current_round_turns) + 1
+    if speaker_index > 3:
+        return []
+
+    if len(session.round_speaker_labels) < 3:
+        session.round_speaker_labels = random.sample(COMPANY_LABELS, 3)
+
+    requested_label = session.round_speaker_labels[speaker_index - 1]
+    turn = await produce_debate_speaker(
+        session=session,
+        round_number=session.round_number,
+        speaker_index=speaker_index,
+        requested_label=requested_label,
+        prior_turns=session.current_round_turns,
+        round_user_input=round_user_input,
+    )
+    if turn is None:
+        return []
+
+    session.current_round_turns.append(turn)
+    return [turn]
+
+
+def debate_response(session: DebateSession, turns: list[DebateTurn], queued: bool = False) -> dict:
+    return {
+        "debateId": random.randint(1000, 9999),
+        "queued": queued,
+        "selectedModels": [turn.model for turn in turns],
+        "turns": [dump_model(turn) for turn in turns],
+        "round": session.round_number,
+        "summary": session.previous_summary,
+        "pending_user_input": session.pending_user_input,
+        "user_input_history": [dump_model(item) for item in session.user_input_history],
+        "failed_candidates": session.failed_candidates,
+    }
+
+
 @app.post("/compare/stream")
 async def stream_compare(data: CompareRequest) -> StreamingResponse:
     if data.model_name not in COMPANY_LABELS:
         raise HTTPException(status_code=400, detail="Invalid model_name")
 
+    await ensure_model_cache_fresh()
     label = data.model_name
     persona = PERSONAS[label]
-    candidates = candidates_for_label(label)
+    candidates = build_candidates_for_label(label, SPEECH_MODEL_WHITELIST)
 
     async def generate() -> AsyncIterator[str]:
         for model_id in candidates:
@@ -484,16 +792,13 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                 continue
                             if line == "data: [DONE]":
                                 return
-
                             try:
                                 raw = json.loads(line[6:])
                             except json.JSONDecodeError:
-                                logger.warning("Stream JSON parse failed label=%s model=%s line=%s", label, model_id, line[:200])
                                 yield sse({"model": data.model_name, "error": "[API 오류 JSON 파싱 실패]"})
                                 return
 
                             if raw.get("error"):
-                                logger.warning("OpenRouter stream payload error label=%s model=%s raw=%s", label, model_id, raw)
                                 yield sse({"model": data.model_name, "error": "[API 오류 스트리밍 실패]"})
                                 return
 
@@ -511,7 +816,6 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                 )
                         return
             except httpx.HTTPError as exc:
-                logger.warning("OpenRouter stream network error label=%s model=%s error=%s", label, model_id, exc)
                 if model_id != candidates[-1]:
                     continue
                 yield sse({"model": data.model_name, "error": f"[API 오류 {exc.__class__.__name__}]"})
@@ -526,107 +830,37 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
-def result_to_debate_turn(preferred_label: str, result: ModelCallResult) -> DebateTurn:
-    return DebateTurn(
-        model=result.actual_label,
-        actual_label=result.actual_label,
-        requested_label=preferred_label,
-        actual_model=result.actual_model,
-        requested_model=result.requested_model,
-        is_real_company_model=result.is_real_company_model,
-        role="입장",
-        content=result.content,
-        failed_candidates=result.failed_candidates,
-    )
-
-
-async def produce_debate_turn(
-    preferred_label: str,
-    used_actual_labels: set[str],
-    prompt_builder: Callable[[str], str],
-) -> DebateTurn | None:
-    requested_labels = [preferred_label] + [label for label in COMPANY_LABELS if label != preferred_label]
-    requested_labels = requested_labels[:MAX_MODEL_CANDIDATES_PER_LABEL]
-
-    for requested_label in requested_labels:
-        result = await call_ai_model(requested_label, prompt_builder(requested_label))
-        if result.success and result.actual_label not in used_actual_labels:
-            return result_to_debate_turn(preferred_label, result)
-        if result.success:
-            logger.info(
-                "Skipping debate turn because actual label is already used: requested=%s actual=%s",
-                requested_label,
-                result.actual_label,
-            )
-        else:
-            logger.info("Skipping failed debate candidate requested=%s error=%s", requested_label, result.error)
-
-    return None
-
-
-async def run_debate_round(
-    prompt_builder: Callable[[str, str | None], str],
-    num_speakers: int = 3,
-) -> list[DebateTurn]:
-    preferred_labels = random.sample(COMPANY_LABELS, min(num_speakers, len(COMPANY_LABELS)))
-    turns: list[DebateTurn] = []
-    used_actual_labels: set[str] = set()
-
-    for preferred_label in preferred_labels:
-        previous_content = turns[-1].content if turns else None
-
-        def build_prompt(label: str) -> str:
-            return prompt_builder(label, previous_content)
-
-        turn = await produce_debate_turn(preferred_label, used_actual_labels, build_prompt)
-        if turn is not None:
-            used_actual_labels.add(turn.actual_label)
-            turns.append(turn)
-        await asyncio.sleep(0.3)
-
-    return turns
-
-
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest) -> dict:
-    session = DebateSession(topic=request.topic, round=1)
+    await ensure_model_cache_fresh()
+    session = DebateSession(topic=request.topic)
     DEBATE_SESSIONS[request.session_id] = session
+    lock = get_debate_lock(request.session_id)
 
-    turns = await run_debate_round(
-        prompt_builder=lambda _label, previous: build_opening_prompt(request.topic, previous),
-    )
-    session.turns = turns
-
-    return {
-        "debateId": random.randint(1000, 9999),
-        "selectedModels": [turn.model for turn in turns],
-        "turns": [dump_model(turn) for turn in turns],
-        "round": session.round,
-    }
+    async with lock:
+        if request.user_input:
+            append_pending_user_input(session, request.user_input, target_round=1)
+        turns = await run_debate_step(session)
+    return debate_response(session, turns)
 
 
 @app.post("/debate/continue")
 async def debate_continue(request: DebateRequest) -> dict:
+    await ensure_model_cache_fresh()
     session = DEBATE_SESSIONS.get(request.session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Debate session not found")
 
-    recent_turns = session.turns[-3:]
-    summary = "\n".join(f"{turn.actual_label}: {turn.content[:120]}..." for turn in recent_turns)
-    turns = await run_debate_round(
-        prompt_builder=lambda _label, previous: build_rebuttal_prompt(session.topic, summary, previous),
-    )
+    lock = get_debate_lock(request.session_id)
+    if request.user_input and (lock.locked() or len(session.current_round_turns) < 3):
+        append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+        return debate_response(session, [], queued=True)
 
-    session.round += 1
-    session.turns.extend(turns)
-
-    return {
-        "debateId": random.randint(1000, 9999),
-        "selectedModels": [turn.model for turn in turns],
-        "turns": [dump_model(turn) for turn in turns],
-        "round": session.round,
-        "summary": summary,
-    }
+    async with lock:
+        if request.user_input:
+            append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+        turns = await run_debate_step(session)
+    return debate_response(session, turns)
 
 
 @app.get("/health")
@@ -636,19 +870,23 @@ async def health() -> dict:
 
 @app.get("/models/info")
 async def models_info() -> dict:
-    ensure_model_cache()
+    await ensure_model_cache_fresh()
     return {
         "source": MODEL_CACHE_STATE.source,
         "error": MODEL_CACHE_STATE.error,
+        "refreshed_at": MODEL_CACHE_STATE.refreshed_at,
+        "cache_ttl_seconds": MODEL_CACHE_TTL_SECONDS,
         "mapping": MODEL_MAPPING,
         "fallbackMapping": FALLBACK_MODEL_MAPPING,
         "candidates": MODEL_CANDIDATES,
+        "speech_model_whitelist": SPEECH_MODEL_WHITELIST,
+        "summary_model_whitelist": SUMMARY_MODEL_WHITELIST,
         "is_real_company_model": IS_REAL_COMPANY_MODEL,
         "free_models_by_label": MODEL_CACHE_STATE.free_models_by_label,
     }
 
 
-async def check_model_health(semaphore: asyncio.Semaphore, label: str, model_id: str) -> tuple[str, str]:
+async def check_model_health(semaphore: asyncio.Semaphore, model_id: str) -> tuple[str, str]:
     async with semaphore:
         await asyncio.sleep(HEALTHCHECK_DELAY_SECONDS)
         try:
@@ -663,7 +901,6 @@ async def check_model_health(semaphore: asyncio.Semaphore, label: str, model_id:
                     },
                 )
         except httpx.HTTPError as exc:
-            logger.warning("Model health check failed label=%s model=%s error=%s", label, model_id, exc)
             return model_id, f"실패({exc.__class__.__name__})"
 
         if response.status_code == 200:
@@ -673,14 +910,10 @@ async def check_model_health(semaphore: asyncio.Semaphore, label: str, model_id:
 
 @app.get("/models/health")
 async def models_health() -> dict[str, str]:
-    ensure_model_cache()
+    await ensure_model_cache_fresh()
     semaphore = asyncio.Semaphore(HEALTHCHECK_CONCURRENCY)
-    unique_model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
-    tasks = [
-        check_model_health(semaphore, label_for_model_id(model_id), model_id)
-        for model_id in unique_model_ids
-    ]
-    results = await asyncio.gather(*tasks)
+    model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
+    results = await asyncio.gather(*(check_model_health(semaphore, model_id) for model_id in model_ids))
     return dict(results)
 
 
