@@ -7,6 +7,7 @@ import os
 import random
 import re
 import time
+import urllib.parse
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
@@ -14,8 +15,11 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field
+
+from custom_agent import CustomWebAgent, _extract_start_url
 
 load_dotenv()
 
@@ -224,6 +228,10 @@ class CollabRecommendRequest(BaseModel):
     task: str
 
 
+class AgentRequest(BaseModel):
+    query: str
+
+
 class DebateRequest(BaseModel):
     session_id: str
     topic: str
@@ -278,6 +286,7 @@ DEBATE_SESSIONS: dict[str, DebateSession] = {}
 DEBATE_LOCKS: dict[str, asyncio.Lock] = {}
 COMPARE_ACTIVE_MODELS: dict[str, set[str]] = {}
 COMPARE_SESSION_LOCK = asyncio.Lock()
+AGENT_LOCK = asyncio.Semaphore(1)
 
 
 def build_openrouter_headers() -> dict[str, str]:
@@ -725,6 +734,14 @@ async def call_ai_model(
         ]
 
     if not label_candidates:
+        if excluded_models and LAST_RESORT_MODEL in excluded_models:
+            return make_failed_result(
+                requested_label=label,
+                requested_model=LAST_RESORT_MODEL,
+                actual_model="",
+                failed_candidates=[],
+                error=USER_FACING_FAILURE_MSG,
+            )
         label_candidates = [LAST_RESORT_MODEL]
 
     candidates = label_candidates
@@ -793,7 +810,10 @@ async def call_ai_model(
                 failed_candidates=failed_candidates,
             )
 
-    final_result = await final_attempt_model_call(label, requested_model, failed_candidates)
+    if excluded_models and LAST_RESORT_MODEL in excluded_models:
+        final_result = None
+    else:
+        final_result = await final_attempt_model_call(label, requested_model, failed_candidates)
     if final_result is not None:
         return final_result
 
@@ -1015,6 +1035,15 @@ async def produce_debate_speaker(
         )
         session.failed_candidates.extend(result.failed_candidates)
         if result.success:
+            if result.actual_model in already_used_models:
+                logger.warning(
+                    "Duplicate debate actual_model blocked label=%s speaker=%s model=%s",
+                    label,
+                    speaker_index,
+                    result.actual_model,
+                )
+                already_used_models.add(result.actual_model)
+                continue
             already_used_models.add(result.actual_model)
             return result_to_debate_turn(round_number, speaker_index, requested_label, result)
         logger.info(
@@ -1261,7 +1290,9 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                 return
             finally:
-                await release_compare_model(session_id, model_id)
+                # Keep the reservation for the whole compare_session_id so a later
+                # finishing card cannot reuse the same actual_model in this compare.
+                pass
 
             if not failed_this_model:
                 return
@@ -1391,6 +1422,60 @@ async def models_health() -> dict[str, str]:
     model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
     results = await asyncio.gather(*(check_model_health(semaphore, model_id) for model_id in model_ids))
     return dict(results)
+
+
+@app.post("/agent/task")
+async def agent_task(request: AgentRequest):
+    query = request.query.strip()
+    if not query:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "작업 내용을 입력해주세요."},
+        )
+
+    if AGENT_LOCK.locked():
+        return JSONResponse(
+            status_code=429,
+            content={"status": "error", "message": "이미 다른 에이전트 작업이 실행 중입니다. 잠시 후 다시 시도해주세요."},
+        )
+
+    model = os.environ.get("AGENT_MODEL", "openai/gpt-4o")
+    headless = os.environ.get("AGENT_HEADLESS", "true").lower() != "false"
+    headers = build_openrouter_headers()
+    start_url = _extract_start_url(query)
+
+    async with AGENT_LOCK:
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=headless,
+                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                )
+                try:
+                    context = await browser.new_context(
+                        viewport={"width": 1280, "height": 800},
+                        user_agent=(
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36"
+                        ),
+                    )
+                    try:
+                        page = await context.new_page()
+                        await page.goto(start_url, wait_until="domcontentloaded", timeout=20000)
+                        agent = CustomWebAgent(openrouter_headers=headers, model=model)
+                        result = await agent.run(query, page)
+                        return {"status": "success", "result": result}
+                    finally:
+                        await context.close()
+                finally:
+                    await browser.close()
+        except Exception:
+            logger.exception("CustomWebAgent failed query=%s", query[:120])
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": "브라우저 에이전트 작업 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."},
+            )
 
 
 @app.get("/")

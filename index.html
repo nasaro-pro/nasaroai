@@ -624,6 +624,214 @@
                 transform: translateX(78%) scale(0.88);
             }
         }
+
+        /* ===== Agent Mode ===== */
+        .agent-toggle-btn {
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #5b21b6;
+            box-shadow: 0 2px 8px rgba(91, 33, 182, 0.12);
+        }
+
+        .agent-toggle-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+        }
+
+        .agent-toggle-btn.active {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            color: #fff;
+            border-color: #6d28d9;
+        }
+
+        .agent-panel {
+            display: none;
+            position: fixed;
+            left: 50%;
+            bottom: 80px;
+            transform: translateX(-50%);
+            z-index: 250;
+            width: min(920px, calc(100vw - 24px));
+            max-height: min(62dvh, 560px);
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(14px);
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+            overflow: hidden;
+            flex-direction: column;
+        }
+
+        .agent-panel.visible {
+            display: flex;
+        }
+
+        .agent-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid #f3f4f6;
+            background: rgba(249, 250, 251, 0.9);
+        }
+
+        .agent-panel-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .agent-panel-close {
+            border: 0;
+            background: #f3f4f6;
+            color: #374151;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .agent-panel-close:hover {
+            background: #e5e7eb;
+        }
+
+        .agent-status-bar {
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 700;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .agent-status-bar[data-type="idle"] {
+            background: #f9fafb;
+            color: #6b7280;
+        }
+
+        .agent-status-bar[data-type="loading"] {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .agent-status-bar[data-type="success"] {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .agent-status-bar[data-type="error"] {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .agent-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .agent-history::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .agent-history::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 999px;
+        }
+
+        .agent-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #7c3aed;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .agent-card.error-card {
+            border-left-color: #dc2626;
+            background: #fef2f2;
+        }
+
+        .agent-card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px 8px;
+        }
+
+        .agent-card-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #111827;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .agent-card-badge {
+            flex: 0 0 auto;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        .agent-card-badge.error {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .agent-card-meta {
+            padding: 0 14px 8px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .agent-card-body {
+            padding: 0 14px 12px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #374151;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .agent-card-toggle {
+            margin: 0 14px 12px;
+            border: 0;
+            background: #f3f4f6;
+            color: #374151;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .agent-card-body.collapsed {
+            display: none;
+        }
+
+        .agent-empty {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 14px;
+            line-height: 1.7;
+            padding: 24px 12px;
+        }
+
+        @media (max-width: 640px) {
+            .agent-panel {
+                bottom: calc(var(--input-dock-height, 120px) + 12px);
+                width: calc(100vw - 16px);
+                max-height: 48dvh;
+            }
+        }
     </style>
 </head>
 <body>
@@ -744,12 +952,24 @@
                 </div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 <div class="dock-actions">
+                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                     <button id="dockPrimaryBtn" class="dock-btn primary" type="button">비교 시작 ▶</button>
                 </div>
             </div>
         </footer>
+
+        <aside id="agentPanel" class="agent-panel" aria-label="에이전트 컨트롤러">
+            <div class="agent-panel-header">
+                <div class="agent-panel-title">에이전트 컨트롤러</div>
+                <button id="agentPanelClose" class="agent-panel-close" type="button" aria-label="에이전트 패널 닫기">×</button>
+            </div>
+            <div id="agentStatusBar" class="agent-status-bar" data-type="idle" role="status" aria-live="polite">대기 중</div>
+            <div id="agentHistory" class="agent-history">
+                <div class="agent-empty">브라우저 에이전트에게 수행할 작업을 입력하세요.</div>
+            </div>
+        </aside>
     </div>
 
     <script>
@@ -790,10 +1010,18 @@
         let collabTaskAsked = false;
         let collabRecommendInFlight = false;
 
+        let isAgentMode = false;
+        let agentInFlight = false;
+
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
         const dockSecondaryBtn = document.getElementById("dockSecondaryBtn");
         const dockNewDebateBtn = document.getElementById("dockNewDebateBtn");
+        const agentToggleBtn = document.getElementById("agentToggleBtn");
+        const agentPanel = document.getElementById("agentPanel");
+        const agentPanelClose = document.getElementById("agentPanelClose");
+        const agentStatusBar = document.getElementById("agentStatusBar");
+        const agentHistory = document.getElementById("agentHistory");
         const inputDock = document.getElementById("inputDock");
         const mainContent = document.getElementById("mainContent");
 
@@ -842,6 +1070,20 @@
         function updateDockUI() {
             dockSecondaryBtn.style.display = "none";
             dockNewDebateBtn.style.display = "none";
+
+            if (isAgentMode) {
+                agentToggleBtn.classList.add("active");
+                mainInput.placeholder = agentInFlight
+                    ? "작업 진행 중..."
+                    : "브라우저 에이전트에게 명령을 입력하세요…";
+                dockPrimaryBtn.textContent = agentInFlight ? "작업 중..." : "작업 실행 ▶";
+                dockPrimaryBtn.className = "dock-btn primary";
+                dockPrimaryBtn.disabled = agentInFlight;
+                mainInput.disabled = agentInFlight;
+                return;
+            }
+
+            agentToggleBtn.classList.remove("active");
 
             if (currentMode === "compare") {
                 mainInput.placeholder = "비교할 질문을 입력하세요…";
@@ -907,11 +1149,153 @@
         });
 
         mainInput.addEventListener("input", autoResizeInput);
+        mainInput.addEventListener("keydown", event => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (isAgentMode) {
+                    sendAgentTask();
+                    return;
+                }
+                dockPrimaryBtn.click();
+            }
+        });
         new ResizeObserver(syncMainPadding).observe(inputDock);
         window.addEventListener("resize", syncMainPadding);
         autoResizeInput();
 
+        function lockMainInput(isLocked) {
+            mainInput.disabled = isLocked;
+            dockPrimaryBtn.disabled = isLocked;
+        }
+
+        function setAgentStatus(text, type = "idle") {
+            agentStatusBar.textContent = text;
+            agentStatusBar.dataset.type = type;
+        }
+
+        function toggleAgentMode(forceState = null) {
+            isAgentMode = forceState !== null ? forceState : !isAgentMode;
+            agentPanel.classList.toggle("visible", isAgentMode);
+            if (isAgentMode) {
+                if (!agentInFlight) {
+                    setAgentStatus("대기 중", "idle");
+                }
+            } else if (agentInFlight) {
+                setAgentStatus("작업은 백그라운드에서 계속됩니다 (패널 닫힘)", "loading");
+            }
+            updateDockUI();
+        }
+
+        function renderAgentCard(data) {
+            const empty = agentHistory.querySelector(".agent-empty");
+            if (empty) empty.remove();
+
+            const card = document.createElement("article");
+            card.className = "agent-card" + (data.status === "error" ? " error-card" : "");
+            const isSuccess = data.status === "success";
+            const summary = isSuccess
+                ? (data.result || "결과 없음")
+                : (data.message || "알 수 없는 오류");
+            const preview = summary.length > 220 ? `${summary.slice(0, 220)}...` : summary;
+
+            card.innerHTML = `
+                <div class="agent-card-header">
+                    <div class="agent-card-title">${escapeHtml(data.query)}</div>
+                    <span class="agent-card-badge${isSuccess ? "" : " error"}">${isSuccess ? "완료" : "실패"}</span>
+                </div>
+                <div class="agent-card-meta">${escapeHtml(data.timestamp)}</div>
+                <div class="agent-card-body collapsed">${escapeHtml(preview)}</div>
+                <button class="agent-card-toggle" type="button">결과 펼치기</button>
+            `;
+
+            const body = card.querySelector(".agent-card-body");
+            body.dataset.full = summary;
+            body.textContent = preview;
+
+            const toggle = card.querySelector(".agent-card-toggle");
+            toggle.addEventListener("click", () => {
+                const collapsed = body.classList.toggle("collapsed");
+                if (!collapsed) {
+                    body.textContent = body.dataset.full;
+                } else {
+                    body.textContent = preview;
+                }
+                toggle.textContent = collapsed ? "결과 펼치기" : "결과 접기";
+            });
+
+            agentHistory.prepend(card);
+            agentHistory.scrollTop = 0;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
+
+        async function sendAgentTask() {
+            const query = mainInput.value.trim();
+            if (!query || agentInFlight || !isAgentMode) return;
+
+            agentInFlight = true;
+            lockMainInput(true);
+            setAgentStatus("⏳ 브라우저 탐색 및 작업 중...", "loading");
+            mainInput.value = "";
+            autoResizeInput();
+
+            const timestamp = new Date().toLocaleString("ko-KR");
+            try {
+                const response = await fetch(`${API_URL}/agent/task`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query }),
+                });
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    throw new Error("서버 응답을 해석하지 못했습니다.");
+                }
+
+                if (!response.ok || data.status === "error") {
+                    const message = data.message || data.detail?.message || `서버 오류 (${response.status})`;
+                    renderAgentCard({ query, status: "error", message, timestamp });
+                    setAgentStatus("❌ 실패", "error");
+                    return;
+                }
+
+                renderAgentCard({
+                    query,
+                    status: "success",
+                    result: data.result || "",
+                    timestamp,
+                });
+                setAgentStatus("✅ 완료", "success");
+            } catch (error) {
+                renderAgentCard({
+                    query,
+                    status: "error",
+                    message: error.message || "네트워크 오류",
+                    timestamp,
+                });
+                setAgentStatus("❌ 실패", "error");
+            } finally {
+                agentInFlight = false;
+                updateDockUI();
+            }
+        }
+
+        agentToggleBtn.addEventListener("click", () => toggleAgentMode());
+        agentPanelClose.addEventListener("click", () => toggleAgentMode(false));
+
         dockPrimaryBtn.addEventListener("click", () => {
+            if (isAgentMode) {
+                sendAgentTask();
+                return;
+            }
             if (currentMode === "compare") handleCompare();
             else if (currentMode === "debate") {
                 if (!debateStarted) handleDebateStart();
