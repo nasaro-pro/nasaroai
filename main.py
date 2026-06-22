@@ -45,11 +45,11 @@ COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도
 LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
 
 SUMMARY_MODEL_WHITELIST = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "qwen/qwen3-coder:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "google/gemma-4-26b-a4b-it:free",
+    "openai/gpt-oss-120b:free",
+    "meta-llama/llama-4-maverick:free",
+    "nvidia/nemotron-ultra-253b-v1:free",
     "deepseek/deepseek-r1:free",
+    "qwen/qwen3-coder:free",
 ]
 
 META_RESPONSE_KEYWORDS = [
@@ -79,9 +79,11 @@ COMPANY_PREFIXES: dict[str, str] = {
     "Google": "google/",
     "xAI": "x-ai/",
     "Perplexity": "perplexity/",
+    "DeepSeek": "deepseek/",
 }
 
 COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
+MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"]
 
 PERSONAS: dict[str, str] = {
     "OpenAI": (
@@ -103,6 +105,10 @@ PERSONAS: dict[str, str] = {
     "Perplexity": (
         "당신은 사실 검증과 근거 제시에 강합니다. 확인 가능한 근거와 논리 구조를 함께 "
         "한국어로 제시하세요."
+    ),
+    "DeepSeek": (
+        "당신은 심층 추론과 수학적 분석에 강합니다. 단계적 사고와 논리적 근거를 명확히 하면서 "
+        "한국어로 정확하고 깊이 있는 답변을 제시하세요."
     ),
 }
 
@@ -133,41 +139,61 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     "OpenAI": LabelProviderConfig(
         label="OpenAI",
         substitute_chain=(
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "qwen/qwen3-coder:free",
+            "openai/gpt-oss-120b:free",
+            "openai/gpt-oss-20b:free",
+            "meta-llama/llama-4-maverick:free",
+            "nvidia/nemotron-ultra-253b-v1:free",
+            "deepseek/deepseek-r1:free",
+        ),
+    ),
+    "Anthropic": LabelProviderConfig(
+        label="Anthropic",
+        substitute_chain=(
+            "nvidia/nemotron-ultra-253b-v1:free",
             "nvidia/nemotron-3-super-120b-a12b:free",
+            "meta-llama/llama-4-maverick:free",
+            "deepseek/deepseek-r1:free",
+            "qwen/qwen3-coder:free",
         ),
     ),
     "Google": LabelProviderConfig(
         label="Google",
         substitute_chain=(
+            "meta-llama/llama-4-maverick:free",
+            "meta-llama/llama-4-scout:free",
             "qwen/qwen3-coder:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "deepseek/deepseek-r1:free",
+            "deepseek/deepseek-v3:free",
+            "openai/gpt-oss-120b:free",
         ),
     ),
     "xAI": LabelProviderConfig(
         label="xAI",
         substitute_chain=(
             "deepseek/deepseek-r1:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "qwen/qwen3-coder:free",
-        ),
-    ),
-    "Anthropic": LabelProviderConfig(
-        label="Anthropic",
-        substitute_chain=(
+            "deepseek/deepseek-v3:free",
+            "meta-llama/llama-4-maverick:free",
             "nvidia/nemotron-3-super-120b-a12b:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "qwen/qwen3-coder:free",
+            "openai/gpt-oss-20b:free",
         ),
     ),
     "Perplexity": LabelProviderConfig(
         label="Perplexity",
         substitute_chain=(
-            "deepseek/deepseek-r1:free",
+            "nousresearch/hermes-3-llama-3.1-70b:free",
             "meta-llama/llama-3.3-70b-instruct:free",
+            "deepseek/deepseek-v3:free",
             "qwen/qwen3-coder:free",
+            "google/gemma-3-27b-it:free",
+        ),
+    ),
+    "DeepSeek": LabelProviderConfig(
+        label="DeepSeek",
+        substitute_chain=(
+            "deepseek/deepseek-r1:free",
+            "deepseek/deepseek-v3:free",
+            "openai/gpt-oss-120b:free",
+            "meta-llama/llama-4-maverick:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
         ),
     ),
 }
@@ -382,20 +408,27 @@ def assign_models_without_overlap() -> dict[str, list[str]]:
                     break
             if not assigned[label]:
                 assigned[label].append(LAST_RESORT_MODEL)
+                globally_used.add(LAST_RESORT_MODEL)
 
         for model_id in raw_chains[label]:
             if len(assigned[label]) >= MAX_MODEL_CANDIDATES_PER_LABEL:
                 break
-            if model_id not in assigned[label]:
+            if model_id not in assigned[label] and model_id not in globally_used:
                 assigned[label].append(model_id)
+                globally_used.add(model_id)
 
         while len(assigned[label]) < MIN_MODEL_CANDIDATES_PER_LABEL:
-            pool = [model_id for model_id in MODEL_CACHE_STATE.all_free_models if model_id not in assigned[label]]
+            pool = [
+                model_id
+                for model_id in MODEL_CACHE_STATE.all_free_models
+                if model_id not in assigned[label] and model_id not in globally_used
+            ]
             if not pool:
                 if LAST_RESORT_MODEL not in assigned[label]:
                     assigned[label].append(LAST_RESORT_MODEL)
                 break
             assigned[label].append(pool[0])
+            globally_used.add(pool[0])
 
         if not assigned[label]:
             assigned[label] = [LAST_RESORT_MODEL]
@@ -657,6 +690,7 @@ async def call_ai_model(
     label: str,
     prompt: str,
     max_tokens: int | None = None,
+    excluded_models: set[str] | None = None,
 ) -> ModelCallResult:
     if label not in COMPANY_LABELS:
         raise HTTPException(status_code=400, detail="Invalid model label")
@@ -664,6 +698,9 @@ async def call_ai_model(
     await ensure_model_cache_fresh()
     persona = PERSONAS[label]
     candidates = resolve_label_models(label)
+    if excluded_models:
+        filtered = [model_id for model_id in candidates if model_id not in excluded_models]
+        candidates = filtered if filtered else candidates
     requested_model = candidates[0]
     failed_candidates: list[str] = []
 
@@ -932,7 +969,8 @@ async def produce_debate_speaker(
     )
 
     for label in requested_labels[:MAX_MODEL_CANDIDATES_PER_LABEL]:
-        result = await call_ai_model(label, prompt)
+        already_used_models = {turn.actual_model for turn in prior_turns if turn.actual_model}
+        result = await call_ai_model(label, prompt, excluded_models=already_used_models)
         session.failed_candidates.extend(result.failed_candidates)
         if result.success:
             return result_to_debate_turn(round_number, speaker_index, requested_label, result)

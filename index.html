@@ -38,28 +38,26 @@
             margin: 0 auto;
             padding: 14px 18px;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header-brand {
+            text-align: center;
         }
 
         .header-brand h1 {
-            font-size: 22px;
+            font-size: 32px;
+            font-weight: 900;
             line-height: 1.2;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
         }
 
         .header-brand p {
             margin-top: 2px;
+            font-size: 14px;
             color: #6b7280;
-            font-size: 13px;
-        }
-
-        .mode-buttons {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
         }
 
         .mode-btn {
@@ -100,6 +98,77 @@
 
         .panel.active {
             display: block;
+        }
+
+        .collab-layout {
+            display: flex;
+            gap: 16px;
+            min-height: 60dvh;
+        }
+
+        .collab-sidebar {
+            width: 160px;
+            flex: 0 0 160px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 14px 10px;
+        }
+
+        .collab-sidebar-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 10px;
+            padding: 0 4px;
+        }
+
+        .collab-ai-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .collab-ai-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.12s, border-color 0.12s;
+        }
+
+        .collab-ai-btn:hover {
+            background: #f3f4f6;
+        }
+
+        .collab-ai-btn.active {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        .collab-ai-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            flex: 0 0 8px;
+        }
+
+        .collab-main {
+            flex: 1;
+            min-width: 0;
         }
 
         .collab-placeholder {
@@ -406,6 +475,13 @@
             gap: 8px;
         }
 
+        .dock-mode-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
         #mainInput {
             width: 100%;
             min-height: 44px;
@@ -478,17 +554,27 @@
         }
 
         @media (max-width: 640px) {
-            .header-inner {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .mode-buttons {
-                justify-content: center;
-            }
-
             main {
                 padding: 12px;
+            }
+
+            .collab-layout {
+                flex-direction: column;
+            }
+
+            .collab-sidebar {
+                width: 100%;
+                flex: none;
+            }
+
+            .collab-ai-list {
+                flex-direction: row;
+                flex-wrap: wrap;
+            }
+
+            .collab-ai-btn {
+                width: auto;
+                flex: 0 0 auto;
             }
 
             .debate-stage {
@@ -518,11 +604,6 @@
                     <h1>ArenaX</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
                 </div>
-                <div class="mode-buttons">
-                    <button class="mode-btn active" type="button" data-mode="compare">비교</button>
-                    <button class="mode-btn" type="button" data-mode="debate">토론</button>
-                    <button class="mode-btn" type="button" data-mode="collab">협업</button>
-                </div>
             </div>
         </header>
 
@@ -545,18 +626,57 @@
             </section>
 
             <section id="collabPanel" class="panel">
-                <div class="collab-placeholder">
-                    협업 기능을 준비 중입니다.<br>
-                    AI들이 함께 하나의 결과물을 만들어냅니다.
+                <div class="collab-layout">
+                    <aside class="collab-sidebar">
+                        <div class="collab-sidebar-title">AI 선택</div>
+                        <div class="collab-ai-list">
+                            <button class="collab-ai-btn active" data-ai="OpenAI" type="button">
+                                <span class="collab-ai-dot" style="background:#2563eb;"></span> OpenAI
+                            </button>
+                            <button class="collab-ai-btn" data-ai="Anthropic" type="button">
+                                <span class="collab-ai-dot" style="background:#7c3aed;"></span> Anthropic
+                            </button>
+                            <button class="collab-ai-btn" data-ai="Google" type="button">
+                                <span class="collab-ai-dot" style="background:#ca8a04;"></span> Google
+                            </button>
+                            <button class="collab-ai-btn" data-ai="xAI" type="button">
+                                <span class="collab-ai-dot" style="background:#dc2626;"></span> xAI
+                            </button>
+                            <button class="collab-ai-btn" data-ai="Perplexity" type="button">
+                                <span class="collab-ai-dot" style="background:#059669;"></span> Perplexity
+                            </button>
+                            <button class="collab-ai-btn" data-ai="DeepSeek" type="button">
+                                <span class="collab-ai-dot" style="background:#9333ea;"></span> DeepSeek
+                            </button>
+                            <button class="collab-ai-btn" data-ai="Meta" type="button">
+                                <span class="collab-ai-dot" style="background:#0f766e;"></span> Meta
+                            </button>
+                            <button class="collab-ai-btn" data-ai="NVIDIA" type="button">
+                                <span class="collab-ai-dot" style="background:#65a30d;"></span> NVIDIA
+                            </button>
+                        </div>
+                    </aside>
+                    <div class="collab-main">
+                        <div class="collab-placeholder">
+                            협업 기능을 준비 중입니다.<br>
+                            AI들이 함께 하나의 결과물을 만들어냅니다.
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>
 
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
+                <div class="dock-mode-row">
+                    <button class="mode-btn active" type="button" data-mode="compare">비교</button>
+                    <button class="mode-btn" type="button" data-mode="debate">토론</button>
+                    <button class="mode-btn" type="button" data-mode="collab">협업</button>
+                </div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 <div class="dock-actions">
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
+                    <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                     <button id="dockPrimaryBtn" class="dock-btn primary" type="button">비교 시작 ▶</button>
                 </div>
             </div>
@@ -571,13 +691,14 @@
             Google: "#ca8a04",
             xAI: "#dc2626",
             Perplexity: "#059669",
+            DeepSeek: "#9333ea",
             meta: "#0f766e",
             qwen: "#0891b2",
             nvidia: "#65a30d",
             deepseek: "#9333ea",
             Unknown: "#6b7280",
         };
-        const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity"];
+        const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
 
         const COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요.";
         const DEBATE_FAILURE_MSG = "이번 발언 생성에 실패했습니다. 다시 시도해주세요.";
@@ -600,6 +721,7 @@
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
         const dockSecondaryBtn = document.getElementById("dockSecondaryBtn");
+        const dockNewDebateBtn = document.getElementById("dockNewDebateBtn");
         const inputDock = document.getElementById("inputDock");
         const mainContent = document.getElementById("mainContent");
 
@@ -647,6 +769,7 @@
 
         function updateDockUI() {
             dockSecondaryBtn.style.display = "none";
+            dockNewDebateBtn.style.display = "none";
 
             if (currentMode === "compare") {
                 mainInput.placeholder = "비교할 질문을 입력하세요…";
@@ -679,6 +802,8 @@
                 dockPrimaryBtn.disabled = debateInFlight;
                 dockSecondaryBtn.style.display = "inline-block";
                 dockSecondaryBtn.disabled = debateInFlight;
+                dockNewDebateBtn.style.display = "inline-block";
+                dockNewDebateBtn.disabled = debateInFlight;
             }
         }
 
@@ -710,6 +835,32 @@
         });
 
         dockSecondaryBtn.addEventListener("click", handleAddUserInput);
+        dockNewDebateBtn.addEventListener("click", handleNewDebate);
+
+        function handleNewDebate() {
+            debateSessionId = createUUID();
+            debateTopic = "";
+            debateStarted = false;
+            debateInFlight = false;
+            queuedDuringFlight = false;
+            debateCards = [];
+            activeCardIndex = 0;
+            userMovedDeck = false;
+            mainInput.value = "";
+            autoResizeInput();
+            document.getElementById("debateStage").style.display = "none";
+            document.getElementById("deckIndicators").innerHTML = "";
+            showNotice("debateError", "");
+            showNotice("debateLoading", "");
+            updateDockUI();
+        }
+
+        document.querySelectorAll(".collab-ai-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".collab-ai-btn").forEach(b => b.classList.remove("active"));
+                btn.classList.add("active");
+            });
+        });
 
         function renderCompareCard(model) {
             const color = colorFor(model);
