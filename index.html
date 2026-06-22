@@ -825,6 +825,101 @@
             padding: 24px 12px;
         }
 
+        .agent-result-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #7c3aed;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .agent-result-card.success {
+            border-left-color: #047857;
+        }
+
+        .agent-result-card.error {
+            border-left-color: #dc2626;
+            background: #fef2f2;
+        }
+
+        .agent-result-card.loading {
+            opacity: 0.65;
+        }
+
+        .agent-result-card .agent-card-badge.success {
+            background: #d1fae5;
+            color: #047857;
+        }
+
+        .agent-result-card .agent-card-badge.error {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .agent-result-card .agent-card-badge.loading {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+
+        .agent-input-row {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-top: 1px solid #f3f4f6;
+            background: rgba(249, 250, 251, 0.9);
+            flex-shrink: 0;
+        }
+
+        .agent-input {
+            flex: 1;
+            resize: none;
+            overflow: hidden;
+            min-height: 38px;
+            max-height: 120px;
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+            font-family: inherit;
+            color: #111827;
+            background: #fff;
+        }
+
+        .agent-input:focus {
+            outline: none;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+        }
+
+        .agent-input:disabled {
+            background: #f3f4f6;
+            color: #9ca3af;
+        }
+
+        .agent-send-btn {
+            align-self: flex-end;
+            flex: 0 0 auto;
+            border: 0;
+            background: #7c3aed;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 0 18px;
+            height: 38px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .agent-send-btn:hover {
+            background: #6d28d9;
+        }
+
+        .agent-send-btn:disabled {
+            background: #c4b5fd;
+            cursor: not-allowed;
+        }
+
         @media (max-width: 640px) {
             .agent-panel {
                 bottom: calc(var(--input-dock-height, 120px) + 12px);
@@ -969,6 +1064,10 @@
             <div id="agentHistory" class="agent-history">
                 <div class="agent-empty">브라우저 에이전트에게 수행할 작업을 입력하세요.</div>
             </div>
+            <div class="agent-input-row">
+                <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 웹 작업을 지시하세요..."></textarea>
+                <button id="agentSendBtn" class="agent-send-btn" type="button" aria-label="전송">전송</button>
+            </div>
         </aside>
     </div>
 
@@ -1011,7 +1110,9 @@
         let collabRecommendInFlight = false;
 
         let isAgentMode = false;
+        let isAgentPanelVisible = false;
         let agentInFlight = false;
+        let agentHistory = [];
 
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
@@ -1021,7 +1122,9 @@
         const agentPanel = document.getElementById("agentPanel");
         const agentPanelClose = document.getElementById("agentPanelClose");
         const agentStatusBar = document.getElementById("agentStatusBar");
-        const agentHistory = document.getElementById("agentHistory");
+        const agentHistoryEl = document.getElementById("agentHistory");
+        const agentInput = document.getElementById("agentInput");
+        const agentSendBtn = document.getElementById("agentSendBtn");
         const inputDock = document.getElementById("inputDock");
         const mainContent = document.getElementById("mainContent");
 
@@ -1054,9 +1157,12 @@
         }
 
         function syncMainPadding() {
-            const height = inputDock.offsetHeight;
-            document.documentElement.style.setProperty("--input-dock-height", `${height}px`);
-            mainContent.style.paddingBottom = `${height + 32}px`;
+            const dockHeight = inputDock.offsetHeight;
+            const panelHeight = isAgentPanelVisible ? agentPanel.offsetHeight : 0;
+            const offset = dockHeight + panelHeight + 32;
+            document.documentElement.style.setProperty("--input-dock-height", `${dockHeight}px`);
+            document.documentElement.style.setProperty("--bottom-offset", `${offset}px`);
+            mainContent.style.paddingBottom = "var(--bottom-offset)";
         }
 
         function autoResizeInput() {
@@ -1070,20 +1176,6 @@
         function updateDockUI() {
             dockSecondaryBtn.style.display = "none";
             dockNewDebateBtn.style.display = "none";
-
-            if (isAgentMode) {
-                agentToggleBtn.classList.add("active");
-                mainInput.placeholder = agentInFlight
-                    ? "작업 진행 중..."
-                    : "브라우저 에이전트에게 명령을 입력하세요…";
-                dockPrimaryBtn.textContent = agentInFlight ? "작업 중..." : "작업 실행 ▶";
-                dockPrimaryBtn.className = "dock-btn primary";
-                dockPrimaryBtn.disabled = agentInFlight;
-                mainInput.disabled = agentInFlight;
-                return;
-            }
-
-            agentToggleBtn.classList.remove("active");
 
             if (currentMode === "compare") {
                 mainInput.placeholder = "비교할 질문을 입력하세요…";
@@ -1152,14 +1244,12 @@
         mainInput.addEventListener("keydown", event => {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                if (isAgentMode) {
-                    sendAgentTask();
-                    return;
-                }
                 dockPrimaryBtn.click();
             }
         });
-        new ResizeObserver(syncMainPadding).observe(inputDock);
+        const bottomResizeObserver = new ResizeObserver(syncMainPadding);
+        bottomResizeObserver.observe(inputDock);
+        bottomResizeObserver.observe(agentPanel);
         window.addEventListener("resize", syncMainPadding);
         autoResizeInput();
 
@@ -1173,58 +1263,72 @@
             agentStatusBar.dataset.type = type;
         }
 
-        function toggleAgentMode(forceState = null) {
-            isAgentMode = forceState !== null ? forceState : !isAgentMode;
-            agentPanel.classList.toggle("visible", isAgentMode);
-            if (isAgentMode) {
-                if (!agentInFlight) {
-                    setAgentStatus("대기 중", "idle");
-                }
-            } else if (agentInFlight) {
-                setAgentStatus("작업은 백그라운드에서 계속됩니다 (패널 닫힘)", "loading");
+        function updateAgentPanel() {
+            agentPanel.classList.toggle("visible", isAgentPanelVisible);
+            agentToggleBtn.classList.toggle("active", isAgentMode);
+
+            agentInput.disabled = agentInFlight;
+            agentSendBtn.disabled = agentInFlight;
+
+            if (agentInFlight) {
+                setAgentStatus("⏳ 브라우저 탐색 및 작업 중...", "loading");
+            } else if (!isAgentPanelVisible && isAgentMode) {
+                setAgentStatus("작업 결과는 패널에 보관됩니다 (패널 닫힘)", "idle");
+            } else if (agentStatusBar.dataset.type === "loading") {
+                setAgentStatus("대기 중", "idle");
             }
-            updateDockUI();
+
+            renderAgentHistory();
         }
 
-        function renderAgentCard(data) {
-            const empty = agentHistory.querySelector(".agent-empty");
-            if (empty) empty.remove();
+        function setAgentPanelVisible(visible) {
+            isAgentPanelVisible = visible;
+            updateAgentPanel();
+            syncMainPadding();
+        }
 
-            const card = document.createElement("article");
-            card.className = "agent-card" + (data.status === "error" ? " error-card" : "");
-            const isSuccess = data.status === "success";
-            const summary = isSuccess
-                ? (data.result || "결과 없음")
-                : (data.message || "알 수 없는 오류");
-            const preview = summary.length > 220 ? `${summary.slice(0, 220)}...` : summary;
+        function setAgentMode(enabled) {
+            isAgentMode = enabled;
+            setAgentPanelVisible(enabled);
+        }
 
-            card.innerHTML = `
-                <div class="agent-card-header">
-                    <div class="agent-card-title">${escapeHtml(data.query)}</div>
-                    <span class="agent-card-badge${isSuccess ? "" : " error"}">${isSuccess ? "완료" : "실패"}</span>
-                </div>
-                <div class="agent-card-meta">${escapeHtml(data.timestamp)}</div>
-                <div class="agent-card-body collapsed">${escapeHtml(preview)}</div>
-                <button class="agent-card-toggle" type="button">결과 펼치기</button>
-            `;
+        const AGENT_STATUS_LABEL = { success: "완료", error: "실패", loading: "진행 중" };
 
-            const body = card.querySelector(".agent-card-body");
-            body.dataset.full = summary;
-            body.textContent = preview;
+        function renderAgentHistory() {
+            if (!agentHistory.length) {
+                agentHistoryEl.innerHTML = `<div class="agent-empty">브라우저 에이전트에게 수행할 작업을 입력하세요.</div>`;
+                return;
+            }
 
-            const toggle = card.querySelector(".agent-card-toggle");
-            toggle.addEventListener("click", () => {
-                const collapsed = body.classList.toggle("collapsed");
-                if (!collapsed) {
-                    body.textContent = body.dataset.full;
-                } else {
-                    body.textContent = preview;
-                }
-                toggle.textContent = collapsed ? "결과 펼치기" : "결과 접기";
+            agentHistoryEl.innerHTML = "";
+            agentHistory.forEach(item => {
+                const card = document.createElement("article");
+                card.className = `agent-result-card ${item.status}`;
+                card.dataset.id = item.id;
+                const badge = AGENT_STATUS_LABEL[item.status] || item.status;
+                const bodyText = item.status === "loading"
+                    ? "처리 중..."
+                    : (item.result || "결과 없음");
+                card.innerHTML = `
+                    <div class="agent-card-header">
+                        <div class="agent-card-title">${escapeHtml(item.task)}</div>
+                        <span class="agent-card-badge ${item.status}">${badge}</span>
+                    </div>
+                    <div class="agent-card-meta">${escapeHtml(item.timestamp || "")}</div>
+                    <div class="agent-card-body">${escapeHtml(bodyText)}</div>
+                `;
+                agentHistoryEl.appendChild(card);
             });
+            agentHistoryEl.scrollTop = agentHistoryEl.scrollHeight;
+        }
 
-            agentHistory.prepend(card);
-            agentHistory.scrollTop = 0;
+        function updateAgentCard(id, result, status) {
+            const item = agentHistory.find(entry => entry.id === id);
+            if (item) {
+                item.result = result;
+                item.status = status;
+            }
+            renderAgentHistory();
         }
 
         function escapeHtml(value) {
@@ -1235,67 +1339,76 @@
                 .replace(/"/g, "&quot;");
         }
 
+        async function callAgentAPI(task) {
+            const response = await fetch(`${API_URL}/agent/task`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: task }),
+            });
+
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                throw new Error("서버 응답을 해석하지 못했습니다.");
+            }
+
+            if (!response.ok || data.status === "error") {
+                throw new Error(data.message || data.detail?.message || `서버 오류 (${response.status})`);
+            }
+            return data.result || "결과 없음";
+        }
+
         async function sendAgentTask() {
-            const query = mainInput.value.trim();
-            if (!query || agentInFlight || !isAgentMode) return;
+            if (agentInFlight) return;
+            if (!isAgentPanelVisible) return;
+
+            const task = agentInput.value.trim();
+            if (!task) return;
 
             agentInFlight = true;
-            lockMainInput(true);
-            setAgentStatus("⏳ 브라우저 탐색 및 작업 중...", "loading");
-            mainInput.value = "";
-            autoResizeInput();
+            agentInput.disabled = true;
+            agentSendBtn.disabled = true;
+            agentInput.value = "";
+            agentInput.style.height = "auto";
 
+            const requestId = Date.now();
             const timestamp = new Date().toLocaleString("ko-KR");
+            agentHistory.push({ id: requestId, task, result: "", status: "loading", timestamp });
+            renderAgentHistory();
+            setAgentStatus("⏳ 브라우저 탐색 및 작업 중...", "loading");
+
             try {
-                const response = await fetch(`${API_URL}/agent/task`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query }),
-                });
-
-                let data = {};
-                try {
-                    data = await response.json();
-                } catch (parseError) {
-                    throw new Error("서버 응답을 해석하지 못했습니다.");
-                }
-
-                if (!response.ok || data.status === "error") {
-                    const message = data.message || data.detail?.message || `서버 오류 (${response.status})`;
-                    renderAgentCard({ query, status: "error", message, timestamp });
-                    setAgentStatus("❌ 실패", "error");
-                    return;
-                }
-
-                renderAgentCard({
-                    query,
-                    status: "success",
-                    result: data.result || "",
-                    timestamp,
-                });
+                const result = await callAgentAPI(task);
+                updateAgentCard(requestId, result, "success");
                 setAgentStatus("✅ 완료", "success");
             } catch (error) {
-                renderAgentCard({
-                    query,
-                    status: "error",
-                    message: error.message || "네트워크 오류",
-                    timestamp,
-                });
+                updateAgentCard(requestId, error.message || "네트워크 오류", "error");
                 setAgentStatus("❌ 실패", "error");
             } finally {
                 agentInFlight = false;
-                updateDockUI();
+                agentInput.disabled = false;
+                agentSendBtn.disabled = false;
+                agentInput.focus();
+                updateAgentPanel();
             }
         }
 
-        agentToggleBtn.addEventListener("click", () => toggleAgentMode());
-        agentPanelClose.addEventListener("click", () => toggleAgentMode(false));
+        agentToggleBtn.addEventListener("click", () => setAgentMode(!isAgentMode));
+        agentPanelClose.addEventListener("click", () => setAgentPanelVisible(false));
+        agentSendBtn.addEventListener("click", sendAgentTask);
+        agentInput.addEventListener("input", () => {
+            agentInput.style.height = "auto";
+            agentInput.style.height = `${Math.min(agentInput.scrollHeight, 120)}px`;
+        });
+        agentInput.addEventListener("keydown", event => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendAgentTask();
+            }
+        });
 
         dockPrimaryBtn.addEventListener("click", () => {
-            if (isAgentMode) {
-                sendAgentTask();
-                return;
-            }
             if (currentMode === "compare") handleCompare();
             else if (currentMode === "debate") {
                 if (!debateStarted) handleDebateStart();

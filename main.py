@@ -44,6 +44,12 @@ RATE_LIMIT_RETRY_DELAY_SECONDS = 1.0
 FINAL_ATTEMPT_PROMPT = "주제에 대해 한 문장으로 짧게 의견을 말해주세요."
 USER_FACING_FAILURE_MSG = "이번 발언 생성에 실패했습니다. 다시 시도해주세요."
 COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요."
+# OpenRouter free tier exhausted its per-day quota for this account.
+DAILY_LIMIT_MSG = (
+    "OpenRouter 무료 일일 요청 한도를 모두 사용했습니다. "
+    "OpenRouter에 10크레딧을 충전하면 하루 1000회로 늘어나고, "
+    "충전 전에는 자정(UTC) 한도 초기화 후 다시 시도해주세요."
+)
 
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
 LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
@@ -641,6 +647,12 @@ def should_try_next_candidate(status_code: int) -> bool:
     return status_code in {400, 401, 403, 404, 408, 409, 429, 500, 502, 503, 504}
 
 
+def is_daily_free_limit(body_text: str) -> bool:
+    """Detect OpenRouter's account-wide per-day free quota exhaustion."""
+    lowered = (body_text or "").lower()
+    return "free-models-per-day" in lowered or "add 10 credits" in lowered
+
+
 def extract_content(payload: dict) -> str:
     choices = payload.get("choices") or []
     if not choices:
@@ -777,6 +789,14 @@ async def call_ai_model(
 
             # On 429, wait briefly and retry the SAME model once before moving on.
             if response.status_code == 429:
+                if is_daily_free_limit(response.text):
+                    return make_failed_result(
+                        requested_label=label,
+                        requested_model=requested_model,
+                        actual_model=model_id,
+                        failed_candidates=failed_candidates,
+                        error=DAILY_LIMIT_MSG,
+                    )
                 logger.warning(
                     "Rate limited, retrying once after %ss label=%s model=%s",
                     RATE_LIMIT_RETRY_DELAY_SECONDS,
@@ -799,6 +819,14 @@ async def call_ai_model(
                     response.status_code,
                     response.text[:300],
                 )
+                if is_daily_free_limit(response.text):
+                    return make_failed_result(
+                        requested_label=label,
+                        requested_model=requested_model,
+                        actual_model=model_id,
+                        failed_candidates=failed_candidates,
+                        error=DAILY_LIMIT_MSG,
+                    )
                 failed_candidates.append(model_id)
                 if should_try_next_candidate(response.status_code):
                     continue
@@ -1001,7 +1029,12 @@ def result_to_debate_turn(
     )
 
 
-def make_failure_turn(round_number: int, speaker_index: int, requested_label: str) -> DebateTurn:
+def make_failure_turn(
+    round_number: int,
+    speaker_index: int,
+    requested_label: str,
+    content: str = USER_FACING_FAILURE_MSG,
+) -> DebateTurn:
     return DebateTurn(
         round_number=round_number,
         speaker_index=speaker_index,
@@ -1012,7 +1045,7 @@ def make_failure_turn(round_number: int, speaker_index: int, requested_label: st
         requested_model="",
         is_real_company_model=False,
         role=ROLE_BY_INDEX.get(speaker_index, "발언"),
-        content=USER_FACING_FAILURE_MSG,
+        content=content,
         success=False,
     )
 
@@ -1051,6 +1084,10 @@ async def produce_debate_speaker(
         )
         session.failed_candidates.extend(result.failed_candidates)
         if not result.success:
+            if result.error == DAILY_LIMIT_MSG:
+                return make_failure_turn(
+                    round_number, speaker_index, requested_label, content=DAILY_LIMIT_MSG
+                )
             excluded.update(result.failed_candidates)
             logger.info(
                 "Debate speaker failed label=%s speaker=%s error=%s",
@@ -1338,19 +1375,29 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                     )
                                 },
                             ) as response:
-                                if response.status_code == 429 and attempt == 0:
-                                    await response.aread()
-                                    await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
-                                    continue
+                                if response.status_code == 429:
+                                    body = (await response.aread()).decode("utf-8", "ignore")
+                                    if is_daily_free_limit(body):
+                                        yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
+                                        return
+                                    if attempt == 0:
+                                        await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                                        continue
+                                    excluded_by_failure.add(model_id)
+                                    failed_this_model = True
+                                    break
 
                                 if response.status_code != 200:
+                                    body = (await response.aread()).decode("utf-8", "ignore")
                                     logger.warning(
                                         "Stream non-200 label=%s model=%s status=%s",
                                         label,
                                         model_id,
                                         response.status_code,
                                     )
-                                    await response.aread()
+                                    if is_daily_free_limit(body):
+                                        yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
+                                        return
                                     if should_try_next_candidate(response.status_code):
                                         excluded_by_failure.add(model_id)
                                         failed_this_model = True
