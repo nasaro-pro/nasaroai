@@ -268,6 +268,7 @@ class DebateSession(BaseModel):
     pending_user_input: str | None = None
     user_input_history: list[UserInputHistoryItem] = Field(default_factory=list)
     failed_candidates: list[str] = Field(default_factory=list)
+    round_used_models: list[str] = Field(default_factory=list)
 
 
 class ModelCallResult(BaseModel):
@@ -285,6 +286,8 @@ class ModelCallResult(BaseModel):
 DEBATE_SESSIONS: dict[str, DebateSession] = {}
 DEBATE_LOCKS: dict[str, asyncio.Lock] = {}
 COMPARE_ACTIVE_MODELS: dict[str, set[str]] = {}
+COMPARE_SESSION_PLANS: dict[str, dict[str, str]] = {}
+COMPARE_SESSION_PENDING: dict[str, int] = {}
 COMPARE_SESSION_LOCK = asyncio.Lock()
 AGENT_LOCK = asyncio.Semaphore(1)
 
@@ -437,8 +440,18 @@ def assign_models_without_overlap() -> dict[str, list[str]]:
                 if model_id not in assigned[label] and model_id not in globally_used
             ]
             if not pool:
-                if LAST_RESORT_MODEL not in assigned[label]:
+                for model_id in get_all_available_free_models():
+                    if model_id not in assigned[label] and model_id not in globally_used:
+                        assigned[label].append(model_id)
+                        globally_used.add(model_id)
+                        break
+                if (
+                    len(assigned[label]) < MIN_MODEL_CANDIDATES_PER_LABEL
+                    and LAST_RESORT_MODEL not in assigned[label]
+                    and LAST_RESORT_MODEL not in globally_used
+                ):
                     assigned[label].append(LAST_RESORT_MODEL)
+                    globally_used.add(LAST_RESORT_MODEL)
                 break
             assigned[label].append(pool[0])
             globally_used.add(pool[0])
@@ -471,6 +484,15 @@ def get_all_available_free_models() -> list[str]:
         for model_id in candidates
     )
     return pooled if pooled else [LAST_RESORT_MODEL]
+
+
+def build_model_try_order(label: str, excluded: set[str] | None = None) -> list[str]:
+    """Ordered unique candidates: label chain first, then global free pool."""
+    excluded = excluded or set()
+    label_candidates = resolve_label_models(label)
+    global_candidates = get_all_available_free_models()
+    ordered = unique(label_candidates + [model_id for model_id in global_candidates if model_id not in label_candidates])
+    return [model_id for model_id in ordered if model_id not in excluded]
 
 
 def get_label_provider_config(label: str) -> LabelProviderConfig:
@@ -673,41 +695,50 @@ async def final_attempt_model_call(
     label: str,
     requested_model: str,
     failed_candidates: list[str],
+    excluded_models: set[str] | None = None,
 ) -> ModelCallResult | None:
-    """Last resort: a short, simple prompt to LAST_RESORT_MODEL so the user still gets something."""
+    """Last resort: try unused free models with a short prompt before giving up."""
     persona = PERSONAS[label]
-    try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            response = await request_chat_completion(
-                client, label, LAST_RESORT_MODEL, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200
-            )
-    except httpx.HTTPError as exc:
-        logger.warning("Final attempt request failed label=%s error=%s", label, exc)
-        return None
+    excluded = excluded_models or set()
+    fallbacks = build_model_try_order(label, excluded)
+    if LAST_RESORT_MODEL not in excluded and LAST_RESORT_MODEL not in fallbacks:
+        fallbacks.append(LAST_RESORT_MODEL)
 
-    if response.status_code != 200:
-        logger.warning("Final attempt non-200 label=%s status=%s", label, response.status_code)
-        return None
+    for model_id in fallbacks:
+        try:
+            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                response = await request_chat_completion(
+                    client, label, model_id, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200
+                )
+        except httpx.HTTPError as exc:
+            logger.warning("Final attempt request failed label=%s model=%s error=%s", label, model_id, exc)
+            continue
 
-    try:
-        content = extract_content(response.json())
-    except json.JSONDecodeError:
-        return None
+        if response.status_code != 200:
+            logger.warning("Final attempt non-200 label=%s model=%s status=%s", label, model_id, response.status_code)
+            continue
 
-    if not content.strip():
-        return None
+        try:
+            content = extract_content(response.json())
+        except json.JSONDecodeError:
+            continue
 
-    logger.info("Final attempt succeeded label=%s model=%s", label, LAST_RESORT_MODEL)
-    return ModelCallResult(
-        success=True,
-        content=content,
-        requested_label=label,
-        actual_label=label_for_model_id(LAST_RESORT_MODEL),
-        requested_model=requested_model,
-        actual_model=LAST_RESORT_MODEL,
-        is_real_company_model=False,
-        failed_candidates=failed_candidates,
-    )
+        if not content.strip():
+            continue
+
+        logger.info("Final attempt succeeded label=%s model=%s", label, model_id)
+        return ModelCallResult(
+            success=True,
+            content=content,
+            requested_label=label,
+            actual_label=label_for_model_id(model_id),
+            requested_model=requested_model,
+            actual_model=model_id,
+            is_real_company_model=model_id.startswith(COMPANY_PREFIXES[label]),
+            failed_candidates=failed_candidates,
+        )
+
+    return None
 
 
 async def call_ai_model(
@@ -722,29 +753,16 @@ async def call_ai_model(
     await ensure_model_cache_fresh()
     persona = PERSONAS[label]
 
-    label_candidates = resolve_label_models(label)
-    if excluded_models:
-        label_candidates = [model_id for model_id in label_candidates if model_id not in excluded_models]
+    candidates = build_model_try_order(label, excluded_models)
+    if not candidates:
+        return make_failed_result(
+            requested_label=label,
+            requested_model=LAST_RESORT_MODEL,
+            actual_model="",
+            failed_candidates=[],
+            error=USER_FACING_FAILURE_MSG,
+        )
 
-    if not label_candidates:
-        label_candidates = [
-            model_id
-            for model_id in get_all_available_free_models()
-            if not excluded_models or model_id not in excluded_models
-        ]
-
-    if not label_candidates:
-        if excluded_models and LAST_RESORT_MODEL in excluded_models:
-            return make_failed_result(
-                requested_label=label,
-                requested_model=LAST_RESORT_MODEL,
-                actual_model="",
-                failed_candidates=[],
-                error=USER_FACING_FAILURE_MSG,
-            )
-        label_candidates = [LAST_RESORT_MODEL]
-
-    candidates = label_candidates
     requested_model = candidates[0]
     failed_candidates: list[str] = []
 
@@ -813,7 +831,9 @@ async def call_ai_model(
     if excluded_models and LAST_RESORT_MODEL in excluded_models:
         final_result = None
     else:
-        final_result = await final_attempt_model_call(label, requested_model, failed_candidates)
+        final_result = await final_attempt_model_call(
+            label, requested_model, failed_candidates, excluded_models=excluded_models
+        )
     if final_result is not None:
         return final_result
 
@@ -1014,44 +1034,42 @@ async def produce_debate_speaker(
         user_input=round_user_input if speaker_index == 1 else None,
     )
 
-    already_used_models: set[str] = {
-        turn.actual_model
-        for turn in session.current_round_turns
-        if turn.actual_model
-    }
+    already_used_models: set[str] = set(session.round_used_models)
+    already_used_models.update(
+        turn.actual_model for turn in session.current_round_turns if turn.actual_model
+    )
     already_used_models.update(
         turn.actual_model for turn in prior_turns if turn.actual_model
     )
 
-    labels_to_try = [requested_label] + [
-        lb for lb in COMPANY_LABELS if lb != requested_label
-    ]
-
-    for label in labels_to_try:
+    excluded = set(already_used_models)
+    for _ in range(MAX_MODEL_CANDIDATES_PER_LABEL):
         result = await call_ai_model(
-            label,
+            requested_label,
             prompt,
-            excluded_models=already_used_models,
+            excluded_models=excluded,
         )
         session.failed_candidates.extend(result.failed_candidates)
-        if result.success:
-            if result.actual_model in already_used_models:
-                logger.warning(
-                    "Duplicate debate actual_model blocked label=%s speaker=%s model=%s",
-                    label,
-                    speaker_index,
-                    result.actual_model,
-                )
-                already_used_models.add(result.actual_model)
-                continue
-            already_used_models.add(result.actual_model)
-            return result_to_debate_turn(round_number, speaker_index, requested_label, result)
-        logger.info(
-            "Debate speaker failed label=%s speaker=%s error=%s",
-            label,
-            speaker_index,
-            result.error,
-        )
+        if not result.success:
+            excluded.update(result.failed_candidates)
+            logger.info(
+                "Debate speaker failed label=%s speaker=%s error=%s",
+                requested_label,
+                speaker_index,
+                result.error,
+            )
+            continue
+        if result.actual_model in already_used_models:
+            logger.warning(
+                "Duplicate debate actual_model blocked label=%s speaker=%s model=%s",
+                requested_label,
+                speaker_index,
+                result.actual_model,
+            )
+            excluded.add(result.actual_model)
+            continue
+        session.round_used_models.append(result.actual_model)
+        return result_to_debate_turn(round_number, speaker_index, requested_label, result)
 
     return None
 
@@ -1069,6 +1087,7 @@ async def prepare_next_round_if_needed(session: DebateSession) -> str | None:
     if session.round_number == 0:
         session.round_number = 1
         session.current_round_turns = []
+        session.round_used_models = []
         session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(session.round_speaker_labels)
         round_user_input = session.pending_user_input
         session.pending_user_input = None
@@ -1084,6 +1103,7 @@ async def prepare_next_round_if_needed(session: DebateSession) -> str | None:
     round_user_input = session.pending_user_input
     session.pending_user_input = None
     session.current_round_turns = []
+    session.round_used_models = []
     session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(session.round_speaker_labels)
     return round_user_input
 
@@ -1162,22 +1182,111 @@ def debate_response(session: DebateSession, turns: list[DebateTurn], queued: boo
     }
 
 
-async def acquire_compare_model(session_id: str, candidates: list[str]) -> str | None:
+async def ensure_compare_session_plan(session_id: str) -> dict[str, str]:
+    """Atomically assign one unique primary model per UI label for a compare session."""
+    if not session_id:
+        return {}
+
+    async with COMPARE_SESSION_LOCK:
+        existing = COMPARE_SESSION_PLANS.get(session_id)
+        if existing is not None:
+            return existing
+
+        used: set[str] = set()
+        plan: dict[str, str] = {}
+
+        for label in COMPANY_LABELS:
+            for model_id in resolve_label_models(label):
+                if model_id not in used:
+                    plan[label] = model_id
+                    used.add(model_id)
+                    break
+
+        for label in COMPANY_LABELS:
+            if label in plan:
+                continue
+            for model_id in get_all_available_free_models():
+                if model_id not in used:
+                    plan[label] = model_id
+                    used.add(model_id)
+                    break
+
+        COMPARE_SESSION_PLANS[session_id] = plan
+        logger.info("Compare session plan session_id=%s plan=%s", session_id[:8], plan)
+        return plan
+
+
+def build_compare_candidate_pool(
+    label: str,
+    plan: dict[str, str],
+    excluded_by_failure: set[str],
+) -> list[str]:
+    """Label plan primary first, then label chain, then global free models."""
+    ordered: list[str] = []
+    if label in plan:
+        ordered.append(plan[label])
+    ordered.extend(resolve_label_models(label))
+    ordered.extend(get_all_available_free_models())
+    pool = unique(ordered)
+    return [model_id for model_id in pool if model_id not in excluded_by_failure]
+
+
+async def acquire_compare_model(
+    session_id: str,
+    label: str,
+    excluded_by_failure: set[str],
+) -> str | None:
     """
-    COMPARE_SESSION_LOCK 안에서 candidates를 순회하며
-    아직 사용 중이지 않은 첫 번째 모델을 즉시 점유하고 반환한다.
-    session_id가 없으면 candidates[0]을 반환(단독 요청 허용).
-    candidates를 모두 소진하면 None 반환.
+    Pick the next unused actual_model for this label within a compare session.
+    Falls back to the global free pool when label candidates are exhausted.
     """
     if not session_id:
-        return candidates[0] if candidates else None
+        pool = build_model_try_order(label, excluded_by_failure)
+        return pool[0] if pool else None
+
+    plan = await ensure_compare_session_plan(session_id)
+    pool = build_compare_candidate_pool(label, plan, excluded_by_failure)
+    if not pool:
+        return None
+
     async with COMPARE_SESSION_LOCK:
         used = COMPARE_ACTIVE_MODELS.setdefault(session_id, set())
-        for model_id in candidates:
+        for model_id in pool:
             if model_id not in used:
                 used.add(model_id)
                 return model_id
+        logger.warning(
+            "Compare model pool exhausted session_id=%s label=%s used=%s pool=%s",
+            session_id[:8],
+            label,
+            sorted(used),
+            pool,
+        )
         return None
+
+
+async def mark_compare_stream_started(session_id: str) -> None:
+    if not session_id:
+        return
+    await ensure_compare_session_plan(session_id)
+    async with COMPARE_SESSION_LOCK:
+        COMPARE_SESSION_PENDING[session_id] = COMPARE_SESSION_PENDING.get(session_id, 0) + 1
+
+
+async def mark_compare_stream_done(session_id: str) -> None:
+    if not session_id:
+        return
+    async with COMPARE_SESSION_LOCK:
+        pending = COMPARE_SESSION_PENDING.get(session_id)
+        if pending is None:
+            return
+        pending -= 1
+        if pending <= 0:
+            COMPARE_SESSION_PLANS.pop(session_id, None)
+            COMPARE_ACTIVE_MODELS.pop(session_id, None)
+            COMPARE_SESSION_PENDING.pop(session_id, None)
+        else:
+            COMPARE_SESSION_PENDING[session_id] = pending
 
 
 async def release_compare_model(session_id: str, model_id: str) -> None:
@@ -1187,7 +1296,7 @@ async def release_compare_model(session_id: str, model_id: str) -> None:
         bucket = COMPARE_ACTIVE_MODELS.get(session_id)
         if bucket is not None:
             bucket.discard(model_id)
-            if not bucket:
+            if not bucket and session_id not in COMPARE_SESSION_PENDING:
                 COMPARE_ACTIVE_MODELS.pop(session_id, None)
 
 
@@ -1199,103 +1308,97 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
     await ensure_model_cache_fresh()
     label = data.model_name
     persona = PERSONAS[label]
-    all_candidates = resolve_label_models(label)
     session_id = data.compare_session_id.strip()
 
     async def generate() -> AsyncIterator[str]:
         excluded_by_failure: set[str] = set()
+        await mark_compare_stream_started(session_id)
 
-        while True:
-            pool = [model_id for model_id in all_candidates if model_id not in excluded_by_failure]
-            if not pool:
-                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                return
+        try:
+            while True:
+                model_id = await acquire_compare_model(session_id, label, excluded_by_failure)
+                if model_id is None:
+                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                    return
 
-            model_id = await acquire_compare_model(session_id, pool)
-            if model_id is None:
-                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                return
+                failed_this_model = False
+                try:
+                    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                        for attempt in range(2):
+                            async with client.stream(
+                                "POST",
+                                OPENROUTER_CHAT_URL,
+                                headers=build_openrouter_headers(),
+                                json={
+                                    **build_chat_payload(
+                                        model_id=model_id,
+                                        persona=persona,
+                                        prompt=data.message,
+                                        stream=True,
+                                    )
+                                },
+                            ) as response:
+                                if response.status_code == 429 and attempt == 0:
+                                    await response.aread()
+                                    await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                                    continue
 
-            failed_this_model = False
-            try:
-                async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-                    for attempt in range(2):
-                        async with client.stream(
-                            "POST",
-                            OPENROUTER_CHAT_URL,
-                            headers=build_openrouter_headers(),
-                            json={
-                                **build_chat_payload(
-                                    model_id=model_id,
-                                    persona=persona,
-                                    prompt=data.message,
-                                    stream=True,
-                                )
-                            },
-                        ) as response:
-                            if response.status_code == 429 and attempt == 0:
-                                await response.aread()
-                                await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
-                                continue
+                                if response.status_code != 200:
+                                    logger.warning(
+                                        "Stream non-200 label=%s model=%s status=%s",
+                                        label,
+                                        model_id,
+                                        response.status_code,
+                                    )
+                                    await response.aread()
+                                    if should_try_next_candidate(response.status_code):
+                                        excluded_by_failure.add(model_id)
+                                        failed_this_model = True
+                                        break
+                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                    return
 
-                            if response.status_code != 200:
-                                logger.warning(
-                                    "Stream non-200 label=%s model=%s status=%s",
-                                    label,
-                                    model_id,
-                                    response.status_code,
-                                )
-                                await response.aread()
-                                if should_try_next_candidate(response.status_code):
-                                    excluded_by_failure.add(model_id)
-                                    failed_this_model = True
-                                    break
-                                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                async for line in response.aiter_lines():
+                                    if not line or not line.startswith("data: "):
+                                        continue
+                                    if line == "data: [DONE]":
+                                        return
+                                    try:
+                                        raw = json.loads(line[6:])
+                                    except json.JSONDecodeError:
+                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                        return
+                                    if raw.get("error"):
+                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                        return
+                                    delta = (raw.get("choices") or [{}])[0].get("delta") or {}
+                                    chunk = delta.get("content")
+                                    if chunk:
+                                        yield sse(
+                                            {
+                                                "model": data.model_name,
+                                                "success": True,
+                                                "actual_label": label_for_model_id(model_id),
+                                                "actual_model": model_id,
+                                                "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
+                                                "chunk": chunk,
+                                            }
+                                        )
                                 return
 
-                            async for line in response.aiter_lines():
-                                if not line or not line.startswith("data: "):
-                                    continue
-                                if line == "data: [DONE]":
-                                    return
-                                try:
-                                    raw = json.loads(line[6:])
-                                except json.JSONDecodeError:
-                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                    return
-                                if raw.get("error"):
-                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                    return
-                                delta = (raw.get("choices") or [{}])[0].get("delta") or {}
-                                chunk = delta.get("content")
-                                if chunk:
-                                    yield sse(
-                                        {
-                                            "model": data.model_name,
-                                            "success": True,
-                                            "actual_label": label_for_model_id(model_id),
-                                            "actual_model": model_id,
-                                            "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
-                                            "chunk": chunk,
-                                        }
-                                    )
-                            return
+                except httpx.HTTPError as exc:
+                    logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
+                    excluded_by_failure.add(model_id)
+                    failed_this_model = True
+                except Exception:
+                    logger.exception("Unexpected stream error label=%s model=%s", label, model_id)
+                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                    return
 
-            except httpx.HTTPError as exc:
-                logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
-                excluded_by_failure.add(model_id)
-                failed_this_model = True
-            except Exception:
-                logger.exception("Unexpected stream error label=%s model=%s", label, model_id)
-                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                return
-            finally:
-                # Keep the reservation for the whole compare_session_id so a later
-                # finishing card cannot reuse the same actual_model in this compare.
-                pass
-
-            if not failed_this_model:
-                return
+                if not failed_this_model:
+                    return
+        finally:
+            await mark_compare_stream_done(session_id)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
