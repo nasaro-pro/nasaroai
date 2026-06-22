@@ -33,7 +33,7 @@
         }
 
         header h1 {
-            font-size: 22px;
+            font-size: 26px;
             line-height: 1.2;
             letter-spacing: 0;
         }
@@ -41,7 +41,7 @@
         header p {
             margin-top: 4px;
             color: #cbd5e1;
-            font-size: 13px;
+            font-size: 15px;
         }
 
         .tabs {
@@ -57,7 +57,7 @@
             border-bottom: 3px solid transparent;
             background: transparent;
             color: #6b7280;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
         }
@@ -98,8 +98,8 @@
             border-radius: 6px;
             padding: 12px;
             font: inherit;
-            font-size: 14px;
-            line-height: 1.5;
+            font-size: 16px;
+            line-height: 1.6;
             color: #111827;
         }
 
@@ -111,6 +111,7 @@
         .button-row {
             display: flex;
             flex-wrap: wrap;
+            justify-content: flex-end;
             gap: 8px;
             margin-top: 10px;
         }
@@ -118,10 +119,10 @@
         button {
             border: 0;
             border-radius: 6px;
-            padding: 14px 22px;
-            min-height: 44px;
+            padding: 16px 28px;
+            min-height: 48px;
             font: inherit;
-            font-size: 14px;
+            font-size: 17px;
             font-weight: 700;
             cursor: pointer;
         }
@@ -151,8 +152,8 @@
             margin-bottom: 16px;
             border-radius: 6px;
             padding: 11px 12px;
-            font-size: 13px;
-            line-height: 1.5;
+            font-size: 15px;
+            line-height: 1.6;
         }
 
         .notice.error {
@@ -187,7 +188,7 @@
             min-height: 42px;
             padding: 10px 12px;
             border-bottom: 1px solid #f3f4f6;
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 800;
         }
 
@@ -206,8 +207,8 @@
             white-space: pre-wrap;
             word-break: break-word;
             padding: 12px;
-            font-size: 13px;
-            line-height: 1.65;
+            font-size: 16px;
+            line-height: 1.75;
         }
 
         .compare-card.error-card {
@@ -225,30 +226,31 @@
 
         .retry-button {
             width: auto;
-            min-height: 36px;
-            padding: 8px 16px;
+            min-height: 40px;
+            padding: 10px 18px;
             background: #dc2626;
             color: #fff;
-            font-size: 13px;
+            font-size: 15px;
         }
 
         .retry-button:hover {
             background: #b91c1c;
         }
 
-        /* Debate uses a separate one-way deck carousel instead of the compare grid. */
+        /* Debate: bidirectional carousel — center card full, prev/next peek at edges. */
         .debate-stage {
             position: relative;
             overflow: hidden;
-            min-height: 390px;
+            min-height: 420px;
             margin-top: 14px;
         }
 
         .debate-card {
             position: absolute;
             top: 0;
-            left: 0;
-            width: min(780px, 86%);
+            left: 50%;
+            width: min(720px, 70%);
+            margin-left: calc(min(720px, 70%) / -2);
             min-height: 320px;
             background: #fff;
             border: 1px solid #e5e7eb;
@@ -265,23 +267,29 @@
             z-index: 3;
         }
 
-        .debate-card.exit-left {
-            transform: translateX(-110%) scale(0.94);
-            opacity: 0;
-            z-index: 1;
-            pointer-events: none;
+        .debate-card.preview-prev {
+            transform: translateX(-82%) scale(0.9);
+            opacity: 0.78;
+            z-index: 2;
+            cursor: pointer;
         }
 
         .debate-card.preview-next {
-            transform: translateX(calc(100% + 18px)) scale(0.92);
-            opacity: 0.72;
+            transform: translateX(82%) scale(0.9);
+            opacity: 0.78;
             z-index: 2;
             cursor: pointer;
-            width: min(780px, 86%);
         }
 
-        .debate-card.hidden-card {
-            transform: translateX(130%) scale(0.92);
+        .debate-card.hidden-left {
+            transform: translateX(-130%) scale(0.85);
+            opacity: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .debate-card.hidden-right {
+            transform: translateX(130%) scale(0.85);
             opacity: 0;
             z-index: 0;
             pointer-events: none;
@@ -302,7 +310,7 @@
             gap: 8px;
             padding: 12px 14px;
             border-bottom: 1px solid #f3f4f6;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 800;
         }
 
@@ -312,7 +320,7 @@
             background: #f3f4f6;
             color: #6b7280;
             padding: 3px 7px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 700;
         }
 
@@ -322,21 +330,21 @@
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px;
-            font-size: 14px;
-            line-height: 1.7;
+            font-size: 16px;
+            line-height: 1.75;
         }
 
         .debate-preview-body {
             padding: 14px;
-            font-size: 13px;
-            line-height: 1.5;
+            font-size: 15px;
+            line-height: 1.6;
             color: #4b5563;
         }
 
         .debate-debug {
             padding: 0 14px 14px;
             color: #6b7280;
-            font-size: 11px;
+            font-size: 12px;
             line-height: 1.5;
             word-break: break-word;
         }
@@ -395,16 +403,35 @@
                 padding: 12px;
             }
 
+            header h1 {
+                font-size: 22px;
+            }
+
+            header p {
+                font-size: 14px;
+            }
+
+            button {
+                padding: 14px 20px;
+                font-size: 16px;
+                min-height: 44px;
+            }
+
             .debate-stage {
-                min-height: 410px;
+                min-height: 430px;
             }
 
             .debate-card {
-                width: 91%;
+                width: 84%;
+                margin-left: -42%;
+            }
+
+            .debate-card.preview-prev {
+                transform: translateX(-78%) scale(0.88);
             }
 
             .debate-card.preview-next {
-                transform: translateX(calc(100% + 8px)) scale(0.92);
+                transform: translateX(78%) scale(0.88);
             }
         }
     </style>
@@ -470,6 +497,9 @@
             Unknown: "#6b7280",
         };
         const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity"];
+
+        const COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요.";
+        const DEBATE_FAILURE_MSG = "이번 발언 생성에 실패했습니다. 다시 시도해주세요.";
 
         let debateSessionId = createUUID();
         let debateTopic = "";
@@ -565,8 +595,8 @@
             const model = safeLabel(payload.model, "");
             if (!model) return;
 
-            if (payload.error) {
-                responses[model] = `${payload.error}\n잠시 후 다시 시도해 주세요.`;
+            if (payload.success === false || payload.error) {
+                responses[model] = payload.error || COMPARE_FAILURE_MSG;
                 updateCompareCard(model, responses[model], true);
             } else if (payload.chunk) {
                 responses[model] += payload.chunk;
@@ -581,7 +611,7 @@
             try {
                 await streamCompareModel(model, lastCompareMessage, compareResponses);
             } catch (error) {
-                applyStreamChunk(compareResponses, { model, error: "[API 오류 네트워크 실패]" });
+                applyStreamChunk(compareResponses, { model, success: false, error: COMPARE_FAILURE_MSG });
             }
         }
 
@@ -593,7 +623,7 @@
             });
 
             if (!response.ok || !response.body) {
-                applyStreamChunk(responses, { model, error: `[API 오류 ${response.status}]` });
+                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
                 return;
             }
 
@@ -616,7 +646,7 @@
                     try {
                         applyStreamChunk(responses, JSON.parse(line.slice(6)));
                     } catch (error) {
-                        applyStreamChunk(responses, { model, error: "[API 오류 JSON 파싱 실패]" });
+                        applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
                     }
                 }
             }
@@ -651,7 +681,7 @@
                     .then(() => streamCompareModel(model, message, responses))
                     .catch(error => {
                         failures.push(`${model}: ${error.message}`);
-                        applyStreamChunk(responses, { model, error: "[API 오류 네트워크 실패]" });
+                        applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
                     })
             ));
 
@@ -727,15 +757,18 @@
                 element.style.borderLeftColor = isFailed ? "#dc2626" : color;
                 if (isFailed) element.classList.add("error-card");
 
-                if (index < activeCardIndex) {
-                    element.classList.add("exit-left");
-                } else if (index === activeCardIndex) {
+                if (index === activeCardIndex) {
                     element.classList.add("active");
+                } else if (index === activeCardIndex - 1) {
+                    element.classList.add("preview-prev");
+                    element.addEventListener("click", retreatDeck);
                 } else if (index === activeCardIndex + 1) {
                     element.classList.add("preview-next");
                     element.addEventListener("click", advanceDeck);
+                } else if (index < activeCardIndex) {
+                    element.classList.add("hidden-left");
                 } else {
-                    element.classList.add("hidden-card");
+                    element.classList.add("hidden-right");
                 }
 
                 const isActive = index === activeCardIndex;
@@ -772,7 +805,9 @@
 
                 element.addEventListener("touchend", event => {
                     const touchEndX = event.changedTouches[0].clientX;
-                    if (touchStartX - touchEndX > 45) advanceDeck();
+                    const delta = touchStartX - touchEndX;
+                    if (delta > 45) advanceDeck();
+                    else if (delta < -45) retreatDeck();
                 }, { passive: true });
 
                 stage.appendChild(element);
@@ -787,6 +822,14 @@
         function advanceDeck() {
             if (activeCardIndex >= debateCards.length - 1) return;
             activeCardIndex += 1;
+            userMovedDeck = true;
+            document.getElementById("newArrival").classList.remove("visible");
+            renderDebateDeck();
+        }
+
+        function retreatDeck() {
+            if (activeCardIndex <= 0) return;
+            activeCardIndex -= 1;
             userMovedDeck = true;
             document.getElementById("newArrival").classList.remove("visible");
             renderDebateDeck();
@@ -822,13 +865,15 @@
                 return data;
             } catch (error) {
                 showNotice("debateError", `오류: ${error.message}`);
-                debateCards = debateCards.filter(card => !(
-                    card.loading &&
-                    card.round_number === expectedRound &&
-                    card.speaker_index === expectedSpeaker
-                ));
-                renderDebateDeck();
-                return null;
+                replaceLoadingCards(expectedRound, [{
+                    round_number: expectedRound,
+                    speaker_index: expectedSpeaker,
+                    model: `${expectedSpeaker}번`,
+                    role: expectedSpeaker === 1 ? "1번 주장" : expectedSpeaker === 2 ? "2번 반박" : "3번 종합",
+                    content: DEBATE_FAILURE_MSG,
+                    success: false,
+                }]);
+                return { round: expectedRound, turns: [{ success: false }] };
             } finally {
                 debateInFlight = false;
                 showNotice("debateLoading", "");

@@ -31,34 +31,18 @@ MODEL_CACHE_TTL_SECONDS = 600
 # Allow up to 10 candidates per label so a label can keep falling back to other
 # free models even when several are rate-limited or out of context budget.
 MAX_MODEL_CANDIDATES_PER_LABEL = 10
+MIN_MODEL_CANDIDATES_PER_LABEL = 5
 HEALTHCHECK_CONCURRENCY = 2
 HEALTHCHECK_DELAY_SECONDS = 1.0
 # Wait this long before retrying the exact same model once after a 429.
 RATE_LIMIT_RETRY_DELAY_SECONDS = 1.0
 # Simple prompt used for the very last fallback so even a tiny model can answer.
 FINAL_ATTEMPT_PROMPT = "주제에 대해 한 문장으로 짧게 의견을 말해주세요."
+USER_FACING_FAILURE_MSG = "이번 발언 생성에 실패했습니다. 다시 시도해주세요."
+COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요."
 
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
 LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
-
-SPEECH_MODEL_WHITELIST = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "qwen/qwen3-coder:free",
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "deepseek/deepseek-r1:free",
-]
-
-# Round-robin assignment: give each label a different 1st-choice substitute so the
-# four non-OpenAI labels do not hammer the same model in quick succession (429 cause).
-# Google has no entry here because its own free company model is always tried first;
-# nvidia is its preferred substitute when no own-company model is available.
-LABEL_PREFERRED_WHITELIST_HEAD: dict[str, str] = {
-    "Anthropic": "meta-llama/llama-3.3-70b-instruct:free",
-    "Google": "nvidia/nemotron-3-super-120b-a12b:free",
-    "xAI": "deepseek/deepseek-r1:free",
-    "Perplexity": "qwen/qwen3-coder:free",
-}
 
 SUMMARY_MODEL_WHITELIST = [
     "meta-llama/llama-3.3-70b-instruct:free",
@@ -126,6 +110,67 @@ MODEL_MAPPING: dict[str, str] = {}
 FALLBACK_MODEL_MAPPING: dict[str, str] = {}
 MODEL_CANDIDATES: dict[str, list[str]] = {}
 IS_REAL_COMPANY_MODEL: dict[str, bool] = {}
+
+
+@dataclass(frozen=True)
+class LabelProviderConfig:
+    """Single place to edit when switching a label to an official paid API.
+
+    Today every label uses provider='openrouter'. To move OpenAI to the official API,
+    change provider to 'openai', set official_model_id (e.g. 'gpt-4o'), and point
+    official_api_base_url at OpenAI's endpoint — request_chat_completion routes there.
+    """
+
+    label: str
+    provider: str = "openrouter"
+    official_model_id: str | None = None
+    official_api_base_url: str | None = None
+    substitute_chain: tuple[str, ...] = ()
+
+
+# Fixed substitute preferences when a label has no free company model in the catalog.
+LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
+    "OpenAI": LabelProviderConfig(
+        label="OpenAI",
+        substitute_chain=(
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "qwen/qwen3-coder:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+        ),
+    ),
+    "Google": LabelProviderConfig(
+        label="Google",
+        substitute_chain=(
+            "qwen/qwen3-coder:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "deepseek/deepseek-r1:free",
+        ),
+    ),
+    "xAI": LabelProviderConfig(
+        label="xAI",
+        substitute_chain=(
+            "deepseek/deepseek-r1:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "qwen/qwen3-coder:free",
+        ),
+    ),
+    "Anthropic": LabelProviderConfig(
+        label="Anthropic",
+        substitute_chain=(
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "qwen/qwen3-coder:free",
+        ),
+    ),
+    "Perplexity": LabelProviderConfig(
+        label="Perplexity",
+        substitute_chain=(
+            "deepseek/deepseek-r1:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "qwen/qwen3-coder:free",
+        ),
+    ),
+}
 
 
 @dataclass
@@ -257,73 +302,119 @@ def qwen_model_score(model_id: str) -> tuple[int, int, str]:
     return coder_bonus + instruct_bonus + biggest_number, sum(numbers), model_id
 
 
-def resolve_whitelist_model(model_id: str, free_model_ids: set[str], all_free_models: list[str]) -> str | None:
-    if model_id in free_model_ids:
+def model_size_score(model_id: str) -> int:
+    numbers = [int(value) for value in re.findall(r"\d+", model_id)]
+    return max(numbers) if numbers else 0
+
+
+def largest_free_model_for_prefix(prefix: str) -> str | None:
+    models = [model_id for model_id in MODEL_CACHE_STATE.all_free_models if model_id.startswith(prefix)]
+    if not models:
+        return None
+    return sorted(models, key=model_size_score, reverse=True)[0]
+
+
+def resolve_catalog_model(model_id: str) -> str | None:
+    if model_id in MODEL_CACHE_STATE.free_model_ids:
         return model_id
     if model_id == "qwen/qwen3-coder:free":
         qwen_candidates = [
             candidate
-            for candidate in all_free_models
+            for candidate in MODEL_CACHE_STATE.all_free_models
             if candidate.startswith("qwen/") and candidate.endswith(":free")
         ]
         if qwen_candidates:
             return sorted(qwen_candidates, key=qwen_model_score, reverse=True)[0]
+    prefix = model_id.split("/", 1)[0] + "/" if "/" in model_id else ""
+    if prefix:
+        return largest_free_model_for_prefix(prefix)
     return None
 
 
-def whitelist_substitutes_for_label(label: str, whitelist: list[str]) -> list[str]:
-    own_prefix = COMPANY_PREFIXES[label]
-    candidates: list[str] = []
-    for model_id in whitelist:
-        resolved_model = resolve_whitelist_model(
-            model_id,
-            MODEL_CACHE_STATE.free_model_ids,
-            MODEL_CACHE_STATE.all_free_models,
-        )
-        if not resolved_model:
-            continue
-        if resolved_model.startswith(own_prefix):
-            continue
-        candidates.append(resolved_model)
-    return unique(candidates)
+def build_model_chain_for_label(label: str) -> list[str]:
+    """Ordered preference chain for one label: own-company free models first, then substitutes."""
+    prefix = COMPANY_PREFIXES[label]
+    chain: list[str] = []
 
+    company_model = largest_free_model_for_prefix(prefix)
+    if company_model:
+        chain.append(company_model)
 
-def random_free_substitutes_for_label(label: str, limit: int) -> list[str]:
+    for substitute in LABEL_PROVIDER_CONFIG[label].substitute_chain:
+        resolved = resolve_catalog_model(substitute)
+        if resolved:
+            chain.append(resolved)
+
     own_prefix = COMPANY_PREFIXES[label]
-    pool = [
+    extras = [
         model_id
-        for model_id in MODEL_CACHE_STATE.all_free_models
+        for model_id in sorted(MODEL_CACHE_STATE.all_free_models, key=model_size_score, reverse=True)
         if not model_id.startswith(own_prefix)
     ]
-    if not pool:
-        return []
-    return random.sample(pool, min(limit, len(pool)))
+    chain.extend(extras)
+    return unique(chain)
 
 
-def ordered_whitelist_for_label(label: str, whitelist: list[str]) -> list[str]:
-    """Reorder the whitelist so each label tries a different model first (round-robin)."""
-    preferred = LABEL_PREFERRED_WHITELIST_HEAD.get(label)
-    if not preferred or preferred not in whitelist:
-        return list(whitelist)
-    return [preferred] + [model_id for model_id in whitelist if model_id != preferred]
+def assign_models_without_overlap() -> dict[str, list[str]]:
+    """Pick 1st/2nd/3rd models per label so primary assignments never collide."""
+    raw_chains = {label: build_model_chain_for_label(label) for label in COMPANY_LABELS}
+    assigned: dict[str, list[str]] = {label: [] for label in COMPANY_LABELS}
+    globally_used: set[str] = set()
+
+    for tier in range(3):
+        for label in COMPANY_LABELS:
+            for model_id in raw_chains[label]:
+                if model_id in assigned[label] or model_id in globally_used:
+                    continue
+                assigned[label].append(model_id)
+                globally_used.add(model_id)
+                break
+
+    for label in COMPANY_LABELS:
+        if not assigned[label]:
+            for model_id in raw_chains[label]:
+                if model_id not in globally_used:
+                    assigned[label].append(model_id)
+                    globally_used.add(model_id)
+                    break
+            if not assigned[label]:
+                assigned[label].append(LAST_RESORT_MODEL)
+
+        for model_id in raw_chains[label]:
+            if len(assigned[label]) >= MAX_MODEL_CANDIDATES_PER_LABEL:
+                break
+            if model_id not in assigned[label]:
+                assigned[label].append(model_id)
+
+        while len(assigned[label]) < MIN_MODEL_CANDIDATES_PER_LABEL:
+            pool = [model_id for model_id in MODEL_CACHE_STATE.all_free_models if model_id not in assigned[label]]
+            if not pool:
+                if LAST_RESORT_MODEL not in assigned[label]:
+                    assigned[label].append(LAST_RESORT_MODEL)
+                break
+            assigned[label].append(pool[0])
+
+        if not assigned[label]:
+            assigned[label] = [LAST_RESORT_MODEL]
+
+    primaries = {label: models[0] for label, models in assigned.items() if models}
+    if len(set(primaries.values())) != len(primaries):
+        logger.warning("Primary model overlap detected after assignment: %s", primaries)
+    else:
+        logger.info("Unique primary model assignment: %s", primaries)
+
+    return assigned
 
 
-def build_candidates_for_label(label: str, whitelist: list[str]) -> list[str]:
-    ordered_whitelist = ordered_whitelist_for_label(label, whitelist)
-    same_company = unique(MODEL_CACHE_STATE.free_models_by_label.get(label, []))
-    substitutes = whitelist_substitutes_for_label(label, ordered_whitelist)
+def resolve_label_models(label: str) -> list[str]:
+    """Public resolver entry point — returns ordered model candidates for a UI label."""
+    if label not in MODEL_CANDIDATES or not MODEL_CANDIDATES[label]:
+        return [LAST_RESORT_MODEL]
+    return list(MODEL_CANDIDATES[label])
 
-    candidates = unique(same_company + substitutes)
 
-    # Pad with extra random free models so a single label has many fallbacks
-    # (up to MAX_MODEL_CANDIDATES_PER_LABEL) even if a few models are blocked.
-    if len(candidates) < MAX_MODEL_CANDIDATES_PER_LABEL:
-        extra = random_free_substitutes_for_label(label, MAX_MODEL_CANDIDATES_PER_LABEL * 2)
-        candidates = unique(candidates + extra)
-
-    if not candidates:
-        candidates = [LAST_RESORT_MODEL]
-    return candidates[:MAX_MODEL_CANDIDATES_PER_LABEL]
+def get_label_provider_config(label: str) -> LabelProviderConfig:
+    return LABEL_PROVIDER_CONFIG[label]
 
 
 def rebuild_model_mappings(source: str) -> None:
@@ -332,8 +423,9 @@ def rebuild_model_mappings(source: str) -> None:
     MODEL_CANDIDATES.clear()
     IS_REAL_COMPANY_MODEL.clear()
 
+    assignments = assign_models_without_overlap()
     for label in COMPANY_LABELS:
-        candidates = build_candidates_for_label(label, SPEECH_MODEL_WHITELIST)
+        candidates = assignments[label][:MAX_MODEL_CANDIDATES_PER_LABEL]
         MODEL_CANDIDATES[label] = candidates
         MODEL_MAPPING[label] = candidates[0]
         FALLBACK_MODEL_MAPPING[label] = candidates[1] if len(candidates) > 1 else candidates[0]
@@ -496,15 +588,24 @@ def make_failed_result(
 
 async def request_chat_completion(
     client: httpx.AsyncClient,
+    label: str,
     model_id: str,
     persona: str,
     prompt: str,
     max_tokens: int | None,
 ) -> httpx.Response:
+    config = get_label_provider_config(label)
+    if config.provider != "openrouter" and config.official_model_id and config.official_api_base_url:
+        url = config.official_api_base_url
+        model = config.official_model_id
+    else:
+        url = OPENROUTER_CHAT_URL
+        model = model_id
+
     return await client.post(
-        OPENROUTER_CHAT_URL,
+        url,
         headers=build_openrouter_headers(),
-        json=build_chat_payload(model_id, persona, prompt, stream=False, max_tokens=max_tokens),
+        json=build_chat_payload(model, persona, prompt, stream=False, max_tokens=max_tokens),
     )
 
 
@@ -518,7 +619,7 @@ async def final_attempt_model_call(
     try:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
             response = await request_chat_completion(
-                client, LAST_RESORT_MODEL, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200
+                client, label, LAST_RESORT_MODEL, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200
             )
     except httpx.HTTPError as exc:
         logger.warning("Final attempt request failed label=%s error=%s", label, exc)
@@ -552,7 +653,6 @@ async def final_attempt_model_call(
 async def call_ai_model(
     label: str,
     prompt: str,
-    whitelist: list[str] | None = None,
     max_tokens: int | None = None,
 ) -> ModelCallResult:
     if label not in COMPANY_LABELS:
@@ -560,14 +660,14 @@ async def call_ai_model(
 
     await ensure_model_cache_fresh()
     persona = PERSONAS[label]
-    candidates = build_candidates_for_label(label, whitelist or SPEECH_MODEL_WHITELIST)
+    candidates = resolve_label_models(label)
     requested_model = candidates[0]
     failed_candidates: list[str] = []
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         for model_id in candidates:
             try:
-                response = await request_chat_completion(client, model_id, persona, prompt, max_tokens)
+                response = await request_chat_completion(client, label, model_id, persona, prompt, max_tokens)
             except httpx.HTTPError as exc:
                 logger.warning("OpenRouter request failed label=%s model=%s error=%s", label, model_id, exc)
                 failed_candidates.append(model_id)
@@ -575,10 +675,15 @@ async def call_ai_model(
 
             # On 429, wait briefly and retry the SAME model once before moving on.
             if response.status_code == 429:
-                logger.warning("Rate limited, retrying once after %ss label=%s model=%s", RATE_LIMIT_RETRY_DELAY_SECONDS, label, model_id)
+                logger.warning(
+                    "Rate limited, retrying once after %ss label=%s model=%s",
+                    RATE_LIMIT_RETRY_DELAY_SECONDS,
+                    label,
+                    model_id,
+                )
                 await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
                 try:
-                    response = await request_chat_completion(client, model_id, persona, prompt, max_tokens)
+                    response = await request_chat_completion(client, label, model_id, persona, prompt, max_tokens)
                 except httpx.HTTPError as exc:
                     logger.warning("OpenRouter retry failed label=%s model=%s error=%s", label, model_id, exc)
                     failed_candidates.append(model_id)
@@ -621,7 +726,6 @@ async def call_ai_model(
                 failed_candidates=failed_candidates,
             )
 
-    # Every candidate failed: one last simple attempt before giving up.
     final_result = await final_attempt_model_call(label, requested_model, failed_candidates)
     if final_result is not None:
         return final_result
@@ -631,7 +735,7 @@ async def call_ai_model(
         requested_model=requested_model,
         actual_model=failed_candidates[-1] if failed_candidates else requested_model,
         failed_candidates=failed_candidates,
-        error="All model candidates failed",
+        error=USER_FACING_FAILURE_MSG,
     )
 
 
@@ -727,7 +831,6 @@ async def summarize_previous_round(session: DebateSession) -> None:
     result = await call_ai_model(
         summary_label,
         build_summary_prompt(session.previous_summary, successful_turns),
-        whitelist=SUMMARY_MODEL_WHITELIST,
         max_tokens=500,
     )
     if result.success:
@@ -782,7 +885,7 @@ def result_to_debate_turn(
         is_real_company_model=result.is_real_company_model,
         role=ROLE_BY_INDEX.get(speaker_index, "발언"),
         content=result.content,
-        success=True,
+        success=result.success,
         failed_candidates=result.failed_candidates,
     )
 
@@ -798,7 +901,7 @@ def make_failure_turn(round_number: int, speaker_index: int, requested_label: st
         requested_model="",
         is_real_company_model=False,
         role=ROLE_BY_INDEX.get(speaker_index, "발언"),
-        content="이번 발언 생성에 실패했습니다. 다시 시도해주세요.",
+        content=USER_FACING_FAILURE_MSG,
         success=False,
     )
 
@@ -822,7 +925,7 @@ async def produce_debate_speaker(
     )
 
     for label in requested_labels[:MAX_MODEL_CANDIDATES_PER_LABEL]:
-        result = await call_ai_model(label, prompt, whitelist=SPEECH_MODEL_WHITELIST)
+        result = await call_ai_model(label, prompt)
         session.failed_candidates.extend(result.failed_candidates)
         if result.success:
             return result_to_debate_turn(round_number, speaker_index, requested_label, result)
@@ -935,70 +1038,81 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
     await ensure_model_cache_fresh()
     label = data.model_name
     persona = PERSONAS[label]
-    candidates = build_candidates_for_label(label, SPEECH_MODEL_WHITELIST)
+    candidates = resolve_label_models(label)
 
     async def generate() -> AsyncIterator[str]:
+        payload = build_chat_payload(model_id="", persona=persona, prompt=data.message, stream=True)
+
         for model_id in candidates:
+            payload["model"] = model_id
             try:
                 async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-                    async with client.stream(
-                        "POST",
-                        OPENROUTER_CHAT_URL,
-                        headers=build_openrouter_headers(),
-                        json=build_chat_payload(model_id, persona, data.message, stream=True),
-                    ) as response:
-                        if response.status_code != 200:
-                            logger.warning(
-                                "OpenRouter stream returned non-200 label=%s model=%s status=%s",
-                                label,
-                                model_id,
-                                response.status_code,
-                            )
-                            if should_try_next_candidate(response.status_code) and model_id != candidates[-1]:
+                    for attempt in range(2):
+                        async with client.stream(
+                            "POST",
+                            OPENROUTER_CHAT_URL,
+                            headers=build_openrouter_headers(),
+                            json=payload,
+                        ) as response:
+                            if response.status_code == 429 and attempt == 0:
                                 await response.aread()
+                                await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
                                 continue
-                            yield sse({"model": data.model_name, "error": f"[API 오류 {response.status_code}]"})
-                            return
 
-                        async for line in response.aiter_lines():
-                            if not line or not line.startswith("data: "):
-                                continue
-                            if line == "data: [DONE]":
-                                return
-                            try:
-                                raw = json.loads(line[6:])
-                            except json.JSONDecodeError:
-                                yield sse({"model": data.model_name, "error": "[API 오류 JSON 파싱 실패]"})
-                                return
-
-                            if raw.get("error"):
-                                yield sse({"model": data.model_name, "error": "[API 오류 스트리밍 실패]"})
-                                return
-
-                            delta = (raw.get("choices") or [{}])[0].get("delta") or {}
-                            chunk = delta.get("content")
-                            if chunk:
-                                yield sse(
-                                    {
-                                        "model": data.model_name,
-                                        "actual_label": label_for_model_id(model_id),
-                                        "actual_model": model_id,
-                                        "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
-                                        "chunk": chunk,
-                                    }
+                            if response.status_code != 200:
+                                logger.warning(
+                                    "OpenRouter stream returned non-200 label=%s model=%s status=%s",
+                                    label,
+                                    model_id,
+                                    response.status_code,
                                 )
-                        return
+                                if should_try_next_candidate(response.status_code) and model_id != candidates[-1]:
+                                    await response.aread()
+                                    break
+                                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                return
+
+                            async for line in response.aiter_lines():
+                                if not line or not line.startswith("data: "):
+                                    continue
+                                if line == "data: [DONE]":
+                                    return
+                                try:
+                                    raw = json.loads(line[6:])
+                                except json.JSONDecodeError:
+                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                    return
+
+                                if raw.get("error"):
+                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                    return
+
+                                delta = (raw.get("choices") or [{}])[0].get("delta") or {}
+                                chunk = delta.get("content")
+                                if chunk:
+                                    yield sse(
+                                        {
+                                            "model": data.model_name,
+                                            "success": True,
+                                            "actual_label": label_for_model_id(model_id),
+                                            "actual_model": model_id,
+                                            "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
+                                            "chunk": chunk,
+                                        }
+                                    )
+                            return
             except httpx.HTTPError as exc:
+                logger.warning("OpenRouter stream request failed label=%s model=%s error=%s", label, model_id, exc)
                 if model_id != candidates[-1]:
                     continue
-                yield sse({"model": data.model_name, "error": f"[API 오류 {exc.__class__.__name__}]"})
+                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                 return
             except Exception as exc:
                 logger.exception("Unexpected stream error label=%s model=%s", label, model_id)
-                yield sse({"model": data.model_name, "error": f"[API 오류 {exc.__class__.__name__}]"})
+                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                 return
 
-        yield sse({"model": data.model_name, "error": "[API 오류 모든 후보 실패]"})
+        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -1059,7 +1173,15 @@ async def models_info() -> dict:
         "mapping": MODEL_MAPPING,
         "fallbackMapping": FALLBACK_MODEL_MAPPING,
         "candidates": MODEL_CANDIDATES,
-        "speech_model_whitelist": SPEECH_MODEL_WHITELIST,
+        "label_provider_config": {
+            label: {
+                "provider": config.provider,
+                "official_model_id": config.official_model_id,
+                "official_api_base_url": config.official_api_base_url,
+                "substitute_chain": list(config.substitute_chain),
+            }
+            for label, config in LABEL_PROVIDER_CONFIG.items()
+        },
         "summary_model_whitelist": SUMMARY_MODEL_WHITELIST,
         "is_real_company_model": IS_REAL_COMPANY_MODEL,
         "free_models_by_label": MODEL_CACHE_STATE.free_models_by_label,
