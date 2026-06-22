@@ -191,6 +191,7 @@ MODEL_CACHE_LOCK = asyncio.Lock()
 class CompareRequest(BaseModel):
     message: str
     model_name: str
+    compare_session_id: str = ""
 
 
 class DebateRequest(BaseModel):
@@ -245,6 +246,8 @@ class ModelCallResult(BaseModel):
 
 DEBATE_SESSIONS: dict[str, DebateSession] = {}
 DEBATE_LOCKS: dict[str, asyncio.Lock] = {}
+COMPARE_ACTIVE_MODELS: dict[str, set[str]] = {}
+COMPARE_SESSION_LOCK = asyncio.Lock()
 
 
 def build_openrouter_headers() -> dict[str, str]:
@@ -827,7 +830,11 @@ async def summarize_previous_round(session: DebateSession) -> None:
     if not successful_turns:
         return
 
-    summary_label = "OpenAI"
+    summary_label = (
+        session.current_round_turns[-1].requested_label
+        if session.current_round_turns
+        else random.choice(COMPANY_LABELS)
+    )
     result = await call_ai_model(
         summary_label,
         build_summary_prompt(session.previous_summary, successful_turns),
@@ -933,11 +940,20 @@ async def produce_debate_speaker(
     return None
 
 
+def pick_speaker_labels_avoiding_repeat(previous_labels: list[str]) -> list[str]:
+    prev_first = previous_labels[0] if previous_labels else None
+    for _ in range(20):
+        sample = random.sample(COMPANY_LABELS, 3)
+        if sample[0] != prev_first:
+            return sample
+    return random.sample(COMPANY_LABELS, 3)
+
+
 async def prepare_next_round_if_needed(session: DebateSession) -> str | None:
     if session.round_number == 0:
         session.round_number = 1
         session.current_round_turns = []
-        session.round_speaker_labels = random.sample(COMPANY_LABELS, 3)
+        session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(session.round_speaker_labels)
         round_user_input = session.pending_user_input
         session.pending_user_input = None
         return round_user_input
@@ -952,7 +968,7 @@ async def prepare_next_round_if_needed(session: DebateSession) -> str | None:
     round_user_input = session.pending_user_input
     session.pending_user_input = None
     session.current_round_turns = []
-    session.round_speaker_labels = random.sample(COMPANY_LABELS, 3)
+    session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(session.round_speaker_labels)
     return round_user_input
 
 
@@ -963,7 +979,7 @@ async def run_debate_step(session: DebateSession) -> list[DebateTurn]:
         return []
 
     if len(session.round_speaker_labels) < 3:
-        session.round_speaker_labels = random.sample(COMPANY_LABELS, 3)
+        session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(session.round_speaker_labels)
 
     requested_label = session.round_speaker_labels[speaker_index - 1]
     turn = await produce_debate_speaker(
@@ -1030,6 +1046,29 @@ def debate_response(session: DebateSession, turns: list[DebateTurn], queued: boo
     }
 
 
+async def acquire_compare_model(session_id: str, candidates: list[str]) -> str | None:
+    if not session_id:
+        return candidates[0] if candidates else None
+    async with COMPARE_SESSION_LOCK:
+        used = COMPARE_ACTIVE_MODELS.setdefault(session_id, set())
+        for model_id in candidates:
+            if model_id not in used:
+                used.add(model_id)
+                return model_id
+    return None
+
+
+async def release_compare_model(session_id: str, model_id: str) -> None:
+    if not session_id or not model_id:
+        return
+    async with COMPARE_SESSION_LOCK:
+        bucket = COMPARE_ACTIVE_MODELS.get(session_id)
+        if bucket is not None:
+            bucket.discard(model_id)
+            if not bucket:
+                COMPARE_ACTIVE_MODELS.pop(session_id, None)
+
+
 @app.post("/compare/stream")
 async def stream_compare(data: CompareRequest) -> StreamingResponse:
     if data.model_name not in COMPANY_LABELS:
@@ -1042,9 +1081,20 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
 
     async def generate() -> AsyncIterator[str]:
         payload = build_chat_payload(model_id="", persona=persona, prompt=data.message, stream=True)
+        session_id = data.compare_session_id.strip()
+        excluded_by_failure: set[str] = set()
 
-        for model_id in candidates:
-            payload["model"] = model_id
+        while True:
+            pool = [model_id for model_id in candidates if model_id not in excluded_by_failure]
+            if not pool:
+                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                return
+
+            model_id = await acquire_compare_model(session_id, pool)
+            if model_id is None:
+                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                return
+
             try:
                 async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                     for attempt in range(2):
@@ -1052,7 +1102,7 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                             "POST",
                             OPENROUTER_CHAT_URL,
                             headers=build_openrouter_headers(),
-                            json=payload,
+                            json={**payload, "model": model_id},
                         ) as response:
                             if response.status_code == 429 and attempt == 0:
                                 await response.aread()
@@ -1066,8 +1116,9 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                     model_id,
                                     response.status_code,
                                 )
-                                if should_try_next_candidate(response.status_code) and model_id != candidates[-1]:
+                                if should_try_next_candidate(response.status_code):
                                     await response.aread()
+                                    excluded_by_failure.add(model_id)
                                     break
                                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                 return
@@ -1103,16 +1154,19 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                             return
             except httpx.HTTPError as exc:
                 logger.warning("OpenRouter stream request failed label=%s model=%s error=%s", label, model_id, exc)
-                if model_id != candidates[-1]:
-                    continue
-                yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                return
-            except Exception as exc:
+                excluded_by_failure.add(model_id)
+            except Exception:
                 logger.exception("Unexpected stream error label=%s model=%s", label, model_id)
                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                 return
+            finally:
+                await release_compare_model(session_id, model_id)
 
-        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+            if model_id in excluded_by_failure:
+                continue
+
+            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+            return
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
