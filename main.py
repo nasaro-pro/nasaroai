@@ -28,9 +28,15 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 MODEL_REFRESH_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 MODEL_CACHE_TTL_SECONDS = 600
-MAX_MODEL_CANDIDATES_PER_LABEL = 5
+# Allow up to 10 candidates per label so a label can keep falling back to other
+# free models even when several are rate-limited or out of context budget.
+MAX_MODEL_CANDIDATES_PER_LABEL = 10
 HEALTHCHECK_CONCURRENCY = 2
 HEALTHCHECK_DELAY_SECONDS = 1.0
+# Wait this long before retrying the exact same model once after a 429.
+RATE_LIMIT_RETRY_DELAY_SECONDS = 1.0
+# Simple prompt used for the very last fallback so even a tiny model can answer.
+FINAL_ATTEMPT_PROMPT = "주제에 대해 한 문장으로 짧게 의견을 말해주세요."
 
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
 LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
@@ -42,6 +48,17 @@ SPEECH_MODEL_WHITELIST = [
     "google/gemma-4-26b-a4b-it:free",
     "deepseek/deepseek-r1:free",
 ]
+
+# Round-robin assignment: give each label a different 1st-choice substitute so the
+# four non-OpenAI labels do not hammer the same model in quick succession (429 cause).
+# Google has no entry here because its own free company model is always tried first;
+# nvidia is its preferred substitute when no own-company model is available.
+LABEL_PREFERRED_WHITELIST_HEAD: dict[str, str] = {
+    "Anthropic": "meta-llama/llama-3.3-70b-instruct:free",
+    "Google": "nvidia/nemotron-3-super-120b-a12b:free",
+    "xAI": "deepseek/deepseek-r1:free",
+    "Perplexity": "qwen/qwen3-coder:free",
+}
 
 SUMMARY_MODEL_WHITELIST = [
     "meta-llama/llama-3.3-70b-instruct:free",
@@ -135,6 +152,7 @@ class DebateRequest(BaseModel):
     session_id: str
     topic: str
     user_input: str | None = None
+    retry_speaker_index: int | None = None
 
 
 class DebateTurn(BaseModel):
@@ -148,6 +166,7 @@ class DebateTurn(BaseModel):
     is_real_company_model: bool
     role: str
     content: str
+    success: bool = True
     failed_candidates: list[str] = Field(default_factory=list)
 
 
@@ -281,13 +300,27 @@ def random_free_substitutes_for_label(label: str, limit: int) -> list[str]:
     return random.sample(pool, min(limit, len(pool)))
 
 
+def ordered_whitelist_for_label(label: str, whitelist: list[str]) -> list[str]:
+    """Reorder the whitelist so each label tries a different model first (round-robin)."""
+    preferred = LABEL_PREFERRED_WHITELIST_HEAD.get(label)
+    if not preferred or preferred not in whitelist:
+        return list(whitelist)
+    return [preferred] + [model_id for model_id in whitelist if model_id != preferred]
+
+
 def build_candidates_for_label(label: str, whitelist: list[str]) -> list[str]:
+    ordered_whitelist = ordered_whitelist_for_label(label, whitelist)
     same_company = unique(MODEL_CACHE_STATE.free_models_by_label.get(label, []))
-    substitutes = whitelist_substitutes_for_label(label, whitelist)
-    if not substitutes:
-        substitutes = random_free_substitutes_for_label(label, MAX_MODEL_CANDIDATES_PER_LABEL)
+    substitutes = whitelist_substitutes_for_label(label, ordered_whitelist)
 
     candidates = unique(same_company + substitutes)
+
+    # Pad with extra random free models so a single label has many fallbacks
+    # (up to MAX_MODEL_CANDIDATES_PER_LABEL) even if a few models are blocked.
+    if len(candidates) < MAX_MODEL_CANDIDATES_PER_LABEL:
+        extra = random_free_substitutes_for_label(label, MAX_MODEL_CANDIDATES_PER_LABEL * 2)
+        candidates = unique(candidates + extra)
+
     if not candidates:
         candidates = [LAST_RESORT_MODEL]
     return candidates[:MAX_MODEL_CANDIDATES_PER_LABEL]
@@ -461,6 +494,61 @@ def make_failed_result(
     )
 
 
+async def request_chat_completion(
+    client: httpx.AsyncClient,
+    model_id: str,
+    persona: str,
+    prompt: str,
+    max_tokens: int | None,
+) -> httpx.Response:
+    return await client.post(
+        OPENROUTER_CHAT_URL,
+        headers=build_openrouter_headers(),
+        json=build_chat_payload(model_id, persona, prompt, stream=False, max_tokens=max_tokens),
+    )
+
+
+async def final_attempt_model_call(
+    label: str,
+    requested_model: str,
+    failed_candidates: list[str],
+) -> ModelCallResult | None:
+    """Last resort: a short, simple prompt to LAST_RESORT_MODEL so the user still gets something."""
+    persona = PERSONAS[label]
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            response = await request_chat_completion(
+                client, LAST_RESORT_MODEL, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200
+            )
+    except httpx.HTTPError as exc:
+        logger.warning("Final attempt request failed label=%s error=%s", label, exc)
+        return None
+
+    if response.status_code != 200:
+        logger.warning("Final attempt non-200 label=%s status=%s", label, response.status_code)
+        return None
+
+    try:
+        content = extract_content(response.json())
+    except json.JSONDecodeError:
+        return None
+
+    if not content.strip():
+        return None
+
+    logger.info("Final attempt succeeded label=%s model=%s", label, LAST_RESORT_MODEL)
+    return ModelCallResult(
+        success=True,
+        content=content,
+        requested_label=label,
+        actual_label=label_for_model_id(LAST_RESORT_MODEL),
+        requested_model=requested_model,
+        actual_model=LAST_RESORT_MODEL,
+        is_real_company_model=False,
+        failed_candidates=failed_candidates,
+    )
+
+
 async def call_ai_model(
     label: str,
     prompt: str,
@@ -478,23 +566,24 @@ async def call_ai_model(
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         for model_id in candidates:
-            # TEMP DEBUG LOG - remove after diagnosing 429 issue
-            logger.info("REQUEST label=%s model=%s", label, model_id)
             try:
-                response = await client.post(
-                    OPENROUTER_CHAT_URL,
-                    headers=build_openrouter_headers(),
-                    json=build_chat_payload(model_id, persona, prompt, stream=False, max_tokens=max_tokens),
-                )
+                response = await request_chat_completion(client, model_id, persona, prompt, max_tokens)
             except httpx.HTTPError as exc:
                 logger.warning("OpenRouter request failed label=%s model=%s error=%s", label, model_id, exc)
                 failed_candidates.append(model_id)
                 continue
 
-            # TEMP DEBUG LOG - remove after diagnosing 429 issue
-            logger.info("RESPONSE label=%s model=%s status=%s", label, model_id, response.status_code)
+            # On 429, wait briefly and retry the SAME model once before moving on.
             if response.status_code == 429:
-                logger.warning("RATE_LIMITED label=%s model=%s", label, model_id)
+                logger.warning("Rate limited, retrying once after %ss label=%s model=%s", RATE_LIMIT_RETRY_DELAY_SECONDS, label, model_id)
+                await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                try:
+                    response = await request_chat_completion(client, model_id, persona, prompt, max_tokens)
+                except httpx.HTTPError as exc:
+                    logger.warning("OpenRouter retry failed label=%s model=%s error=%s", label, model_id, exc)
+                    failed_candidates.append(model_id)
+                    continue
+
             if response.status_code != 200:
                 logger.warning(
                     "OpenRouter returned non-200 label=%s model=%s status=%s body=%s",
@@ -506,13 +595,7 @@ async def call_ai_model(
                 failed_candidates.append(model_id)
                 if should_try_next_candidate(response.status_code):
                     continue
-                return make_failed_result(
-                    requested_label=label,
-                    requested_model=requested_model,
-                    actual_model=model_id,
-                    failed_candidates=failed_candidates,
-                    error=f"[API 오류 {response.status_code}]",
-                )
+                break
 
             try:
                 content = extract_content(response.json())
@@ -538,6 +621,11 @@ async def call_ai_model(
                 failed_candidates=failed_candidates,
             )
 
+    # Every candidate failed: one last simple attempt before giving up.
+    final_result = await final_attempt_model_call(label, requested_model, failed_candidates)
+    if final_result is not None:
+        return final_result
+
     return make_failed_result(
         requested_label=label,
         requested_model=requested_model,
@@ -547,11 +635,31 @@ async def call_ai_model(
     )
 
 
-def format_prior_turns(turns: list[DebateTurn]) -> str:
-    return "\n\n".join(
-        f"{turn.speaker_index}번 발언자({turn.actual_label}) 원문:\n{turn.content}"
-        for turn in turns
-    )
+def compress_turn_content(text: str, max_sentences: int = 2, max_chars: int = 180) -> str:
+    clean = re.sub(r"\s+", " ", text).strip()
+    sentences = re.split(r"(?<=[.!?。!?])\s+", clean)
+    summary = " ".join(sentences[:max_sentences]).strip() or clean
+    if len(summary) > max_chars:
+        summary = summary[:max_chars].rstrip() + "..."
+    return summary
+
+
+def format_prior_turns(turns: list[DebateTurn], compress_older: bool = False) -> str:
+    # When there are several prior turns, keep only the most recent one verbatim and
+    # compress the earlier ones so the prompt does not grow without bound.
+    if not compress_older or len(turns) <= 1:
+        return "\n\n".join(
+            f"{turn.speaker_index}번 발언자({turn.actual_label}) 원문:\n{turn.content}"
+            for turn in turns
+        )
+
+    *older, latest = turns
+    parts = [
+        f"{turn.speaker_index}번 발언자({turn.actual_label}) 요약:\n{compress_turn_content(turn.content)}"
+        for turn in older
+    ]
+    parts.append(f"{latest.speaker_index}번 발언자({latest.actual_label}) 원문:\n{latest.content}")
+    return "\n\n".join(parts)
 
 
 def build_round_prompt(
@@ -585,11 +693,15 @@ def build_round_prompt(
         )
 
     role_instruction = "반박/보완" if speaker_index == 2 else "반박하거나 종합"
+    # From the point there are multiple prior speeches, compress older ones to keep
+    # the prompt within free-model context limits.
+    compress_older = len(prior_turns) >= 2
+    prior_text = format_prior_turns(prior_turns, compress_older=compress_older)
     return (
         f"주제: {topic}\n\n"
-        f"현재 라운드에서 당신보다 앞선 모든 발언의 전체 원문입니다.\n\n"
-        f"{format_prior_turns(prior_turns)}\n\n"
-        f"당신은 {speaker_index}번 발언자입니다. 위 원문 전체를 직접 참고하여 "
+        f"현재 라운드에서 당신보다 앞선 발언입니다.\n\n"
+        f"{prior_text}\n\n"
+        f"당신은 {speaker_index}번 발언자입니다. 위 발언을 참고하여 "
         f"{role_instruction}하는 답변을 한국어로 제시하세요."
     )
 
@@ -607,13 +719,14 @@ def build_summary_prompt(existing_summary: str, turns: list[DebateTurn]) -> str:
 
 
 async def summarize_previous_round(session: DebateSession) -> None:
-    if not session.current_round_turns:
+    successful_turns = [turn for turn in session.current_round_turns if turn.success]
+    if not successful_turns:
         return
 
     summary_label = "OpenAI"
     result = await call_ai_model(
         summary_label,
-        build_summary_prompt(session.previous_summary, session.current_round_turns),
+        build_summary_prompt(session.previous_summary, successful_turns),
         whitelist=SUMMARY_MODEL_WHITELIST,
         max_tokens=500,
     )
@@ -622,7 +735,7 @@ async def summarize_previous_round(session: DebateSession) -> None:
     else:
         fallback_lines = [
             f"{turn.speaker_index}번({turn.actual_label})은 {turn.content}"
-            for turn in session.current_round_turns
+            for turn in successful_turns
         ]
         session.previous_summary = (session.previous_summary + "\n\n" + "\n".join(fallback_lines)).strip()
         session.failed_candidates.extend(result.failed_candidates)
@@ -645,17 +758,19 @@ def append_pending_user_input(session: DebateSession, content: str, target_round
     session.user_input_history.append(UserInputHistoryItem(round_number=target_round, content=clean_content))
 
 
+ROLE_BY_INDEX = {
+    1: "1번 주장",
+    2: "2번 반박",
+    3: "3번 종합",
+}
+
+
 def result_to_debate_turn(
     round_number: int,
     speaker_index: int,
     requested_label: str,
     result: ModelCallResult,
 ) -> DebateTurn:
-    role_by_index = {
-        1: "1번 주장",
-        2: "2번 반박",
-        3: "3번 종합",
-    }
     return DebateTurn(
         round_number=round_number,
         speaker_index=speaker_index,
@@ -665,9 +780,26 @@ def result_to_debate_turn(
         actual_model=result.actual_model,
         requested_model=result.requested_model,
         is_real_company_model=result.is_real_company_model,
-        role=role_by_index.get(speaker_index, "발언"),
+        role=ROLE_BY_INDEX.get(speaker_index, "발언"),
         content=result.content,
+        success=True,
         failed_candidates=result.failed_candidates,
+    )
+
+
+def make_failure_turn(round_number: int, speaker_index: int, requested_label: str) -> DebateTurn:
+    return DebateTurn(
+        round_number=round_number,
+        speaker_index=speaker_index,
+        model=requested_label,
+        actual_label=requested_label,
+        requested_label=requested_label,
+        actual_model="",
+        requested_model="",
+        is_real_company_model=False,
+        role=ROLE_BY_INDEX.get(speaker_index, "발언"),
+        content="이번 발언 생성에 실패했습니다. 다시 시도해주세요.",
+        success=False,
     )
 
 
@@ -736,13 +868,48 @@ async def run_debate_step(session: DebateSession) -> list[DebateTurn]:
         round_number=session.round_number,
         speaker_index=speaker_index,
         requested_label=requested_label,
-        prior_turns=session.current_round_turns,
+        # Only feed successful prior speeches into the next prompt.
+        prior_turns=[t for t in session.current_round_turns if t.success],
         round_user_input=round_user_input,
     )
+    # Never return an empty turns list: a failed speaker becomes an explicit failure
+    # turn so the frontend always has something to render instead of a stuck card.
     if turn is None:
-        return []
+        turn = make_failure_turn(session.round_number, speaker_index, requested_label)
 
     session.current_round_turns.append(turn)
+    return [turn]
+
+
+async def retry_debate_speaker(session: DebateSession, speaker_index: int) -> list[DebateTurn]:
+    if speaker_index < 1 or speaker_index > 3:
+        return []
+
+    if len(session.round_speaker_labels) >= speaker_index:
+        requested_label = session.round_speaker_labels[speaker_index - 1]
+    else:
+        requested_label = random.choice(COMPANY_LABELS)
+
+    prior_turns = [
+        turn for turn in session.current_round_turns if turn.speaker_index < speaker_index and turn.success
+    ]
+    turn = await produce_debate_speaker(
+        session=session,
+        round_number=session.round_number,
+        speaker_index=speaker_index,
+        requested_label=requested_label,
+        prior_turns=prior_turns,
+        round_user_input=None,
+    )
+    if turn is None:
+        turn = make_failure_turn(session.round_number, speaker_index, requested_label)
+
+    # Replace the existing (failed) turn for this speaker slot, keeping order by index.
+    session.current_round_turns = [
+        existing for existing in session.current_round_turns if existing.speaker_index != speaker_index
+    ]
+    session.current_round_turns.append(turn)
+    session.current_round_turns.sort(key=lambda existing: existing.speaker_index)
     return [turn]
 
 
@@ -772,8 +939,6 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
 
     async def generate() -> AsyncIterator[str]:
         for model_id in candidates:
-            # TEMP DEBUG LOG - remove after diagnosing 429 issue
-            logger.info("REQUEST label=%s model=%s", label, model_id)
             try:
                 async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                     async with client.stream(
@@ -782,10 +947,6 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                         headers=build_openrouter_headers(),
                         json=build_chat_payload(model_id, persona, data.message, stream=True),
                     ) as response:
-                        # TEMP DEBUG LOG - remove after diagnosing 429 issue
-                        logger.info("RESPONSE label=%s model=%s status=%s", label, model_id, response.status_code)
-                        if response.status_code == 429:
-                            logger.warning("RATE_LIMITED label=%s model=%s", label, model_id)
                         if response.status_code != 200:
                             logger.warning(
                                 "OpenRouter stream returned non-200 label=%s model=%s status=%s",
@@ -864,6 +1025,13 @@ async def debate_continue(request: DebateRequest) -> dict:
         raise HTTPException(status_code=404, detail="Debate session not found")
 
     lock = get_debate_lock(request.session_id)
+
+    # Retry a single failed speaker slot in the current round without advancing.
+    if request.retry_speaker_index is not None:
+        async with lock:
+            turns = await retry_debate_speaker(session, request.retry_speaker_index)
+        return debate_response(session, turns)
+
     if request.user_input and (lock.locked() or len(session.current_round_turns) < 3):
         append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
         return debate_response(session, [], queued=True)

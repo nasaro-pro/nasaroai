@@ -210,6 +210,32 @@
             line-height: 1.65;
         }
 
+        .compare-card.error-card {
+            border-left-color: #dc2626;
+            background: #fef2f2;
+        }
+
+        .retry-row {
+            padding: 0 12px 12px;
+        }
+
+        .retry-row:empty {
+            padding: 0;
+        }
+
+        .retry-button {
+            width: auto;
+            min-height: 36px;
+            padding: 8px 16px;
+            background: #dc2626;
+            color: #fff;
+            font-size: 13px;
+        }
+
+        .retry-button:hover {
+            background: #b91c1c;
+        }
+
         /* Debate uses a separate one-way deck carousel instead of the compare grid. */
         .debate-stage {
             position: relative;
@@ -259,6 +285,15 @@
             opacity: 0;
             z-index: 0;
             pointer-events: none;
+        }
+
+        .debate-card.error-card {
+            border-left-color: #dc2626;
+            background: #fef2f2;
+        }
+
+        .debate-retry {
+            padding: 0 14px 16px;
         }
 
         .debate-card-header {
@@ -446,6 +481,10 @@
         let userMovedDeck = false;
         let touchStartX = 0;
 
+        // Kept at module scope so the per-card retry button can re-run a single model.
+        let lastCompareMessage = "";
+        let compareResponses = {};
+
         function createUUID() {
             if (crypto.randomUUID) return crypto.randomUUID();
             return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
@@ -500,13 +539,26 @@
                     <span>${model}</span>
                 </div>
                 <div id="content-${model}" class="compare-content"></div>
+                <div id="retry-${model}" class="retry-row"></div>
             `;
             document.getElementById("compareResponses").appendChild(card);
         }
 
-        function updateCompareCard(model, content) {
+        function updateCompareCard(model, content, isError = false) {
             const element = document.getElementById(`content-${model}`);
             if (element) element.textContent = content;
+
+            const card = document.getElementById(`response-${model}`);
+            if (card) card.classList.toggle("error-card", isError);
+
+            const retry = document.getElementById(`retry-${model}`);
+            if (!retry) return;
+            if (isError) {
+                retry.innerHTML = `<button class="retry-button" type="button">다시 시도</button>`;
+                retry.querySelector("button").addEventListener("click", () => retryCompareModel(model));
+            } else {
+                retry.innerHTML = "";
+            }
         }
 
         function applyStreamChunk(responses, payload) {
@@ -514,11 +566,23 @@
             if (!model) return;
 
             if (payload.error) {
-                responses[model] = payload.error;
+                responses[model] = `${payload.error}\n잠시 후 다시 시도해 주세요.`;
+                updateCompareCard(model, responses[model], true);
             } else if (payload.chunk) {
                 responses[model] += payload.chunk;
+                updateCompareCard(model, responses[model]);
             }
-            updateCompareCard(model, responses[model]);
+        }
+
+        async function retryCompareModel(model) {
+            if (!lastCompareMessage) return;
+            compareResponses[model] = "";
+            updateCompareCard(model, "다시 시도 중...");
+            try {
+                await streamCompareModel(model, lastCompareMessage, compareResponses);
+            } catch (error) {
+                applyStreamChunk(compareResponses, { model, error: "[API 오류 네트워크 실패]" });
+            }
         }
 
         async function streamCompareModel(model, message, responses) {
@@ -564,7 +628,9 @@
 
             const button = document.getElementById("compareButton");
             const responsesElement = document.getElementById("compareResponses");
-            const responses = {};
+            lastCompareMessage = message;
+            compareResponses = {};
+            const responses = compareResponses;
 
             button.disabled = true;
             showNotice("compareError", "");
@@ -621,8 +687,9 @@
 
         function replaceLoadingCards(roundNumber, turns) {
             turns.forEach(turn => {
+                // Replace any existing card (loading OR previously failed) for this slot,
+                // so retried speakers update in place.
                 debateCards = debateCards.filter(card => !(
-                    card.loading &&
                     card.round_number === roundNumber &&
                     card.speaker_index === turn.speaker_index
                 ));
@@ -654,9 +721,11 @@
             debateCards.forEach((card, index) => {
                 const label = safeLabel(card.model || card.actual_label);
                 const color = colorFor(label);
+                const isFailed = card.success === false && !card.loading;
                 const element = document.createElement("article");
                 element.className = "debate-card";
-                element.style.borderLeftColor = color;
+                element.style.borderLeftColor = isFailed ? "#dc2626" : color;
+                if (isFailed) element.classList.add("error-card");
 
                 if (index < activeCardIndex) {
                     element.classList.add("exit-left");
@@ -669,15 +738,17 @@
                     element.classList.add("hidden-card");
                 }
 
-                const body = index === activeCardIndex ? card.content : summarizeOneLine(card.content);
+                const isActive = index === activeCardIndex;
+                const body = isActive ? card.content : summarizeOneLine(card.content);
                 element.innerHTML = `
-                    <div class="debate-card-header" style="color: ${color};">
-                        <span class="dot" style="background: ${color};"></span>
+                    <div class="debate-card-header" style="color: ${isFailed ? "#dc2626" : color};">
+                        <span class="dot" style="background: ${isFailed ? "#dc2626" : color};"></span>
                         <span>${card.round_number || "-"}라운드 · ${label}</span>
                         <span class="debate-badge">${card.role || "발언"}</span>
                     </div>
-                    <div class="${index === activeCardIndex ? "debate-card-body" : "debate-preview-body"}"></div>
-                    ${index === activeCardIndex ? `
+                    <div class="${isActive ? "debate-card-body" : "debate-preview-body"}"></div>
+                    ${isActive && isFailed ? `<div class="debate-retry"><button class="retry-button" type="button">다시 시도</button></div>` : ""}
+                    ${isActive && !isFailed ? `
                         <div class="debate-debug">
                             요청: ${card.requested_label || "-"} / 실제: ${card.actual_label || label}<br>
                             요청 모델: ${card.requested_model || "-"}<br>
@@ -686,7 +757,14 @@
                         </div>
                     ` : ""}
                 `;
-                element.querySelector(index === activeCardIndex ? ".debate-card-body" : ".debate-preview-body").textContent = body;
+                element.querySelector(isActive ? ".debate-card-body" : ".debate-preview-body").textContent = body;
+
+                if (isActive && isFailed) {
+                    element.querySelector(".retry-button").addEventListener("click", event => {
+                        event.stopPropagation();
+                        retryDebateSpeaker(card.round_number, card.speaker_index);
+                    });
+                }
 
                 element.addEventListener("touchstart", event => {
                     touchStartX = event.touches[0].clientX;
@@ -792,13 +870,47 @@
                     showLoadingCard: true,
                     loadingText: `${speakerIndex}번 발언자를 생성하는 중입니다. /debate는 순차 호출, /compare는 병렬 스트리밍입니다.`,
                 });
-                if (!data || data.queued || !data.turns || !data.turns.length) break;
+                // Stop only on a hard failure (network/HTTP) or a queued request.
+                // A failed speaker turn (success:false) is shown as an error card and we
+                // keep going so the remaining speakers are still generated.
+                if (!data || data.queued) break;
             }
 
             if (queuedDuringFlight && !debateInFlight) {
                 queuedDuringFlight = false;
                 await handleDebateContinue();
             }
+        }
+
+        async function retryDebateSpeaker(roundNumber, speakerIndex) {
+            if (debateInFlight) return;
+
+            // Flip the failed card back to a loading state while we retry.
+            const index = debateCards.findIndex(card =>
+                card.round_number === roundNumber && card.speaker_index === speakerIndex);
+            if (index !== -1) {
+                debateCards[index] = {
+                    id: `loading-${roundNumber}-${speakerIndex}-${Date.now()}`,
+                    loading: true,
+                    round_number: roundNumber,
+                    speaker_index: speakerIndex,
+                    model: `${speakerIndex}번`,
+                    role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 반박" : "3번 종합",
+                    content: "다시 시도하는 중...",
+                };
+                renderDebateDeck();
+            }
+
+            await requestDebate("/debate/continue", {
+                session_id: debateSessionId,
+                topic: debateTopic,
+                retry_speaker_index: speakerIndex,
+            }, {
+                expectedRound: roundNumber,
+                expectedSpeaker: speakerIndex,
+                showLoadingCard: false,
+                loadingText: `${speakerIndex}번 발언자를 다시 생성하는 중입니다.`,
+            });
         }
 
         async function handleDebateContinue(userInput = null) {
