@@ -478,6 +478,8 @@ async def call_ai_model(
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         for model_id in candidates:
+            # TEMP DEBUG LOG - remove after diagnosing 429 issue
+            logger.info("REQUEST label=%s model=%s", label, model_id)
             try:
                 response = await client.post(
                     OPENROUTER_CHAT_URL,
@@ -489,6 +491,10 @@ async def call_ai_model(
                 failed_candidates.append(model_id)
                 continue
 
+            # TEMP DEBUG LOG - remove after diagnosing 429 issue
+            logger.info("RESPONSE label=%s model=%s status=%s", label, model_id, response.status_code)
+            if response.status_code == 429:
+                logger.warning("RATE_LIMITED label=%s model=%s", label, model_id)
             if response.status_code != 200:
                 logger.warning(
                     "OpenRouter returned non-200 label=%s model=%s status=%s body=%s",
@@ -766,6 +772,8 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
 
     async def generate() -> AsyncIterator[str]:
         for model_id in candidates:
+            # TEMP DEBUG LOG - remove after diagnosing 429 issue
+            logger.info("REQUEST label=%s model=%s", label, model_id)
             try:
                 async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                     async with client.stream(
@@ -774,6 +782,10 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                         headers=build_openrouter_headers(),
                         json=build_chat_payload(model_id, persona, data.message, stream=True),
                     ) as response:
+                        # TEMP DEBUG LOG - remove after diagnosing 429 issue
+                        logger.info("RESPONSE label=%s model=%s status=%s", label, model_id, response.status_code)
+                        if response.status_code == 429:
+                            logger.warning("RATE_LIMITED label=%s model=%s", label, model_id)
                         if response.status_code != 200:
                             logger.warning(
                                 "OpenRouter stream returned non-200 label=%s model=%s status=%s",
