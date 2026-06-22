@@ -3,3 +3,4 @@ uvicorn
 httpx
 pydantic
 python-dotenv
+playwright>=1.44.0

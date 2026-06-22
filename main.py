@@ -1447,10 +1447,28 @@ async def agent_task(request: AgentRequest):
     async with AGENT_LOCK:
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=headless,
-                    args=["--no-sandbox", "--disable-dev-shm-usage"],
+                browserless_token = os.environ.get("BROWSERLESS_TOKEN", "")
+                browserless_endpoint = os.environ.get(
+                    "BROWSERLESS_ENDPOINT",
+                    f"wss://chrome.browserless.io?token={browserless_token}",
                 )
+
+                if browserless_token:
+                    try:
+                        browser = await p.chromium.connect_over_cdp(
+                            browserless_endpoint,
+                            timeout=20000,
+                        )
+                    except Exception as cdp_err:
+                        logger.error("[Agent] Browserless 연결 실패 (token 미노출)")
+                        raise RuntimeError(
+                            "브라우저 연결에 실패했습니다. BROWSERLESS_TOKEN을 확인해주세요."
+                        ) from cdp_err
+                else:
+                    browser = await p.chromium.launch(
+                        headless=headless,
+                        args=["--no-sandbox", "--disable-dev-shm-usage"],
+                    )
                 try:
                     context = await browser.new_context(
                         viewport={"width": 1280, "height": 800},
