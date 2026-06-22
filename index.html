@@ -100,48 +100,101 @@
             display: block;
         }
 
-        .collab-layout {
+        /* 협업 초기 안내 화면 */
+        .collab-intro {
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 40dvh;
+            text-align: center;
+            gap: 12px;
+            padding: 32px 16px;
+        }
+
+        .collab-intro-icon {
+            font-size: 48px;
+            line-height: 1;
+        }
+
+        .collab-intro-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .collab-intro-desc {
+            font-size: 15px;
+            color: #6b7280;
+            line-height: 1.8;
+        }
+
+        /* 협업 워크스페이스 */
+        .collab-workspace {
+            display: flex;
+            flex-direction: column;
             gap: 16px;
-            min-height: 60dvh;
+        }
+
+        /* AI 추천 결과 */
+        .collab-recommend-result {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 15px;
+            line-height: 1.75;
+            color: #1e40af;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* 4개 사이드바 컨테이너: 화면 상단에 가로로 4등분 */
+        .collab-sidebars {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            align-items: start;
         }
 
         .collab-sidebar {
-            width: 160px;
-            flex: 0 0 160px;
             background: #fff;
             border: 1px solid #e5e7eb;
             border-radius: 10px;
-            padding: 14px 10px;
+            padding: 12px 10px;
         }
 
         .collab-sidebar-title {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 800;
             color: #9ca3af;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.05em;
             margin-bottom: 10px;
             padding: 0 4px;
+            line-height: 1.5;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
         }
 
         .collab-ai-list {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
 
         .collab-ai-btn {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 7px;
             width: 100%;
-            padding: 9px 10px;
+            padding: 7px 8px;
             border: 1px solid transparent;
             border-radius: 7px;
             background: transparent;
             font: inherit;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: #374151;
             cursor: pointer;
@@ -166,20 +219,16 @@
             flex: 0 0 8px;
         }
 
-        .collab-main {
-            flex: 1;
-            min-width: 0;
+        @media (max-width: 900px) {
+            .collab-sidebars {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
-        .collab-placeholder {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 50dvh;
-            text-align: center;
-            color: #9ca3af;
-            font-size: 15px;
-            line-height: 1.8;
+        @media (max-width: 560px) {
+            .collab-sidebars {
+                grid-template-columns: 1fr;
+            }
         }
 
         .notice {
@@ -558,25 +607,6 @@
                 padding: 12px;
             }
 
-            .collab-layout {
-                flex-direction: column;
-            }
-
-            .collab-sidebar {
-                width: 100%;
-                flex: none;
-            }
-
-            .collab-ai-list {
-                flex-direction: row;
-                flex-wrap: wrap;
-            }
-
-            .collab-ai-btn {
-                width: auto;
-                flex: 0 0 auto;
-            }
-
             .debate-stage {
                 min-height: 430px;
             }
@@ -626,40 +656,79 @@
             </section>
 
             <section id="collabPanel" class="panel">
-                <div class="collab-layout">
-                    <aside class="collab-sidebar">
-                        <div class="collab-sidebar-title">AI 선택</div>
-                        <div class="collab-ai-list">
-                            <button class="collab-ai-btn active" data-ai="OpenAI" type="button">
-                                <span class="collab-ai-dot" style="background:#2563eb;"></span> OpenAI
-                            </button>
-                            <button class="collab-ai-btn" data-ai="Anthropic" type="button">
-                                <span class="collab-ai-dot" style="background:#7c3aed;"></span> Anthropic
-                            </button>
-                            <button class="collab-ai-btn" data-ai="Google" type="button">
-                                <span class="collab-ai-dot" style="background:#ca8a04;"></span> Google
-                            </button>
-                            <button class="collab-ai-btn" data-ai="xAI" type="button">
-                                <span class="collab-ai-dot" style="background:#dc2626;"></span> xAI
-                            </button>
-                            <button class="collab-ai-btn" data-ai="Perplexity" type="button">
-                                <span class="collab-ai-dot" style="background:#059669;"></span> Perplexity
-                            </button>
-                            <button class="collab-ai-btn" data-ai="DeepSeek" type="button">
-                                <span class="collab-ai-dot" style="background:#9333ea;"></span> DeepSeek
-                            </button>
-                            <button class="collab-ai-btn" data-ai="Meta" type="button">
-                                <span class="collab-ai-dot" style="background:#0f766e;"></span> Meta
-                            </button>
-                            <button class="collab-ai-btn" data-ai="NVIDIA" type="button">
-                                <span class="collab-ai-dot" style="background:#65a30d;"></span> NVIDIA
-                            </button>
+                <div id="collabIntro" class="collab-intro">
+                    <div class="collab-intro-icon">🤝</div>
+                    <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
+                    <p class="collab-intro-desc">
+                        아래 입력창에 작업 내용을 입력하면<br>
+                        각 단계에 맞는 AI를 추천해드립니다.
+                    </p>
+                </div>
+
+                <div id="collabWorkspace" class="collab-workspace" style="display:none;">
+                    <div id="collabRecommendResult" class="collab-recommend-result"></div>
+                    <div class="collab-sidebars">
+                        <div class="collab-sidebar" data-sidebar="1">
+                            <div class="collab-sidebar-title">정보 조사 및<br>아이디어 생성 AI 선택</div>
+                            <div class="collab-ai-list">
+                                <button class="collab-ai-btn" data-ai="Perplexity" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>Perplexity</button>
+                                <button class="collab-ai-btn" data-ai="You.com" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>You.com</button>
+                                <button class="collab-ai-btn" data-ai="Exa AI" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Exa AI</button>
+                                <button class="collab-ai-btn" data-ai="Tavily" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Tavily</button>
+                                <button class="collab-ai-btn" data-ai="Gemini" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini</button>
+                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
+                                <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
+                                <button class="collab-ai-btn" data-ai="Llama 4" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>Llama 4</button>
+                                <button class="collab-ai-btn" data-ai="DeepSeek R1" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek R1</button>
+                                <button class="collab-ai-btn" data-ai="Mistral" type="button"><span class="collab-ai-dot" style="background:#f59e0b;"></span>Mistral</button>
+                            </div>
                         </div>
-                    </aside>
-                    <div class="collab-main">
-                        <div class="collab-placeholder">
-                            협업 기능을 준비 중입니다.<br>
-                            AI들이 함께 하나의 결과물을 만들어냅니다.
+                        <div class="collab-sidebar" data-sidebar="2">
+                            <div class="collab-sidebar-title">논리구조 생성 및<br>프롬프트 지시 AI</div>
+                            <div class="collab-ai-list">
+                                <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
+                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
+                                <button class="collab-ai-btn" data-ai="o3" type="button"><span class="collab-ai-dot" style="background:#1d4ed8;"></span>o3</button>
+                                <button class="collab-ai-btn" data-ai="o4-mini" type="button"><span class="collab-ai-dot" style="background:#3b82f6;"></span>o4-mini</button>
+                                <button class="collab-ai-btn" data-ai="DeepSeek R1" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek R1</button>
+                                <button class="collab-ai-btn" data-ai="Gemini 2.5 Pro" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini 2.5 Pro</button>
+                                <button class="collab-ai-btn" data-ai="Qwen3" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Qwen3</button>
+                                <button class="collab-ai-btn" data-ai="NVIDIA Nemotron" type="button"><span class="collab-ai-dot" style="background:#65a30d;"></span>NVIDIA Nemotron</button>
+                                <button class="collab-ai-btn" data-ai="Grok" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Grok</button>
+                                <button class="collab-ai-btn" data-ai="Codex CLI" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>Codex CLI</button>
+                            </div>
+                        </div>
+                        <div class="collab-sidebar" data-sidebar="3">
+                            <div class="collab-sidebar-title">작업물 생성 AI</div>
+                            <div class="collab-ai-list">
+                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
+                                <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
+                                <button class="collab-ai-btn" data-ai="Codex" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>Codex</button>
+                                <button class="collab-ai-btn" data-ai="Gemini 2.5 Pro" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini 2.5 Pro</button>
+                                <button class="collab-ai-btn" data-ai="Llama 4 Maverick" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>Llama 4 Maverick</button>
+                                <button class="collab-ai-btn" data-ai="Qwen3 Coder" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Qwen3 Coder</button>
+                                <button class="collab-ai-btn" data-ai="Mistral Codestral" type="button"><span class="collab-ai-dot" style="background:#f59e0b;"></span>Mistral Codestral</button>
+                                <button class="collab-ai-btn" data-ai="DeepSeek V3" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek V3</button>
+                                <button class="collab-ai-btn" data-ai="DALL-E 3" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>DALL-E 3</button>
+                                <button class="collab-ai-btn" data-ai="Stable Diffusion" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Stable Diffusion</button>
+                                <button class="collab-ai-btn" data-ai="Sora" type="button"><span class="collab-ai-dot" style="background:#1d4ed8;"></span>Sora</button>
+                                <button class="collab-ai-btn" data-ai="ElevenLabs" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>ElevenLabs</button>
+                            </div>
+                        </div>
+                        <div class="collab-sidebar" data-sidebar="4">
+                            <div class="collab-sidebar-title">오류 검증 및<br>업그레이드 AI</div>
+                            <div class="collab-ai-list">
+                                <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
+                                <button class="collab-ai-btn" data-ai="o3" type="button"><span class="collab-ai-dot" style="background:#1d4ed8;"></span>o3</button>
+                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
+                                <button class="collab-ai-btn" data-ai="DeepSeek R1" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek R1</button>
+                                <button class="collab-ai-btn" data-ai="Gemini 2.5 Pro" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini 2.5 Pro</button>
+                                <button class="collab-ai-btn" data-ai="Qwen3" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Qwen3</button>
+                                <button class="collab-ai-btn" data-ai="Grok" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Grok</button>
+                                <button class="collab-ai-btn" data-ai="NVIDIA Nemotron Ultra" type="button"><span class="collab-ai-dot" style="background:#65a30d;"></span>NVIDIA Nemotron Ultra</button>
+                                <button class="collab-ai-btn" data-ai="Perplexity" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>Perplexity</button>
+                                <button class="collab-ai-btn" data-ai="LLaMA Guard" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>LLaMA Guard</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -717,6 +786,9 @@
         let lastCompareMessage = "";
         let lastCompareSessionId = "";
         let compareResponses = {};
+
+        let collabTaskAsked = false;
+        let collabRecommendInFlight = false;
 
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
@@ -781,10 +853,12 @@
             }
 
             if (currentMode === "collab") {
-                mainInput.placeholder = "협업 주제를 입력하세요…";
-                dockPrimaryBtn.textContent = "준비 중";
+                mainInput.placeholder = collabTaskAsked
+                    ? "추가 질문이나 수정 사항을 입력하세요…"
+                    : "어떤 작업을 원하십니까?";
+                dockPrimaryBtn.textContent = collabRecommendInFlight ? "분석 중..." : "AI 추천 받기 ▶";
                 dockPrimaryBtn.className = "dock-btn primary";
-                dockPrimaryBtn.disabled = true;
+                dockPrimaryBtn.disabled = collabRecommendInFlight;
                 mainInput.disabled = false;
                 return;
             }
@@ -814,6 +888,17 @@
             });
             document.querySelectorAll(".panel").forEach(panel => panel.classList.remove("active"));
             document.getElementById(`${mode}Panel`).classList.add("active");
+
+            if (mode === "collab") {
+                if (!collabTaskAsked) {
+                    document.getElementById("collabIntro").style.display = "flex";
+                    document.getElementById("collabWorkspace").style.display = "none";
+                } else {
+                    document.getElementById("collabIntro").style.display = "none";
+                    document.getElementById("collabWorkspace").style.display = "flex";
+                }
+            }
+
             updateDockUI();
         }
 
@@ -831,8 +916,43 @@
             else if (currentMode === "debate") {
                 if (!debateStarted) handleDebateStart();
                 else handleDebateContinue();
-            }
+            } else if (currentMode === "collab") handleCollabSubmit();
         });
+
+        async function handleCollabSubmit() {
+            const task = mainInput.value.trim();
+            if (!task || collabRecommendInFlight) return;
+
+            collabRecommendInFlight = true;
+            dockPrimaryBtn.disabled = true;
+            mainInput.value = "";
+            autoResizeInput();
+
+            const resultEl = document.getElementById("collabRecommendResult");
+            const workspaceEl = document.getElementById("collabWorkspace");
+            const introEl = document.getElementById("collabIntro");
+
+            resultEl.textContent = "추천 AI를 분석하는 중입니다...";
+            workspaceEl.style.display = "flex";
+            introEl.style.display = "none";
+
+            try {
+                const response = await fetch(`${API_URL}/collab/recommend`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ task }),
+                });
+                if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
+                const data = await response.json();
+                resultEl.textContent = data.recommendation || "추천 결과가 없습니다.";
+            } catch (err) {
+                resultEl.textContent = `오류: ${err.message}`;
+            } finally {
+                collabRecommendInFlight = false;
+                collabTaskAsked = true;
+                updateDockUI();
+            }
+        }
 
         dockSecondaryBtn.addEventListener("click", handleAddUserInput);
         dockNewDebateBtn.addEventListener("click", handleNewDebate);
@@ -857,8 +977,7 @@
 
         document.querySelectorAll(".collab-ai-btn").forEach(btn => {
             btn.addEventListener("click", () => {
-                document.querySelectorAll(".collab-ai-btn").forEach(b => b.classList.remove("active"));
-                btn.classList.add("active");
+                btn.classList.toggle("active");
             });
         });
 

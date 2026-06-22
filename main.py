@@ -220,6 +220,10 @@ class CompareRequest(BaseModel):
     compare_session_id: str = ""
 
 
+class CollabRecommendRequest(BaseModel):
+    task: str
+
+
 class DebateRequest(BaseModel):
     session_id: str
     topic: str
@@ -447,6 +451,17 @@ def resolve_label_models(label: str) -> list[str]:
     if label not in MODEL_CANDIDATES or not MODEL_CANDIDATES[label]:
         return [LAST_RESORT_MODEL]
     return list(MODEL_CANDIDATES[label])
+
+
+def get_all_available_free_models() -> list[str]:
+    if MODEL_CACHE_STATE.all_free_models:
+        return list(MODEL_CACHE_STATE.all_free_models)
+    pooled = unique(
+        model_id
+        for candidates in MODEL_CACHE_STATE.free_models_by_label.values()
+        for model_id in candidates
+    )
+    return pooled if pooled else [LAST_RESORT_MODEL]
 
 
 def get_label_provider_config(label: str) -> LabelProviderConfig:
@@ -697,10 +712,22 @@ async def call_ai_model(
 
     await ensure_model_cache_fresh()
     persona = PERSONAS[label]
-    candidates = resolve_label_models(label)
+
+    label_candidates = resolve_label_models(label)
     if excluded_models:
-        filtered = [model_id for model_id in candidates if model_id not in excluded_models]
-        candidates = filtered if filtered else candidates
+        label_candidates = [model_id for model_id in label_candidates if model_id not in excluded_models]
+
+    if not label_candidates:
+        label_candidates = [
+            model_id
+            for model_id in get_all_available_free_models()
+            if not excluded_models or model_id not in excluded_models
+        ]
+
+    if not label_candidates:
+        label_candidates = [LAST_RESORT_MODEL]
+
+    candidates = label_candidates
     requested_model = candidates[0]
     failed_candidates: list[str] = []
 
@@ -958,7 +985,6 @@ async def produce_debate_speaker(
     prior_turns: list[DebateTurn],
     round_user_input: str | None,
 ) -> DebateTurn | None:
-    requested_labels = [requested_label] + [label for label in COMPANY_LABELS if label != requested_label]
     prompt = build_round_prompt(
         topic=session.topic,
         round_number=round_number,
@@ -968,13 +994,36 @@ async def produce_debate_speaker(
         user_input=round_user_input if speaker_index == 1 else None,
     )
 
-    for label in requested_labels[:MAX_MODEL_CANDIDATES_PER_LABEL]:
-        already_used_models = {turn.actual_model for turn in prior_turns if turn.actual_model}
-        result = await call_ai_model(label, prompt, excluded_models=already_used_models)
+    already_used_models: set[str] = {
+        turn.actual_model
+        for turn in session.current_round_turns
+        if turn.actual_model
+    }
+    already_used_models.update(
+        turn.actual_model for turn in prior_turns if turn.actual_model
+    )
+
+    labels_to_try = [requested_label] + [
+        lb for lb in COMPANY_LABELS if lb != requested_label
+    ]
+
+    for label in labels_to_try:
+        result = await call_ai_model(
+            label,
+            prompt,
+            excluded_models=already_used_models,
+        )
         session.failed_candidates.extend(result.failed_candidates)
         if result.success:
+            already_used_models.add(result.actual_model)
             return result_to_debate_turn(round_number, speaker_index, requested_label, result)
-        logger.info("Debate speaker failed requested_label=%s speaker=%s error=%s", label, speaker_index, result.error)
+        logger.info(
+            "Debate speaker failed label=%s speaker=%s error=%s",
+            label,
+            speaker_index,
+            result.error,
+        )
+
     return None
 
 
@@ -1085,6 +1134,12 @@ def debate_response(session: DebateSession, turns: list[DebateTurn], queued: boo
 
 
 async def acquire_compare_model(session_id: str, candidates: list[str]) -> str | None:
+    """
+    COMPARE_SESSION_LOCK 안에서 candidates를 순회하며
+    아직 사용 중이지 않은 첫 번째 모델을 즉시 점유하고 반환한다.
+    session_id가 없으면 candidates[0]을 반환(단독 요청 허용).
+    candidates를 모두 소진하면 None 반환.
+    """
     if not session_id:
         return candidates[0] if candidates else None
     async with COMPARE_SESSION_LOCK:
@@ -1093,7 +1148,7 @@ async def acquire_compare_model(session_id: str, candidates: list[str]) -> str |
             if model_id not in used:
                 used.add(model_id)
                 return model_id
-    return None
+        return None
 
 
 async def release_compare_model(session_id: str, model_id: str) -> None:
@@ -1115,15 +1170,14 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
     await ensure_model_cache_fresh()
     label = data.model_name
     persona = PERSONAS[label]
-    candidates = resolve_label_models(label)
+    all_candidates = resolve_label_models(label)
+    session_id = data.compare_session_id.strip()
 
     async def generate() -> AsyncIterator[str]:
-        payload = build_chat_payload(model_id="", persona=persona, prompt=data.message, stream=True)
-        session_id = data.compare_session_id.strip()
         excluded_by_failure: set[str] = set()
 
         while True:
-            pool = [model_id for model_id in candidates if model_id not in excluded_by_failure]
+            pool = [model_id for model_id in all_candidates if model_id not in excluded_by_failure]
             if not pool:
                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                 return
@@ -1133,6 +1187,7 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                 return
 
+            failed_this_model = False
             try:
                 async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                     for attempt in range(2):
@@ -1140,7 +1195,14 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                             "POST",
                             OPENROUTER_CHAT_URL,
                             headers=build_openrouter_headers(),
-                            json={**payload, "model": model_id},
+                            json={
+                                **build_chat_payload(
+                                    model_id=model_id,
+                                    persona=persona,
+                                    prompt=data.message,
+                                    stream=True,
+                                )
+                            },
                         ) as response:
                             if response.status_code == 429 and attempt == 0:
                                 await response.aread()
@@ -1149,14 +1211,15 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
 
                             if response.status_code != 200:
                                 logger.warning(
-                                    "OpenRouter stream returned non-200 label=%s model=%s status=%s",
+                                    "Stream non-200 label=%s model=%s status=%s",
                                     label,
                                     model_id,
                                     response.status_code,
                                 )
+                                await response.aread()
                                 if should_try_next_candidate(response.status_code):
-                                    await response.aread()
                                     excluded_by_failure.add(model_id)
+                                    failed_this_model = True
                                     break
                                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                 return
@@ -1171,11 +1234,9 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                 except json.JSONDecodeError:
                                     yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                     return
-
                                 if raw.get("error"):
                                     yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                     return
-
                                 delta = (raw.get("choices") or [{}])[0].get("delta") or {}
                                 chunk = delta.get("content")
                                 if chunk:
@@ -1190,9 +1251,11 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                         }
                                     )
                             return
+
             except httpx.HTTPError as exc:
-                logger.warning("OpenRouter stream request failed label=%s model=%s error=%s", label, model_id, exc)
+                logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
                 excluded_by_failure.add(model_id)
+                failed_this_model = True
             except Exception:
                 logger.exception("Unexpected stream error label=%s model=%s", label, model_id)
                 yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
@@ -1200,13 +1263,32 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
             finally:
                 await release_compare_model(session_id, model_id)
 
-            if model_id in excluded_by_failure:
-                continue
-
-            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-            return
+            if not failed_this_model:
+                return
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@app.post("/collab/recommend")
+async def collab_recommend(data: CollabRecommendRequest) -> dict:
+    """사용자 작업 설명을 받아 OpenAI label로 각 단계별 추천 AI 목록을 반환한다."""
+    await ensure_model_cache_fresh()
+
+    prompt = (
+        f"사용자가 원하는 작업: {data.task}\n\n"
+        "아래 4단계에 맞춰 각 단계에서 가장 적합한 AI 도구를 2~3개 추천하고, "
+        "각각 한 줄 이유를 달아주세요. 한국어로 답변하세요.\n\n"
+        "1단계 — 정보 조사 및 아이디어 생성\n"
+        "2단계 — 논리구조 생성 및 프롬프트 지시\n"
+        "3단계 — 작업물 생성\n"
+        "4단계 — 오류 검증 및 업그레이드"
+    )
+
+    result = await call_ai_model("OpenAI", prompt, max_tokens=600)
+    return {
+        "recommendation": result.content if result.success else "추천 생성에 실패했습니다. 다시 시도해주세요.",
+        "success": result.success,
+    }
 
 
 @app.post("/debate/start")
