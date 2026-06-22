@@ -34,6 +34,7 @@
         }
 
         .header-inner {
+            position: relative;
             width: min(1160px, 100%);
             margin: 0 auto;
             padding: 14px 18px;
@@ -58,6 +59,188 @@
             margin-top: 2px;
             font-size: 14px;
             color: #6b7280;
+        }
+
+        /* 좌측 메뉴 토글(햄버거) 버튼 */
+        .menu-toggle-btn {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .menu-toggle-btn span {
+            display: block;
+            width: 18px;
+            height: 2px;
+            border-radius: 2px;
+            background: #374151;
+        }
+
+        .menu-toggle-btn:hover {
+            background: #f3f4f6;
+        }
+
+        /* 좌측 슬라이드 메뉴 */
+        .side-menu-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.28s ease;
+            z-index: 390;
+        }
+
+        .side-menu-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100dvh;
+            width: min(300px, 82vw);
+            background: #fff;
+            border-right: 1px solid #e5e7eb;
+            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.08);
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 400;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .side-menu.open {
+            transform: translateX(0);
+        }
+
+        .side-menu-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 18px 14px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .side-menu-brand {
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+        }
+
+        .side-menu-close {
+            border: 0;
+            background: #f3f4f6;
+            color: #374151;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .side-menu-close:hover {
+            background: #e5e7eb;
+        }
+
+        .side-menu-auth {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 16px 18px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .side-menu-btn {
+            width: 100%;
+            padding: 11px 14px;
+            border-radius: 10px;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .side-menu-btn.primary {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .side-menu-btn.primary:hover {
+            background: #1d4ed8;
+        }
+
+        .side-menu-btn.outline {
+            background: #fff;
+            color: #2563eb;
+            border-color: #bfdbfe;
+        }
+
+        .side-menu-btn.outline:hover {
+            background: #eff6ff;
+        }
+
+        .side-menu-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 18px;
+        }
+
+        .side-menu-section-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }
+
+        .chat-history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .chat-history-empty {
+            font-size: 13px;
+            color: #9ca3af;
+            line-height: 1.6;
+            padding: 8px 0;
+        }
+
+        .chat-history-item {
+            padding: 9px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #374151;
+            background: transparent;
+            border: 1px solid transparent;
+            text-align: left;
+            cursor: pointer;
+            font: inherit;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-history-item:hover {
+            background: #f3f4f6;
         }
 
         .mode-btn {
@@ -182,6 +365,18 @@
             display: flex;
             flex-direction: column;
             gap: 3px;
+        }
+
+        .collab-ai-group {
+            font-size: 10px;
+            font-weight: 800;
+            color: #6b7280;
+            margin: 8px 4px 2px;
+            line-height: 1.4;
+        }
+
+        .collab-ai-group:first-child {
+            margin-top: 0;
         }
 
         .collab-ai-btn {
@@ -354,7 +549,8 @@
             border-left: 5px solid #9ca3af;
             border-radius: 8px;
             box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-            transition: transform 300ms ease-out, opacity 300ms ease-out;
+            transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform, opacity;
             overflow: hidden;
         }
 
@@ -525,6 +721,7 @@
         }
 
         .dock-mode-row {
+            position: relative;
             display: flex;
             gap: 6px;
             flex-wrap: wrap;
@@ -627,6 +824,14 @@
 
         /* ===== Agent Mode ===== */
         .agent-toggle-btn {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            min-height: auto;
+            padding: 7px 14px;
+            font-size: 13px;
+            border-radius: 999px;
             border: 1px solid #c4b5fd;
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
             color: #5b21b6;
@@ -641,6 +846,15 @@
             background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
             color: #fff;
             border-color: #6d28d9;
+        }
+
+        @media (max-width: 560px) {
+            .agent-toggle-btn {
+                position: static;
+                transform: none;
+                width: 100%;
+                margin-top: 4px;
+            }
         }
 
         .agent-panel {
@@ -931,8 +1145,29 @@
 </head>
 <body>
     <div class="app">
+        <div id="sideMenuOverlay" class="side-menu-overlay"></div>
+        <aside id="sideMenu" class="side-menu" aria-label="메뉴">
+            <div class="side-menu-header">
+                <span class="side-menu-brand">ArenaX</span>
+                <button id="sideMenuClose" class="side-menu-close" type="button" aria-label="메뉴 닫기">×</button>
+            </div>
+            <div class="side-menu-auth">
+                <button id="loginBtn" class="side-menu-btn primary" type="button">로그인</button>
+                <button id="signupBtn" class="side-menu-btn outline" type="button">회원가입</button>
+            </div>
+            <div class="side-menu-section">
+                <div class="side-menu-section-title">대화 기록</div>
+                <div id="chatHistoryList" class="chat-history-list">
+                    <div class="chat-history-empty">아직 저장된 대화가 없습니다.</div>
+                </div>
+            </div>
+        </aside>
+
         <header class="site-header">
             <div class="header-inner">
+                <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴 열기">
+                    <span></span><span></span><span></span>
+                </button>
                 <div class="header-brand">
                     <h1>ArenaX</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
@@ -972,65 +1207,80 @@
                     <div id="collabRecommendResult" class="collab-recommend-result"></div>
                     <div class="collab-sidebars">
                         <div class="collab-sidebar" data-sidebar="1">
-                            <div class="collab-sidebar-title">정보 조사 및<br>아이디어 생성 AI 선택</div>
+                            <div class="collab-sidebar-title">🔍 1단계 · 정보 조사 및<br>아이디어 생성</div>
                             <div class="collab-ai-list">
+                                <div class="collab-ai-group">실시간 리서치 &amp; 검색</div>
                                 <button class="collab-ai-btn" data-ai="Perplexity" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>Perplexity</button>
-                                <button class="collab-ai-btn" data-ai="You.com" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>You.com</button>
-                                <button class="collab-ai-btn" data-ai="Exa AI" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Exa AI</button>
-                                <button class="collab-ai-btn" data-ai="Tavily" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Tavily</button>
-                                <button class="collab-ai-btn" data-ai="Gemini" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini</button>
-                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
-                                <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
-                                <button class="collab-ai-btn" data-ai="Llama 4" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>Llama 4</button>
-                                <button class="collab-ai-btn" data-ai="DeepSeek R1" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek R1</button>
-                                <button class="collab-ai-btn" data-ai="Mistral" type="button"><span class="collab-ai-dot" style="background:#f59e0b;"></span>Mistral</button>
+                                <button class="collab-ai-btn" data-ai="Consensus" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>Consensus</button>
+                                <button class="collab-ai-btn" data-ai="Liner" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Liner</button>
+                                <div class="collab-ai-group">문서/자료 기반 추출</div>
+                                <button class="collab-ai-btn" data-ai="NotebookLM" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>NotebookLM</button>
+                                <button class="collab-ai-btn" data-ai="ChatPDF" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>ChatPDF</button>
+                                <button class="collab-ai-btn" data-ai="AskYourPDF" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>AskYourPDF</button>
+                                <div class="collab-ai-group">한국어 &amp; 범용 아이디어</div>
+                                <button class="collab-ai-btn" data-ai="뤼튼(Wrtn)" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>뤼튼(Wrtn)</button>
+                                <button class="collab-ai-btn" data-ai="ChatGPT (GPT-4o)" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>ChatGPT (GPT-4o)</button>
                             </div>
                         </div>
                         <div class="collab-sidebar" data-sidebar="2">
-                            <div class="collab-sidebar-title">논리구조 생성 및<br>프롬프트 지시 AI</div>
+                            <div class="collab-sidebar-title">📐 2단계 · 논리 구조 생성 및<br>프롬프트 지시</div>
                             <div class="collab-ai-list">
+                                <div class="collab-ai-group">생각 정리 &amp; 구조화</div>
                                 <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
-                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
-                                <button class="collab-ai-btn" data-ai="o3" type="button"><span class="collab-ai-dot" style="background:#1d4ed8;"></span>o3</button>
-                                <button class="collab-ai-btn" data-ai="o4-mini" type="button"><span class="collab-ai-dot" style="background:#3b82f6;"></span>o4-mini</button>
-                                <button class="collab-ai-btn" data-ai="DeepSeek R1" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek R1</button>
-                                <button class="collab-ai-btn" data-ai="Gemini 2.5 Pro" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini 2.5 Pro</button>
-                                <button class="collab-ai-btn" data-ai="Qwen3" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Qwen3</button>
-                                <button class="collab-ai-btn" data-ai="NVIDIA Nemotron" type="button"><span class="collab-ai-dot" style="background:#65a30d;"></span>NVIDIA Nemotron</button>
-                                <button class="collab-ai-btn" data-ai="Grok" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Grok</button>
-                                <button class="collab-ai-btn" data-ai="Codex CLI" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>Codex CLI</button>
+                                <button class="collab-ai-btn" data-ai="Whimsical AI" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Whimsical AI</button>
+                                <button class="collab-ai-btn" data-ai="GitMind" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>GitMind</button>
+                                <button class="collab-ai-btn" data-ai="Napkin AI" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Napkin AI</button>
+                                <div class="collab-ai-group">프롬프트 작성 &amp; 지시</div>
+                                <button class="collab-ai-btn" data-ai="PromptHero" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>PromptHero</button>
+                                <button class="collab-ai-btn" data-ai="PromptBase" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>PromptBase</button>
+                                <button class="collab-ai-btn" data-ai="ChatGPT (GPT Builder)" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>GPT Builder</button>
                             </div>
                         </div>
                         <div class="collab-sidebar" data-sidebar="3">
-                            <div class="collab-sidebar-title">작업물 생성 AI</div>
+                            <div class="collab-sidebar-title">🛠️ 3단계 · 작업물 생성<br>(문서·PPT·디자인·영상)</div>
                             <div class="collab-ai-list">
-                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
-                                <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
-                                <button class="collab-ai-btn" data-ai="Codex" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>Codex</button>
-                                <button class="collab-ai-btn" data-ai="Gemini 2.5 Pro" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini 2.5 Pro</button>
-                                <button class="collab-ai-btn" data-ai="Llama 4 Maverick" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>Llama 4 Maverick</button>
-                                <button class="collab-ai-btn" data-ai="Qwen3 Coder" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Qwen3 Coder</button>
-                                <button class="collab-ai-btn" data-ai="Mistral Codestral" type="button"><span class="collab-ai-dot" style="background:#f59e0b;"></span>Mistral Codestral</button>
-                                <button class="collab-ai-btn" data-ai="DeepSeek V3" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek V3</button>
-                                <button class="collab-ai-btn" data-ai="DALL-E 3" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>DALL-E 3</button>
-                                <button class="collab-ai-btn" data-ai="Stable Diffusion" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Stable Diffusion</button>
-                                <button class="collab-ai-btn" data-ai="Sora" type="button"><span class="collab-ai-dot" style="background:#1d4ed8;"></span>Sora</button>
+                                <div class="collab-ai-group">PPT &amp; 프레젠테이션</div>
+                                <button class="collab-ai-btn" data-ai="Gamma" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Gamma</button>
+                                <button class="collab-ai-btn" data-ai="Tome" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>Tome</button>
+                                <button class="collab-ai-btn" data-ai="Beautiful.ai" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Beautiful.ai</button>
+                                <button class="collab-ai-btn" data-ai="Plus AI" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>Plus AI</button>
+                                <div class="collab-ai-group">이미지 &amp; 디자인</div>
+                                <button class="collab-ai-btn" data-ai="DALL·E 3" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>DALL·E 3</button>
+                                <button class="collab-ai-btn" data-ai="Photoroom" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Photoroom</button>
+                                <button class="collab-ai-btn" data-ai="Canva Magic Studio" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Canva Magic</button>
+                                <button class="collab-ai-btn" data-ai="Leonardo.ai" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Leonardo.ai</button>
+                                <button class="collab-ai-btn" data-ai="Midjourney" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>Midjourney</button>
+                                <div class="collab-ai-group">동영상 &amp; 오디오</div>
+                                <button class="collab-ai-btn" data-ai="Vrew" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Vrew</button>
+                                <button class="collab-ai-btn" data-ai="HeyGen" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>HeyGen</button>
+                                <button class="collab-ai-btn" data-ai="CapCut" type="button"><span class="collab-ai-dot" style="background:#111827;"></span>CapCut</button>
+                                <button class="collab-ai-btn" data-ai="Suno" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Suno</button>
+                                <button class="collab-ai-btn" data-ai="Udio" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>Udio</button>
                                 <button class="collab-ai-btn" data-ai="ElevenLabs" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>ElevenLabs</button>
+                                <div class="collab-ai-group">글쓰기 &amp; 번역</div>
+                                <button class="collab-ai-btn" data-ai="Notion AI" type="button"><span class="collab-ai-dot" style="background:#374151;"></span>Notion AI</button>
+                                <button class="collab-ai-btn" data-ai="Copy.ai" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>Copy.ai</button>
+                                <button class="collab-ai-btn" data-ai="Jasper" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Jasper</button>
+                                <button class="collab-ai-btn" data-ai="DeepL" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>DeepL</button>
+                                <div class="collab-ai-group">앱 &amp; 웹사이트 제작</div>
+                                <button class="collab-ai-btn" data-ai="Framer" type="button"><span class="collab-ai-dot" style="background:#111827;"></span>Framer</button>
+                                <button class="collab-ai-btn" data-ai="Glide" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>Glide</button>
+                                <button class="collab-ai-btn" data-ai="Softr" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>Softr</button>
                             </div>
                         </div>
                         <div class="collab-sidebar" data-sidebar="4">
-                            <div class="collab-sidebar-title">오류 검증 및<br>업그레이드 AI</div>
+                            <div class="collab-sidebar-title">🩺 4단계 · 오류 검증 및<br>업그레이드</div>
                             <div class="collab-ai-list">
+                                <div class="collab-ai-group">문서 교정 &amp; 문체</div>
+                                <button class="collab-ai-btn" data-ai="QuillBot" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>QuillBot</button>
+                                <button class="collab-ai-btn" data-ai="Grammarly" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>Grammarly</button>
                                 <button class="collab-ai-btn" data-ai="Claude" type="button"><span class="collab-ai-dot" style="background:#7c3aed;"></span>Claude</button>
-                                <button class="collab-ai-btn" data-ai="o3" type="button"><span class="collab-ai-dot" style="background:#1d4ed8;"></span>o3</button>
-                                <button class="collab-ai-btn" data-ai="GPT-4o" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>GPT-4o</button>
-                                <button class="collab-ai-btn" data-ai="DeepSeek R1" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>DeepSeek R1</button>
-                                <button class="collab-ai-btn" data-ai="Gemini 2.5 Pro" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>Gemini 2.5 Pro</button>
-                                <button class="collab-ai-btn" data-ai="Qwen3" type="button"><span class="collab-ai-dot" style="background:#0891b2;"></span>Qwen3</button>
-                                <button class="collab-ai-btn" data-ai="Grok" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Grok</button>
-                                <button class="collab-ai-btn" data-ai="NVIDIA Nemotron Ultra" type="button"><span class="collab-ai-dot" style="background:#65a30d;"></span>NVIDIA Nemotron Ultra</button>
-                                <button class="collab-ai-btn" data-ai="Perplexity" type="button"><span class="collab-ai-dot" style="background:#059669;"></span>Perplexity</button>
-                                <button class="collab-ai-btn" data-ai="LLaMA Guard" type="button"><span class="collab-ai-dot" style="background:#0f766e;"></span>LLaMA Guard</button>
+                                <div class="collab-ai-group">데이터 오류 검증</div>
+                                <button class="collab-ai-btn" data-ai="Julius AI" type="button"><span class="collab-ai-dot" style="background:#2563eb;"></span>Julius AI</button>
+                                <button class="collab-ai-btn" data-ai="ChatExcel" type="button"><span class="collab-ai-dot" style="background:#ca8a04;"></span>ChatExcel</button>
+                                <div class="collab-ai-group">표절 &amp; AI 생성물 검출</div>
+                                <button class="collab-ai-btn" data-ai="Copyleaks" type="button"><span class="collab-ai-dot" style="background:#dc2626;"></span>Copyleaks</button>
+                                <button class="collab-ai-btn" data-ai="Turnitin" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>Turnitin</button>
                             </div>
                         </div>
                     </div>
@@ -1044,10 +1294,10 @@
                     <button class="mode-btn active" type="button" data-mode="compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate">토론</button>
                     <button class="mode-btn" type="button" data-mode="collab">협업</button>
+                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
                 </div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 <div class="dock-actions">
-                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                     <button id="dockPrimaryBtn" class="dock-btn primary" type="button">비교 시작 ▶</button>
@@ -1127,6 +1377,20 @@
         const agentSendBtn = document.getElementById("agentSendBtn");
         const inputDock = document.getElementById("inputDock");
         const mainContent = document.getElementById("mainContent");
+
+        const sideMenu = document.getElementById("sideMenu");
+        const sideMenuOverlay = document.getElementById("sideMenuOverlay");
+        const menuToggleBtn = document.getElementById("menuToggleBtn");
+        const sideMenuClose = document.getElementById("sideMenuClose");
+
+        function setSideMenuOpen(open) {
+            sideMenu.classList.toggle("open", open);
+            sideMenuOverlay.classList.toggle("open", open);
+        }
+
+        menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
+        sideMenuClose.addEventListener("click", () => setSideMenuOpen(false));
+        sideMenuOverlay.addEventListener("click", () => setSideMenuOpen(false));
 
         function createUUID() {
             if (crypto.randomUUID) return crypto.randomUUID();
@@ -1662,88 +1926,110 @@
             renderDebateDeck();
         }
 
+        const POSITION_CLASSES = ["active", "preview-prev", "preview-next", "hidden-left", "hidden-right"];
+
+        function applyCardState(element, card, index) {
+            const label = safeLabel(card.model || card.actual_label);
+            const color = colorFor(label);
+            const isFailed = card.success === false && !card.loading;
+            const isActive = index === activeCardIndex;
+
+            element.style.borderLeftColor = isFailed ? "#dc2626" : color;
+            element.classList.toggle("error-card", isFailed);
+
+            element.classList.remove(...POSITION_CLASSES);
+            element.onclick = null;
+            if (isActive) {
+                element.classList.add("active");
+            } else if (index === activeCardIndex - 1) {
+                element.classList.add("preview-prev");
+                element.onclick = retreatDeck;
+            } else if (index === activeCardIndex + 1) {
+                element.classList.add("preview-next");
+                element.onclick = advanceDeck;
+            } else if (index < activeCardIndex) {
+                element.classList.add("hidden-left");
+            } else {
+                element.classList.add("hidden-right");
+            }
+
+            const body = isActive ? card.content : summarizeOneLine(card.content);
+            const debugId = `debug-${card.id}`;
+            element.innerHTML = `
+                <div class="debate-card-header" style="color: ${isFailed ? "#dc2626" : color};">
+                    <span class="dot" style="background: ${isFailed ? "#dc2626" : color};"></span>
+                    <span>${card.round_number || "-"}라운드 · ${label}</span>
+                    ${isActive && !isFailed && !card.loading ? `<button class="debug-toggle" type="button" aria-label="디버그 정보">···</button>` : ""}
+                    <span class="debate-badge">${card.role || "발언"}</span>
+                </div>
+                <div class="${isActive ? "debate-card-body" : "debate-preview-body"}"></div>
+                ${isActive && isFailed ? `<div class="debate-retry"><button class="retry-button" type="button">다시 시도</button></div>` : ""}
+                ${isActive && !isFailed && !card.loading ? `
+                    <div class="debate-debug" id="${debugId}">
+                        요청: ${card.requested_label || "-"} / 실제: ${card.actual_label || label}<br>
+                        요청 모델: ${card.requested_model || "-"}<br>
+                        실제 모델: ${card.actual_model || "-"}<br>
+                        실제 회사 모델: ${card.is_real_company_model ? "예" : "아니오"}
+                    </div>
+                ` : ""}
+            `;
+            element.querySelector(isActive ? ".debate-card-body" : ".debate-preview-body").textContent = body;
+
+            if (isActive && isFailed) {
+                element.querySelector(".retry-button").addEventListener("click", event => {
+                    event.stopPropagation();
+                    retryDebateSpeaker(card.round_number, card.speaker_index);
+                });
+            }
+
+            if (isActive && !isFailed && !card.loading) {
+                const toggle = element.querySelector(".debug-toggle");
+                const debug = element.querySelector(`#${CSS.escape(debugId)}`);
+                if (toggle && debug) {
+                    toggle.addEventListener("click", event => {
+                        event.stopPropagation();
+                        debug.style.display = debug.style.display === "block" ? "none" : "block";
+                    });
+                }
+            }
+        }
+
         function renderDebateDeck() {
             const stage = document.getElementById("debateStage");
             const indicator = document.getElementById("deckIndicators");
             stage.style.display = debateCards.length ? "block" : "none";
-            stage.querySelectorAll(".debate-card").forEach(card => card.remove());
+
+            // Reuse existing card elements by id so transform transitions animate
+            // smoothly when navigating, instead of recreating the whole deck.
+            const existing = new Map();
+            stage.querySelectorAll(".debate-card").forEach(el => existing.set(el.dataset.id, el));
+
+            const validIds = new Set(debateCards.map(card => String(card.id)));
+            existing.forEach((el, id) => {
+                if (!validIds.has(id)) {
+                    el.remove();
+                    existing.delete(id);
+                }
+            });
 
             debateCards.forEach((card, index) => {
-                const label = safeLabel(card.model || card.actual_label);
-                const color = colorFor(label);
-                const isFailed = card.success === false && !card.loading;
-                const element = document.createElement("article");
-                element.className = "debate-card";
-                element.style.borderLeftColor = isFailed ? "#dc2626" : color;
-                if (isFailed) element.classList.add("error-card");
-
-                if (index === activeCardIndex) {
-                    element.classList.add("active");
-                } else if (index === activeCardIndex - 1) {
-                    element.classList.add("preview-prev");
-                    element.addEventListener("click", retreatDeck);
-                } else if (index === activeCardIndex + 1) {
-                    element.classList.add("preview-next");
-                    element.addEventListener("click", advanceDeck);
-                } else if (index < activeCardIndex) {
-                    element.classList.add("hidden-left");
-                } else {
-                    element.classList.add("hidden-right");
+                let element = existing.get(String(card.id));
+                if (!element) {
+                    element = document.createElement("article");
+                    element.className = "debate-card";
+                    element.dataset.id = card.id;
+                    element.addEventListener("touchstart", event => {
+                        touchStartX = event.touches[0].clientX;
+                    }, { passive: true });
+                    element.addEventListener("touchend", event => {
+                        const touchEndX = event.changedTouches[0].clientX;
+                        const delta = touchStartX - touchEndX;
+                        if (delta > 45) advanceDeck();
+                        else if (delta < -45) retreatDeck();
+                    }, { passive: true });
+                    stage.appendChild(element);
                 }
-
-                const isActive = index === activeCardIndex;
-                const body = isActive ? card.content : summarizeOneLine(card.content);
-                const debugId = `debug-${card.id}`;
-                element.innerHTML = `
-                    <div class="debate-card-header" style="color: ${isFailed ? "#dc2626" : color};">
-                        <span class="dot" style="background: ${isFailed ? "#dc2626" : color};"></span>
-                        <span>${card.round_number || "-"}라운드 · ${label}</span>
-                        ${isActive && !isFailed && !card.loading ? `<button class="debug-toggle" type="button" aria-label="디버그 정보">···</button>` : ""}
-                        <span class="debate-badge">${card.role || "발언"}</span>
-                    </div>
-                    <div class="${isActive ? "debate-card-body" : "debate-preview-body"}"></div>
-                    ${isActive && isFailed ? `<div class="debate-retry"><button class="retry-button" type="button">다시 시도</button></div>` : ""}
-                    ${isActive && !isFailed && !card.loading ? `
-                        <div class="debate-debug" id="${debugId}">
-                            요청: ${card.requested_label || "-"} / 실제: ${card.actual_label || label}<br>
-                            요청 모델: ${card.requested_model || "-"}<br>
-                            실제 모델: ${card.actual_model || "-"}<br>
-                            실제 회사 모델: ${card.is_real_company_model ? "예" : "아니오"}
-                        </div>
-                    ` : ""}
-                `;
-                element.querySelector(isActive ? ".debate-card-body" : ".debate-preview-body").textContent = body;
-
-                if (isActive && isFailed) {
-                    element.querySelector(".retry-button").addEventListener("click", event => {
-                        event.stopPropagation();
-                        retryDebateSpeaker(card.round_number, card.speaker_index);
-                    });
-                }
-
-                if (isActive && !isFailed && !card.loading) {
-                    const toggle = element.querySelector(".debug-toggle");
-                    const debug = element.querySelector(`#${CSS.escape(debugId)}`);
-                    if (toggle && debug) {
-                        toggle.addEventListener("click", event => {
-                            event.stopPropagation();
-                            debug.style.display = debug.style.display === "block" ? "none" : "block";
-                        });
-                    }
-                }
-
-                element.addEventListener("touchstart", event => {
-                    touchStartX = event.touches[0].clientX;
-                }, { passive: true });
-
-                element.addEventListener("touchend", event => {
-                    const touchEndX = event.changedTouches[0].clientX;
-                    const delta = touchStartX - touchEndX;
-                    if (delta > 45) advanceDeck();
-                    else if (delta < -45) retreatDeck();
-                }, { passive: true });
-
-                stage.appendChild(element);
+                applyCardState(element, card, index);
             });
 
             indicator.innerHTML = debateCards.map((_, index) => {

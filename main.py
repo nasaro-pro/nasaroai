@@ -95,32 +95,39 @@ COMPANY_PREFIXES: dict[str, str] = {
 COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
 MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"]
 
+# 페르소나(개성) 제거: 모든 라벨은 동일한 중립 시스템 메시지를 사용한다.
+NEUTRAL_SYSTEM_PROMPT = "한국어로 명확하고 정확하게 답변하세요."
+
 PERSONAS: dict[str, str] = {
     "OpenAI": (
-        "당신은 범용적이고 체계적인 설명에 강합니다. 핵심을 구조적으로 정리하고, "
-        "한국어로 명확하고 실용적으로 답변하세요."
+        NEUTRAL_SYSTEM_PROMPT
     ),
     "Anthropic": (
-        "당신은 신중하고 다각도의 분석에 강합니다. 여러 관점과 trade-off를 균형 있게 "
-        "짚으면서 한국어로 답변하세요."
+        NEUTRAL_SYSTEM_PROMPT
     ),
     "Google": (
-        "당신은 실용적이고 적용 가능한 정보 정리에 강합니다. 핵심을 간결하게 추리고 "
-        "한국어로 실행 가능한 관점을 제시하세요."
+        NEUTRAL_SYSTEM_PROMPT
     ),
     "xAI": (
-        "당신은 직설적이고 날카로운 분석에 강합니다. 돌려 말하지 말고 핵심 의견을 "
-        "한국어로 분명하게 제시하세요."
+        NEUTRAL_SYSTEM_PROMPT
     ),
     "Perplexity": (
-        "당신은 사실 검증과 근거 제시에 강합니다. 확인 가능한 근거와 논리 구조를 함께 "
-        "한국어로 제시하세요."
+        NEUTRAL_SYSTEM_PROMPT
     ),
     "DeepSeek": (
-        "당신은 심층 추론과 수학적 분석에 강합니다. 단계적 사고와 논리적 근거를 명확히 하면서 "
-        "한국어로 정확하고 깊이 있는 답변을 제시하세요."
+        NEUTRAL_SYSTEM_PROMPT
     ),
 }
+
+# 토론 발언에 공통으로 덧붙이는 강한 지시: 정보 수집 · 주장 · 비판.
+DEBATE_DIRECTIVE = (
+    "당신은 치열한 토론의 참가자입니다. 다음을 반드시 지키세요.\n"
+    "1) 정보 수집: 주제와 관련된 사실, 데이터, 사례, 통계, 전문가 견해 등 "
+    "구체적 근거를 적극적으로 끌어와 제시하세요.\n"
+    "2) 주장: 모호하게 양비론으로 빠지지 말고, 명확한 입장을 선택해 강하게 주장하세요.\n"
+    "3) 비판: 상대 발언의 논리적 허점, 근거 부족, 반례를 날카롭게 지적하고 반박하세요.\n"
+    "감정적 비방은 피하되, 근거에 기반해 단호하고 설득력 있게 한국어로 발언하세요."
+)
 
 MODEL_MAPPING: dict[str, str] = {}
 FALLBACK_MODEL_MAPPING: dict[str, str] = {}
@@ -911,24 +918,27 @@ def build_round_prompt(
 ) -> str:
     if round_number == 1 and speaker_index == 1:
         return (
+            f"{DEBATE_DIRECTIVE}\n\n"
             f"주제: {topic}\n\n"
             "당신은 1번 발언자입니다. 다른 발언자의 내용은 아직 없습니다. "
-            "주제만 보고 첫 주장을 한국어로 명확하게 제시하세요."
+            "주제에 대해 구체적 근거를 동원해 강한 첫 주장을 한국어로 제시하세요."
         )
 
     if speaker_index == 1:
         if user_input:
             return (
+                f"{DEBATE_DIRECTIVE}\n\n"
                 f"지금까지 토론 요약: {previous_summary or '아직 요약이 없습니다.'}\n\n"
                 f"사용자가 추가로 다음 질문/의견을 남겼습니다: '{user_input}'\n\n"
-                "이 질문/의견을 반드시 반영하여 답변하세요.\n\n"
+                "이 질문/의견을 반드시 반영하여, 근거를 들어 강하게 답변하세요.\n\n"
                 f"주제: {topic}"
             )
         return (
+            f"{DEBATE_DIRECTIVE}\n\n"
             f"이전 라운드 요약:\n{previous_summary or '아직 요약이 없습니다.'}\n\n"
             f"주제: {topic}\n\n"
             "당신은 새 라운드의 1번 발언자입니다. 이전 라운드 요약을 바탕으로 "
-            "반복을 피하고 새로운 주장이나 관점을 한국어로 제시하세요."
+            "반복을 피하고 새로운 근거와 관점으로 강하게 주장하세요."
         )
 
     role_instruction = "반박/보완" if speaker_index == 2 else "반박하거나 종합"
@@ -937,11 +947,12 @@ def build_round_prompt(
     compress_older = len(prior_turns) >= 2
     prior_text = format_prior_turns(prior_turns, compress_older=compress_older)
     return (
+        f"{DEBATE_DIRECTIVE}\n\n"
         f"주제: {topic}\n\n"
         f"현재 라운드에서 당신보다 앞선 발언입니다.\n\n"
         f"{prior_text}\n\n"
-        f"당신은 {speaker_index}번 발언자입니다. 위 발언을 참고하여 "
-        f"{role_instruction}하는 답변을 한국어로 제시하세요."
+        f"당신은 {speaker_index}번 발언자입니다. 위 발언의 허점과 약한 근거를 "
+        f"구체적으로 짚어 {role_instruction}하고, 당신의 근거를 들어 강하게 답변하세요."
     )
 
 
@@ -1615,10 +1626,17 @@ async def agent_task(request: AgentRequest):
                             "브라우저 연결에 실패했습니다. BROWSERLESS_TOKEN을 확인해주세요."
                         ) from cdp_err
                 else:
-                    browser = await p.chromium.launch(
-                        headless=headless,
-                        args=["--no-sandbox", "--disable-dev-shm-usage"],
-                    )
+                    try:
+                        browser = await p.chromium.launch(
+                            headless=headless,
+                            args=["--no-sandbox", "--disable-dev-shm-usage"],
+                        )
+                    except Exception as launch_err:
+                        logger.error("[Agent] 로컬 Chromium 실행 실패: %s", launch_err)
+                        raise RuntimeError(
+                            "브라우저를 실행하지 못했습니다. 서버에 BROWSERLESS_TOKEN을 설정하거나 "
+                            "로컬에서 'playwright install chromium'을 실행해주세요."
+                        ) from launch_err
                 try:
                     context = await browser.new_context(
                         viewport={"width": 1280, "height": 800},
@@ -1638,6 +1656,12 @@ async def agent_task(request: AgentRequest):
                         await context.close()
                 finally:
                     await browser.close()
+        except RuntimeError as setup_err:
+            logger.warning("CustomWebAgent setup failed: %s", setup_err)
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "message": str(setup_err)},
+            )
         except Exception:
             logger.exception("CustomWebAgent failed query=%s", query[:120])
             return JSONResponse(
