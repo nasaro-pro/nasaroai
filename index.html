@@ -734,7 +734,7 @@
             }
 
             .app.sidebar-open .agent-panel {
-                left: calc(50% + 140px);
+                left: 280px;
             }
         }
 
@@ -887,16 +887,17 @@
         .agent-panel {
             display: none;
             position: fixed;
-            left: 50%;
-            bottom: 80px;
-            transform: translateX(-50%);
-            z-index: 250;
-            width: min(920px, calc(100vw - 24px));
-            max-height: min(62dvh, 560px);
+            left: 0;
+            right: 0;
+            bottom: var(--input-dock-height, 120px);
+            z-index: 220;
+            width: 100%;
+            max-height: min(46dvh, 420px);
             background: rgba(255, 255, 255, 0.94);
             backdrop-filter: blur(14px);
             border: 1px solid #e5e7eb;
-            border-radius: 16px;
+            border-bottom: none;
+            border-radius: 16px 16px 0 0;
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
             overflow: hidden;
             flex-direction: column;
@@ -1164,9 +1165,8 @@
 
         @media (max-width: 640px) {
             .agent-panel {
-                bottom: calc(var(--input-dock-height, 120px) + 12px);
-                width: calc(100vw - 16px);
-                max-height: 48dvh;
+                max-height: 50dvh;
+                border-radius: 14px 14px 0 0;
             }
         }
     </style>
@@ -1715,7 +1715,7 @@
             if (currentMode === "compare") handleCompare();
             else if (currentMode === "debate") {
                 if (!debateStarted) handleDebateStart();
-                else handleDebateContinue();
+                else handleAddUserInput();
             } else if (currentMode === "collab") handleCollabSubmit();
         });
 
@@ -1931,7 +1931,7 @@
 
         function appendLoadingCard(roundNumber, speakerIndex) {
             debateCards.push({
-                id: `loading-${roundNumber}-${speakerIndex}-${Date.now()}`,
+                id: `${roundNumber}-${speakerIndex}-loading`,
                 loading: true,
                 round_number: roundNumber,
                 speaker_index: speakerIndex,
@@ -1952,7 +1952,7 @@
             turns.forEach(turn => {
                 const newCard = {
                     ...turn,
-                    id: `${turn.round_number}-${turn.speaker_index}-${turn.actual_model || turn.model}`,
+                    id: `${turn.round_number}-${turn.speaker_index}-loading`,
                     loading: false,
                 };
                 const existingIndex = debateCards.findIndex(card =>
@@ -2210,7 +2210,7 @@
                 card.round_number === roundNumber && card.speaker_index === speakerIndex);
             if (index !== -1) {
                 debateCards[index] = {
-                    id: `loading-${roundNumber}-${speakerIndex}-${Date.now()}`,
+                    id: `${roundNumber}-${speakerIndex}-loading`,
                     loading: true,
                     round_number: roundNumber,
                     speaker_index: speakerIndex,

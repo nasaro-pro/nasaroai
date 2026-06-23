@@ -85,6 +85,7 @@
     #statusBar[data-type="loading"] { background: #eff6ff; color: #1d4ed8; }
     #statusBar[data-type="success"] { background: #ecfdf5; color: #047857; }
     #statusBar[data-type="error"]   { background: #fef2f2; color: #b91c1c; }
+    #statusBar[data-type="handoff"] { background: #fffbeb; color: #b45309; }
 
     #historyArea {
       flex: 1;
@@ -115,6 +116,7 @@
     .agent-card.success { border-left-color: #7c3aed; }
     .agent-card.error   { border-left-color: #dc2626; background: #fef2f2; }
     .agent-card.loading { border-left-color: #3b82f6; opacity: 0.7; }
+    .agent-card.handoff { border-left-color: #f59e0b; background: #fffbeb; }
 
     .card-header {
       display: flex;
@@ -143,6 +145,7 @@
     .card-badge.success { background: #ede9fe; color: #6d28d9; }
     .card-badge.error   { background: #fee2e2; color: #b91c1c; }
     .card-badge.loading { background: #dbeafe; color: #1d4ed8; }
+    .card-badge.handoff { background: #fef3c7; color: #b45309; }
 
     .card-time {
       padding: 0 12px 4px;
@@ -217,7 +220,7 @@
 
   <div id="urlSettingArea" class="url-setting-area">
     <div class="url-row">
-      <input id="serverUrl" type="url" placeholder="http://localhost:8000" />
+      <input id="serverUrl" type="url" placeholder="https://arenax-4812.onrender.com" value="https://arenax-4812.onrender.com" />
       <button id="saveServerBtn" type="button">저장</button>
     </div>
   </div>

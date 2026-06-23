@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
   "name": "ArenaX 에이전트",
-  "version": "1.0.0",
-  "description": "어떤 사이트에서든 ArenaX 웹 에이전트를 사용할 수 있는 사이드 패널",
+  "version": "1.1.0",
+  "description": "사용자가 보고 있는 바로 그 탭을 ArenaX 에이전트가 직접 조작합니다 (chrome.debugger 기반).",
   "permissions": [
     "sidePanel",
     "activeTab",
-    "storage"
+    "storage",
+    "scripting",
+    "debugger"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"

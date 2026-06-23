@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field
 
-from custom_agent import CustomWebAgent, _extract_start_url
+from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
 
 load_dotenv()
 
@@ -78,7 +78,9 @@ app = FastAPI(title="ArenaX Backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # allow_origins=["*"] 와 allow_credentials=True 조합은 브라우저가 preflight를
+    # 거부한다(쿠키 인증을 안 쓰므로 False가 맞다). 확장/웹 fetch 모두 비인증 요청.
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -245,6 +247,18 @@ class AgentRequest(BaseModel):
     query: str
 
 
+# /agent/step (확장 기반 무상태 두뇌)용 요청 모델.
+# [보안] elements에는 비밀번호/카드번호 등 민감 입력값이 들어오면 안 된다.
+# 확장(background.js)의 스캔이 input[type="password"] 값은 수집하지 않고
+# has_password 플래그만 보낸다. 서버는 만약을 대비해 custom_agent.detect_handoff
+# 에서 비밀번호/캡차/결제 폼을 만나면 LLM 호출 없이 즉시 사용자 핸드오프로 정지한다.
+class AgentStepRequest(BaseModel):
+    task: str
+    elements: list[dict] = Field(default_factory=list)
+    current_url: str = ""
+    action_history: list[dict] = Field(default_factory=list)
+
+
 class DebateRequest(BaseModel):
     session_id: str
     topic: str
@@ -303,6 +317,11 @@ COMPARE_SESSION_PLANS: dict[str, dict[str, str]] = {}
 COMPARE_SESSION_PENDING: dict[str, int] = {}
 COMPARE_SESSION_LOCK = asyncio.Lock()
 AGENT_LOCK = asyncio.Semaphore(1)
+
+# /agent/step은 브라우저를 띄우지 않는 순수 LLM 판단이라 부담이 훨씬 적다.
+# /agent/task의 AGENT_LOCK(1개)과 공유하지 않고 별도 세마포어로 넉넉히 허용한다.
+AGENT_STEP_CONCURRENCY = int(os.environ.get("AGENT_STEP_CONCURRENCY", "8"))
+AGENT_STEP_SEMAPHORE = asyncio.Semaphore(AGENT_STEP_CONCURRENCY)
 
 
 def build_openrouter_headers() -> dict[str, str]:
@@ -1361,10 +1380,17 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
     async def generate() -> AsyncIterator[str]:
         excluded_by_failure: set[str] = set()
         await mark_compare_stream_started(session_id)
+        current_model_id: str | None = None
 
         try:
             while True:
-                model_id = await acquire_compare_model(session_id, label, excluded_by_failure)
+                # 직전 모델(실패해서 다음 후보로 넘어가는 경우)을 먼저 반납해 누수를 막는다.
+                if current_model_id:
+                    await release_compare_model(session_id, current_model_id)
+                    current_model_id = None
+
+                current_model_id = await acquire_compare_model(session_id, label, excluded_by_failure)
+                model_id = current_model_id
                 if model_id is None:
                     yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                     return
@@ -1456,6 +1482,9 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                 if not failed_this_model:
                     return
         finally:
+            # 스트림이 정상 종료/예외/early return 어느 경로로 끝나도 모델 락을 반드시 반납한다.
+            if current_model_id:
+                await release_compare_model(session_id, current_model_id)
             await mark_compare_stream_done(session_id)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -1583,6 +1612,58 @@ async def models_health() -> dict[str, str]:
     model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
     results = await asyncio.gather(*(check_model_health(semaphore, model_id) for model_id in model_ids))
     return dict(results)
+
+
+AGENT_STEP_MAX_CANDIDATES = 4
+
+
+def _resolve_agent_models() -> list[str]:
+    """에이전트가 시도할 모델 목록(우선순위). AGENT_MODEL 환경변수가 있으면 맨 앞에,
+    그 뒤로 현재 가용 무료 모델을 붙여 폴백 체인을 만든다(무료 모델 429 대비).
+    나중에 실제 API를 붙이면 AGENT_MODEL만 지정하면 그 모델이 1순위가 된다."""
+    configured = os.environ.get("AGENT_MODEL", "").strip()
+    candidates: list[str] = []
+    if configured:
+        candidates.append(configured)
+    candidates.extend(get_all_available_free_models())
+    deduped = list(dict.fromkeys(candidate for candidate in candidates if candidate))
+    if not deduped:
+        deduped = ["openai/gpt-4o"]
+    return deduped[:AGENT_STEP_MAX_CANDIDATES]
+
+
+@app.post("/agent/step")
+async def agent_step(request: AgentStepRequest):
+    """확장 프로그램이 사용자의 실제 탭에서 화면을 스캔해 보내면, 다음에 할
+    액션 1개만 판단해 돌려주는 무상태 엔드포인트. Playwright를 전혀 쓰지 않는다.
+    실제 클릭/입력은 확장(background.js)이 chrome.debugger로 수행한다."""
+    task = request.task.strip()
+    if not task:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "작업 내용을 입력해주세요."},
+        )
+
+    await ensure_model_cache_fresh()
+    models = _resolve_agent_models()
+    headers = build_openrouter_headers()
+
+    async with AGENT_STEP_SEMAPHORE:
+        try:
+            return await decide_next_step(
+                headers=headers,
+                models=models,
+                task=task,
+                elements=request.elements,
+                action_history=request.action_history,
+                current_url=request.current_url,
+            )
+        except Exception:
+            logger.exception("agent_step failed task=%s", task[:120])
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": "에이전트 판단 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."},
+            )
 
 
 @app.post("/agent/task")
