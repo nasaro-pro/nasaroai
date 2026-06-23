@@ -1,0 +1,50 @@
+name: Build ArenaX Agent APK
+
+on:
+  push:
+    paths:
+      - 'android-agent/**'
+  workflow_dispatch:   # 수동 실행 버튼
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: |
+          cd android-agent
+          gradle wrapper
+          chmod +x gradlew
+
+      - name: Build Debug APK
+        run: |
+          cd android-agent
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: arenax-agent-apk
+          path: android-agent/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: "ArenaX Agent APK (최신)"
+          body: "ArenaX 플로팅 버튼 앱 — 아래 apk 파일을 다운로드해서 설치하세요."
+          files: android-agent/app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
