@@ -247,7 +247,7 @@
         }
 
         .chat-history-item {
-            padding: 9px 10px;
+            padding: 7px 10px;
             border-radius: 8px;
             font-size: 13px;
             color: #374151;
@@ -256,9 +256,8 @@
             text-align: left;
             cursor: pointer;
             font: inherit;
-            white-space: nowrap;
+            min-width: 0;
             overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .chat-history-item:hover {
@@ -512,14 +511,14 @@
         }
 
         .compare-content {
-            min-height: 120px;
-            max-height: 300px;
+            min-height: 140px;
+            max-height: 520px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-word;
-            padding: 12px;
-            font-size: 16px;
-            line-height: 1.75;
+            padding: 14px 16px;
+            font-size: 15px;
+            line-height: 1.8;
         }
 
         .compare-card.error-card {
@@ -821,15 +820,17 @@
             color: #374151;
         }
 
-        @media (min-width: 760px) {
+        @media (min-width: 640px) {
             .compare-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 16px;
             }
         }
 
-        @media (min-width: 1080px) {
+        @media (min-width: 960px) {
             .compare-grid {
                 grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 18px;
             }
         }
 
@@ -1464,17 +1465,26 @@
             catch { chatHistory = []; }
         }
 
+        function saveHistory() {
+            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(chatHistory)); } catch {}
+        }
+
         function saveToHistory(message, responses) {
             if (!message || Object.keys(responses).every(k => !responses[k])) return;
             const entry = {
                 id: Date.now().toString(),
                 query: message,
                 timestamp: new Date().toLocaleString("ko-KR"),
+                pinned: false,
                 responses: Object.fromEntries(Object.entries(responses).filter(([, v]) => v)),
             };
-            chatHistory.unshift(entry);
+            // 고정 항목은 맨 앞, 나머지는 그 다음에 추가
+            const pinnedItems = chatHistory.filter(e => e.pinned);
+            const unpinnedItems = chatHistory.filter(e => !e.pinned);
+            unpinnedItems.unshift(entry);
+            chatHistory = [...pinnedItems, ...unpinnedItems];
             if (chatHistory.length > 60) chatHistory.splice(60);
-            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(chatHistory)); } catch {}
+            saveHistory();
             renderChatHistory();
         }
 
@@ -1486,15 +1496,52 @@
                 return;
             }
             list.innerHTML = "";
-            chatHistory.forEach(entry => {
+            chatHistory.forEach((entry, idx) => {
+                const row = document.createElement("div");
+                row.style.cssText = "display:flex;align-items:stretch;gap:3px;margin-bottom:3px;";
+
+                // 기록 항목 버튼
                 const item = document.createElement("button");
                 item.className = "chat-history-item";
+                item.style.flex = "1";
                 item.title = entry.query;
+                item.style.borderLeft = entry.pinned ? "3px solid #7c3aed" : "";
                 item.innerHTML =
-                    `<span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(entry.query)}</span>` +
-                    `<span style="display:block;font-size:11px;color:#9ca3af;margin-top:1px;">${escapeHtml(entry.timestamp)}</span>`;
+                    `<span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${entry.pinned?700:400};">${escapeHtml(entry.query)}</span>` +
+                    `<span style="display:block;font-size:11px;color:#9ca3af;margin-top:1px;">${entry.pinned ? "📌 " : ""}${escapeHtml(entry.timestamp)}</span>`;
                 item.addEventListener("click", () => restoreHistoryEntry(entry));
-                list.appendChild(item);
+
+                // 고정 버튼
+                const pinBtn = document.createElement("button");
+                pinBtn.title = entry.pinned ? "고정 해제" : "상단 고정";
+                pinBtn.style.cssText = `flex:0 0 26px;background:${entry.pinned?"#312e81":"#1a1030"};border:1px solid #2d1f50;border-radius:6px;
+                    color:${entry.pinned?"#a78bfa":"#6b7280"};font-size:13px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;`;
+                pinBtn.textContent = "📌";
+                pinBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    chatHistory[idx].pinned = !chatHistory[idx].pinned;
+                    // 고정된 항목은 목록 맨 앞으로
+                    const pinned = chatHistory.filter(e => e.pinned);
+                    const unpinned = chatHistory.filter(e => !e.pinned);
+                    chatHistory = [...pinned, ...unpinned];
+                    saveHistory();
+                    renderChatHistory();
+                });
+
+                // 삭제 버튼
+                const delBtn = document.createElement("button");
+                delBtn.title = "이 기록 삭제";
+                delBtn.style.cssText = "flex:0 0 26px;background:#1a1030;border:1px solid #2d1f50;border-radius:6px;color:#6b7280;font-size:13px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;";
+                delBtn.textContent = "✕";
+                delBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    chatHistory.splice(idx, 1);
+                    saveHistory();
+                    renderChatHistory();
+                });
+
+                row.append(item, pinBtn, delBtn);
+                list.appendChild(row);
             });
         }
 
@@ -1537,7 +1584,7 @@
         document.getElementById("clearHistoryBtn")?.addEventListener("click", () => {
             if (!confirm("대화 기록을 모두 삭제할까요?")) return;
             chatHistory = [];
-            try { localStorage.removeItem(HISTORY_KEY); } catch {}
+            saveHistory();
             renderChatHistory();
         });
 
