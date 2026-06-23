@@ -1449,7 +1449,7 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                         return
                                     try:
                                         raw = json.loads(line[6:])
-                    except json.JSONDecodeError:
+                                    except json.JSONDecodeError:
                                         yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                         return
                                     if raw.get("error"):
