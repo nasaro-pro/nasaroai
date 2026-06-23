@@ -16,22 +16,8 @@ const tabToTask    = new Map();   // tabId → taskId (활성 임무)
 const pauseFlags   = new Set();   // Set<taskId>  — 루프 중단 대기
 const cancelFlags  = new Set();   // Set<taskId>  — 루프 취소 요청
 
-// ---- 서비스워커 시작 시: stale "running"/"paused" 임무를 error로 정리 ----
-(async () => {
-  try {
-    const { agentTasks = [] } = await chrome.storage.local.get("agentTasks");
-    let changed = false;
-    for (const t of agentTasks) {
-      if (t.status === "running" || t.status === "paused") {
-        t.status  = "error";
-        t.result  = "⚠️ 에이전트가 재시작됐습니다. 수정 후 다시 실행하세요.";
-        t.updatedAt = Date.now();
-        changed = true;
-      }
-    }
-    if (changed) await chrome.storage.local.set({ agentTasks });
-  } catch {}
-})();
+// STARTUP_TIME: 이후에 정의될 _withTasks 초기화 직후에 cleanup 실행
+const STARTUP_TIME = Date.now();
 
 // ---- 유틸 ----
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -52,16 +38,28 @@ function sendToTab(tabId, msg) {
 let _twChain = Promise.resolve();
 
 function _withTasks(fn) {
-  // 호출자가 에러를 받을 수 있도록 raw promise 반환
-  // chain 자체는 에러를 삼켜서 이후 write가 영원히 block되지 않도록 함
+  // raw promise 반환 → 호출자가 에러 받을 수 있음
+  // chain은 .catch로 막아서 에러 시에도 다음 write가 block 안 됨
   const p = _twChain.then(async () => {
     const { agentTasks = [] } = await chrome.storage.local.get("agentTasks");
     const extra = (await fn(agentTasks)) || {};
     await chrome.storage.local.set({ agentTasks, ...extra });
   });
-  _twChain = p.catch(() => {}); // chain 유지 — 에러가 있어도 다음 write 가능
-  return p; // 에러 전파 가능한 raw promise 반환
+  _twChain = p.catch(() => {});
+  return p;
 }
+
+// ---- 서비스워커 시작 시: stale 임무 정리 (STARTUP_TIME 이전 생성 임무만) ----
+// _withTasks 체인을 이용해 race condition 없이 직렬 처리
+_withTasks(async (ts) => {
+  for (const t of ts) {
+    if ((t.status === "running" || t.status === "paused") && (t.createdAt || 0) < STARTUP_TIME) {
+      t.status  = "error";
+      t.result  = "⚠️ 에이전트가 재시작됐습니다. 수정 후 다시 실행하세요.";
+      t.updatedAt = STARTUP_TIME;
+    }
+  }
+});
 
 function tsCreate(taskId, text, tabId) {
   return _withTasks(async (ts) => {

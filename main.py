@@ -884,7 +884,7 @@ async def call_ai_model(
 
     if excluded_models and LAST_RESORT_MODEL in excluded_models:
         final_result = None
-            else:
+    else:
         final_result = await final_attempt_model_call(
             label, requested_model, failed_candidates, excluded_models=excluded_models
         )

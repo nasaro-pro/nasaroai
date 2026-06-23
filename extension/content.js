@@ -408,7 +408,11 @@
     const task = input.value.trim();
     if (!task) return;
     input.value = ""; input.style.height = "auto"; input.focus();
-    chrome.runtime.sendMessage({ type: "RUN_TASK", task }, () => void chrome.runtime.lastError);
+    try {
+      chrome.runtime.sendMessage({ type: "RUN_TASK", task }, () => void chrome.runtime.lastError);
+    } catch (e) {
+      // Extension context invalidated (확장 리로드 시) → 무시
+    }
   }
 
   // ── 에이전트 종료 ────────────────────────────────────────────────────
