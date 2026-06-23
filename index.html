@@ -1532,6 +1532,7 @@
             }
 
             updateDockUI();
+            updateAgentPanel();
         }
 
         document.querySelectorAll(".mode-btn").forEach(btn => {
@@ -1587,7 +1588,11 @@
 
         function setAgentMode(enabled) {
             isAgentMode = enabled;
-            setAgentPanelVisible(enabled);
+            if (enabled) {
+                setAgentPanelVisible(true);
+            }
+            agentToggleBtn.classList.toggle("active", isAgentMode);
+            syncMainPadding();
         }
 
         const AGENT_STATUS_LABEL = { success: "완료", error: "실패", loading: "진행 중" };
@@ -1693,7 +1698,7 @@
         }
 
         agentToggleBtn.addEventListener("click", () => setAgentMode(!isAgentMode));
-        agentPanelClose.addEventListener("click", () => setAgentMode(false));
+        agentPanelClose.addEventListener("click", () => setAgentPanelVisible(false));
         agentSendBtn.addEventListener("click", sendAgentTask);
         agentInput.addEventListener("input", () => {
             agentInput.style.height = "auto";
