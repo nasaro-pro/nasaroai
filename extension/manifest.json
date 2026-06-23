@@ -1,10 +1,9 @@
 {
   "manifest_version": 3,
   "name": "ArenaX 에이전트",
-  "version": "1.1.0",
-  "description": "사용자가 보고 있는 바로 그 탭을 ArenaX 에이전트가 직접 조작합니다 (chrome.debugger 기반).",
+  "version": "2.0.0",
+  "description": "어떤 사이트에서든 화면 하단의 요청창으로 ArenaX 에이전트가 그 탭을 직접 조작합니다.",
   "permissions": [
-    "sidePanel",
     "activeTab",
     "storage",
     "scripting",
@@ -16,10 +15,15 @@
   "background": {
     "service_worker": "background.js"
   },
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
   "action": {
-    "default_title": "ArenaX 에이전트 열기"
+    "default_title": "ArenaX 에이전트 켜기/끄기"
   }
 }

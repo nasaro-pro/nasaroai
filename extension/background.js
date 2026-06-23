@@ -1,25 +1,47 @@
-// ArenaX 에이전트 백그라운드 서비스 워커
-// 역할: 사용자가 보고 있는 "그 탭"을 chrome.debugger(CDP)로 직접 조작한다.
-//  - 화면 스캔(DOM)         : Runtime.evaluate 로 상호작용 요소 수집
-//  - 액션 실행(클릭/입력 등) : Input.dispatch* 로 "진짜 신뢰 입력 이벤트" 전송
-// content script 주입 없이 전부 debugger 채널로 처리한다.
+// ArenaX 에이전트 백그라운드 서비스 워커 (v2 — 하단 바 방식)
+// 역할:
+//  - content.js(하단 바)가 보낸 RUN_TASK를 받아 "그 탭"에서 작업 루프를 돌린다.
+//  - 화면 스캔/실제 입력은 chrome.debugger(CDP)로 수행한다.
+//  - 서버(/agent/step) 호출도 여기서 한다(host_permissions 덕분에 페이지 CORS 영향 없음).
+// content.js는 UI만 담당한다.
 
-// ----------------------- 사이드패널 열기(기존 로직 유지) -----------------------
-chrome.sidePanel
-  .setPanelBehavior({ openPanelOnActionClick: true })
-  .catch(console.error);
-
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setOptions({
-    enabled: true,
-    path: "sidepanel.html",
-  });
-});
-
-// ----------------------- 디버거 연결 상태 추적 -----------------------
+const DEFAULT_SERVER = "https://arenax-4812.onrender.com";
 const DEBUGGER_VERSION = "1.3";
-const attachedTabs = new Set();
+const MAX_ROUNDS = 20;
+const INTERNAL_URL_RE = /^(chrome|edge|brave|about|chrome-extension|devtools|view-source):/i;
 
+const attachedTabs = new Set();
+const runningTabs = new Set();
+
+// ----------------------- 유틸 -----------------------
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function getServerUrl() {
+  try {
+    const stored = await chrome.storage.local.get("serverUrl");
+    const raw = (stored.serverUrl || DEFAULT_SERVER).trim().replace(/\/+$/, "");
+    return raw || DEFAULT_SERVER;
+  } catch (e) {
+    return DEFAULT_SERVER;
+  }
+}
+
+function sendToTab(tabId, message) {
+  // content 스크립트가 아직 없거나 페이지가 바뀌어도 조용히 무시한다.
+  try {
+    chrome.tabs.sendMessage(tabId, message, () => void chrome.runtime.lastError);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function progress(tabId, text, kind) {
+  sendToTab(tabId, { type: "AGENT_PROGRESS", text, kind });
+}
+
+// ----------------------- CDP 래퍼 -----------------------
 function sendCommand(tabId, method, params = {}) {
   return new Promise((resolve, reject) => {
     chrome.debugger.sendCommand({ tabId }, method, params, (result) => {
@@ -35,7 +57,7 @@ function sendCommand(tabId, method, params = {}) {
 function attachDebugger(tabId) {
   return new Promise((resolve, reject) => {
     if (attachedTabs.has(tabId)) {
-      resolve({ success: true, already: true });
+      resolve();
       return;
     }
     chrome.debugger.attach({ tabId }, DEBUGGER_VERSION, () => {
@@ -44,7 +66,7 @@ function attachDebugger(tabId) {
         return;
       }
       attachedTabs.add(tabId);
-      resolve({ success: true, already: false });
+      resolve();
     });
   });
 }
@@ -52,35 +74,28 @@ function attachDebugger(tabId) {
 function detachDebugger(tabId) {
   return new Promise((resolve) => {
     if (!attachedTabs.has(tabId)) {
-      resolve({ success: true });
+      resolve();
       return;
     }
     chrome.debugger.detach({ tabId }, () => {
-      // detach 실패해도(이미 떨어졌거나 탭이 닫힘) 상태만 정리하고 넘어간다.
       attachedTabs.delete(tabId);
-      resolve({ success: true });
+      void chrome.runtime.lastError;
+      resolve();
     });
   });
 }
 
-// 사용자가 배너의 "취소"를 누르거나 탭이 닫히면 상태를 정리한다.
 chrome.debugger.onDetach.addListener((source) => {
-  if (source.tabId != null) {
-    attachedTabs.delete(source.tabId);
-  }
+  if (source.tabId != null) attachedTabs.delete(source.tabId);
 });
-
 chrome.tabs.onRemoved.addListener((tabId) => {
   attachedTabs.delete(tabId);
+  runningTabs.delete(tabId);
 });
 
 // ----------------------- 화면 스캔 -----------------------
-// custom_agent.py 의 DOM_INJECTOR_JS 와 같은 로직을 Runtime.evaluate 용 IIFE로 옮긴 것.
-// 차이점/개선점:
-//   - 매 스캔마다 data-agent-id 를 새로 덮어써 "이번 라운드"에서만 유효한 안정적 ID를 보장
-//     (스캔→판단→실행이 한 라운드 안에서 끝나므로 stale ID 충돌 위험 제거).
-//   - 가시성 판정을 "뷰포트와 교차하면 보임"으로 완화(원본의 '완전히 안쪽' 기준보다 실용적).
-//   - [보안] input[type="password"] 의 value 는 절대 수집하지 않고 has_password 만 표시.
+// custom_agent.py DOM_INJECTOR_JS 와 같은 로직(매 스캔마다 data-agent-id 재부여,
+// 뷰포트 교차=가시, 비밀번호 값 미수집).
 const SCAN_EXPRESSION = `(() => {
   const TAGS = [
     'a','button','input','select','textarea',
@@ -96,13 +111,10 @@ const SCAN_EXPRESSION = `(() => {
     if (rect.width === 0 || rect.height === 0) continue;
     const style = getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
-
     el.setAttribute('data-agent-id', 'a' + counter);
     counter++;
-
     const isVisible = (rect.bottom > 0 && rect.top < vh && rect.right > 0 && rect.left < vw);
     const isPassword = (el.tagName === 'INPUT' && (el.type || '').toLowerCase() === 'password');
-
     items.push({
       id: el.getAttribute('data-agent-id'),
       tag: el.tagName.toLowerCase(),
@@ -116,12 +128,7 @@ const SCAN_EXPRESSION = `(() => {
       aria_label: el.getAttribute('aria-label') || null,
       name: el.name || null,
       is_visible: isVisible,
-      rect: {
-        top: Math.round(rect.top),
-        left: Math.round(rect.left),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height)
-      }
+      rect: { top: Math.round(rect.top), left: Math.round(rect.left), width: Math.round(rect.width), height: Math.round(rect.height) }
     });
   }
   items.sort((a, b) => (b.is_visible ? 1 : 0) - (a.is_visible ? 1 : 0));
@@ -135,30 +142,19 @@ async function scanCurrentTab(tabId) {
     awaitPromise: false,
   });
   const value = res && res.result ? res.result.value : null;
-  if (!value || !Array.isArray(value.elements)) {
-    return { elements: [], url: "", title: "" };
-  }
+  if (!value || !Array.isArray(value.elements)) return { elements: [], url: "", title: "" };
   return value;
 }
 
 // ----------------------- 액션 실행 -----------------------
-// 핵심 보강(스펙 대비 개선): 클릭/입력은 스캔 시점 좌표를 신뢰하지 않고,
-// "실행 직전에" data-agent-id 로 요소를 다시 찾아 scrollIntoView 후 최신 좌표를
-// 계산한다. SPA에서 스캔과 실행 사이에 레이아웃이 바뀌어도 좌표가 틀어지지 않는다.
+// 클릭/입력은 실행 직전에 data-agent-id로 요소를 다시 찾아 최신 좌표를 계산한다(SPA 대비).
 function buildResolveExpression(agentId) {
-  // agentId 는 'a0' 형태의 안전한 값이라 문자열 보간이 안전하다.
   return `(() => {
     const el = document.querySelector('[data-agent-id="${agentId}"]');
     if (!el) return { found: false };
     el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
-    return {
-      found: true,
-      x: r.left + r.width / 2,
-      y: r.top + r.height / 2,
-      width: r.width,
-      height: r.height
-    };
+    return { found: true, x: r.left + r.width / 2, y: r.top + r.height / 2 };
   })()`;
 }
 
@@ -182,54 +178,38 @@ const KEY_MAP = {
 };
 
 async function dispatchClickAt(tabId, x, y) {
-  await sendCommand(tabId, "Input.dispatchMouseEvent", {
-    type: "mouseMoved", x, y, buttons: 0,
-  });
-  await sendCommand(tabId, "Input.dispatchMouseEvent", {
-    type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1,
-  });
-  await sendCommand(tabId, "Input.dispatchMouseEvent", {
-    type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1,
-  });
+  await sendCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y, buttons: 0 });
+  await sendCommand(tabId, "Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", buttons: 1, clickCount: 1 });
+  await sendCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", buttons: 0, clickCount: 1 });
 }
 
 async function dispatchKey(tabId, keyName) {
   const k = KEY_MAP[keyName];
   if (!k) {
-    // 한 글자 키 등은 그대로 시도
     await sendCommand(tabId, "Input.dispatchKeyEvent", { type: "keyDown", key: keyName });
     await sendCommand(tabId, "Input.dispatchKeyEvent", { type: "keyUp", key: keyName });
     return;
   }
-  await sendCommand(tabId, "Input.dispatchKeyEvent", {
-    type: "keyDown", key: k.key, code: k.code, windowsVirtualKeyCode: k.windowsVirtualKeyCode,
-  });
-  await sendCommand(tabId, "Input.dispatchKeyEvent", {
-    type: "keyUp", key: k.key, code: k.code, windowsVirtualKeyCode: k.windowsVirtualKeyCode,
-  });
+  await sendCommand(tabId, "Input.dispatchKeyEvent", { type: "keyDown", key: k.key, code: k.code, windowsVirtualKeyCode: k.windowsVirtualKeyCode });
+  await sendCommand(tabId, "Input.dispatchKeyEvent", { type: "keyUp", key: k.key, code: k.code, windowsVirtualKeyCode: k.windowsVirtualKeyCode });
 }
 
 async function executeAction(tabId, action) {
   const type = action && action.action;
   try {
     if (type === "click") {
-      const center = await resolveElementCenter(tabId, action.target_id);
-      if (!center.found) return { success: false, error: "요소를 찾을 수 없습니다(클릭): " + action.target_id };
-      await dispatchClickAt(tabId, center.x, center.y);
-
+      const c = await resolveElementCenter(tabId, action.target_id);
+      if (!c.found) return { success: false, error: "요소를 찾을 수 없습니다(클릭): " + action.target_id };
+      await dispatchClickAt(tabId, c.x, c.y);
     } else if (type === "type") {
-      const center = await resolveElementCenter(tabId, action.target_id);
-      if (!center.found) return { success: false, error: "요소를 찾을 수 없습니다(입력): " + action.target_id };
-      // 1) 클릭으로 포커스 → 2) 기존 내용 전체 선택 → 3) 신뢰 입력(insertText)
-      await dispatchClickAt(tabId, center.x, center.y);
+      const c = await resolveElementCenter(tabId, action.target_id);
+      if (!c.found) return { success: false, error: "요소를 찾을 수 없습니다(입력): " + action.target_id };
+      await dispatchClickAt(tabId, c.x, c.y);
       await sendCommand(tabId, "Runtime.evaluate", {
         expression: `(() => { const el = document.querySelector('[data-agent-id="${action.target_id}"]'); if (el) { el.focus(); if (el.select) el.select(); } })()`,
       });
       await sendCommand(tabId, "Input.insertText", { text: String(action.value ?? "") });
-
     } else if (type === "select") {
-      // 네이티브 select 드롭다운은 OS 레벨로 렌더링되어 CDP 마우스로 다루기 까다롭다.
-      // 이 경우에 한해 예외적으로 Runtime.evaluate 로 value 설정 + 이벤트 디스패치한다.
       const value = JSON.stringify(String(action.value ?? ""));
       const expr = `(() => {
         const el = document.querySelector('[data-agent-id="${action.target_id}"]');
@@ -245,78 +225,217 @@ async function executeAction(tabId, action) {
         return matched;
       })()`;
       const res = await sendCommand(tabId, "Runtime.evaluate", { expression: expr, returnByValue: true });
-      const ok = res && res.result ? res.result.value : false;
-      if (!ok) return { success: false, error: "select 옵션을 찾지 못했습니다: " + action.value };
-
+      if (!(res && res.result && res.result.value)) return { success: false, error: "select 옵션을 찾지 못했습니다: " + action.value };
     } else if (type === "scroll_down") {
-      // 스크롤은 신뢰 입력 여부가 사이트 동작에 영향을 주지 않아 evaluate로 처리(안정적).
       await sendCommand(tabId, "Runtime.evaluate", { expression: "window.scrollBy(0, 600)" });
-
     } else if (type === "scroll_up") {
       await sendCommand(tabId, "Runtime.evaluate", { expression: "window.scrollBy(0, -600)" });
-
     } else if (type === "press_key") {
       await dispatchKey(tabId, String(action.value || "Enter"));
-
     } else if (type === "navigate") {
       await sendCommand(tabId, "Page.navigate", { url: String(action.value || "") });
-
+      await sleep(1200);
     } else if (type === "back") {
       await sendCommand(tabId, "Runtime.evaluate", { expression: "history.back()" });
-
     } else if (type === "wait") {
       const ms = parseInt(action.value, 10);
-      await new Promise((r) => setTimeout(r, Number.isFinite(ms) ? ms : 1000));
-
+      await sleep(Number.isFinite(ms) ? ms : 1000);
     } else if (type === "done") {
       return { success: true, error: null };
-
     } else {
       return { success: false, error: "알 수 없는 액션: " + type };
     }
-
     return { success: true, error: null };
   } catch (err) {
     return { success: false, error: String(err && err.message ? err.message : err) };
   }
 }
 
-// ----------------------- 메시지 라우팅 -----------------------
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  (async () => {
-    try {
-      if (message.type === "ATTACH_DEBUGGER") {
-        const res = await attachDebugger(message.tabId);
-        sendResponse(res);
-      } else if (message.type === "DETACH_DEBUGGER") {
-        const res = await detachDebugger(message.tabId);
-        sendResponse(res);
-      } else if (message.type === "SCAN") {
-        const tabId = message.tabId;
-        const data = await scanCurrentTab(tabId);
-        sendResponse({ success: true, ...data });
-      } else if (message.type === "EXECUTE") {
-        const tabId = message.tabId;
-        const res = await executeAction(tabId, message.action);
-        sendResponse(res);
-      } else {
-        sendResponse({ success: false, error: "알 수 없는 메시지 타입" });
-      }
-    } catch (err) {
-      sendResponse({ success: false, error: String(err && err.message ? err.message : err) });
-    }
-  })();
-  // 비동기 응답을 위해 반드시 true 반환
-  return true;
-});
+// ----------------------- 서버 호출 -----------------------
+async function postStep(serverUrl, task, scan, actionHistory) {
+  let resp;
+  try {
+    resp = await fetch(serverUrl + "/agent/step", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        task,
+        elements: scan.elements || [],
+        current_url: scan.url || "",
+        action_history: actionHistory,
+      }),
+    });
+  } catch (e) {
+    throw new Error("서버에 연결할 수 없습니다. 서버 주소(설정)를 확인하세요.");
+  }
+  let data;
+  try {
+    data = await resp.json();
+  } catch (e) {
+    throw new Error("서버 응답을 해석하지 못했습니다.");
+  }
+  if (!resp.ok || data.status === "error") {
+    throw new Error(data.message || (data.detail && data.detail.message) || "서버 오류 (" + resp.status + ")");
+  }
+  return data;
+}
 
-// ----------------------- 사이드패널 수명주기 정리 -----------------------
-// 사이드패널이 열리면 포트를 연결하고, 닫히면 onDisconnect 로 모든 디버거를 정리한다.
-chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== "sidepanel") return;
-  port.onDisconnect.addListener(async () => {
-    for (const tabId of Array.from(attachedTabs)) {
-      await detachDebugger(tabId);
+// 제출/결제 확인을 하단 바에 물어보고 응답(승인/취소)을 기다린다. 60초 무응답이면 취소.
+function askConfirm(tabId, payload) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(false);
+      }
+    }, 60000);
+    try {
+      chrome.tabs.sendMessage(tabId, { type: "AGENT_CONFIRM", ...payload }, (resp) => {
+        if (chrome.runtime.lastError) {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(false);
+          }
+          return;
+        }
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(!!(resp && resp.approved));
+        }
+      });
+    } catch (e) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(false);
+      }
     }
   });
+}
+
+// ----------------------- 작업 루프 -----------------------
+async function runTask(tabId, task) {
+  const serverUrl = await getServerUrl();
+
+  try {
+    await attachDebugger(tabId);
+  } catch (e) {
+    return { ok: false, finalText: "이 탭을 제어할 수 없습니다(디버거 연결 실패): " + (e.message || e), kind: "error" };
+  }
+  progress(tabId, "⚙️ 이 탭을 제어합니다. 상단에 디버깅 배너가 표시됩니다.", "info");
+
+  const actionHistory = [];
+  let finalText = "최대 단계(20단계)에 도달했습니다. 목표를 완전히 달성하지 못했을 수 있습니다.";
+  let kind = "error";
+
+  try {
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
+      const scan = await scanCurrentTab(tabId);
+      const data = await postStep(serverUrl, task, scan, actionHistory);
+      const reasoning = data.reasoning || "(이유 없음)";
+      progress(tabId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
+
+      if (data.handoff_required) {
+        finalText = "🟡 사용자가 직접 진행해야 합니다.\n" + reasoning;
+        kind = "handoff";
+        break;
+      }
+      if (data.done) {
+        finalText = reasoning;
+        kind = "success";
+        break;
+      }
+      if (data.confirm_required) {
+        const approved = await askConfirm(tabId, {
+          message: data.confirm_message || "중요한 동작을 실행하려고 합니다.",
+          action: data.action,
+          reasoning,
+        });
+        if (!approved) {
+          finalText = "🟡 사용자가 실행을 취소했습니다.";
+          kind = "handoff";
+          break;
+        }
+      }
+
+      const exec = await executeAction(tabId, {
+        action: data.action,
+        target_id: data.target_id,
+        value: data.value,
+      });
+      actionHistory.push({
+        step: round,
+        action: data.action,
+        target: data.target_id,
+        value: data.value,
+        error: exec.success ? null : exec.error,
+      });
+      await sleep(700);
+    }
+  } catch (e) {
+    finalText = "❌ " + (e.message || e);
+    kind = "error";
+  } finally {
+    await detachDebugger(tabId);
+  }
+
+  return { ok: kind !== "error", finalText, kind };
+}
+
+// ----------------------- 메시지 라우팅 -----------------------
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  (async () => {
+    try {
+      if (message.type === "RUN_TASK") {
+        const tabId = sender.tab && sender.tab.id;
+        if (tabId == null) {
+          sendResponse({ ok: false, finalText: "탭 정보를 찾을 수 없습니다.", kind: "error" });
+          return;
+        }
+        if (runningTabs.has(tabId)) {
+          sendResponse({ ok: false, finalText: "이미 이 탭에서 작업이 진행 중입니다.", kind: "error" });
+          return;
+        }
+        runningTabs.add(tabId);
+        try {
+          const result = await runTask(tabId, message.task);
+          sendResponse(result);
+        } finally {
+          runningTabs.delete(tabId);
+        }
+      } else if (message.type === "GET_SERVER_URL") {
+        sendResponse({ serverUrl: await getServerUrl() });
+      } else if (message.type === "SET_SERVER_URL") {
+        const raw = String(message.serverUrl || "").trim().replace(/\/+$/, "");
+        const url = raw ? (raw.startsWith("http") ? raw : "https://" + raw) : DEFAULT_SERVER;
+        await chrome.storage.local.set({ serverUrl: url });
+        sendResponse({ ok: true, serverUrl: url });
+      } else {
+        sendResponse({ ok: false, error: "알 수 없는 메시지" });
+      }
+    } catch (e) {
+      sendResponse({ ok: false, finalText: String(e && e.message ? e.message : e), kind: "error" });
+    }
+  })();
+  return true; // 비동기 응답
+});
+
+// ----------------------- 아이콘 클릭 = 하단 바 토글 -----------------------
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab || tab.id == null) return;
+  if (tab.url && INTERNAL_URL_RE.test(tab.url)) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_BAR" });
+  } catch (e) {
+    // 설치 전부터 열려 있던 탭은 content script가 없으므로 주입 후 토글한다.
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+      await chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_BAR" });
+    } catch (e2) {
+      /* ignore */
+    }
+  }
 });
