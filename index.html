@@ -1198,7 +1198,13 @@
                 <button id="signupBtn" class="side-menu-btn outline" type="button">회원가입</button>
             </div>
             <div class="side-menu-section">
-                <div class="side-menu-section-title">대화 기록</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <div class="side-menu-section-title" style="margin-bottom:0;">대화 기록</div>
+                    <button id="clearHistoryBtn" type="button"
+                        style="font-size:11px;color:#6b7280;background:none;border:1px solid #374151;border-radius:6px;padding:3px 8px;cursor:pointer;"
+                        title="기록 전체 삭제">삭제</button>
+                </div>
+                <div style="font-size:11px;color:#4b5563;margin-bottom:8px;">이 브라우저에만 저장됩니다</div>
                 <div id="chatHistoryList" class="chat-history-list">
                     <div class="chat-history-empty">아직 저장된 대화가 없습니다.</div>
                 </div>
@@ -1413,8 +1419,18 @@
         menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
         sideMenuOverlay.addEventListener("click", () => setSideMenuOpen(false));
 
-        // ── 대화 기록 (localStorage) ────────────────────────────────────────
-        const HISTORY_KEY = "arenax_chat_history";
+        // ── 대화 기록 (localStorage — 기기별 독립 저장) ──────────────────────
+        // 기기 고유 ID: 처음 방문 시 생성, 이후 동일 브라우저에서만 유효
+        // 로그인 없이 접속 시 다른 기기/브라우저의 기록은 보이지 않음
+        function getDeviceId() {
+            let id = localStorage.getItem("arenax_device_id");
+            if (!id) {
+                id = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+                localStorage.setItem("arenax_device_id", id);
+            }
+            return id;
+        }
+        const HISTORY_KEY = "arenax_chat_history_" + getDeviceId();
         let chatHistory = [];
 
         function loadHistory() {
@@ -1490,6 +1506,14 @@
             mainInput.focus();
         }
         newChatBtn.addEventListener("click", startNewChat);
+
+        // ── 기록 전체 삭제 ───────────────────────────────────────────────────
+        document.getElementById("clearHistoryBtn")?.addEventListener("click", () => {
+            if (!confirm("대화 기록을 모두 삭제할까요?")) return;
+            chatHistory = [];
+            try { localStorage.removeItem(HISTORY_KEY); } catch {}
+            renderChatHistory();
+        });
 
         // 데스크톱에서는 사이드바를 펼친 상태로 시작(콘텐츠를 옆으로 밀어줌).
         setSideMenuOpen(window.innerWidth >= 768);

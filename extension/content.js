@@ -577,7 +577,9 @@
   function updateKbOffset() {
     if (!window.visualViewport) return;
     const vv = window.visualViewport;
-    const newOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    // 키보드 높이 = 전체 내부 높이 - 가시 뷰포트 높이 - 상단 오프셋
+    const raw = window.innerHeight - vv.height - Math.max(0, vv.offsetTop);
+    const newOffset = Math.max(0, raw);
     if (newOffset === kbOffset) return;
     kbOffset = newOffset;
     host.style.bottom = kbOffset + "px";
@@ -587,6 +589,14 @@
     window.visualViewport.addEventListener("resize", updateKbOffset);
     window.visualViewport.addEventListener("scroll", updateKbOffset);
   }
+  // input focus 시 즉시 반영 (키보드 애니메이션 완료 후 재계산)
+  input && input.addEventListener("focus", () => {
+    setTimeout(updateKbOffset, 100);
+    setTimeout(updateKbOffset, 350);
+  });
+  input && input.addEventListener("blur", () => {
+    setTimeout(updateKbOffset, 150);
+  });
 
   // ── 초기화 ───────────────────────────────────────────────────────────
   chrome.storage.local
