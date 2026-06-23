@@ -64,11 +64,16 @@ function _withTasks(fn) {
 
 function tsCreate(taskId, text, tabId) {
   return _withTasks(async (ts) => {
-    ts.unshift({
+    // 활성(실행중/중단됨) 임무는 최대 5개 — 이미 5개이면 오류 표시 후 생성 안 함
+    const active = ts.filter(t => t.status === "running" || t.status === "paused").length;
+    if (active >= 5) throw new Error("MAX_ACTIVE");
+    // push(append) — 최신이 마지막(UI에서 아래 = 최신)
+    ts.push({
       id: taskId, text, status: "running", result: "", steps: [],
       tabId, createdAt: Date.now(), updatedAt: Date.now(),
     });
-    if (ts.length > 20) ts.splice(20);
+    // 완료된 기록은 최대 50개 유지
+    if (ts.length > 55) ts.splice(0, ts.length - 55);
   });
 }
 
@@ -425,18 +430,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const tabId = sender.tab?.id;
         if (tabId == null) { sendResponse({ ok: false, finalText: "탭 정보를 찾을 수 없습니다.", kind: "error" }); return; }
         if (runningTabs.has(tabId)) {
-          // 이미 작업 중인 경우 error 카드 생성 후 즉시 응답
-          const errId = "err_" + Date.now();
-          await tsCreate(errId, message.task, tabId);
-          await tsFinish(errId, "error", "⚠️ 이미 이 탭에서 작업이 진행 중입니다. 먼저 완료/취소 후 다시 시도하세요.");
-          sendResponse({ ok: false, finalText: "이미 작업 중", kind: "error" });
+          sendResponse({ ok: false, finalText: "⚠️ 이미 이 탭에서 작업 중입니다.", kind: "error" });
           return;
         }
+        // 활성 임무 5개 제한 사전 체크
+        try {
+          const { agentTasks = [] } = await chrome.storage.local.get("agentTasks");
+          const active = agentTasks.filter(t => t.status === "running" || t.status === "paused").length;
+          if (active >= 5) {
+            sendResponse({ ok: false, finalText: "⚠️ 활성 임무가 5개입니다. 임무를 완료/취소 후 다시 시도하세요.", kind: "error" });
+            return;
+          }
+        } catch {}
+
         const taskId = "t" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
         runningTabs.add(tabId);
         tabToTask.set(tabId, taskId);
-        // fire and let it run — sendResponse called when loop ends
-        runTask(tabId, message.task, taskId).then(sendResponse).catch(e => sendResponse({ ok: false, finalText: String(e?.message ?? e), kind: "error" }));
+        runTask(tabId, message.task, taskId)
+          .then(sendResponse)
+          .catch(e => {
+            const msg = String(e?.message ?? e);
+            if (msg === "MAX_ACTIVE") {
+              sendResponse({ ok: false, finalText: "⚠️ 활성 임무가 5개입니다.", kind: "error" });
+            } else {
+              sendResponse({ ok: false, finalText: msg, kind: "error" });
+            }
+          });
 
       } else if (message.type === "PAUSE_TASK") {
         pauseFlags.add(message.taskId);
@@ -449,6 +468,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else if (message.type === "CANCEL_TASK") {
         pauseFlags.delete(message.taskId);
         cancelFlags.add(message.taskId);
+        sendResponse({ ok: true });
+
+      } else if (message.type === "DELETE_TASK") {
+        // 실행/중단 중이면 먼저 취소 후 스토리지에서 삭제
+        const { taskId } = message;
+        pauseFlags.delete(taskId);
+        cancelFlags.add(taskId);
+        await _withTasks(async (ts) => {
+          const idx = ts.findIndex(x => x.id === taskId);
+          if (idx >= 0) ts.splice(idx, 1);
+        });
         sendResponse({ ok: true });
 
       } else if (message.type === "STOP_TASK") {
@@ -479,13 +509,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // ---- 아이콘 클릭 = 에이전트 켜기/끄기 토글 ----
+// 켜는 경우, 이미 열려 있는 모든 탭에 content.js를 주입한다.
+// 설치 전 열린 탭은 manifest content_scripts로 자동 주입이 안 되기 때문에 직접 주입이 필요하다.
 chrome.action.onClicked.addListener(async (tab) => {
   let cur = false;
   try { cur = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
   const next = !cur;
   try { await chrome.storage.local.set({ agentEnabled: next }); } catch {}
-  if (next && tab?.id != null && !(tab.url && INTERNAL_URL_RE.test(tab.url))) {
-    try { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }); }
-    catch {}
+
+  if (next) {
+    // 모든 열려 있는 탭에 content.js 주입 시도
+    let allTabs = [];
+    try { allTabs = await chrome.tabs.query({}); } catch {}
+    for (const t of allTabs) {
+      if (!t.id || !t.url || INTERNAL_URL_RE.test(t.url)) continue;
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["content.js"] });
+      } catch { /* 이미 주입됐거나 제한된 페이지면 무시 */ }
+    }
   }
 });

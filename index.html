@@ -2,8 +2,15 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ArenaX</title>
+    <!-- PWA: 홈화면 추가 지원 -->
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ArenaX">
+    <link rel="manifest" href="/manifest.json">
     <style>
         * {
             box-sizing: border-box;
@@ -1185,7 +1192,6 @@
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
                 <span class="side-menu-brand">ArenaX</span>
-                <button id="sideMenuClose" class="side-menu-close" type="button" aria-label="메뉴 닫기">×</button>
             </div>
             <div class="side-menu-auth">
                 <button id="loginBtn" class="side-menu-btn primary" type="button">로그인</button>
@@ -1330,6 +1336,7 @@
                     <button class="mode-btn active" type="button" data-mode="compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate">토론</button>
                     <button class="mode-btn" type="button" data-mode="collab">협업</button>
+                    <button id="newChatBtn" class="dock-btn muted" type="button" title="새 채팅 시작">✦ 새 채팅</button>
                     <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
                 </div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
@@ -1393,9 +1400,8 @@
         const sideMenu = document.getElementById("sideMenu");
         const sideMenuOverlay = document.getElementById("sideMenuOverlay");
         const menuToggleBtn = document.getElementById("menuToggleBtn");
-        const sideMenuClose = document.getElementById("sideMenuClose");
-
         const appShell = document.querySelector(".app");
+        const newChatBtn = document.getElementById("newChatBtn");
 
         function setSideMenuOpen(open) {
             sideMenu.classList.toggle("open", open);
@@ -1404,11 +1410,92 @@
         }
 
         menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
-        sideMenuClose.addEventListener("click", () => setSideMenuOpen(false));
         sideMenuOverlay.addEventListener("click", () => setSideMenuOpen(false));
+
+        // ── 대화 기록 (localStorage) ────────────────────────────────────────
+        const HISTORY_KEY = "arenax_chat_history";
+        let chatHistory = [];
+
+        function loadHistory() {
+            try { chatHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+            catch { chatHistory = []; }
+        }
+
+        function saveToHistory(message, responses) {
+            if (!message || Object.keys(responses).every(k => !responses[k])) return;
+            const entry = {
+                id: Date.now().toString(),
+                query: message,
+                timestamp: new Date().toLocaleString("ko-KR"),
+                responses: Object.fromEntries(Object.entries(responses).filter(([, v]) => v)),
+            };
+            chatHistory.unshift(entry);
+            if (chatHistory.length > 60) chatHistory.splice(60);
+            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(chatHistory)); } catch {}
+            renderChatHistory();
+        }
+
+        function renderChatHistory() {
+            const list = document.getElementById("chatHistoryList");
+            if (!list) return;
+            if (!chatHistory.length) {
+                list.innerHTML = '<div class="chat-history-empty">아직 저장된 대화가 없습니다.</div>';
+                return;
+            }
+            list.innerHTML = "";
+            chatHistory.forEach(entry => {
+                const item = document.createElement("button");
+                item.className = "chat-history-item";
+                item.title = entry.query;
+                item.innerHTML =
+                    `<span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(entry.query)}</span>` +
+                    `<span style="display:block;font-size:11px;color:#9ca3af;margin-top:1px;">${escapeHtml(entry.timestamp)}</span>`;
+                item.addEventListener("click", () => restoreHistoryEntry(entry));
+                list.appendChild(item);
+            });
+        }
+
+        function restoreHistoryEntry(entry) {
+            switchMode("compare");
+            lastCompareMessage = entry.query;
+            lastCompareSessionId = entry.id;
+            compareResponses = { ...entry.responses };
+
+            const responsesElement = document.getElementById("compareResponses");
+            responsesElement.innerHTML = "";
+            showNotice("compareLoading", "");
+            showNotice("compareError", "");
+
+            Object.keys(entry.responses).forEach(model => {
+                renderCompareCard(model);
+                const el = document.getElementById(`content-${model}`);
+                if (el) el.textContent = entry.responses[model];
+            });
+
+            setSideMenuOpen(false);
+        }
+
+        // ── 새 채팅 ──────────────────────────────────────────────────────────
+        function startNewChat() {
+            switchMode("compare");
+            compareResponses = {};
+            lastCompareMessage = "";
+            lastCompareSessionId = "";
+            document.getElementById("compareResponses").innerHTML = "";
+            showNotice("compareLoading", "");
+            showNotice("compareError", "");
+            mainInput.value = "";
+            mainInput.style.height = "auto";
+            mainInput.focus();
+        }
+        newChatBtn.addEventListener("click", startNewChat);
 
         // 데스크톱에서는 사이드바를 펼친 상태로 시작(콘텐츠를 옆으로 밀어줌).
         setSideMenuOpen(window.innerWidth >= 768);
+
+        // 저장된 대화 기록 로드
+        loadHistory();
+        renderChatHistory();
 
         function createUUID() {
             if (crypto.randomUUID) return crypto.randomUUID();
@@ -1793,6 +1880,9 @@
 
             showNotice("compareLoading", "");
             dockPrimaryBtn.disabled = false;
+
+            // 비교 완료 → 대화 기록에 저장
+            saveToHistory(message, responses);
         }
 
         function appendLoadingCard(roundNumber, speakerIndex) {
