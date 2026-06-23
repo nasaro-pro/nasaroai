@@ -518,24 +518,61 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // 비동기 응답
 });
 
+// ---- 모든 탭 동기화 ----
+// enabled=true : 고아 인스턴스 제거 후 fresh content.js 주입 (런처 표시)
+// enabled=false: 런처 DOM만 숨김 (content.js 재주입 없이 모든 인스턴스 즉시 제거)
+async function syncAllTabs(enabled) {
+  let allTabs = [];
+  try { allTabs = await chrome.tabs.query({}); } catch { return; }
+  for (const t of allTabs) {
+    if (!t.id || !t.url || INTERNAL_URL_RE.test(t.url)) continue;
+    try {
+      if (enabled) {
+        // 1) 고아 인스턴스 감지 & 제거 — 활성 인스턴스는 그대로 유지
+        await chrome.scripting.executeScript({
+          target: { tabId: t.id },
+          func: () => {
+            if (!window.__arenaxAgentInjected) return;
+            // chrome.runtime.id가 undefined면 고아(orphaned) 인스턴스
+            if (typeof chrome === "undefined" || !chrome.runtime?.id) {
+              window.__arenaxAgentInjected = false;
+              document.getElementById("__arenax_agent_host")?.remove();
+            }
+          },
+        });
+        // 2) content.js 주입 (guard로 이미 활성 탭은 스킵됨)
+        await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["content.js"] });
+      } else {
+        // 비활성화: Shadow DOM 안의 런처/바를 직접 숨김 (고아 포함)
+        await chrome.scripting.executeScript({
+          target: { tabId: t.id },
+          func: () => {
+            const host = document.getElementById("__arenax_agent_host");
+            if (!host?.shadowRoot) return;
+            const s = host.shadowRoot;
+            const launcher = s.getElementById("ax-launcher");
+            const bar      = s.getElementById("ax-bar");
+            if (launcher) launcher.classList.remove("show");
+            if (bar)      bar.hidden = true;
+          },
+        });
+      }
+    } catch {}
+  }
+}
+
+// ---- storage.onChanged → 모든 탭 자동 동기화 ----
+// 아이콘 클릭, ArenaX 사이트 버튼, 종료 버튼 등 어떤 경로로 agentEnabled가 바뀌어도
+// 모든 탭에 즉시 반영된다.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || changes.agentEnabled === undefined) return;
+  syncAllTabs(!!changes.agentEnabled.newValue).catch(() => {});
+});
+
 // ---- 아이콘 클릭 = 에이전트 켜기/끄기 토글 ----
-// 켜는 경우, 이미 열려 있는 모든 탭에 content.js를 주입한다.
-// 설치 전 열린 탭은 manifest content_scripts로 자동 주입이 안 되기 때문에 직접 주입이 필요하다.
-chrome.action.onClicked.addListener(async (tab) => {
+// 스토리지 쓰기만 하면 storage.onChanged가 syncAllTabs를 자동 호출한다.
+chrome.action.onClicked.addListener(async () => {
   let cur = false;
   try { cur = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
-  const next = !cur;
-  try { await chrome.storage.local.set({ agentEnabled: next }); } catch {}
-
-  if (next) {
-    // 모든 열려 있는 탭에 content.js 주입 시도
-    let allTabs = [];
-    try { allTabs = await chrome.tabs.query({}); } catch {}
-    for (const t of allTabs) {
-      if (!t.id || !t.url || INTERNAL_URL_RE.test(t.url)) continue;
-      try {
-        await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["content.js"] });
-      } catch { /* 이미 주입됐거나 제한된 페이지면 무시 */ }
-    }
-  }
+  try { await chrome.storage.local.set({ agentEnabled: !cur }); } catch {}
 });
