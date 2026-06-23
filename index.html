@@ -22,6 +22,14 @@
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
+            transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 데스크톱: 사이드바가 펼쳐지면 본문을 오른쪽으로 밀어준다. */
+        @media (min-width: 768px) {
+            .app.sidebar-open {
+                padding-left: 280px;
+            }
         }
 
         .site-header {
@@ -108,12 +116,19 @@
             pointer-events: auto;
         }
 
+        /* 데스크톱에서는 펼침 상태가 본문을 밀어내므로 어두운 오버레이를 숨긴다. */
+        @media (min-width: 768px) {
+            .side-menu-overlay {
+                display: none;
+            }
+        }
+
         .side-menu {
             position: fixed;
             top: 0;
             left: 0;
             height: 100dvh;
-            width: min(300px, 82vw);
+            width: min(280px, 82vw);
             background: #fff;
             border-right: 1px solid #e5e7eb;
             box-shadow: 4px 0 24px rgba(15, 23, 42, 0.08);
@@ -709,6 +724,18 @@
             border-top: 1px solid #e5e7eb;
             box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.06);
             padding-bottom: env(safe-area-inset-bottom, 0);
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 사이드바가 펼쳐지면 하단 입력창과 에이전트 패널도 함께 밀린다. */
+        @media (min-width: 768px) {
+            .app.sidebar-open .input-dock {
+                left: 280px;
+            }
+
+            .app.sidebar-open .agent-panel {
+                left: calc(50% + 140px);
+            }
         }
 
         .dock-inner {
@@ -895,20 +922,21 @@
             color: #111827;
         }
 
-        .agent-panel-close {
-            border: 0;
-            background: #f3f4f6;
-            color: #374151;
-            width: 34px;
-            height: 34px;
+        .agent-panel-end {
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+            padding: 7px 14px;
             border-radius: 8px;
-            font-size: 18px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
             line-height: 1;
             cursor: pointer;
         }
 
-        .agent-panel-close:hover {
-            background: #e5e7eb;
+        .agent-panel-end:hover {
+            background: #fee2e2;
         }
 
         .agent-status-bar {
@@ -1308,7 +1336,7 @@
         <aside id="agentPanel" class="agent-panel" aria-label="에이전트 컨트롤러">
             <div class="agent-panel-header">
                 <div class="agent-panel-title">에이전트 컨트롤러</div>
-                <button id="agentPanelClose" class="agent-panel-close" type="button" aria-label="에이전트 패널 닫기">×</button>
+                <button id="agentPanelClose" class="agent-panel-end" type="button">에이전트 종료</button>
             </div>
             <div id="agentStatusBar" class="agent-status-bar" data-type="idle" role="status" aria-live="polite">대기 중</div>
             <div id="agentHistory" class="agent-history">
@@ -1383,14 +1411,20 @@
         const menuToggleBtn = document.getElementById("menuToggleBtn");
         const sideMenuClose = document.getElementById("sideMenuClose");
 
+        const appShell = document.querySelector(".app");
+
         function setSideMenuOpen(open) {
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
+            appShell.classList.toggle("sidebar-open", open);
         }
 
         menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
         sideMenuClose.addEventListener("click", () => setSideMenuOpen(false));
         sideMenuOverlay.addEventListener("click", () => setSideMenuOpen(false));
+
+        // 데스크톱에서는 사이드바를 펼친 상태로 시작(콘텐츠를 옆으로 밀어줌).
+        setSideMenuOpen(window.innerWidth >= 768);
 
         function createUUID() {
             if (crypto.randomUUID) return crypto.randomUUID();
@@ -1659,7 +1693,7 @@
         }
 
         agentToggleBtn.addEventListener("click", () => setAgentMode(!isAgentMode));
-        agentPanelClose.addEventListener("click", () => setAgentPanelVisible(false));
+        agentPanelClose.addEventListener("click", () => setAgentMode(false));
         agentSendBtn.addEventListener("click", sendAgentTask);
         agentInput.addEventListener("input", () => {
             agentInput.style.height = "auto";
@@ -1905,24 +1939,46 @@
         }
 
         function replaceLoadingCards(roundNumber, turns) {
+            // Remember which card is focused so we can keep focus stable after re-sort
+            // (important for retry: the regenerated card must stay in place and visible).
+            const activeCard = debateCards[activeCardIndex];
+            const activeKey = activeCard ? `${activeCard.round_number}:${activeCard.speaker_index}` : null;
+
             turns.forEach(turn => {
-                debateCards = debateCards.filter(card => !(
-                    card.round_number === roundNumber &&
-                    card.speaker_index === turn.speaker_index
-                ));
-                debateCards.push({
+                const newCard = {
                     ...turn,
                     id: `${turn.round_number}-${turn.speaker_index}-${turn.actual_model || turn.model}`,
                     loading: false,
-                });
+                };
+                const existingIndex = debateCards.findIndex(card =>
+                    card.round_number === roundNumber && card.speaker_index === turn.speaker_index);
+                if (existingIndex !== -1) {
+                    debateCards[existingIndex] = newCard;
+                } else {
+                    debateCards.push(newCard);
+                }
             });
+
+            // Keep a stable visual order by round, then speaker.
+            debateCards.sort((a, b) =>
+                (a.round_number - b.round_number) || (a.speaker_index - b.speaker_index));
 
             const hasFirstSpeaker = turns.some(turn => turn.speaker_index === 1);
             if (!userMovedDeck && hasFirstSpeaker) {
-                activeCardIndex = Math.max(0, debateCards.length - 1);
-            } else if (activeCardIndex < debateCards.length - 1) {
-                document.getElementById("newArrival").classList.add("visible");
+                activeCardIndex = debateCards.length - 1;
+            } else {
+                const keepIndex = activeKey
+                    ? debateCards.findIndex(card => `${card.round_number}:${card.speaker_index}` === activeKey)
+                    : -1;
+                if (keepIndex !== -1) {
+                    activeCardIndex = keepIndex;
+                }
+                if (activeCardIndex < debateCards.length - 1) {
+                    document.getElementById("newArrival").classList.add("visible");
+                }
             }
+
+            activeCardIndex = Math.max(0, Math.min(activeCardIndex, debateCards.length - 1));
             renderDebateDeck();
         }
 
@@ -2157,6 +2213,8 @@
                     role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 반박" : "3번 종합",
                     content: "다시 시도하는 중...",
                 };
+                activeCardIndex = index;
+                userMovedDeck = true;
                 renderDebateDeck();
             }
 

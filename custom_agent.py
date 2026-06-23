@@ -329,13 +329,21 @@ class CustomWebAgent:
     async def _execute(self, current_page: Page, action: AgentAction) -> tuple[Page, str | None]:
         try:
             if action.action == "click":
+                locator = current_page.locator(f'[data-agent-id="{action.target_id}"]').first
+                try:
+                    await locator.scroll_into_view_if_needed(timeout=3000)
+                except Exception:
+                    pass
                 new_page_future = asyncio.ensure_future(
                     current_page.context.wait_for_event("page", timeout=3000)
                 )
                 try:
-                    await current_page.locator(
-                        f'[data-agent-id="{action.target_id}"]'
-                    ).click(force=True, timeout=3000)
+                    # Prefer a real (non-forced) click so site handlers fire correctly;
+                    # fall back to a forced click if the element is obscured.
+                    try:
+                        await locator.click(timeout=4000)
+                    except Exception:
+                        await locator.click(force=True, timeout=3000)
                     await asyncio.sleep(0.5)
                     if new_page_future.done() and not new_page_future.exception():
                         new_tab = new_page_future.result()
@@ -347,12 +355,22 @@ class CustomWebAgent:
                     new_page_future.cancel()
 
             elif action.action == "type":
-                await current_page.locator(
-                    f'[data-agent-id="{action.target_id}"]'
-                ).fill(action.value)  # type: ignore[arg-type]
+                locator = current_page.locator(f'[data-agent-id="{action.target_id}"]').first
+                try:
+                    await locator.scroll_into_view_if_needed(timeout=3000)
+                except Exception:
+                    pass
+                await locator.click(timeout=3000)
+                await locator.fill("")
+                # Use real keystrokes so search boxes with key listeners react.
+                await locator.type(action.value, delay=15)  # type: ignore[arg-type]
 
             elif action.action == "select":
-                locator = current_page.locator(f'[data-agent-id="{action.target_id}"]')
+                locator = current_page.locator(f'[data-agent-id="{action.target_id}"]').first
+                try:
+                    await locator.scroll_into_view_if_needed(timeout=3000)
+                except Exception:
+                    pass
                 try:
                     await locator.select_option(value=action.value, timeout=3000)
                 except Exception:
