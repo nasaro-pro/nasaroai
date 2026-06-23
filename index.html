@@ -1341,20 +1341,7 @@
             </div>
         </footer>
 
-        <aside id="agentPanel" class="agent-panel" aria-label="에이전트 컨트롤러">
-            <div class="agent-panel-header">
-                <div class="agent-panel-title">에이전트 컨트롤러</div>
-                <button id="agentPanelClose" class="agent-panel-end" type="button">에이전트 종료</button>
-            </div>
-            <div id="agentStatusBar" class="agent-status-bar" data-type="idle" role="status" aria-live="polite">대기 중</div>
-            <div id="agentHistory" class="agent-history">
-                <div class="agent-empty">브라우저 에이전트에게 수행할 작업을 입력하세요.</div>
-            </div>
-            <div class="agent-input-row">
-                <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 웹 작업을 지시하세요..."></textarea>
-                <button id="agentSendBtn" class="agent-send-btn" type="button" aria-label="전송">전송</button>
-            </div>
-        </aside>
+        <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
     <script>
@@ -1395,22 +1382,11 @@
         let collabTaskAsked = false;
         let collabRecommendInFlight = false;
 
-        let isAgentMode = false;
-        let isAgentPanelVisible = false;
-        let agentInFlight = false;
-        let agentHistory = [];
-
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
         const dockSecondaryBtn = document.getElementById("dockSecondaryBtn");
         const dockNewDebateBtn = document.getElementById("dockNewDebateBtn");
         const agentToggleBtn = document.getElementById("agentToggleBtn");
-        const agentPanel = document.getElementById("agentPanel");
-        const agentPanelClose = document.getElementById("agentPanelClose");
-        const agentStatusBar = document.getElementById("agentStatusBar");
-        const agentHistoryEl = document.getElementById("agentHistory");
-        const agentInput = document.getElementById("agentInput");
-        const agentSendBtn = document.getElementById("agentSendBtn");
         const inputDock = document.getElementById("inputDock");
         const mainContent = document.getElementById("mainContent");
 
@@ -1464,8 +1440,7 @@
 
         function syncMainPadding() {
             const dockHeight = inputDock.offsetHeight;
-            const panelHeight = isAgentPanelVisible ? agentPanel.offsetHeight : 0;
-            const offset = dockHeight + panelHeight + 32;
+            const offset = dockHeight + 32;
             document.documentElement.style.setProperty("--input-dock-height", `${dockHeight}px`);
             document.documentElement.style.setProperty("--bottom-offset", `${offset}px`);
             mainContent.style.paddingBottom = "var(--bottom-offset)";
@@ -1540,7 +1515,6 @@
             }
 
             updateDockUI();
-            updateAgentPanel();
         }
 
         document.querySelectorAll(".mode-btn").forEach(btn => {
@@ -1556,90 +1530,12 @@
         });
         const bottomResizeObserver = new ResizeObserver(syncMainPadding);
         bottomResizeObserver.observe(inputDock);
-        bottomResizeObserver.observe(agentPanel);
         window.addEventListener("resize", syncMainPadding);
         autoResizeInput();
 
         function lockMainInput(isLocked) {
             mainInput.disabled = isLocked;
             dockPrimaryBtn.disabled = isLocked;
-        }
-
-        function setAgentStatus(text, type = "idle") {
-            agentStatusBar.textContent = text;
-            agentStatusBar.dataset.type = type;
-        }
-
-        function updateAgentPanel() {
-            agentPanel.classList.toggle("visible", isAgentPanelVisible);
-            agentToggleBtn.classList.toggle("active", isAgentMode);
-
-            agentInput.disabled = agentInFlight;
-            agentSendBtn.disabled = agentInFlight;
-
-            if (agentInFlight) {
-                setAgentStatus("⏳ 브라우저 탐색 및 작업 중...", "loading");
-            } else if (!isAgentPanelVisible && isAgentMode) {
-                setAgentStatus("작업 결과는 패널에 보관됩니다 (패널 닫힘)", "idle");
-            } else if (agentStatusBar.dataset.type === "loading") {
-                setAgentStatus("대기 중", "idle");
-            }
-
-            renderAgentHistory();
-        }
-
-        function setAgentPanelVisible(visible) {
-            isAgentPanelVisible = visible;
-            updateAgentPanel();
-            syncMainPadding();
-        }
-
-        function setAgentMode(enabled) {
-            isAgentMode = enabled;
-            if (enabled) {
-                setAgentPanelVisible(true);
-            }
-            agentToggleBtn.classList.toggle("active", isAgentMode);
-            syncMainPadding();
-        }
-
-        const AGENT_STATUS_LABEL = { success: "완료", error: "실패", loading: "진행 중" };
-
-        function renderAgentHistory() {
-            if (!agentHistory.length) {
-                agentHistoryEl.innerHTML = `<div class="agent-empty">브라우저 에이전트에게 수행할 작업을 입력하세요.</div>`;
-                return;
-            }
-
-            agentHistoryEl.innerHTML = "";
-            agentHistory.forEach(item => {
-                const card = document.createElement("article");
-                card.className = `agent-result-card ${item.status}`;
-                card.dataset.id = item.id;
-                const badge = AGENT_STATUS_LABEL[item.status] || item.status;
-                const bodyText = item.status === "loading"
-                    ? "처리 중..."
-                    : (item.result || "결과 없음");
-                card.innerHTML = `
-                    <div class="agent-card-header">
-                        <div class="agent-card-title">${escapeHtml(item.task)}</div>
-                        <span class="agent-card-badge ${item.status}">${badge}</span>
-                    </div>
-                    <div class="agent-card-meta">${escapeHtml(item.timestamp || "")}</div>
-                    <div class="agent-card-body">${escapeHtml(bodyText)}</div>
-                `;
-                agentHistoryEl.appendChild(card);
-            });
-            agentHistoryEl.scrollTop = agentHistoryEl.scrollHeight;
-        }
-
-        function updateAgentCard(id, result, status) {
-            const item = agentHistory.find(entry => entry.id === id);
-            if (item) {
-                item.result = result;
-                item.status = status;
-            }
-            renderAgentHistory();
         }
 
         function escapeHtml(value) {
@@ -1650,73 +1546,35 @@
                 .replace(/"/g, "&quot;");
         }
 
-        async function callAgentAPI(task) {
-            const response = await fetch(`${API_URL}/agent/task`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: task }),
-            });
-
-            let data = {};
-            try {
-                data = await response.json();
-            } catch (parseError) {
-                throw new Error("서버 응답을 해석하지 못했습니다.");
+        // 에이전트는 크롬 확장(하단 바)으로 동작한다. 사이트의 "에이전트" 버튼은
+        // 같은 페이지에 주입된 확장 content script에게 window 메시지로 런처를 열도록 요청한다.
+        let arenaxExtReady = false;
+        window.addEventListener("message", (event) => {
+            if (event.source !== window) return;
+            const d = event.data;
+            if (d && d.__arenax === "agent" && d.type === "READY") {
+                arenaxExtReady = true;
+                agentToggleBtn.classList.add("active");
+                agentToggleBtn.title = "에이전트 런처 열기 (확장 설치됨)";
             }
-
-            if (!response.ok || data.status === "error") {
-                throw new Error(data.message || data.detail?.message || `서버 오류 (${response.status})`);
-            }
-            return data.result || "결과 없음";
-        }
-
-        async function sendAgentTask() {
-            if (agentInFlight) return;
-            if (!isAgentPanelVisible) return;
-
-            const task = agentInput.value.trim();
-            if (!task) return;
-
-            agentInFlight = true;
-            agentInput.disabled = true;
-            agentSendBtn.disabled = true;
-            agentInput.value = "";
-            agentInput.style.height = "auto";
-
-            const requestId = Date.now();
-            const timestamp = new Date().toLocaleString("ko-KR");
-            agentHistory.push({ id: requestId, task, result: "", status: "loading", timestamp });
-            renderAgentHistory();
-            setAgentStatus("⏳ 브라우저 탐색 및 작업 중...", "loading");
-
-            try {
-                const result = await callAgentAPI(task);
-                updateAgentCard(requestId, result, "success");
-                setAgentStatus("✅ 완료", "success");
-            } catch (error) {
-                updateAgentCard(requestId, error.message || "네트워크 오류", "error");
-                setAgentStatus("❌ 실패", "error");
-            } finally {
-                agentInFlight = false;
-                agentInput.disabled = false;
-                agentSendBtn.disabled = false;
-                agentInput.focus();
-                updateAgentPanel();
-            }
-        }
-
-        agentToggleBtn.addEventListener("click", () => setAgentMode(!isAgentMode));
-        agentPanelClose.addEventListener("click", () => setAgentPanelVisible(false));
-        agentSendBtn.addEventListener("click", sendAgentTask);
-        agentInput.addEventListener("input", () => {
-            agentInput.style.height = "auto";
-            agentInput.style.height = `${Math.min(agentInput.scrollHeight, 120)}px`;
         });
-        agentInput.addEventListener("keydown", event => {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                sendAgentTask();
-            }
+        // 페이지 로드 시 확장 존재 여부 확인
+        window.postMessage({ __arenax: "agent", type: "PING" }, "*");
+
+        agentToggleBtn.addEventListener("click", () => {
+            window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
+            setTimeout(() => {
+                if (!arenaxExtReady) {
+                    alert(
+                        "ArenaX 에이전트 확장 프로그램이 필요합니다.\n\n" +
+                        "1) 크롬 주소창에 chrome://extensions 입력\n" +
+                        "2) 우상단 '개발자 모드' 켜기\n" +
+                        "3) '압축해제된 확장 프로그램 로드'로 extension 폴더 선택\n" +
+                        "(또는 추후 크롬 웹스토어에서 설치)\n\n" +
+                        "설치 후 이 페이지를 새로고침하고 다시 눌러주세요."
+                    );
+                }
+            }, 600);
         });
 
         dockPrimaryBtn.addEventListener("click", () => {
