@@ -1336,6 +1336,33 @@
             </section>
         </main>
 
+        <!-- 확장 미설치 시 설치 안내 배너 -->
+        <div id="extInstallBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
+            background:linear-gradient(135deg,#1e1b4b,#312e81);border-top:1px solid #4c1d95;
+            padding:14px 20px;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;">
+                <span style="font-size:22px;">🤖</span>
+                <div>
+                    <div style="color:#e9d5ff;font-weight:600;font-size:14px;">ArenaX 에이전트 미설치</div>
+                    <div style="color:#a78bfa;font-size:12px;margin-top:2px;">에이전트를 사용하려면 확장 프로그램(PC) 또는 앱(Android)이 필요합니다.</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="/install" target="_blank"
+                    style="background:#7c3aed;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
+                    PC · Chrome 설치
+                </a>
+                <a href="/static/arenax-agent.apk"
+                    style="background:#059669;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
+                    Android APK 다운로드
+                </a>
+                <button onclick="document.getElementById('extInstallBanner').style.display='none';"
+                    style="background:transparent;border:1px solid #6b7280;color:#9ca3af;padding:9px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">
+                    닫기
+                </button>
+            </div>
+        </div>
+
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
                 <div class="dock-mode-row">
@@ -1344,7 +1371,6 @@
                     <button class="mode-btn" type="button" data-mode="collab">협업</button>
                     <button id="newChatBtn" class="dock-btn muted" type="button" title="새 채팅 시작">✦ 새 채팅</button>
                     <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
-                    <a href="/install" target="_blank" id="installExtBtn" class="dock-btn muted" title="확장 프로그램 설치" style="display:none;text-decoration:none;">⬇ 설치</a>
                 </div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 <div class="dock-actions">
@@ -1661,16 +1687,17 @@
         // 에이전트는 크롬 확장(하단 바)으로 동작한다. 사이트의 "에이전트" 버튼은
         // 같은 페이지에 주입된 확장 content script에게 window 메시지로 런처를 열도록 요청한다.
         let arenaxExtReady = false;
-        const installExtBtn = document.getElementById("installExtBtn");
+        const extInstallBanner = document.getElementById("extInstallBanner");
 
         function setExtReady(ready) {
             arenaxExtReady = ready;
             if (ready) {
                 agentToggleBtn.classList.add("active");
                 agentToggleBtn.title = "에이전트 런처 열기 (확장 설치됨)";
-                if (installExtBtn) installExtBtn.style.display = "none";
+                if (extInstallBanner) extInstallBanner.style.display = "none";
             } else {
-                if (installExtBtn) installExtBtn.style.display = "";
+                // PC이고 확장 미설치인 경우 배너 표시
+                if (extInstallBanner) extInstallBanner.style.display = "flex";
             }
         }
 
@@ -1684,12 +1711,11 @@
         setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
 
         agentToggleBtn.addEventListener("click", () => {
+            if (!arenaxExtReady) {
+                if (extInstallBanner) extInstallBanner.style.display = "flex";
+                return;
+            }
             window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
-            setTimeout(() => {
-                if (!arenaxExtReady) {
-                    window.open("/install", "_blank");
-                }
-            }, 600);
         });
 
         dockPrimaryBtn.addEventListener("click", () => {

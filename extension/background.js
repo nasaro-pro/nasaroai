@@ -15,6 +15,7 @@ const runningTabs  = new Set();   // Set<tabId>  — 현재 제어 중인 탭
 const tabToTask    = new Map();   // tabId → taskId (활성 임무)
 const pauseFlags   = new Set();   // Set<taskId>  — 루프 중단 대기
 const cancelFlags  = new Set();   // Set<taskId>  — 루프 취소 요청
+const amendMap     = new Map();   // taskId → string (실행 중 수정 지시)
 
 // STARTUP_TIME: 이후에 정의될 _withTasks 초기화 직후에 cleanup 실행
 const STARTUP_TIME = Date.now();
@@ -393,6 +394,19 @@ async function runTask(tabId, text, taskId) {
           await tsStatus(taskId, "running");
         }
 
+        // 실행 중 수정 지시가 있으면 목표 갱신
+        if (amendMap.has(taskId)) {
+          const newGoal = amendMap.get(taskId);
+          amendMap.delete(taskId);
+          text = newGoal;
+          actionHistory = [];
+          await tsStep(taskId, `✏️ 지시 수정됨: ${newGoal}`, "info");
+          await _withTasks(async ts => {
+            const t = ts.find(x => x.id === taskId);
+            if (t) t.text = newGoal;
+          });
+        }
+
         const scan = await scanCurrentTab(tabId);
         const data  = await postStep(serverUrl, text, scan, actionHistory);
         const reasoning = data.reasoning || "(이유 없음)";
@@ -478,6 +492,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else if (message.type === "CANCEL_TASK") {
         pauseFlags.delete(message.taskId);
         cancelFlags.add(message.taskId);
+        sendResponse({ ok: true });
+
+      } else if (message.type === "AMEND_TASK") {
+        // 실행 중인 임무의 목표를 다음 스텝에서 교체
+        const { taskId, amendment } = message;
+        if (taskId && amendment) {
+          amendMap.set(taskId, amendment);
+          // 중단 상태였으면 자동으로 재개
+          if (pauseFlags.has(taskId)) pauseFlags.delete(taskId);
+        }
         sendResponse({ ok: true });
 
       } else if (message.type === "DELETE_TASK") {

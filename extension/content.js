@@ -172,6 +172,13 @@
   .tbtn.resume-btn  { border-color: #34d399; background: #ecfdf5; color: #065f46; }
   .tbtn.cancel-btn  { border-color: #fca5a5; color: #b91c1c; }
   .tbtn.edit-btn    { border-color: #93c5fd; color: #1d4ed8; }
+  .tbtn.amend-btn   { border-color: #fbbf24; color: #b45309; }
+  .amend-row { display:flex; gap:6px; padding:6px 0 2px; }
+  .amend-row textarea { flex:1; font-size:12px; padding:5px 8px; border-radius:7px;
+    border:1px solid #fbbf24; background:#1f2937; color:#f3f4f6; resize:none;
+    min-height:44px; outline:none; font-family:inherit; }
+  .amend-row textarea:focus { border-color:#f59e0b; }
+  .amend-row .tbtn { white-space:nowrap; }
   .tbtn.delete-btn  { margin-left: auto; border-color: #d1d5db; color: #9ca3af; }
 
   .confirm { display: none; padding: 10px 14px; border-top: 1px solid #f1f1f4; background: #fffbeb; flex-direction: column; gap: 8px; flex-shrink: 0; }
@@ -346,10 +353,11 @@
     let btnHtml = "";
     if (task.status === "running") {
       btnHtml = `<button class="tbtn pause-btn"  data-id="${esc(task.id)}">중단</button>
+                 <button class="tbtn amend-btn"  data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>
                  <button class="tbtn cancel-btn" data-id="${esc(task.id)}">취소</button>`;
     } else if (task.status === "paused") {
       btnHtml = `<button class="tbtn resume-btn" data-id="${esc(task.id)}">재개</button>
-                 <button class="tbtn edit-btn"   data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>
+                 <button class="tbtn amend-btn"  data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>
                  <button class="tbtn cancel-btn" data-id="${esc(task.id)}">취소</button>`;
     } else {
       btnHtml = `<button class="tbtn edit-btn" data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>`;
@@ -423,6 +431,7 @@
     else if (btn.classList.contains("delete-btn"))
       { try { await chrome.runtime.sendMessage({ type: "DELETE_TASK", taskId }); } catch {} }
     else if (btn.classList.contains("edit-btn")) {
+      // 완료된 임무: 입력창에 복사해서 재실행 준비
       try {
         input.value = btn.dataset.text || "";
         input.style.height = "auto";
@@ -430,6 +439,37 @@
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
       } catch {}
+    }
+    else if (btn.classList.contains("amend-btn")) {
+      // 실행중/중단됨 임무: 카드 안에 인라인 수정 UI 표시
+      const card = btn.closest(".task-card");
+      if (!card || card.querySelector(".amend-row")) return;
+      const amendRow = document.createElement("div");
+      amendRow.className = "amend-row";
+      const ta = document.createElement("textarea");
+      ta.value = btn.dataset.text || "";
+      ta.rows = 2;
+      ta.placeholder = "새 지시를 입력하세요…";
+      const confirmBtn = document.createElement("button");
+      confirmBtn.className = "tbtn amend-btn";
+      confirmBtn.textContent = "확인";
+      const cancelABtn = document.createElement("button");
+      cancelABtn.className = "tbtn";
+      cancelABtn.textContent = "취소";
+      amendRow.append(ta, confirmBtn, cancelABtn);
+      card.appendChild(amendRow);
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+
+      confirmBtn.addEventListener("click", async () => {
+        const newText = ta.value.trim();
+        if (!newText) return;
+        try {
+          await chrome.runtime.sendMessage({ type: "AMEND_TASK", taskId, amendment: newText });
+        } catch {}
+        amendRow.remove();
+      });
+      cancelABtn.addEventListener("click", () => amendRow.remove());
     }
   });
 
