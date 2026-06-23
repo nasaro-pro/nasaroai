@@ -1777,14 +1777,18 @@ def serve_manifest() -> FileResponse:
 
 
 @app.get("/static/{filename}")
-def serve_static(filename: str) -> FileResponse:
+def serve_static(filename: str):
     safe = os.path.basename(filename)
     path = os.path.join(BASE_DIR, "static", safe)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
-    # ZIP 파일은 다운로드 헤더 포함
-    media = "application/zip" if safe.endswith(".zip") else "application/octet-stream"
-    return FileResponse(path, media_type=media, filename=safe)
+    if safe.endswith(".zip"):
+        return FileResponse(
+            path,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{safe}"'},
+        )
+    return FileResponse(path)
 
 
 if __name__ == "__main__":
