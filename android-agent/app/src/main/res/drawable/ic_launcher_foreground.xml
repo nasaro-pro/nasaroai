@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 흰색 로봇 머리 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,38 Q30,28 40,28 L68,28 Q78,28 78,38 L78,62 Q78,72 68,72 L40,72 Q30,72 30,62 Z"/>
+    <!-- 눈 왼쪽 -->
+    <path
+        android:fillColor="#7C3AED"
+        android:pathData="M44,48 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"/>
+    <!-- 눈 오른쪽 -->
+    <path
+        android:fillColor="#7C3AED"
+        android:pathData="M64,48 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"/>
+    <!-- 안테나 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M54,28 L54,18"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,14 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0"/>
+    <!-- 몸통 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,74 Q36,70 40,70 L68,70 Q72,70 72,74 L72,92 Q72,96 68,96 L40,96 Q36,96 36,92 Z"/>
+</vector>
