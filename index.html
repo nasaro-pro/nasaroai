@@ -430,7 +430,7 @@
             border: 1px solid #bfdbfe;
             border-radius: 10px;
             padding: 14px 16px;
-            font-size: 15px;
+            font-size: 0.9375rem;
             line-height: 1.75;
             color: #1e40af;
             white-space: pre-wrap;
@@ -601,7 +601,7 @@
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px 16px;
-            font-size: 15px;
+            font-size: 0.9375rem;
             line-height: 1.8;
         }
 
@@ -746,13 +746,13 @@
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px;
-            font-size: 16px;
+            font-size: 1rem;
             line-height: 1.75;
         }
 
         .debate-preview-body {
             padding: 14px;
-            font-size: 15px;
+            font-size: 0.9375rem;
             line-height: 1.6;
             color: #4b5563;
         }
@@ -1136,7 +1136,7 @@
 
         .agent-card-body {
             padding: 0 14px 12px;
-            font-size: 14px;
+            font-size: 0.875rem;
             line-height: 1.7;
             color: #374151;
             white-space: pre-wrap;
@@ -1441,6 +1441,230 @@
             transition: background .15s;
         }
         .install-apk-btn:hover { background: #047857; }
+
+        /* ── AX 로고 (플로팅 런처 버튼) ── */
+        .ax-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1;
+            gap: 2px;
+            pointer-events: none;
+        }
+        .ax-logo-text {
+            font-size: 17px;
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .ax-logo-sub {
+            font-size: 6.5px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.75);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        /* ── 에이전트 채팅 윈도우 ── */
+        .agent-chat-window {
+            position: fixed;
+            inset: 0;
+            z-index: 10002;
+            background: #f9fafb;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(100%);
+            transition: transform .3s cubic-bezier(.4,0,.2,1);
+            will-change: transform;
+        }
+        .agent-chat-window.open {
+            transform: translateY(0);
+        }
+        .acw-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            flex-shrink: 0;
+            min-height: 54px;
+        }
+        .acw-logo-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            background: none;
+            padding: 5px 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .acw-logo-btn:hover { background: #f5f3ff; }
+        .acw-logo-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            gap: 1px;
+        }
+        .acw-logo-icon span:first-child {
+            font-size: 13px;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .acw-logo-icon span:last-child {
+            font-size: 5.5px;
+            font-weight: 700;
+            color: rgba(255,255,255,.7);
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+        .acw-logo-name {
+            font-size: 15px;
+            font-weight: 900;
+            color: #111827;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .acw-logo-name small {
+            display: block;
+            font-size: 10px;
+            font-weight: 600;
+            color: #9ca3af;
+            letter-spacing: 0;
+        }
+        .acw-header-spacer { flex: 1; }
+        .acw-end-btn {
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+            padding: 7px 13px;
+            border-radius: 9px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .acw-end-btn:hover { background: #fee2e2; }
+        .acw-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .acw-welcome {
+            text-align: center;
+            padding: 28px 12px 12px;
+            color: #9ca3af;
+            font-size: 0.875rem;
+            line-height: 1.7;
+        }
+        .acw-welcome strong { color: #6b7280; display: block; font-size: 1rem; margin-bottom: 4px; }
+        .acw-msg {
+            max-width: 84%;
+            padding: 11px 14px;
+            border-radius: 16px;
+            font-size: 0.9375rem;
+            line-height: 1.72;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .acw-msg.user {
+            align-self: flex-end;
+            background: #7c3aed;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .acw-msg.agent {
+            align-self: flex-start;
+            background: #fff;
+            color: #111827;
+            border: 1px solid #e5e7eb;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 4px rgba(15,23,42,.06);
+        }
+        .acw-msg.error {
+            align-self: flex-start;
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            border-bottom-left-radius: 4px;
+        }
+        .acw-msg.loading {
+            align-self: flex-start;
+            background: #f3f4f6;
+            color: #9ca3af;
+            font-style: italic;
+            border-bottom-left-radius: 4px;
+            animation: acwPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes acwPulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: .45; }
+        }
+        .acw-input-row {
+            display: flex;
+            gap: 8px;
+            padding: 10px 14px;
+            padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+            border-top: 1px solid #e5e7eb;
+            background: #fff;
+            flex-shrink: 0;
+        }
+        .acw-input {
+            flex: 1;
+            resize: none;
+            overflow: hidden;
+            min-height: 42px;
+            max-height: 130px;
+            padding: 10px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            font: inherit;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #111827;
+            background: #f9fafb;
+        }
+        .acw-input:focus {
+            outline: none;
+            border-color: #7c3aed;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(124,58,237,.1);
+        }
+        .acw-send-btn {
+            align-self: flex-end;
+            flex: 0 0 auto;
+            border: none;
+            background: #7c3aed;
+            color: #fff;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 0 18px;
+            height: 42px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background .12s;
+        }
+        .acw-send-btn:hover { background: #6d28d9; }
+        .acw-send-btn:disabled { background: #c4b5fd; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -1716,16 +1940,56 @@
                     </div>
                 </div>
 
+                <!-- 쿼터 안내 -->
+                <div style="margin:0 20px 4px;padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:12px;font-size:12px;color:#166534;line-height:1.6;">
+                    <strong style="display:block;margin-bottom:3px;">📊 무료 사용 쿼터 안내</strong>
+                    • 하루 <strong>비교 20회 · 토론 10회 · 에이전트 30회</strong> 무료<br>
+                    • 쿼터 초과 시 다음날 자동 리셋됩니다<br>
+                    • 로그인 시 쿼터가 추가로 제공됩니다
+                </div>
+
                 <a href="/static/arenax-agent.apk" class="install-apk-btn" id="apkDownloadLink">
                     ⬇️ APK 다운로드 시작
                 </a>
             </div>
         </div>
 
-        <!-- 에이전트 플로팅 런처 버튼 (확장/앱 설치 시 항상 표시) -->
-        <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 열기" aria-label="에이전트 열기">
-            🌐
+        <!-- 에이전트 플로팅 런처 버튼 (에이전트 ON 시 표시) -->
+        <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 질문창 열기" aria-label="에이전트 열기">
+            <div class="ax-logo">
+                <span class="ax-logo-text">AX</span>
+                <span class="ax-logo-sub">Agent</span>
+            </div>
         </button>
+
+        <!-- 에이전트 채팅 윈도우 -->
+        <div id="agentChatWindow" class="agent-chat-window" role="dialog" aria-label="ArenaX 에이전트">
+            <div class="acw-header">
+                <button class="acw-logo-btn" id="acwLogoBtn" title="ArenaX로 돌아가기">
+                    <div class="acw-logo-icon">
+                        <span>AX</span>
+                        <span>Arena</span>
+                    </div>
+                    <div class="acw-logo-name">
+                        ArenaX
+                        <small>에이전트</small>
+                    </div>
+                </button>
+                <div class="acw-header-spacer"></div>
+                <button class="acw-end-btn" id="acwEndBtn" type="button">에이전트 종료</button>
+            </div>
+            <div class="acw-messages" id="acwMessages">
+                <div class="acw-welcome">
+                    <strong>ArenaX 에이전트</strong>
+                    AI 모델에게 자유롭게 질문하세요.<br>
+                    왼쪽 상단 로고를 누르면 사이트로 돌아갑니다.
+                </div>
+            </div>
+            <div class="acw-input-row">
+                <textarea id="acwInput" class="acw-input" rows="1" placeholder="질문을 입력하세요…"></textarea>
+                <button id="acwSendBtn" class="acw-send-btn" type="button">전송</button>
+            </div>
+        </div>
 
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
@@ -2200,64 +2464,205 @@
             // download attribute가 직접 처리하므로 추가 작업 없음
         });
 
-        // ── 에이전트 확장/앱 연동 ─────────────────────────────────────────────
-        let arenaxExtReady = false;
-        const extInstallBanner = document.getElementById("extInstallBanner");
-        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
+        // ── APK 앱 / ?source=app 감지 ─────────────────────────────────────────
+        const isAppSource = (() => {
+            const fromUrl = new URLSearchParams(window.location.search).get("source") === "app";
+            const fromUA  = navigator.userAgent.includes("ArenaXApp");
+            if (fromUrl) { try { localStorage.setItem("arenax_is_app", "1"); } catch {} }
+            return fromUrl || fromUA || localStorage.getItem("arenax_is_app") === "1";
+        })();
 
-        function setExtReady(ready) {
-            arenaxExtReady = ready;
-            if (ready) {
-                agentToggleBtn.classList.add("active");
-                agentToggleBtn.title = "에이전트 런처 열기";
-                if (extInstallBanner) extInstallBanner.style.display = "none";
-                // 플로팅 런처 버튼 표시
-                if (agentFloatLauncher) agentFloatLauncher.classList.add("visible");
-            } else {
-                agentToggleBtn.classList.remove("active");
-                // APK 앱 소스가 아닐 때만 배너 표시
-                if (!isAppSource && extInstallBanner) extInstallBanner.style.display = "flex";
+        const extInstallBanner   = document.getElementById("extInstallBanner");
+        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
+        const agentChatWindow    = document.getElementById("agentChatWindow");
+        const acwMessages        = document.getElementById("acwMessages");
+        const acwInput           = document.getElementById("acwInput");
+        const acwSendBtn         = document.getElementById("acwSendBtn");
+
+        // 앱/확장 감지 상태 (배너 표시용만 사용)
+        let arenaxExtReady = isAppSource;
+
+        // ── 에이전트 상태 (에이전트 ON/OFF) ──────────────────────────────────
+        let agentActive = false;
+        let agentChatInFlight = false;
+        let agentSessionId = createUUID();
+        const AGENT_CHAT_KEY = "arenax_agent_chat_" + getDeviceId();
+        let agentChatLog = []; // { role, content }[]
+
+        function setAgentActive(active) {
+            agentActive = active;
+            agentToggleBtn.classList.toggle("active", active);
+            agentToggleBtn.textContent = active ? "● 에이전트" : "🌐 에이전트";
+            if (agentFloatLauncher) agentFloatLauncher.classList.toggle("visible", active);
+            if (!active) {
+                closeAgentChat();
+                // 배너는 앱 소스가 아닌 경우에만 노출
+                if (!isAppSource && !arenaxExtReady && extInstallBanner) {
+                    extInstallBanner.style.display = "flex";
+                }
             }
         }
 
-        // APK 앱 / ?source=app 감지 → 앱으로 실행 중이면 확장이 설치된 것처럼 처리
-        const isAppSource =
-            new URLSearchParams(window.location.search).get("source") === "app" ||
-            navigator.userAgent.includes("ArenaXApp");
-
-        if (isAppSource) {
-            // 앱으로 열린 경우: 설치 배너 숨기고 플로팅 버튼만 표시
-            if (extInstallBanner) extInstallBanner.style.display = "none";
-            arenaxExtReady = true;
-            agentToggleBtn.classList.add("active");
-            if (agentFloatLauncher) agentFloatLauncher.classList.add("visible");
+        // 에이전트 채팅창 열기 / 닫기
+        function openAgentChat() {
+            if (!agentChatWindow) return;
+            agentChatWindow.classList.add("open");
+            setTimeout(() => acwInput?.focus(), 200);
+        }
+        function closeAgentChat() {
+            agentChatWindow?.classList.remove("open");
         }
 
+        // ── 에이전트 채팅 메시지 렌더 ─────────────────────────────────────────
+        function appendAcwMsg(role, text, id) {
+            const el = document.createElement("div");
+            el.className = "acw-msg " + role;
+            if (id) el.id = id;
+            el.textContent = text;
+            acwMessages?.appendChild(el);
+            if (acwMessages) acwMessages.scrollTop = acwMessages.scrollHeight;
+            return el;
+        }
+
+        function autoResizeAcwInput() {
+            if (!acwInput) return;
+            acwInput.style.height = "auto";
+            acwInput.style.height = Math.min(acwInput.scrollHeight, 130) + "px";
+        }
+
+        // ── 에이전트 메시지 전송 ───────────────────────────────────────────────
+        async function sendAgentMessage() {
+            const text = acwInput ? acwInput.value.trim() : "";
+            if (!text || agentChatInFlight) return;
+
+            acwInput.value = "";
+            autoResizeAcwInput();
+            appendAcwMsg("user", text);
+            agentChatLog.push({ role: "user", content: text });
+
+            const loadingId = "acw-l-" + Date.now();
+            const loadingEl = appendAcwMsg("loading", "응답 생성 중…", loadingId);
+            agentChatInFlight = true;
+            if (acwSendBtn) acwSendBtn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/agent/chat`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        message: text,
+                        session_id: agentSessionId,
+                        user_id: getDeviceId(),
+                        history: agentChatLog.slice(-12),
+                    }),
+                });
+                loadingEl.remove();
+                if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+
+                if (res.body) {
+                    // SSE 스트리밍 응답
+                    const reader  = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buf = "";
+                    let content = "";
+                    const msgEl = appendAcwMsg("agent", "");
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buf += decoder.decode(value, { stream: true });
+                        const parts = buf.split("\n\n");
+                        buf = parts.pop() || "";
+                        for (const part of parts) {
+                            const line = part.split("\n").find(l => l.startsWith("data: "));
+                            if (!line) continue;
+                            try {
+                                const d = JSON.parse(line.slice(6));
+                                if (d.chunk) {
+                                    content += d.chunk;
+                                    msgEl.textContent = content;
+                                    if (acwMessages) acwMessages.scrollTop = acwMessages.scrollHeight;
+                                }
+                            } catch {}
+                        }
+                    }
+                    if (content) agentChatLog.push({ role: "agent", content });
+                } else {
+                    const data = await res.json();
+                    const reply = data.response || data.message || "응답을 받지 못했습니다.";
+                    appendAcwMsg("agent", reply);
+                    agentChatLog.push({ role: "agent", content: reply });
+                }
+            } catch (err) {
+                loadingEl?.remove();
+                appendAcwMsg("error", `오류: ${err.message}`);
+            } finally {
+                agentChatInFlight = false;
+                if (acwSendBtn) acwSendBtn.disabled = false;
+            }
+        }
+
+        // ── 에이전트 채팅창 이벤트 리스너 ────────────────────────────────────
+        document.getElementById("acwLogoBtn")?.addEventListener("click", closeAgentChat);
+        document.getElementById("acwEndBtn")?.addEventListener("click", () => setAgentActive(false));
+        acwSendBtn?.addEventListener("click", sendAgentMessage);
+        acwInput?.addEventListener("input", autoResizeAcwInput);
+        acwInput?.addEventListener("keydown", e => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAgentMessage(); }
+        });
+        // visualViewport: 채팅창에서도 키보드 처리
+        if (window.visualViewport && agentChatWindow) {
+            window.visualViewport.addEventListener("resize", () => {
+                if (!agentChatWindow.classList.contains("open")) return;
+                const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.offsetTop - window.visualViewport.height);
+                agentChatWindow.style.paddingBottom = kbHeight > 60 ? kbHeight + "px" : "";
+            });
+        }
+
+        // ── 플로팅 런처: 채팅창 토글 ─────────────────────────────────────────
+        agentFloatLauncher?.addEventListener("click", () => {
+            if (!agentActive) return;
+            if (agentChatWindow?.classList.contains("open")) {
+                closeAgentChat();
+            } else {
+                openAgentChat();
+            }
+        });
+
+        // ── 에이전트 토글 버튼 (사이트 dock) ─────────────────────────────────
+        agentToggleBtn.addEventListener("click", () => {
+            if (agentActive) {
+                // 이미 켜진 상태 → 채팅창 열기/닫기만
+                if (agentChatWindow?.classList.contains("open")) {
+                    closeAgentChat();
+                } else {
+                    openAgentChat();
+                }
+                return;
+            }
+            // 에이전트 켜기 (ext 확인 없이 자체 채팅창 사용)
+            setAgentActive(true);
+            openAgentChat();
+        });
+
+        // ── 확장 프로그램 감지 (배너 표시용) ─────────────────────────────────
+        function setExtReady(ready) {
+            arenaxExtReady = ready;
+            if (ready) {
+                if (extInstallBanner) extInstallBanner.style.display = "none";
+            } else if (!isAppSource) {
+                if (extInstallBanner) extInstallBanner.style.display = "flex";
+            }
+        }
         window.addEventListener("message", (event) => {
             if (event.source !== window) return;
             const d = event.data;
             if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
         });
-        // 페이지 로드 시 확장 존재 여부 확인 — 700ms 후 응답 없으면 배너 표시
         window.postMessage({ __arenax: "agent", type: "PING" }, "*");
         setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
 
-        agentToggleBtn.addEventListener("click", () => {
-            if (!arenaxExtReady) {
-                if (extInstallBanner) extInstallBanner.style.display = "flex";
-                return;
-            }
-            window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
-        });
-
-        // 플로팅 런처 버튼 클릭
-        agentFloatLauncher?.addEventListener("click", () => {
-            if (arenaxExtReady) {
-                window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
-            } else {
-                openAndroidInstallModal();
-            }
-        });
+        // 앱 소스이면 배너 숨김
+        if (isAppSource && extInstallBanner) extInstallBanner.style.display = "none";
 
         dockPrimaryBtn.addEventListener("click", () => {
             if (currentMode === "compare") handleCompare();
