@@ -52,14 +52,15 @@ function sendToTab(tabId, msg) {
 let _twChain = Promise.resolve();
 
 function _withTasks(fn) {
-  _twChain = _twChain
-    .then(async () => {
-      const { agentTasks = [] } = await chrome.storage.local.get("agentTasks");
-      const extra = (await fn(agentTasks)) || {};
-      await chrome.storage.local.set({ agentTasks, ...extra });
-    })
-    .catch(() => {});
-  return _twChain;
+  // 호출자가 에러를 받을 수 있도록 raw promise 반환
+  // chain 자체는 에러를 삼켜서 이후 write가 영원히 block되지 않도록 함
+  const p = _twChain.then(async () => {
+    const { agentTasks = [] } = await chrome.storage.local.get("agentTasks");
+    const extra = (await fn(agentTasks)) || {};
+    await chrome.storage.local.set({ agentTasks, ...extra });
+  });
+  _twChain = p.catch(() => {}); // chain 유지 — 에러가 있어도 다음 write 가능
+  return p; // 에러 전파 가능한 raw promise 반환
 }
 
 function tsCreate(taskId, text, tabId) {
@@ -347,79 +348,94 @@ async function runTask(tabId, text, taskId) {
   cancelFlags.delete(taskId);
   pauseFlags.delete(taskId);
 
-  await tsCreate(taskId, text, tabId);
-
+  // 외부 try/finally: 어떤 경로(early return 포함)로 나가도 cleanup 보장
   try {
-    await attachDebugger(tabId);
-  } catch (e) {
-    const msg = "디버거 연결 실패: " + (e.message || e);
-    await tsFinish(taskId, "error", msg);
-    return { ok: false, finalText: msg, kind: "error" };
-  }
-
-  await tsStep(taskId, "⚙️ 탭 제어 시작 (상단에 디버깅 배너 표시됨)", "info");
-
-  const actionHistory = [];
-  let finalText = "최대 단계(" + MAX_ROUNDS + "단계)에 도달했습니다. 목표를 완전히 달성하지 못했을 수 있습니다.";
-  let kind = "error";
-
-  try {
-    for (let round = 1; round <= MAX_ROUNDS; round++) {
-      // 취소 체크
-      if (cancelFlags.has(taskId)) {
-        finalText = "🛑 사용자가 취소했습니다.";
-        kind = "cancelled";
-        break;
+    // 1) 태스크 생성 — MAX_ACTIVE이면 에러 throw (이제 _withTasks가 에러를 전파함)
+    try {
+      await tsCreate(taskId, text, tabId);
+    } catch (e) {
+      const msg = String(e?.message ?? e);
+      if (msg === "MAX_ACTIVE") {
+        return { ok: false, finalText: "⚠️ 활성 임무가 5개입니다. 먼저 완료/취소 후 시도하세요.", kind: "error" };
       }
-
-      // 중단 대기 — 재개 또는 취소될 때까지 폴링
-      if (pauseFlags.has(taskId)) {
-        await tsStep(taskId, "⏸ 중단됨 — 재개를 기다리는 중...", "info");
-        await tsStatus(taskId, "paused");
-        while (pauseFlags.has(taskId) && !cancelFlags.has(taskId)) await sleep(400);
-        if (cancelFlags.has(taskId)) { finalText = "🛑 사용자가 취소했습니다."; kind = "cancelled"; break; }
-        await tsStep(taskId, "▶ 재개됨", "info");
-        await tsStatus(taskId, "running");
-      }
-
-      const scan = await scanCurrentTab(tabId);
-      const data  = await postStep(serverUrl, text, scan, actionHistory);
-      const reasoning = data.reasoning || "(이유 없음)";
-      await tsStep(taskId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
-
-      if (data.handoff_required) {
-        finalText = "🟡 직접 진행 필요: " + reasoning;
-        kind = "handoff";
-        break;
-      }
-      if (data.done) {
-        finalText = reasoning;
-        kind = "success";
-        break;
-      }
-      if (data.confirm_required) {
-        const approved = await askConfirm(tabId, {
-          message: data.confirm_message || "중요한 동작을 실행하려고 합니다.",
-          action: data.action, reasoning,
-        });
-        if (!approved) { finalText = "🟡 사용자가 실행을 취소했습니다."; kind = "cancelled"; break; }
-      }
-
-      const exec = await executeAction(tabId, { action: data.action, target_id: data.target_id, value: data.value });
-      actionHistory.push({ step: round, action: data.action, target: data.target_id, value: data.value, error: exec.success ? null : exec.error });
-      await sleep(400);
+      return { ok: false, finalText: "임무 생성 실패: " + msg, kind: "error" };
     }
-  } catch (e) {
-    finalText = "❌ " + (e.message || e);
-    kind = "error";
+
+    // 2) 디버거 연결
+    try {
+      await attachDebugger(tabId);
+    } catch (e) {
+      const msg = "디버거 연결 실패: " + (e.message || e);
+      await tsFinish(taskId, "error", msg);
+      return { ok: false, finalText: msg, kind: "error" };
+      // → finally 블록이 cleanup 처리
+    }
+
+    await tsStep(taskId, "⚙️ 탭 제어 시작 (상단에 디버깅 배너 표시됨)", "info");
+
+    const actionHistory = [];
+    let finalText = "최대 단계(" + MAX_ROUNDS + "단계)에 도달했습니다. 목표를 완전히 달성하지 못했을 수 있습니다.";
+    let kind = "error";
+
+    // 3) 메인 루프
+    try {
+      for (let round = 1; round <= MAX_ROUNDS; round++) {
+        if (cancelFlags.has(taskId)) {
+          finalText = "🛑 사용자가 취소했습니다.";
+          kind = "cancelled";
+          break;
+        }
+
+        if (pauseFlags.has(taskId)) {
+          await tsStep(taskId, "⏸ 중단됨 — 재개를 기다리는 중...", "info");
+          await tsStatus(taskId, "paused");
+          while (pauseFlags.has(taskId) && !cancelFlags.has(taskId)) await sleep(400);
+          if (cancelFlags.has(taskId)) { finalText = "🛑 사용자가 취소했습니다."; kind = "cancelled"; break; }
+          await tsStep(taskId, "▶ 재개됨", "info");
+          await tsStatus(taskId, "running");
+        }
+
+        const scan = await scanCurrentTab(tabId);
+        const data  = await postStep(serverUrl, text, scan, actionHistory);
+        const reasoning = data.reasoning || "(이유 없음)";
+        await tsStep(taskId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
+
+        if (data.handoff_required) {
+          finalText = "🟡 직접 진행 필요: " + reasoning;
+          kind = "handoff";
+          break;
+        }
+        if (data.done) {
+          finalText = reasoning;
+          kind = "success";
+          break;
+        }
+        if (data.confirm_required) {
+          const approved = await askConfirm(tabId, {
+            message: data.confirm_message || "중요한 동작을 실행하려고 합니다.",
+            action: data.action, reasoning,
+          });
+          if (!approved) { finalText = "🟡 사용자가 실행을 취소했습니다."; kind = "cancelled"; break; }
+        }
+
+        const exec = await executeAction(tabId, { action: data.action, target_id: data.target_id, value: data.value });
+        actionHistory.push({ step: round, action: data.action, target: data.target_id, value: data.value, error: exec.success ? null : exec.error });
+        await sleep(400);
+      }
+    } catch (e) {
+      finalText = "❌ " + (e.message || e);
+      kind = "error";
+    }
+
+    await tsFinish(taskId, kind, finalText);
+    return { ok: kind === "success", finalText, kind };
+
   } finally {
+    // 어떤 경로(early return, throw, 정상 종료)든 항상 실행
     tabToTask.delete(tabId);
     runningTabs.delete(tabId);
     await detachDebugger(tabId);
   }
-
-  await tsFinish(taskId, kind, finalText);
-  return { ok: kind === "success", finalText, kind };
 }
 
 // ---- 메시지 라우팅 ----
@@ -446,15 +462,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const taskId = "t" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
         runningTabs.add(tabId);
         tabToTask.set(tabId, taskId);
+        // runTask의 외부 finally가 runningTabs/tabToTask cleanup을 보장함
         runTask(tabId, message.task, taskId)
           .then(sendResponse)
           .catch(e => {
-            const msg = String(e?.message ?? e);
-            if (msg === "MAX_ACTIVE") {
-              sendResponse({ ok: false, finalText: "⚠️ 활성 임무가 5개입니다.", kind: "error" });
-            } else {
-              sendResponse({ ok: false, finalText: msg, kind: "error" });
-            }
+            sendResponse({ ok: false, finalText: String(e?.message ?? e), kind: "error" });
           });
 
       } else if (message.type === "PAUSE_TASK") {

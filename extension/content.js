@@ -78,6 +78,7 @@
     .tbtn { padding: 5px 11px; font-size: 12px; min-height: 30px; }
     .send-btn { min-width: 56px; font-size: 15px; }
     .icon-btn, .end-btn { padding: 6px 10px; font-size: 12px; min-height: 32px; }
+    .min-btn { padding: 7px 14px; font-size: 14px; min-width: 60px; }
     /* 리사이즈 핸들 터치 영역 확장 */
     .resize-handle { height: 10px; }
     .resize-handle::before { height: 4px; width: 40px; }
@@ -89,10 +90,18 @@
   .title { font-size: 14px; font-weight: 800; color: #6d28d9; flex: 0 0 auto; }
   .task-counter { flex: 1 1 auto; font-size: 11px; font-weight: 700; color: #7c3aed; background: #ede9fe; border-radius: 20px; padding: 2px 9px; white-space: nowrap; display: inline-block; align-self: center; }
   .task-counter.full { background: #fecaca; color: #b91c1c; }
-  .head-btns { display: flex; gap: 5px; flex: 0 0 auto; }
-  .icon-btn { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; cursor: pointer; font-size: 12px; padding: 4px 9px; color: #6b7280; white-space: nowrap; }
+  .head-btns { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; }
+  .icon-btn { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; cursor: pointer; font-size: 12px; padding: 5px 11px; color: #6b7280; white-space: nowrap; }
   .icon-btn:hover { background: #f3f4f6; }
-  .end-btn { border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; padding: 4px 10px; white-space: nowrap; }
+  /* 접기 버튼 — 눈에 띄게 크게 */
+  .min-btn {
+    border: 2px solid #c4b5fd; background: #ede9fe; color: #7c3aed;
+    border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 900;
+    padding: 6px 18px; white-space: nowrap; line-height: 1;
+    min-width: 72px; text-align: center;
+  }
+  .min-btn:hover { background: #ddd6fe; border-color: #a78bfa; }
+  .end-btn { border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; padding: 5px 12px; white-space: nowrap; }
   .end-btn:hover { background: #fee2e2; }
 
   .settings { display: none; padding: 8px 14px; border-bottom: 1px solid #f1f1f4; gap: 6px; flex-shrink: 0; }
@@ -195,18 +204,18 @@
           <span class="task-counter" id="ax-counter">0/5 활성</span>
           <div class="head-btns">
             <button class="icon-btn" id="ax-gear" title="서버 설정">설정</button>
-            <button class="icon-btn" id="ax-min"  title="최소화">─</button>
-            <button class="end-btn"  id="ax-end"  title="에이전트 종료">종료</button>
+            <button class="min-btn"  id="ax-min"  title="질문창 닫기">▼ 접기</button>
+            <button class="end-btn"  id="ax-end"  title="에이전트 종료">에이전트 종료</button>
           </div>
         </div>
         <div class="settings" id="ax-settings">
           <input id="ax-server" type="text" placeholder="https://arenax-4812.onrender.com" />
           <button id="ax-save">저장</button>
         </div>
-        <div class="resize-handle" id="ax-resize"></div>
         <div class="tasks-wrap" id="ax-tasks-wrap">
           <div class="tasks-inner" id="ax-tasks"></div>
         </div>
+        <div class="resize-handle" id="ax-resize"></div>
         <div class="confirm" id="ax-confirm">
           <div class="confirm-msg" id="ax-confirm-msg"></div>
           <div class="confirm-btns">
@@ -348,15 +357,7 @@
 
     tasksEl.innerHTML = "";
 
-    // 활성 임무 (최신이 아래 = 배열 순서 그대로)
-    if (active.length) {
-      const lbl = document.createElement("div");
-      lbl.className = "section-label"; lbl.textContent = "활성 임무";
-      tasksEl.appendChild(lbl);
-      active.forEach(t => tasksEl.appendChild(makeCard(t, false)));
-    }
-
-    // 기록 임무 (최신이 아래)
+    // ── 기록 먼저(위) — 위로 스크롤하면 볼 수 있음 ──
     if (archived.length) {
       const lbl = document.createElement("div");
       lbl.className = "section-label"; lbl.textContent = "기록";
@@ -364,11 +365,19 @@
       archived.forEach(t => tasksEl.appendChild(makeCard(t, true)));
     }
 
+    // ── 활성 임무 나중(아래) — 항상 화면에 보임 ──
+    if (active.length) {
+      const lbl = document.createElement("div");
+      lbl.className = "section-label"; lbl.textContent = "활성 임무";
+      tasksEl.appendChild(lbl);
+      active.forEach(t => tasksEl.appendChild(makeCard(t, false)));
+    }
+
     if (!active.length && !archived.length) {
       tasksEl.innerHTML = '<div class="empty">아직 임무가 없습니다. 아래에 지시사항을 입력하세요.</div>';
     }
 
-    // 최신이 아래 → 스크롤 하단
+    // 활성 임무가 아래 → 스크롤 하단으로 맞춰 활성 임무가 기본 노출
     tasksWrap.scrollTop = tasksWrap.scrollHeight;
   }
 
@@ -441,7 +450,8 @@
   });
   resizeHandle.addEventListener("pointermove", e => {
     if (!resizing) return;
-    const dy = resizing.y - e.clientY; // 핸들을 위로 드래그 → 높이 증가
+    // 핸들이 tasks-wrap 아래에 있으므로: 위로 드래그 = 줄이기, 아래로 드래그 = 늘리기
+    const dy = e.clientY - resizing.y;
     tasksHeight = Math.max(80, Math.min(Math.round(window.innerHeight * 0.6), resizing.h + dy));
     applyTasksHeight();
   });

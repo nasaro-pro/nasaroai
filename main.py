@@ -617,7 +617,7 @@ def sse(payload: dict) -> str:
 
 def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
     return [
-        {"role": "system", "content": persona},
+            {"role": "system", "content": persona},
         {"role": "user", "content": prompt},
     ]
 
@@ -884,7 +884,7 @@ async def call_ai_model(
 
     if excluded_models and LAST_RESORT_MODEL in excluded_models:
         final_result = None
-    else:
+            else:
         final_result = await final_attempt_model_call(
             label, requested_model, failed_candidates, excluded_models=excluded_models
         )
@@ -1449,7 +1449,7 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
                                         return
                                     try:
                                         raw = json.loads(line[6:])
-                                    except json.JSONDecodeError:
+                    except json.JSONDecodeError:
                                         yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                         return
                                     if raw.get("error"):
