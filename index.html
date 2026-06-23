@@ -1269,6 +1269,178 @@
                 border-radius: 14px 14px 0 0;
             }
         }
+
+        /* ── 모바일 설정 패널: 위로 팝업 ── */
+        @media (max-width: 767px) {
+            .settings-panel {
+                left: 0 !important;
+                width: min(280px, 82vw) !important;
+                bottom: 68px !important;
+                border-radius: 14px 14px 0 0 !important;
+                transform: translateY(20px) !important;
+                box-shadow: 0 -6px 24px rgba(15,23,42,.14) !important;
+                border-right: none !important;
+                border-left: none !important;
+                border-bottom: none !important;
+            }
+            .settings-panel.open {
+                transform: translateY(0) !important;
+            }
+        }
+
+        /* ── 에이전트 플로팅 런처 버튼 ── */
+        .agent-float-launcher {
+            display: none;
+            position: fixed;
+            bottom: calc(var(--input-dock-height, 120px) + 14px);
+            right: 16px;
+            z-index: 290;
+            width: 54px;
+            height: 54px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+            color: #fff;
+            font-size: 24px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(124,58,237,.45);
+            align-items: center;
+            justify-content: center;
+            transition: transform .2s, box-shadow .2s;
+        }
+        .agent-float-launcher.visible {
+            display: flex;
+        }
+        .agent-float-launcher:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 28px rgba(124,58,237,.55);
+        }
+        .agent-float-launcher:active {
+            transform: scale(0.95);
+        }
+
+        /* ── APK 설치 안내 모달 ── */
+        .install-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10,10,20,.72);
+            z-index: 10000;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .install-modal-overlay.open {
+            display: flex;
+        }
+        .install-modal {
+            background: #fff;
+            width: 100%;
+            max-width: 520px;
+            max-height: 90dvh;
+            border-radius: 22px 22px 0 0;
+            overflow-y: auto;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+            animation: slideUpModal .28s cubic-bezier(.4,0,.2,1);
+        }
+        @keyframes slideUpModal {
+            from { transform: translateY(40px); opacity: .5; }
+            to   { transform: translateY(0);    opacity: 1;  }
+        }
+        .install-modal-header {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1;
+        }
+        .install-modal-title {
+            font-size: 17px;
+            font-weight: 800;
+            color: #111827;
+        }
+        .install-modal-close {
+            border: 0;
+            background: #f3f4f6;
+            color: #374151;
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            font-size: 17px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .install-modal-close:hover { background: #e5e7eb; }
+        .install-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .install-step:last-of-type { border-bottom: none; }
+        .install-step-num {
+            flex: 0 0 28px;
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            background: #7c3aed;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 2px;
+        }
+        .install-step-content { flex: 1; }
+        .install-step-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        .install-step-desc {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.65;
+        }
+        .install-step-tag {
+            display: inline-block;
+            margin-top: 7px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+        .install-step-tag.warn { background: #fef3c7; color: #92400e; }
+        .install-step-tag.ok   { background: #d1fae5; color: #065f46; }
+        .install-step-tag.info { background: #eff6ff; color: #1e40af; }
+        .install-apk-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 16px 20px 20px;
+            padding: 15px;
+            background: #059669;
+            color: #fff;
+            text-align: center;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: background .15s;
+        }
+        .install-apk-btn:hover { background: #047857; }
     </style>
 </head>
 <body>
@@ -1460,29 +1632,100 @@
         <!-- 확장 미설치 시 설치 안내 배너 -->
         <div id="extInstallBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
             background:linear-gradient(135deg,#1e1b4b,#312e81);border-top:1px solid #4c1d95;
-            padding:14px 20px;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            padding:14px 20px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;">
-                <span style="font-size:22px;">🤖</span>
+                <span style="font-size:22px;background:#7c3aed;width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;">⚡</span>
                 <div>
-                    <div style="color:#e9d5ff;font-weight:600;font-size:14px;">ArenaX 에이전트 미설치</div>
+                    <div style="color:#e9d5ff;font-weight:700;font-size:14px;">ArenaX 에이전트 미설치</div>
                     <div style="color:#a78bfa;font-size:12px;margin-top:2px;">에이전트를 사용하려면 확장 프로그램(PC) 또는 앱(Android)이 필요합니다.</div>
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <a href="/install" target="_blank"
                     style="background:#7c3aed;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
-                    PC · Chrome 설치
+                    💻 PC · Chrome 설치
                 </a>
-                <a href="/static/arenax-agent.apk"
-                    style="background:#059669;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
-                    Android APK 다운로드
-                </a>
+                <button onclick="openAndroidInstallModal()"
+                    style="background:#059669;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;border:none;cursor:pointer;">
+                    📱 Android 설치
+                </button>
                 <button onclick="document.getElementById('extInstallBanner').style.display='none';"
                     style="background:transparent;border:1px solid #6b7280;color:#9ca3af;padding:9px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">
                     닫기
                 </button>
             </div>
         </div>
+
+        <!-- Android APK 설치 안내 모달 -->
+        <div id="androidInstallModal" class="install-modal-overlay" onclick="if(event.target===this)closeAndroidInstallModal()">
+            <div class="install-modal">
+                <div class="install-modal-header">
+                    <span class="install-modal-title">📱 Android APK 설치 방법</span>
+                    <button class="install-modal-close" onclick="closeAndroidInstallModal()">✕</button>
+                </div>
+
+                <div class="install-step">
+                    <div class="install-step-num">1</div>
+                    <div class="install-step-content">
+                        <div class="install-step-title">APK 다운로드</div>
+                        <div class="install-step-desc">아래 버튼을 눌러 APK 파일을 다운로드합니다. 알림창이나 파일 관리자 › 다운로드 폴더에서 확인하세요.</div>
+                    </div>
+                </div>
+
+                <div class="install-step">
+                    <div class="install-step-num">2</div>
+                    <div class="install-step-content">
+                        <div class="install-step-title">알 수 없는 출처 허용</div>
+                        <div class="install-step-desc">APK 파일을 처음 설치할 때 "알 수 없는 앱" 팝업이 뜹니다.</div>
+                        <div class="install-step-tag info">💡 팝업에서 <strong>"이 출처 허용"</strong> 또는 <strong>"설정"</strong> 버튼을 누르세요.</div>
+                        <div class="install-step-tag warn">⚠️ 팝업이 없으면: 설정 → 보안 → <strong>"알 수 없는 출처"</strong> 또는 <strong>"출처를 알 수 없는 앱 설치"</strong> 허용</div>
+                    </div>
+                </div>
+
+                <div class="install-step">
+                    <div class="install-step-num">3</div>
+                    <div class="install-step-content">
+                        <div class="install-step-title">APK 파일 실행</div>
+                        <div class="install-step-desc">다운로드된 <strong>arenax-agent.apk</strong> 파일을 탭하여 실행합니다.<br>알림창에서 바로 누르거나, 파일 관리자 › 다운로드 폴더에서 찾아 실행하세요.</div>
+                    </div>
+                </div>
+
+                <div class="install-step">
+                    <div class="install-step-num">4</div>
+                    <div class="install-step-content">
+                        <div class="install-step-title">Play 프로텍트 경고 → 무시하고 설치</div>
+                        <div class="install-step-desc">구글 Play Protect가 경고를 표시할 수 있습니다.</div>
+                        <div class="install-step-tag warn">⚠️ <strong>"Play 프로텍트에서 이 앱을 차단했습니다"</strong> 화면이 나오면<br>→ 하단 <strong>"무시하고 설치"</strong> 버튼을 누르세요.</div>
+                    </div>
+                </div>
+
+                <div class="install-step">
+                    <div class="install-step-num">5</div>
+                    <div class="install-step-content">
+                        <div class="install-step-title">권한 확인 → "설치" 클릭</div>
+                        <div class="install-step-desc">앱 권한 안내 화면이 나오면 <strong>"설치"</strong> 버튼을 누릅니다. 설치가 완료될 때까지 잠시 기다리세요.</div>
+                    </div>
+                </div>
+
+                <div class="install-step">
+                    <div class="install-step-num">6</div>
+                    <div class="install-step-content">
+                        <div class="install-step-title">설치 완료 → "열기"</div>
+                        <div class="install-step-desc">설치가 끝나면 <strong>"열기"</strong>를 눌러 ArenaX 앱을 실행하세요.</div>
+                        <div class="install-step-tag ok">✅ 앱을 열면 ArenaX 사이트가 바로 시작됩니다!</div>
+                    </div>
+                </div>
+
+                <a href="/static/arenax-agent.apk" class="install-apk-btn" id="apkDownloadLink">
+                    ⬇️ APK 다운로드 시작
+                </a>
+            </div>
+        </div>
+
+        <!-- 에이전트 플로팅 런처 버튼 (확장/앱 설치 시 항상 표시) -->
+        <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 열기" aria-label="에이전트 열기">
+            🌐
+        </button>
 
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
@@ -1896,6 +2139,30 @@
         window.addEventListener("resize", syncMainPadding);
         autoResizeInput();
 
+        // ── 모바일 키보드 팝업 시 입력창 함께 올라오기 (visualViewport) ────────
+        if (window.visualViewport) {
+            let prevVVHeight = window.visualViewport.height;
+            function onViewportResize() {
+                const vv = window.visualViewport;
+                const keyboardHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+                // 키보드가 올라왔으면 inputDock을 위로 밀어줌
+                inputDock.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                syncMainPadding();
+                // 포커스된 입력창을 화면에 보이도록 스크롤
+                if (keyboardHeight > 60) {
+                    const focused = document.activeElement;
+                    if (focused && (focused.tagName === "TEXTAREA" || focused.tagName === "INPUT")) {
+                        setTimeout(() => {
+                            focused.scrollIntoView({ behavior: "smooth", block: "end" });
+                        }, 80);
+                    }
+                }
+                prevVVHeight = vv.height;
+            }
+            window.visualViewport.addEventListener("resize", onViewportResize);
+            window.visualViewport.addEventListener("scroll", onViewportResize);
+        }
+
         function lockMainInput(isLocked) {
             mainInput.disabled = isLocked;
             dockPrimaryBtn.disabled = isLocked;
@@ -1909,21 +2176,61 @@
                 .replace(/"/g, "&quot;");
         }
 
-        // 에이전트는 크롬 확장(하단 바)으로 동작한다. 사이트의 "에이전트" 버튼은
-        // 같은 페이지에 주입된 확장 content script에게 window 메시지로 런처를 열도록 요청한다.
+        // ── Android 설치 안내 모달 ────────────────────────────────────────────
+        function openAndroidInstallModal() {
+            const modal = document.getElementById("androidInstallModal");
+            if (!modal) return;
+            modal.classList.add("open");
+            // 모달 열릴 때 APK 다운로드도 동시 시작
+            setTimeout(() => {
+                const link = document.createElement("a");
+                link.href = "/static/arenax-agent.apk";
+                link.download = "arenax-agent.apk";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }, 400);
+        }
+        function closeAndroidInstallModal() {
+            const modal = document.getElementById("androidInstallModal");
+            if (modal) modal.classList.remove("open");
+        }
+        // 모달 내 다운로드 버튼도 클릭 추적
+        document.getElementById("apkDownloadLink")?.addEventListener("click", () => {
+            // download attribute가 직접 처리하므로 추가 작업 없음
+        });
+
+        // ── 에이전트 확장/앱 연동 ─────────────────────────────────────────────
         let arenaxExtReady = false;
         const extInstallBanner = document.getElementById("extInstallBanner");
+        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
 
         function setExtReady(ready) {
             arenaxExtReady = ready;
             if (ready) {
                 agentToggleBtn.classList.add("active");
-                agentToggleBtn.title = "에이전트 런처 열기 (확장 설치됨)";
+                agentToggleBtn.title = "에이전트 런처 열기";
                 if (extInstallBanner) extInstallBanner.style.display = "none";
+                // 플로팅 런처 버튼 표시
+                if (agentFloatLauncher) agentFloatLauncher.classList.add("visible");
             } else {
-                // PC이고 확장 미설치인 경우 배너 표시
-                if (extInstallBanner) extInstallBanner.style.display = "flex";
+                agentToggleBtn.classList.remove("active");
+                // APK 앱 소스가 아닐 때만 배너 표시
+                if (!isAppSource && extInstallBanner) extInstallBanner.style.display = "flex";
             }
+        }
+
+        // APK 앱 / ?source=app 감지 → 앱으로 실행 중이면 확장이 설치된 것처럼 처리
+        const isAppSource =
+            new URLSearchParams(window.location.search).get("source") === "app" ||
+            navigator.userAgent.includes("ArenaXApp");
+
+        if (isAppSource) {
+            // 앱으로 열린 경우: 설치 배너 숨기고 플로팅 버튼만 표시
+            if (extInstallBanner) extInstallBanner.style.display = "none";
+            arenaxExtReady = true;
+            agentToggleBtn.classList.add("active");
+            if (agentFloatLauncher) agentFloatLauncher.classList.add("visible");
         }
 
         window.addEventListener("message", (event) => {
@@ -1931,7 +2238,7 @@
             const d = event.data;
             if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
         });
-        // 페이지 로드 시 확장 존재 여부 확인 — 600ms 후 응답 없으면 설치 버튼 표시
+        // 페이지 로드 시 확장 존재 여부 확인 — 700ms 후 응답 없으면 배너 표시
         window.postMessage({ __arenax: "agent", type: "PING" }, "*");
         setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
 
@@ -1941,6 +2248,15 @@
                 return;
             }
             window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
+        });
+
+        // 플로팅 런처 버튼 클릭
+        agentFloatLauncher?.addEventListener("click", () => {
+            if (arenaxExtReady) {
+                window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
+            } else {
+                openAndroidInstallModal();
+            }
         });
 
         dockPrimaryBtn.addEventListener("click", () => {
@@ -1972,7 +2288,7 @@
                 const response = await fetch(`${API_URL}/collab/recommend`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ task }),
+                    body: JSON.stringify({ task, user_id: getDeviceId() }),
                 });
                 if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
                 const data = await response.json();
@@ -2089,6 +2405,7 @@
                     message,
                     model_name: model,
                     compare_session_id: compareSessionId,
+                    user_id: getDeviceId(),
                 }),
             });
 
@@ -2351,6 +2668,7 @@
         }
 
         async function requestDebate(endpoint, payload, options = {}) {
+            payload.user_id = getDeviceId();
             debateInFlight = true;
             updateDockUI();
             showNotice("debateError", "");
@@ -2490,15 +2808,16 @@
             if (debateInFlight) {
                 dockSecondaryBtn.disabled = true;
                 try {
-                    const response = await fetch(`${API_URL}/debate/continue`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            session_id: debateSessionId,
-                            topic: debateTopic,
-                            user_input: userInput,
-                        }),
-                    });
+                        const response = await fetch(`${API_URL}/debate/continue`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                session_id: debateSessionId,
+                                topic: debateTopic,
+                                user_input: userInput,
+                                user_id: getDeviceId(),
+                            }),
+                        });
                     if (!response.ok) throw new Error(`큐잉 실패 (${response.status})`);
                     const data = await response.json();
                     if (data.queued) {
