@@ -39,19 +39,13 @@ jobs:
           path: android-agent/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
-      - name: Create or update Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: apk-latest
-          name: "ArenaX Agent APK (최신)"
-          body: |
-            ## ArenaX 플로팅 에이전트 버튼 앱
-
-            **설치 방법**
-            1. 아래 `app-debug.apk` 다운로드
-            2. 폰으로 전송 후 설치 (출처를 알 수 없는 앱 허용 필요)
-            3. 앱 실행 → 오버레이 권한 허용 → 버튼 켜기
-          files: android-agent/app/build/outputs/apk/debug/app-debug.apk
-          make_latest: true
+      - name: Deploy APK to static folder
+        run: |
+          cp android-agent/app/build/outputs/apk/debug/app-debug.apk static/arenax-agent.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add static/arenax-agent.apk
+          git diff --staged --quiet || git commit -m "ci: update arenax-agent.apk [skip ci]"
+          git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
