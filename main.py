@@ -1618,17 +1618,21 @@ AGENT_STEP_MAX_CANDIDATES = 4
 
 
 def _resolve_agent_models() -> list[str]:
-    """에이전트가 시도할 모델 목록(우선순위). AGENT_MODEL 환경변수가 있으면 맨 앞에,
-    그 뒤로 현재 가용 무료 모델을 붙여 폴백 체인을 만든다(무료 모델 429 대비).
-    나중에 실제 API를 붙이면 AGENT_MODEL만 지정하면 그 모델이 1순위가 된다."""
+    """에이전트가 시도할 모델 목록(우선순위, 무료 폴백 체인).
+
+    [유료 호출 차단] 기본적으로 무료 모델만 사용한다. AGENT_MODEL 환경변수는
+    그것이 ':free' 모델이거나 AGENT_ALLOW_PAID=true일 때만 1순위로 추가한다.
+    (지금은 무료만 호출하라는 요구사항. 나중에 실제 유료 API를 붙일 땐
+    AGENT_ALLOW_PAID=true 로 켜면 된다.)"""
+    allow_paid = os.environ.get("AGENT_ALLOW_PAID", "").strip().lower() == "true"
     configured = os.environ.get("AGENT_MODEL", "").strip()
     candidates: list[str] = []
-    if configured:
+    if configured and (allow_paid or ":free" in configured):
         candidates.append(configured)
     candidates.extend(get_all_available_free_models())
     deduped = list(dict.fromkeys(candidate for candidate in candidates if candidate))
     if not deduped:
-        deduped = ["openai/gpt-4o"]
+        deduped = [LAST_RESORT_MODEL]
     return deduped[:AGENT_STEP_MAX_CANDIDATES]
 
 
@@ -1681,7 +1685,9 @@ async def agent_task(request: AgentRequest):
             content={"status": "error", "message": "이미 다른 에이전트 작업이 실행 중입니다. 잠시 후 다시 시도해주세요."},
         )
 
-    model = os.environ.get("AGENT_MODEL", "openai/gpt-4o")
+    # 유료 호출 차단: 무료 모델만 사용한다(402 Insufficient credits 방지).
+    await ensure_model_cache_fresh()
+    model = _resolve_agent_models()[0]
     headless = os.environ.get("AGENT_HEADLESS", "true").lower() != "false"
     headers = build_openrouter_headers()
     start_url = _extract_start_url(query)
