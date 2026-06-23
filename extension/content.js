@@ -395,11 +395,13 @@
     else if (btn.classList.contains("delete-btn"))
       { try { await chrome.runtime.sendMessage({ type: "DELETE_TASK", taskId }); } catch {} }
     else if (btn.classList.contains("edit-btn")) {
-      input.value = btn.dataset.text || "";
-      input.style.height = "auto";
-      input.style.height = Math.min(input.scrollHeight, 120) + "px";
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
+      try {
+        input.value = btn.dataset.text || "";
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 120) + "px";
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      } catch {}
     }
   });
 
