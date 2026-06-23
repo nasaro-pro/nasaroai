@@ -30,6 +30,19 @@
   .launcher:active { cursor: grabbing; }
   .launcher:hover { background: #6d28d9; }
 
+  /* 활성 임무 표시 도트 */
+  .launcher-dot {
+    position: absolute; top: 5px; right: 5px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #10b981; border: 2px solid #fff;
+    display: none; pointer-events: none;
+  }
+  .launcher.has-active .launcher-dot { display: block; animation: dot-pulse 1.8s ease-in-out infinite; }
+  @keyframes dot-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.35); opacity: 0.75; }
+  }
+
   .bubble {
     --bg: #1f2937;
     pointer-events: auto; position: fixed; right: 76px;
@@ -192,7 +205,7 @@
 
   const root = document.createElement("div");
   root.innerHTML = `
-    <button class="launcher" id="ax-launcher" title="ArenaX 에이전트 (드래그로 이동)">🤖</button>
+    <button class="launcher" id="ax-launcher" title="ArenaX 에이전트 (드래그로 이동)">🤖<span class="launcher-dot"></span></button>
     <div class="bubble" id="ax-bubble">
       <span class="bubble-text" id="ax-bubble-text"></span>
       <button class="bubble-close" id="ax-bubble-close" title="닫기">✕</button>
@@ -259,6 +272,7 @@
   document.documentElement.appendChild(host);
 
   const MAX_ACTIVE  = 5;
+  let initialized   = false; // storage 확인 전까지 런처를 절대 표시하지 않음
   let enabled       = false;
   let pendingConfirm= null;
   let launcherBottom= 96;
@@ -282,7 +296,11 @@
   }
 
   // ── 표시 상태 ────────────────────────────────────────────────────────
-  function render() { launcher.classList.toggle("show", enabled && bar.hidden); }
+  // storage 초기화 완료 전까지 런처를 표시하지 않도록 guard
+  function render() {
+    if (!initialized) { launcher.classList.remove("show"); return; }
+    launcher.classList.toggle("show", enabled && bar.hidden);
+  }
   function showBar(show) {
     bar.hidden = !show;
     render();
@@ -354,6 +372,9 @@
     const list = tasks || [];
     const active   = list.filter(t => ACTIVE_SET.has(t.status));
     const archived = list.filter(t => !ACTIVE_SET.has(t.status));
+
+    // 실행 중인 임무가 있으면 런처에 초록 도트 표시
+    launcher.classList.toggle("has-active", active.some(t => t.status === "running"));
 
     counter.textContent = `${active.length}/${MAX_ACTIVE} 활성`;
     counter.classList.toggle("full", active.length >= MAX_ACTIVE);
@@ -577,6 +598,8 @@
       applyLauncherPos();
       applyTasksHeight();
       renderTasks(s.agentTasks || []);
+      // storage 확인 완료 → 이제부터 render()가 실제로 동작
+      initialized = true;
       applyEnabled(!!s.agentEnabled);
       // barOpen: 에이전트가 켜져 있고 바가 열린 상태였으면 복원
       if (!!s.agentEnabled && s.barOpen === true) { bar.hidden = false; render(); }
