@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArenaX 에이전트 설치</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+      background: #0f0a1a;
+      color: #f3f4f6;
+      min-height: 100vh;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #1e1030 0%, #0f0a1a 100%);
+      border-bottom: 1px solid #2d1f50;
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+    .hero-logo { font-size: 48px; margin-bottom: 12px; }
+    .hero h1 { font-size: clamp(24px,4vw,36px); font-weight: 900; color: #fff; margin-bottom: 8px; }
+    .hero h1 span { color: #a78bfa; }
+    .hero p { font-size: 15px; color: #9ca3af; max-width: 500px; margin: 0 auto; line-height: 1.6; }
+
+    .container { max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    /* 다운로드 버튼 */
+    .dl-wrap { text-align: center; margin-bottom: 48px; }
+    .dl-btn {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      color: #fff; font-size: 17px; font-weight: 800;
+      padding: 16px 36px; border-radius: 14px; text-decoration: none;
+      box-shadow: 0 8px 30px rgba(124,58,237,.45);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 36px rgba(124,58,237,.55); }
+    .dl-btn .icon { font-size: 22px; }
+    .dl-note { margin-top: 10px; font-size: 12px; color: #6b7280; }
+
+    /* 단계 */
+    .steps-title {
+      font-size: 19px; font-weight: 800; color: #e9d5ff;
+      margin-bottom: 20px; padding-bottom: 12px;
+      border-bottom: 1px solid #2d1f50;
+    }
+    .steps { display: flex; flex-direction: column; gap: 16px; }
+    .step {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: #1a1030; border: 1px solid #2d1f50;
+      border-radius: 14px; padding: 18px 20px;
+    }
+    .step-num {
+      flex: 0 0 36px; height: 36px; border-radius: 50%;
+      background: #7c3aed; color: #fff;
+      font-size: 15px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-body { flex: 1; }
+    .step-body h3 { font-size: 15px; font-weight: 800; color: #e9d5ff; margin-bottom: 4px; }
+    .step-body p { font-size: 13px; color: #9ca3af; line-height: 1.6; }
+    .step-body code {
+      display: inline-block; background: #0f172a; color: #a78bfa;
+      border: 1px solid #312e81; border-radius: 6px;
+      padding: 2px 8px; font-size: 12px; margin-top: 4px; user-select: all;
+    }
+    .step-body .tip {
+      margin-top: 8px; padding: 8px 12px;
+      background: #1e3a5f; border-left: 3px solid #3b82f6;
+      border-radius: 0 8px 8px 0; font-size: 12px; color: #93c5fd;
+    }
+    .step-icon { font-size: 22px; margin-top: 2px; }
+
+    /* 완료 배너 */
+    .done-banner {
+      margin-top: 36px; padding: 20px 24px;
+      background: linear-gradient(135deg, #064e3b, #065f46);
+      border: 1px solid #10b981; border-radius: 14px;
+      text-align: center;
+    }
+    .done-banner .emoji { font-size: 32px; display: block; margin-bottom: 8px; }
+    .done-banner h3 { font-size: 16px; font-weight: 800; color: #6ee7b7; margin-bottom: 4px; }
+    .done-banner p { font-size: 13px; color: #a7f3d0; }
+
+    /* 상단 nav */
+    .nav {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 24px; background: rgba(15,10,26,.9);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #2d1f50; position: sticky; top: 0; z-index: 10;
+    }
+    .nav-logo { font-size: 20px; font-weight: 900; color: #a78bfa; text-decoration: none; }
+    .nav-spacer { flex: 1; }
+    .nav-link {
+      font-size: 13px; color: #9ca3af; text-decoration: none;
+      padding: 6px 14px; border-radius: 8px;
+      border: 1px solid #2d1f50; background: #1a1030;
+    }
+    .nav-link:hover { color: #e9d5ff; border-color: #7c3aed; }
+
+    @media (max-width: 480px) {
+      .step { flex-direction: column; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <a href="/" class="nav-logo">🤖 ArenaX</a>
+    <span class="nav-spacer"></span>
+    <a href="/" class="nav-link">← 사이트로 돌아가기</a>
+  </nav>
+
+  <div class="hero">
+    <div class="hero-logo">🌐</div>
+    <h1>ArenaX <span>에이전트</span> 설치</h1>
+    <p>Chrome 확장 프로그램을 설치하면 어느 사이트에서나 AI 에이전트가 직접 웹 탐색 임무를 수행합니다.</p>
+  </div>
+
+  <div class="container">
+
+    <div class="dl-wrap">
+      <a href="/static/arenax-extension.zip" download class="dl-btn">
+        <span class="icon">⬇️</span>
+        확장 프로그램 다운로드 (ZIP)
+      </a>
+      <div class="dl-note">Chrome 전용 · 약 20KB · 무료</div>
+    </div>
+
+    <div class="steps-title">⚙️ 설치 방법 (1분 소요)</div>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>ZIP 파일 다운로드</h3>
+          <p>위 버튼을 눌러 <strong>arenax-extension.zip</strong>을 다운로드하세요. 압축을 풀지 않아도 됩니다.</p>
+        </div>
+        <span class="step-icon">📦</span>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Chrome 확장 관리 페이지 열기</h3>
+          <p>주소창에 아래를 입력하고 Enter를 누르세요.</p>
+          <code>chrome://extensions</code>
+        </div>
+        <span class="step-icon">🔧</span>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>개발자 모드 켜기</h3>
+          <p>페이지 오른쪽 상단의 <strong>"개발자 모드"</strong> 토글을 켜세요.</p>
+          <div class="tip">💡 이미 켜져 있으면 다음 단계로 넘어가세요.</div>
+        </div>
+        <span class="step-icon">🛠️</span>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>ZIP 파일을 페이지에 드래그 앤 드롭</h3>
+          <p>다운로드한 <strong>arenax-extension.zip</strong> 파일을 <code>chrome://extensions</code> 페이지 위로 끌어다 놓으세요. 자동으로 설치됩니다.</p>
+          <div class="tip">💡 또는 "압축 해제된 확장 프로그램 로드" 버튼 → 압축 해제한 폴더 선택도 가능합니다.</div>
+        </div>
+        <span class="step-icon">🖱️</span>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>권한 허용</h3>
+          <p>설치 후 팝업이 뜨면 <strong>"확장 프로그램 추가"</strong>를 클릭하세요. 모든 사이트에 접근 권한이 필요합니다.</p>
+        </div>
+        <span class="step-icon">✅</span>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <h3>ArenaX 사이트에서 에이전트 버튼 클릭</h3>
+          <p><a href="/" style="color:#a78bfa">ArenaX</a>로 돌아가서 <strong>🌐 에이전트</strong> 버튼을 누르면 모든 사이트에서 동작하는 런처가 나타납니다.</p>
+        </div>
+        <span class="step-icon">🚀</span>
+      </div>
+
+    </div>
+
+    <div class="done-banner">
+      <span class="emoji">🎉</span>
+      <h3>설치 완료! 이제 어느 사이트든 에이전트가 함께합니다.</h3>
+      <p>런처(🤖)를 클릭해 임무를 지시하면 AI가 직접 웹을 탐색하며 작업합니다.</p>
+    </div>
+
+  </div>
+
+</body>
+</html>

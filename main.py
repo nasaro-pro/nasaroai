@@ -1763,6 +1763,21 @@ def serve_home() -> FileResponse:
     return FileResponse(index_path)
 
 
+@app.get("/install")
+def serve_install() -> FileResponse:
+    return FileResponse(os.path.join(BASE_DIR, "install.html"))
+
+
+@app.get("/static/{filename}")
+def serve_static(filename: str) -> FileResponse:
+    safe = os.path.basename(filename)
+    path = os.path.join(BASE_DIR, "static", safe)
+    if not os.path.isfile(path):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return FileResponse(path, filename=safe)
+
+
 if __name__ == "__main__":
     import uvicorn
 

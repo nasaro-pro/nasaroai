@@ -1338,6 +1338,7 @@
                     <button class="mode-btn" type="button" data-mode="collab">협업</button>
                     <button id="newChatBtn" class="dock-btn muted" type="button" title="새 채팅 시작">✦ 새 채팅</button>
                     <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
+                    <a href="/install" target="_blank" id="installExtBtn" class="dock-btn muted" title="확장 프로그램 설치" style="display:none;text-decoration:none;">⬇ 설치</a>
                 </div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 <div class="dock-actions">
@@ -1636,30 +1637,33 @@
         // 에이전트는 크롬 확장(하단 바)으로 동작한다. 사이트의 "에이전트" 버튼은
         // 같은 페이지에 주입된 확장 content script에게 window 메시지로 런처를 열도록 요청한다.
         let arenaxExtReady = false;
+        const installExtBtn = document.getElementById("installExtBtn");
+
+        function setExtReady(ready) {
+            arenaxExtReady = ready;
+            if (ready) {
+                agentToggleBtn.classList.add("active");
+                agentToggleBtn.title = "에이전트 런처 열기 (확장 설치됨)";
+                if (installExtBtn) installExtBtn.style.display = "none";
+            } else {
+                if (installExtBtn) installExtBtn.style.display = "";
+            }
+        }
+
         window.addEventListener("message", (event) => {
             if (event.source !== window) return;
             const d = event.data;
-            if (d && d.__arenax === "agent" && d.type === "READY") {
-                arenaxExtReady = true;
-                agentToggleBtn.classList.add("active");
-                agentToggleBtn.title = "에이전트 런처 열기 (확장 설치됨)";
-            }
+            if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
         });
-        // 페이지 로드 시 확장 존재 여부 확인
+        // 페이지 로드 시 확장 존재 여부 확인 — 600ms 후 응답 없으면 설치 버튼 표시
         window.postMessage({ __arenax: "agent", type: "PING" }, "*");
+        setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
 
         agentToggleBtn.addEventListener("click", () => {
             window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
             setTimeout(() => {
                 if (!arenaxExtReady) {
-                    alert(
-                        "ArenaX 에이전트 확장 프로그램이 필요합니다.\n\n" +
-                        "1) 크롬 주소창에 chrome://extensions 입력\n" +
-                        "2) 우상단 '개발자 모드' 켜기\n" +
-                        "3) '압축해제된 확장 프로그램 로드'로 extension 폴더 선택\n" +
-                        "(또는 추후 크롬 웹스토어에서 설치)\n\n" +
-                        "설치 후 이 페이지를 새로고침하고 다시 눌러주세요."
-                    );
+                    window.open("/install", "_blank");
                 }
             }, 600);
         });
