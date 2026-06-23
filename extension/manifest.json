@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "ArenaX 에이전트",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "어떤 사이트에서든 화면 하단의 요청창으로 ArenaX 에이전트가 그 탭을 직접 조작합니다.",
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "permissions": [
     "activeTab",
     "storage",
@@ -24,6 +29,11 @@
     }
   ],
   "action": {
-    "default_title": "ArenaX 에이전트 켜기/끄기"
+    "default_title": "ArenaX 에이전트 켜기/끄기",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   }
 }

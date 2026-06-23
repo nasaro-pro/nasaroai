@@ -282,7 +282,13 @@
 
   // ── 표시 상태 ────────────────────────────────────────────────────────
   function render() { launcher.classList.toggle("show", enabled && bar.hidden); }
-  function showBar(show) { bar.hidden = !show; render(); if (show) input.focus(); }
+  function showBar(show) {
+    bar.hidden = !show;
+    render();
+    if (show) input.focus();
+    // 모든 탭에 동기화 — 한 탭에서 접으면 다른 탭도 같이 접힘
+    try { chrome.storage.local.set({ barOpen: show }); } catch {}
+  }
   function applyEnabled(v) { enabled = v; if (!v) bar.hidden = true; render(); }
   async function setEnabled(v) {
     try { await chrome.storage.local.set({ agentEnabled: v }); } catch {}
@@ -537,11 +543,17 @@
         if (bar.hidden) showBubble(n.text, n.kind);
       }
     }
+    // 탭 간 바 열기/닫기 동기화
+    if (changes.barOpen !== undefined && enabled) {
+      const open = !!changes.barOpen.newValue;
+      bar.hidden = !open;
+      render();
+    }
   });
 
   // ── 초기화 ───────────────────────────────────────────────────────────
   chrome.storage.local
-    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "tasksHeight"])
+    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "tasksHeight", "barOpen"])
     .then(s => {
       if (s.serverUrl) serverInput.value = s.serverUrl;
       if (typeof s.launcherBottom === "number") launcherBottom = s.launcherBottom;
@@ -550,6 +562,8 @@
       applyTasksHeight();
       renderTasks(s.agentTasks || []);
       applyEnabled(!!s.agentEnabled);
+      // barOpen: 에이전트가 켜져 있고 바가 열린 상태였으면 복원
+      if (!!s.agentEnabled && s.barOpen === true) { bar.hidden = false; render(); }
     })
     .catch(() => {});
 })();
