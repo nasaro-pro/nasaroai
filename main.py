@@ -1776,6 +1776,34 @@ def serve_manifest() -> FileResponse:
     return FileResponse(path, media_type="application/manifest+json")
 
 
+@app.get("/extension-update")
+def extension_update(request: Request):
+    """Chrome 확장 자동 업데이트 매니페스트 (update_url)"""
+    # 브라우저가 쿼리 파라미터로 ?x=id%3D{id}%26v%3D{ver}%26uc 형태로 보냄
+    raw = request.query_params.get("x", "")
+    ext_id = ""
+    for part in raw.replace("%3D", "=").replace("%26", "&").split("&"):
+        if part.startswith("id="):
+            ext_id = part[3:]
+    if not ext_id:
+        ext_id = "arenax-agent"
+    xml = (
+        "<?xml version='1.0' encoding='UTF-8'?>"
+        "<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>"
+        f"<app appid='{ext_id}'>"
+        "<updatecheck"
+        " status='ok'"
+        " version='2.2.0'"
+        " prodversionmin='88.0'"
+        " codebase='https://arenax-4812.onrender.com/static/arenax-extension.zip'"
+        "/>"
+        "</app>"
+        "</gupdate>"
+    )
+    from fastapi.responses import Response as FastResponse
+    return FastResponse(content=xml, media_type="application/xml")
+
+
 @app.get("/static/{filename}")
 def serve_static(filename: str):
     safe = os.path.basename(filename)

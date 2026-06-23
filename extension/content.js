@@ -262,6 +262,7 @@
   let enabled       = false;
   let pendingConfirm= null;
   let launcherBottom= 96;
+  let kbOffset = 0; // 모바일 키보드 높이 오프셋
   let tasksHeight   = 260;
   let bubbleTimer   = null;
   let prevNotifT    = 0;
@@ -295,8 +296,8 @@
     applyEnabled(v);
   }
   function applyLauncherPos() {
-    launcher.style.bottom = launcherBottom + "px";
-    bubble.style.bottom   = (launcherBottom + 58) + "px";
+    launcher.style.bottom = (launcherBottom + kbOffset) + "px";
+    bubble.style.bottom   = (launcherBottom + 58 + kbOffset) + "px";
   }
   function applyTasksHeight() { tasksWrap.style.height = tasksHeight + "px"; }
 
@@ -550,6 +551,21 @@
       render();
     }
   });
+
+  // ── 모바일 키보드 올라올 때 바/런처 위로 이동 ─────────────────────────
+  function updateKbOffset() {
+    if (!window.visualViewport) return;
+    const vv = window.visualViewport;
+    const newOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    if (newOffset === kbOffset) return;
+    kbOffset = newOffset;
+    host.style.bottom = kbOffset + "px";
+    applyLauncherPos();
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateKbOffset);
+    window.visualViewport.addEventListener("scroll", updateKbOffset);
+  }
 
   // ── 초기화 ───────────────────────────────────────────────────────────
   chrome.storage.local
