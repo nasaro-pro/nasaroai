@@ -197,23 +197,32 @@
       <p>런처(🤖)를 클릭해 임무를 지시하면 AI가 직접 웹을 탐색하며 작업합니다.</p>
     </div>
 
-    <!-- ── 모바일 (Kiwi Browser) ── -->
+    <!-- ── 모바일 (Quetta Browser / 안드로이드) ── -->
     <div style="margin-top:48px;">
-      <div class="steps-title">📱 모바일 안드로이드 — Kiwi Browser로 설치</div>
-      <p style="font-size:13px;color:#9ca3af;margin-bottom:20px;line-height:1.6;">
-        iOS(아이폰)는 현재 Chrome 확장을 지원하지 않습니다. 안드로이드에서는
-        <strong style="color:#e9d5ff">Kiwi Browser</strong>를 사용하면 크롬 확장을 설치할 수 있습니다.
-      </p>
+      <div class="steps-title">📱 모바일 안드로이드 — Quetta Browser로 설치</div>
+
+      <!-- Kiwi 종료 안내 -->
+      <div style="margin-bottom:20px;padding:14px 18px;background:#2d1505;border:1px solid #f97316;border-radius:12px;font-size:13px;color:#fed7aa;line-height:1.7;">
+        <strong style="color:#fb923c;">⚠️ Kiwi Browser는 2025년 1월 공식 종료됐습니다.</strong><br>
+        Play Store에서 삭제됐고 보안 업데이트도 없습니다.
+        대신 <strong style="color:#fff">Quetta Browser</strong>를 사용하세요 — Kiwi와 동일하게 Chrome 웹 스토어 확장을 지원하며 현재 활발히 개발 중입니다.
+      </div>
+
+      <!-- iOS 불가 안내 -->
+      <div style="margin-bottom:20px;padding:12px 16px;background:#1a1030;border:1px solid #4b2d6b;border-radius:12px;font-size:13px;color:#c4b5fd;line-height:1.7;">
+        <strong>iOS(아이폰)</strong>는 Apple 정책상 Chrome 확장 프로그램 자체를 지원하지 않습니다. 아이폰에서는 에이전트 기능을 사용할 수 없습니다.
+      </div>
+
       <div class="steps">
 
         <div class="step">
           <div class="step-num">1</div>
           <div class="step-body">
-            <h3>Kiwi Browser 설치</h3>
-            <p>Play 스토어에서 <strong>Kiwi Browser</strong>를 검색해 설치하세요. 무료입니다.</p>
-            <a href="https://play.google.com/store/apps/details?id=com.kiwibrowser.browser" target="_blank"
-               style="display:inline-block;margin-top:6px;padding:6px 14px;background:#7c3aed;color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;">
-              Play 스토어 바로가기 ↗
+            <h3>Quetta Browser 설치</h3>
+            <p>Play 스토어에서 <strong>Quetta Browser</strong>를 검색해 설치하세요. 무료입니다.</p>
+            <a href="https://play.google.com/store/apps/details?id=net.quetta.browser" target="_blank"
+               style="display:inline-block;margin-top:8px;padding:8px 16px;background:#7c3aed;color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;">
+              Play 스토어에서 설치 ↗
             </a>
           </div>
           <span class="step-icon">📲</span>
@@ -223,7 +232,8 @@
           <div class="step-num">2</div>
           <div class="step-body">
             <h3>ZIP 파일 다운로드</h3>
-            <p>Kiwi Browser에서 이 페이지를 열고 위의 <strong>⬇️ 확장 프로그램 다운로드</strong> 버튼을 탭하세요.</p>
+            <p>Quetta Browser에서 이 페이지를 열고 위의 <strong>⬇️ 확장 프로그램 다운로드</strong> 버튼을 탭하세요.</p>
+            <div class="tip">💡 다운로드 완료 후 알림이 뜨면 "열기"를 탭하거나, 내 파일 → Downloads 폴더에서 찾으세요.</div>
           </div>
           <span class="step-icon">📦</span>
         </div>
@@ -231,10 +241,9 @@
         <div class="step">
           <div class="step-num">3</div>
           <div class="step-body">
-            <h3>확장 관리 페이지 열기</h3>
-            <p>Kiwi Browser 주소창에 아래를 입력하세요.</p>
-            <code>kiwi://extensions</code>
-            <div class="tip">💡 또는 우측 상단 <strong>⋮ 메뉴 → Extensions</strong>를 탭해도 됩니다.</div>
+            <h3>확장 프로그램 메뉴 열기</h3>
+            <p>하단 탐색 바의 <strong>메뉴 아이콘(≡)</strong>을 탭한 뒤 <strong>"Extensions"</strong>를 선택하세요.</p>
+            <div class="tip">💡 또는 주소창에 <code>quetta://extensions</code> 를 입력해도 됩니다.</div>
           </div>
           <span class="step-icon">🔧</span>
         </div>
@@ -243,8 +252,7 @@
           <div class="step-num">4</div>
           <div class="step-body">
             <h3>개발자 모드 켜기</h3>
-            <p>오른쪽 상단의 <strong>"Developer mode"</strong> 토글을 켜세요.<br>
-            토글이 안 보이면 화면을 아래로 스크롤하거나, 페이지를 가로 방향으로 회전해보세요.</p>
+            <p>확장 페이지 오른쪽 상단의 <strong>"Developer mode"</strong> 토글을 켜세요.</p>
           </div>
           <span class="step-icon">🛠️</span>
         </div>
@@ -253,9 +261,9 @@
           <div class="step-num">5</div>
           <div class="step-body">
             <h3>ZIP으로 확장 설치</h3>
-            <p>개발자 모드를 켜면 상단에 <strong>"+ (from .zip/.crx/.user.js)"</strong> 버튼이 나타납니다.<br>
+            <p>개발자 모드를 켜면 <strong>"+ (from .zip/.crx/.user.js)"</strong> 버튼이 나타납니다.<br>
             탭 → 다운로드된 <strong>arenax-extension.zip</strong> 파일 선택 → 설치 완료.</p>
-            <div class="tip">💡 파일이 안 보이면 내 파일 → 다운로드 폴더에서 찾으세요.</div>
+            <div class="tip">💡 파일이 보이지 않으면 "내 파일" 앱 → Downloads 폴더에서 찾으세요.</div>
           </div>
           <span class="step-icon">📂</span>
         </div>
@@ -264,11 +272,21 @@
           <div class="step-num">6</div>
           <div class="step-body">
             <h3>ArenaX에서 에이전트 활성화</h3>
-            <p>Kiwi Browser로 <a href="/" style="color:#a78bfa">ArenaX</a>를 열고 <strong>🌐 에이전트</strong> 버튼을 탭하세요.</p>
+            <p>Quetta Browser로 <a href="/" style="color:#a78bfa">ArenaX</a>를 열고 <strong>🌐 에이전트</strong> 버튼을 탭하세요.</p>
+            <div class="tip">💡 에이전트 실행 시 화면 상단에 "디버거 연결됨" 배너가 표시되는 것은 정상입니다.</div>
           </div>
           <span class="step-icon">🚀</span>
         </div>
 
+      </div>
+
+      <!-- 얀덱스 보조 안내 -->
+      <div style="margin-top:24px;padding:14px 18px;background:#1a1030;border:1px solid #2d1f50;border-radius:12px;font-size:13px;color:#9ca3af;line-height:1.8;">
+        <strong style="color:#e9d5ff;display:block;margin-bottom:6px;">대안: Yandex Browser</strong>
+        Quetta가 작동하지 않을 경우 <strong style="color:#e9d5ff">Yandex Browser</strong>도 동일하게 Chrome 확장을 지원합니다.
+        Play 스토어에서 설치 후, 주소창에 <code style="color:#a78bfa">chromewebstore.google.com</code> 을 입력해
+        Chrome 웹 스토어에 접속하거나, 위 ZIP 방식으로 설치하세요.<br>
+        단, Yandex는 러시아 기업 제품이므로 개인정보에 민감한 경우 Quetta를 권장합니다.
       </div>
     </div>
 
