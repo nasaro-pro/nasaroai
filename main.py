@@ -1768,14 +1768,23 @@ def serve_install() -> FileResponse:
     return FileResponse(os.path.join(BASE_DIR, "install.html"))
 
 
+@app.get("/manifest.json")
+def serve_manifest() -> FileResponse:
+    path = os.path.join(BASE_DIR, "manifest.json")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="application/manifest+json")
+
+
 @app.get("/static/{filename}")
 def serve_static(filename: str) -> FileResponse:
     safe = os.path.basename(filename)
     path = os.path.join(BASE_DIR, "static", safe)
     if not os.path.isfile(path):
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
-    return FileResponse(path, filename=safe)
+    # ZIP 파일은 다운로드 헤더 포함
+    media = "application/zip" if safe.endswith(".zip") else "application/octet-stream"
+    return FileResponse(path, media_type=media, filename=safe)
 
 
 if __name__ == "__main__":
