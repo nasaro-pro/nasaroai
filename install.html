@@ -206,17 +206,87 @@
         <strong>iOS(아이폰)</strong>는 Apple 정책상 Chrome 확장 프로그램을 지원하지 않습니다. 아이폰에서는 에이전트 기능을 사용할 수 없습니다.
       </div>
 
-      <!-- 브라우저 선택 탭 -->
-      <div style="display:flex;gap:0;margin-bottom:24px;border:1px solid #2d1f50;border-radius:12px;overflow:hidden;">
-        <div style="flex:1;padding:12px;text-align:center;background:#7c3aed;font-size:13px;font-weight:800;color:#fff;">
-          Kiwi Browser <span style="font-size:11px;font-weight:400;opacity:.8;">(이미 설치됨)</span>
-        </div>
-        <div style="flex:1;padding:12px;text-align:center;background:#1a1030;font-size:13px;font-weight:700;color:#9ca3af;">
-          Quetta Browser <span style="font-size:11px;font-weight:400;">(신규 설치)</span>
-        </div>
+      <!-- ── Quetta (권장) ── -->
+      <div style="font-size:15px;font-weight:800;color:#e9d5ff;margin-bottom:16px;padding:10px 16px;background:#1e1030;border-left:4px solid #7c3aed;border-radius:0 10px 10px 0;">
+        방법 1 — Quetta Browser (권장 · Play Store 정상 배포 중)
       </div>
 
-      <!-- Kiwi 설치 방법 -->
+      <div class="steps">
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h3>Quetta Browser 설치</h3>
+            <p>Play 스토어에서 <strong>Quetta Browser</strong>를 검색해 설치하세요.</p>
+            <a href="https://play.google.com/store/apps/details?id=net.quetta.browser" target="_blank"
+               style="display:inline-block;margin-top:8px;padding:7px 14px;background:#7c3aed;color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;">
+              Play 스토어에서 설치 ↗
+            </a>
+          </div>
+          <span class="step-icon">📲</span>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h3>ZIP 파일 다운로드</h3>
+            <p>Quetta Browser로 이 페이지를 열고 위의 <strong>⬇️ 확장 프로그램 다운로드</strong> 버튼을 탭하세요.</p>
+          </div>
+          <span class="step-icon">📦</span>
+        </div>
+
+        <div class="step" style="border-color:#7c3aed;">
+          <div class="step-num" style="background:#5b21b6;">3</div>
+          <div class="step-body">
+            <h3>Settings → Extensions → Developer options</h3>
+            <p>Quetta 앱에서 <strong>⋮ 메뉴 → Settings → Extensions</strong>로 이동한 뒤,
+            페이지를 <strong>맨 아래까지 스크롤</strong>하면 <strong>"Developer options"</strong> 항목이 나타납니다.</p>
+            <div class="tip" style="background:#2d1f50;border-color:#7c3aed;color:#c4b5fd;">
+              Extensions 항목이 메뉴에 바로 없을 경우: ⋮ 메뉴 → Extensions (퍼즐 아이콘) → Manage Extensions → 아래로 스크롤
+            </div>
+          </div>
+          <span class="step-icon">🔧</span>
+        </div>
+
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <h3>Developer mode 켜기</h3>
+            <p>Developer options 안의 <strong>"Developer mode"</strong> 토글을 켜세요. (오른쪽 상단)</p>
+          </div>
+          <span class="step-icon">🛠️</span>
+        </div>
+
+        <div class="step">
+          <div class="step-num">5</div>
+          <div class="step-body">
+            <h3>ZIP으로 설치</h3>
+            <p>Developer mode를 켜면 <strong>"+ (from .zip/.crx/.user.js)"</strong> 버튼이 나타납니다.<br>
+            탭 → 파일 선택기에서 <strong>내 파일 → Downloads → arenax-extension.zip</strong> 선택.</p>
+          </div>
+          <span class="step-icon">📂</span>
+        </div>
+
+        <div class="step">
+          <div class="step-num">6</div>
+          <div class="step-body">
+            <h3>ArenaX에서 에이전트 활성화</h3>
+            <p>Quetta로 <a href="/" style="color:#a78bfa">ArenaX</a>를 열고 <strong>🌐 에이전트</strong> 버튼을 탭하세요.</p>
+            <div class="tip">에이전트 실행 중 상단에 디버거 배너가 표시되는 건 정상입니다.</div>
+          </div>
+          <span class="step-icon">🚀</span>
+        </div>
+
+      </div>
+
+      <!-- ── Kiwi (이미 있는 경우) ── -->
+      <div style="font-size:15px;font-weight:800;color:#e9d5ff;margin:36px 0 16px;padding:10px 16px;background:#1e1030;border-left:4px solid #4b5563;border-radius:0 10px 10px 0;">
+        방법 2 — Kiwi Browser (이미 설치된 경우만)
+      </div>
+      <div style="margin-bottom:16px;padding:12px 16px;background:#2d1505;border:1px solid #f97316;border-radius:10px;font-size:13px;color:#fed7aa;line-height:1.7;">
+        <strong style="color:#fb923c;">주의:</strong> Kiwi Browser는 2025년 1월 공식 종료돼 Play Store에서 삭제됐습니다. 이미 설치돼 있다면 아래 방법으로 사용 가능하지만, 보안 업데이트가 없으므로 Quetta를 권장합니다.
+      </div>
+
       <div class="steps">
 
         <div class="step">
@@ -231,22 +301,19 @@
         <div class="step">
           <div class="step-num">2</div>
           <div class="step-body">
-            <h3>확장 관리 페이지 열기</h3>
-            <p>우측 상단 <strong>⋮ (점 세 개)</strong> → <strong>"Extensions"</strong> 탭</p>
-            <div class="tip">또는 주소창에 <code>kiwi://extensions</code> 직접 입력</div>
+            <h3>Extensions 페이지 열기</h3>
+            <p>우측 상단 <strong>⋮</strong> → <strong>"Extensions"</strong></p>
+            <div class="tip">또는 주소창에 <code>kiwi://extensions</code> 입력</div>
           </div>
           <span class="step-icon">🔧</span>
         </div>
 
-        <div class="step" style="border-color:#7c3aed;">
-          <div class="step-num" style="background:#5b21b6;">3</div>
+        <div class="step">
+          <div class="step-num">3</div>
           <div class="step-body">
-            <h3>개발자 모드 켜기 — 오른쪽 상단 토글</h3>
-            <p>Extensions 페이지 <strong>오른쪽 상단 모서리</strong>에 작은 <strong>"Developer mode"</strong> 토글이 있습니다. 이걸 켜세요.</p>
-            <div class="tip" style="background:#2d1f50;border-color:#7c3aed;color:#c4b5fd;">
-              토글이 안 보이면 화면을 아래로 스크롤하거나 가로 방향으로 회전하면 보입니다.
-              켜져 있으면 그냥 넘어가세요.
-            </div>
+            <h3>Developer mode 켜기</h3>
+            <p>Extensions 페이지 <strong>오른쪽 상단 모서리</strong>의 <strong>"Developer mode"</strong> 토글을 켜세요.</p>
+            <div class="tip">토글이 안 보이면 화면을 가로(가로 방향)로 돌려보거나 아래로 스크롤하세요.</div>
           </div>
           <span class="step-icon">🛠️</span>
         </div>
@@ -255,9 +322,7 @@
           <div class="step-num">4</div>
           <div class="step-body">
             <h3>ZIP으로 설치</h3>
-            <p>Developer mode를 켜면 상단에 두 버튼이 나타납니다:<br>
-            <strong>"+ (from .zip/.crx/.user.js)"</strong> 를 탭하세요.</p>
-            <div class="tip">파일 선택기에서 <strong>내 파일 → Downloads → arenax-extension.zip</strong> 선택</div>
+            <p><strong>"+ (from .zip/.crx/.user.js)"</strong> 탭 → <strong>Downloads → arenax-extension.zip</strong> 선택.</p>
           </div>
           <span class="step-icon">📂</span>
         </div>
@@ -267,24 +332,10 @@
           <div class="step-body">
             <h3>ArenaX에서 에이전트 활성화</h3>
             <p>Kiwi로 <a href="/" style="color:#a78bfa">ArenaX</a>를 열고 <strong>🌐 에이전트</strong> 버튼을 탭하세요.</p>
-            <div class="tip">에이전트 실행 중 상단에 주황색 디버거 배너가 표시되는 건 정상입니다.</div>
           </div>
           <span class="step-icon">🚀</span>
         </div>
 
-      </div>
-
-      <!-- Quetta 대안 -->
-      <div style="margin-top:28px;padding:16px 20px;background:#1a1030;border:1px solid #2d1f50;border-radius:14px;">
-        <div style="font-size:14px;font-weight:800;color:#e9d5ff;margin-bottom:8px;">Kiwi가 없다면 — Quetta Browser</div>
-        <p style="font-size:13px;color:#9ca3af;line-height:1.8;margin-bottom:10px;">
-          Kiwi Browser는 2025년 1월 공식 종료돼 Play Store에서는 다운로드 불가입니다. 새로 설치해야 한다면
-          <strong style="color:#e9d5ff">Quetta Browser</strong>가 현재 가장 좋은 대체제입니다. 설치 방법은 동일합니다 (메뉴 → Extensions → Developer mode → ZIP 설치).
-        </p>
-        <a href="https://play.google.com/store/apps/details?id=net.quetta.browser" target="_blank"
-           style="display:inline-block;padding:8px 16px;background:#4b1d96;color:#c4b5fd;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #7c3aed;">
-          Play 스토어에서 Quetta 설치 ↗
-        </a>
       </div>
     </div>
 
