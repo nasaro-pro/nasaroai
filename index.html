@@ -2821,11 +2821,9 @@
             const pW = Math.min(460, W - 32);
             const pH = Math.min(Math.floor(H * 0.72), 640);
 
-            // 런처 왼쪽 배치 시도 → 부족하면 오른쪽
-            let left = r.left - pW - 12;
-            if (left < 8) left = r.right + 12;
-            // 여전히 화면 밖이면 오른쪽 가장자리에 정렬
-            if (left + pW > W - 8) left = W - pW - 8;
+            // 런처 오른쪽 배치 시도 → 화면 밖이면 왼쪽
+            let left = r.right + 12;
+            if (left + pW > W - 8) left = r.left - pW - 12;
             if (left < 8) left = 8;
 
             // 수직: 런처 하단 기준으로 패널 하단 맞춤
@@ -3207,6 +3205,11 @@
             if (agentActive) {
                 if (agentPanel?.style.display === "none") openAgentPanel();
                 else closeAgentPanel();
+                return;
+            }
+            // 모바일이고 앱이 아니면 → 설치 팝업 (앱 없이는 에이전트 사용 불가)
+            if (isMobileDevice && !isAppSource) {
+                openAndroidInstallModal();
                 return;
             }
             setAgentActive(true);

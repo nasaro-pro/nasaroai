@@ -364,10 +364,9 @@
     const bW = Math.min(440, W - 32);
     const bH = Math.min(Math.floor(H * 0.72), 620);
 
-    // 런처 왼쪽 시도 → 공간 부족하면 오른쪽
-    let left = lRect.left - bW - 12;
-    if (left < 8) left = lRect.right + 12;
-    if (left + bW > W - 8) left = W - bW - 8;
+    // 런처 오른쪽 시도 → 화면 밖이면 왼쪽
+    let left = lRect.right + 12;
+    if (left + bW > W - 8) left = lRect.left - bW - 12;
     if (left < 8) left = 8;
 
     // 수직: 런처 하단 기준 패널 하단 맞춤
@@ -718,7 +717,11 @@
       initialized = true;
       applyEnabled(!!s.agentEnabled);
       // barOpen: 에이전트가 켜져 있고 바가 열린 상태였으면 복원
-      if (!!s.agentEnabled && s.barOpen === true) { bar.hidden = false; render(); }
+      if (!!s.agentEnabled && s.barOpen === true) {
+        bar.hidden = false;
+        // 새 페이지에서도 런처 옆에 패널 배치 (position:fixed이므로 rAF 후 계산)
+        requestAnimationFrame(() => { applyBarPos(); render(); });
+      }
     })
     .catch(() => {});
 })();
