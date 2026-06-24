@@ -817,13 +817,9 @@
             transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 사이드바가 펼쳐지면 하단 입력창과 에이전트 패널도 함께 밀린다. */
+        /* 사이드바가 펼쳐지면 하단 입력창 함께 밀림 (에이전트 패널은 우측 고정이라 제외) */
         @media (min-width: 768px) {
             .app.sidebar-open .input-dock {
-                left: 280px;
-            }
-
-            .app.sidebar-open .agent-panel {
                 left: 280px;
             }
         }
@@ -979,29 +975,27 @@
         .agent-panel {
             display: none;
             position: fixed;
-            right: 16px;
-            bottom: calc(var(--input-dock-height, 120px) + 12px);
+            right: 0;
+            bottom: var(--input-dock-height, 120px);
             z-index: 230;
-            width: min(420px, calc(100vw - 32px));
-            height: min(62dvh, 540px);
+            width: min(400px, 100vw);
+            height: min(60dvh, 520px);
             background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(16px);
+            backdrop-filter: blur(14px);
             border: 1px solid #e5e7eb;
-            border-radius: 18px;
-            box-shadow: 0 8px 40px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(124,58,237,.1);
+            border-bottom: none;
+            border-radius: 18px 0 0 0;
+            box-shadow: -4px -4px 28px rgba(15, 23, 42, 0.12);
             overflow: hidden;
             flex-direction: column;
         }
 
-        /* 모바일: 전체 너비 바텀 시트 */
+        /* 모바일: 전체 너비 */
         @media (max-width: 500px) {
             .agent-panel {
                 left: 0;
-                right: 0;
-                bottom: var(--input-dock-height, 120px);
                 width: 100%;
                 border-radius: 18px 18px 0 0;
-                height: min(58dvh, 460px);
             }
         }
 
@@ -1292,33 +1286,35 @@
 
         .agent-input-row {
             display: flex;
+            flex-direction: column;
             gap: 8px;
-            padding: 12px 16px;
-            border-top: 1px solid #f3f4f6;
-            background: rgba(249, 250, 251, 0.9);
+            padding: 10px 14px 14px;
+            padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+            border-top: 1px solid #e5e7eb;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(8px);
             flex-shrink: 0;
         }
 
         .agent-input {
-            flex: 1;
+            width: 100%;
             resize: none;
             overflow: hidden;
-            min-height: 38px;
-            max-height: 120px;
-            padding: 9px 12px;
+            min-height: 44px;
+            max-height: 130px;
+            padding: 12px 14px;
             border: 1px solid #d1d5db;
-            border-radius: 10px;
-            font-size: 14px;
+            border-radius: 12px;
+            font: inherit;
+            font-size: 15px;
             line-height: 1.5;
-            font-family: inherit;
             color: #111827;
             background: #fff;
         }
 
         .agent-input:focus {
-            outline: none;
-            border-color: #7c3aed;
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+            outline: 2px solid #bfdbfe;
+            border-color: #3b82f6;
         }
 
         .agent-input:disabled {
@@ -1326,34 +1322,32 @@
             color: #9ca3af;
         }
 
+        .agent-input-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
         .agent-send-btn {
-            align-self: flex-end;
             flex: 0 0 auto;
             border: 0;
-            background: #7c3aed;
+            background: linear-gradient(135deg, #3b82f6, #7c3aed);
             color: #fff;
+            font: inherit;
             font-size: 14px;
             font-weight: 700;
-            padding: 0 18px;
+            padding: 0 22px;
             height: 38px;
             border-radius: 10px;
             cursor: pointer;
         }
 
         .agent-send-btn:hover {
-            background: #6d28d9;
+            opacity: 0.9;
         }
 
         .agent-send-btn:disabled {
-            background: #c4b5fd;
+            opacity: 0.5;
             cursor: not-allowed;
-        }
-
-        @media (max-width: 640px) {
-            .agent-panel {
-                max-height: 50dvh;
-                border-radius: 14px 14px 0 0;
-            }
         }
 
         /* ── 모바일 설정 패널: 위로 팝업 ── */
@@ -2148,15 +2142,7 @@
             </div>
         </div>
 
-        <!-- 에이전트 플로팅 런처 (에이전트 ON 시 표시, 패널 닫아도 유지) -->
-        <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 패널 열기" aria-label="에이전트 열기">
-            <div class="ax-logo">
-                <span class="ax-logo-text">AX</span>
-                <span class="ax-logo-sub">Agent</span>
-            </div>
-        </button>
-
-        <!-- 에이전트 패널 (우측 플로팅, 임무 카드형) -->
+        <!-- 에이전트 패널 (우측 하단 도킹, 임무 카드형) -->
         <div id="agentPanel" class="agent-panel" aria-label="ArenaX 에이전트">
             <div class="agent-panel-header">
                 <span class="agent-panel-title">🌐 ArenaX 에이전트</span>
@@ -2169,7 +2155,9 @@
             </div>
             <div class="agent-input-row">
                 <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
-                <button id="agentSendBtn" class="agent-send-btn" type="button">실행</button>
+                <div class="agent-input-actions">
+                    <button id="agentSendBtn" class="agent-send-btn" type="button">실행 ▶</button>
+                </div>
             </div>
         </div>
 
@@ -2682,31 +2670,38 @@
 
         const extInstallBanner = document.getElementById("extInstallBanner");
 
-        // ── 확장/앱 감지 → 배너 표시 ─────────────────────────────────────────
-        let arenaxExtReady = isAppSource;
+        // ── 확장/앱 감지 → 배너 표시 (PC 데스크톱 전용) ──────────────────────
+        const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent);
+        let arenaxExtReady = isAppSource || isMobileDevice; // 모바일은 항상 "준비됨" 처리
         function setExtReady(ready) {
             arenaxExtReady = ready;
             if (!extInstallBanner) return;
-            extInstallBanner.style.display = (ready || isAppSource) ? "none" : "flex";
+            // 배너는 PC에서 확장 미설치일 때만 표시
+            const showBanner = !ready && !isAppSource && !isMobileDevice;
+            extInstallBanner.style.display = showBanner ? "flex" : "none";
         }
-        window.addEventListener("message", (e) => {
-            if (e.source !== window) return;
-            const d = e.data;
-            if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
-        });
-        window.postMessage({ __arenax: "agent", type: "PING" }, "*");
-        setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
-        if (isAppSource && extInstallBanner) extInstallBanner.style.display = "none";
+        // 모바일·앱 환경에서는 배너 즉시 숨김
+        if (isMobileDevice || isAppSource) {
+            if (extInstallBanner) extInstallBanner.style.display = "none";
+        } else {
+            // PC: 확장 PING 확인
+            window.addEventListener("message", (e) => {
+                if (e.source !== window) return;
+                const d = e.data;
+                if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
+            });
+            window.postMessage({ __arenax: "agent", type: "PING" }, "*");
+            setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
+        }
 
         // ── 에이전트 패널 (임무 카드형) ─────────────────────────────────────
-        const agentPanel         = document.getElementById("agentPanel");
-        const agentHistory       = document.getElementById("agentHistory");
-        const agentStatusBar     = document.getElementById("agentStatusBar");
-        const agentInputEl       = document.getElementById("agentInput");
-        const agentSendBtn       = document.getElementById("agentSendBtn");
-        const agentPanelEndBtn   = document.getElementById("agentPanelEndBtn");
-        const agentMinBtn        = document.getElementById("agentMinBtn");
-        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
+        const agentPanel       = document.getElementById("agentPanel");
+        const agentHistory     = document.getElementById("agentHistory");
+        const agentStatusBar   = document.getElementById("agentStatusBar");
+        const agentInputEl     = document.getElementById("agentInput");
+        const agentSendBtn     = document.getElementById("agentSendBtn");
+        const agentPanelEndBtn = document.getElementById("agentPanelEndBtn");
+        const agentMinBtn      = document.getElementById("agentMinBtn");
 
         let agentActive   = false;
         let agentInFlight = false;
@@ -2724,14 +2719,12 @@
             if (!agentPanel) return;
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
-            if (agentFloatLauncher) agentFloatLauncher.classList.remove("visible");
             setTimeout(() => agentInputEl?.focus(), 100);
         }
 
         function closeAgentPanel() {
             if (!agentPanel) return;
             agentPanel.style.display = "none";
-            if (agentActive && agentFloatLauncher) agentFloatLauncher.classList.add("visible");
         }
 
         function toggleMinimize() {
@@ -2753,9 +2746,7 @@
             if (active) {
                 openAgentPanel();
             } else {
-                // 종료: 패널·런처 숨기고 내용 초기화
-                if (agentPanel) agentPanel.style.display = "none";
-                if (agentFloatLauncher) agentFloatLauncher.classList.remove("visible");
+                closeAgentPanel();
                 currentMission = "";
                 if (agentHistory) {
                     agentHistory.innerHTML =
@@ -2891,55 +2882,10 @@
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); agentSendBtn?.click(); }
         });
 
-        // 런처 버튼: 패널 열기
-        agentFloatLauncher?.addEventListener("click", () => {
-            if (!agentActive) return;
-            openAgentPanel();
-        });
-
-        // ── 런처 드래그 ────────────────────────────────────────────────────────
-        (function draggableLauncher(el) {
-            if (!el) return;
-            let active = false, moved = false, ox = 0, oy = 0, startR = 0, startB = 0;
-            const getXY = (e) => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-            const onStart = (e) => {
-                const [cx, cy] = getXY(e);
-                ox = cx; oy = cy;
-                const r = el.getBoundingClientRect();
-                startR = window.innerWidth - r.right;
-                startB = window.innerHeight - r.bottom;
-                active = true; moved = false;
-                el.style.transition = "box-shadow .15s";
-            };
-            const onMove = (e) => {
-                if (!active) return;
-                const [cx, cy] = getXY(e);
-                const dx = cx - ox, dy = cy - oy;
-                if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-                if (!moved) return;
-                if (e.cancelable) e.preventDefault();
-                el.style.right  = Math.max(8, Math.min(window.innerWidth  - 62, startR - dx)) + "px";
-                el.style.bottom = Math.max(8, Math.min(window.innerHeight - 62, startB - dy)) + "px";
-            };
-            const onEnd = () => {
-                el.style.transition = "transform .2s, box-shadow .2s";
-                if (moved) el.addEventListener("click", e => { e.stopPropagation(); e.preventDefault(); }, { once: true, capture: true });
-                active = false;
-            };
-            el.addEventListener("mousedown",  onStart);
-            el.addEventListener("touchstart", onStart, { passive: true });
-            window.addEventListener("mousemove",  onMove);
-            window.addEventListener("touchmove",  onMove, { passive: false });
-            window.addEventListener("mouseup",   onEnd);
-            window.addEventListener("touchend",  onEnd);
-        })(agentFloatLauncher);
-
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
-        const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent);
-
         agentToggleBtn.addEventListener("click", () => {
-            // 이미 활성화된 경우 → 패널 토글
             if (agentActive) {
+                // 이미 켜진 상태 → 패널 토글
                 if (agentPanel?.style.display === "none") {
                     openAgentPanel();
                 } else {
@@ -2947,20 +2893,7 @@
                 }
                 return;
             }
-
-            // 모바일 + 앱 아님 → 앱 설치 팝업
-            if (isMobileDevice && !isAppSource) {
-                openAndroidInstallModal();
-                return;
-            }
-
-            // PC + 확장 없음 → 설치 페이지
-            if (!isMobileDevice && !arenaxExtReady) {
-                window.open("/install", "_blank");
-                return;
-            }
-
-            // 앱 내부 or 확장 설치됨 → 에이전트 켜기
+            // 에이전트는 서버사이드 → 누구든 패널 열기
             setAgentActive(true);
         });
 
