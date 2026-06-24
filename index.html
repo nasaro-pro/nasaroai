@@ -975,27 +975,31 @@
         .agent-panel {
             display: none;
             position: fixed;
+            /* 위치는 positionPanelNearLauncher() 로 JS에서 동적 설정 */
             right: 0;
             bottom: var(--input-dock-height, 120px);
             z-index: 230;
-            width: min(460px, 100vw);
+            width: min(460px, calc(100vw - 16px));
             height: min(72dvh, 640px);
             background: rgba(255, 255, 255, 0.99);
             backdrop-filter: blur(14px);
             border: 1px solid #e5e7eb;
-            border-bottom: none;
-            border-radius: 18px 0 0 0;
-            box-shadow: -6px -4px 32px rgba(15, 23, 42, 0.14);
+            border-radius: 18px;
+            box-shadow: 0 8px 40px rgba(15, 23, 42, 0.18);
             overflow: hidden;
             flex-direction: column;
         }
 
-        /* 모바일: 전체 너비 */
+        /* 모바일: 전체 너비 바텀 시트 */
         @media (max-width: 520px) {
             .agent-panel {
-                left: 0;
-                width: 100%;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: var(--input-dock-height, 120px) !important;
+                top: auto !important;
+                width: 100% !important;
                 border-radius: 18px 18px 0 0;
+                height: min(65dvh, 560px);
             }
         }
 
@@ -2799,9 +2803,47 @@
         function showLauncher() { agentFloatLauncher?.classList.add("visible"); }
         function hideLauncher() { agentFloatLauncher?.classList.remove("visible"); }
 
+        // ── 패널을 런처 근처에 배치 ───────────────────────────────────────────
+        function positionPanelNearLauncher() {
+            if (!agentPanel || !agentFloatLauncher) return;
+            // 모바일: CSS @media가 처리하므로 JS 재정의 불필요
+            if (window.innerWidth <= 520) {
+                agentPanel.style.removeProperty("left");
+                agentPanel.style.removeProperty("top");
+                agentPanel.style.right  = "";
+                agentPanel.style.bottom = "";
+                return;
+            }
+
+            const r  = agentFloatLauncher.getBoundingClientRect();
+            const W  = window.innerWidth;
+            const H  = window.innerHeight;
+            const pW = Math.min(460, W - 32);
+            const pH = Math.min(Math.floor(H * 0.72), 640);
+
+            // 런처 왼쪽 배치 시도 → 부족하면 오른쪽
+            let left = r.left - pW - 12;
+            if (left < 8) left = r.right + 12;
+            // 여전히 화면 밖이면 오른쪽 가장자리에 정렬
+            if (left + pW > W - 8) left = W - pW - 8;
+            if (left < 8) left = 8;
+
+            // 수직: 런처 하단 기준으로 패널 하단 맞춤
+            let top = r.bottom - pH;
+            if (top < 8) top = 8;
+            if (top + pH > H - 8) top = H - pH - 8;
+
+            agentPanel.style.left   = left + "px";
+            agentPanel.style.top    = top  + "px";
+            agentPanel.style.right  = "auto";
+            agentPanel.style.bottom = "auto";
+            agentPanel.style.width  = pW + "px";
+        }
+
         // ── 패널 열기 / 닫기 / 최소화 ─────────────────────────────────────────
         function openAgentPanel() {
             if (!agentPanel) return;
+            positionPanelNearLauncher();        // 런처 옆에 위치 설정 먼저
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
             hideLauncher();
@@ -3139,6 +3181,8 @@
                 if (e.cancelable) e.preventDefault();
                 el.style.right  = Math.max(8, Math.min(window.innerWidth  - 62, startR - dx)) + "px";
                 el.style.bottom = Math.max(8, Math.min(window.innerHeight - 62, startB - dy)) + "px";
+                // 패널이 열려있으면 런처 위치에 맞게 패널도 이동
+                if (agentPanel?.style.display !== "none") positionPanelNearLauncher();
             };
             const onEnd = () => {
                 el.style.transition = "transform .2s, box-shadow .2s";
@@ -3152,6 +3196,11 @@
             window.addEventListener("mouseup",  onEnd);
             window.addEventListener("touchend", onEnd);
         })(agentFloatLauncher);
+
+        // 창 크기 변경 시 패널 재배치
+        window.addEventListener("resize", () => {
+            if (agentPanel?.style.display !== "none") positionPanelNearLauncher();
+        });
 
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
