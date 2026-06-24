@@ -1853,33 +1853,6 @@
             </section>
         </main>
 
-        <!-- 확장 미설치 시 설치 안내 배너 -->
-        <div id="extInstallBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
-            background:linear-gradient(135deg,#1e1b4b,#312e81);border-top:1px solid #4c1d95;
-            padding:14px 20px;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:220px;">
-                <span style="font-size:22px;background:#7c3aed;width:36px;height:36px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;">⚡</span>
-                <div>
-                    <div style="color:#e9d5ff;font-weight:700;font-size:14px;">ArenaX 에이전트 미설치</div>
-                    <div style="color:#a78bfa;font-size:12px;margin-top:2px;">에이전트를 사용하려면 확장 프로그램(PC) 또는 앱(Android)이 필요합니다.</div>
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a href="/install" target="_blank"
-                    style="background:#7c3aed;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;">
-                    💻 PC · Chrome 설치
-                </a>
-                <button onclick="openAndroidInstallModal()"
-                    style="background:#059669;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;border:none;cursor:pointer;">
-                    📱 Android 설치
-                </button>
-                <button onclick="document.getElementById('extInstallBanner').style.display='none';"
-                    style="background:transparent;border:1px solid #6b7280;color:#9ca3af;padding:9px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">
-                    닫기
-                </button>
-            </div>
-        </div>
-
         <!-- Android APK 설치 안내 모달 -->
         <div id="androidInstallModal" class="install-modal-overlay" onclick="if(event.target===this)closeAndroidInstallModal()">
             <div class="install-modal">
@@ -1954,11 +1927,11 @@
             </div>
         </div>
 
-        <!-- 에이전트 플로팅 런처 버튼 (에이전트 ON 시 표시) -->
+        <!-- 에이전트 플로팅 런처 버튼 (에이전트 ON 시 표시, 종료 전까지 항상 떠있음) -->
         <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 질문창 열기" aria-label="에이전트 열기">
             <div class="ax-logo">
                 <span class="ax-logo-text">AX</span>
-                <span class="ax-logo-sub">Agent</span>
+                <span class="ax-logo-sub">Arena</span>
             </div>
         </button>
 
@@ -2464,7 +2437,7 @@
             // download attribute가 직접 처리하므로 추가 작업 없음
         });
 
-        // ── APK 앱 / ?source=app 감지 ─────────────────────────────────────────
+        // ── APK 앱 / ?source=app 감지 (앱 열면 바로 사이트 표시) ───────────────
         const isAppSource = (() => {
             const fromUrl = new URLSearchParams(window.location.search).get("source") === "app";
             const fromUA  = navigator.userAgent.includes("ArenaXApp");
@@ -2472,15 +2445,11 @@
             return fromUrl || fromUA || localStorage.getItem("arenax_is_app") === "1";
         })();
 
-        const extInstallBanner   = document.getElementById("extInstallBanner");
         const agentFloatLauncher = document.getElementById("agentFloatLauncher");
         const agentChatWindow    = document.getElementById("agentChatWindow");
         const acwMessages        = document.getElementById("acwMessages");
         const acwInput           = document.getElementById("acwInput");
         const acwSendBtn         = document.getElementById("acwSendBtn");
-
-        // 앱/확장 감지 상태 (배너 표시용만 사용)
-        let arenaxExtReady = isAppSource;
 
         // ── 에이전트 상태 (에이전트 ON/OFF) ──────────────────────────────────
         let agentActive = false;
@@ -2489,28 +2458,28 @@
         const AGENT_CHAT_KEY = "arenax_agent_chat_" + getDeviceId();
         let agentChatLog = []; // { role, content }[]
 
+        // 에이전트 ON 여부에 따라 런처 버튼 표시. 켜져 있으면 채팅창을 닫아도
+        // (창을 나가도) 런처는 '에이전트 종료' 전까지 계속 떠있는다.
         function setAgentActive(active) {
             agentActive = active;
             agentToggleBtn.classList.toggle("active", active);
             agentToggleBtn.textContent = active ? "● 에이전트" : "🌐 에이전트";
             if (agentFloatLauncher) agentFloatLauncher.classList.toggle("visible", active);
-            if (!active) {
-                closeAgentChat();
-                // 배너는 앱 소스가 아닌 경우에만 노출
-                if (!isAppSource && !arenaxExtReady && extInstallBanner) {
-                    extInstallBanner.style.display = "flex";
-                }
-            }
+            if (!active) closeAgentChat();
         }
 
-        // 에이전트 채팅창 열기 / 닫기
+        // 에이전트 채팅창 열기 / 닫기 (닫아도 런처는 유지됨)
         function openAgentChat() {
             if (!agentChatWindow) return;
             agentChatWindow.classList.add("open");
+            // 채팅창을 열어도 런처는 계속 떠있도록 유지
+            if (agentActive && agentFloatLauncher) agentFloatLauncher.classList.add("visible");
             setTimeout(() => acwInput?.focus(), 200);
         }
         function closeAgentChat() {
             agentChatWindow?.classList.remove("open");
+            // 창을 나가도 에이전트가 켜져 있으면 런처 유지
+            if (agentActive && agentFloatLauncher) agentFloatLauncher.classList.add("visible");
         }
 
         // ── 에이전트 채팅 메시지 렌더 ─────────────────────────────────────────
@@ -2644,25 +2613,8 @@
             openAgentChat();
         });
 
-        // ── 확장 프로그램 감지 (배너 표시용) ─────────────────────────────────
-        function setExtReady(ready) {
-            arenaxExtReady = ready;
-            if (ready) {
-                if (extInstallBanner) extInstallBanner.style.display = "none";
-            } else if (!isAppSource) {
-                if (extInstallBanner) extInstallBanner.style.display = "flex";
-            }
-        }
-        window.addEventListener("message", (event) => {
-            if (event.source !== window) return;
-            const d = event.data;
-            if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
-        });
-        window.postMessage({ __arenax: "agent", type: "PING" }, "*");
-        setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
-
-        // 앱 소스이면 배너 숨김
-        if (isAppSource && extInstallBanner) extInstallBanner.style.display = "none";
+        // 설치 배너 제거됨: 앱/사이트를 열면 곧바로 사이트가 표시되고,
+        // 에이전트는 '에이전트' 버튼을 눌렀을 때만 런처와 채팅창이 생성된다.
 
         dockPrimaryBtn.addEventListener("click", () => {
             if (currentMode === "compare") handleCompare();
