@@ -1119,6 +1119,19 @@
 
         .agent-card-action-btn.resume:hover { background: #dcfce7; }
 
+        /* 추가 임무 섹션 */
+        .agent-card-extra {
+            border-top: 2px dashed #e5e7eb;
+            margin-top: 4px;
+        }
+
+        .agent-card-extra-title {
+            padding: 8px 14px 4px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #6d28d9;
+        }
+
         .agent-status-bar {
             padding: 10px 16px;
             font-size: 14px;
@@ -2933,8 +2946,15 @@
             });
             actionsEl.querySelector(".continue")?.addEventListener("click", () => {
                 if (agentInFlight) return;
-                if (agentInputEl) { agentInputEl.value = ""; agentInputEl.placeholder = `"${mission.slice(0,20)}…" 다음 임무`; agentInputEl.focus(); }
+                // 추가 임무: 입력창에 포커스하고 제출 시 이 카드(cardRefs)에 붙임
+                if (agentInputEl) {
+                    agentInputEl.value = "";
+                    agentInputEl.placeholder = `"${mission.slice(0,20)}…" 다음 임무를 입력하세요`;
+                    agentInputEl.focus();
+                }
                 if (agentPanel?.classList.contains("minimized")) toggleMinimize();
+                // 전송 시 기존 카드에 추가하도록 표시
+                agentSendBtn._appendToCard = { card, badge: cardRefs.badge, progressEl: cardRefs.progressEl, bodyEl: cardRefs.bodyEl, metaEl: cardRefs.metaEl, actionsEl: cardRefs.actionsEl, stepInterval: null };
             });
             actionsEl.querySelector(".resume")?.addEventListener("click", () => {
                 if (agentInFlight) return;
@@ -2942,35 +2962,65 @@
             });
         }
 
-        // ── 임무 실행 ─────────────────────────────────────────────────────────
-        async function runAgentMission(mission, isModify) {
+        // ── 이전 임무 기록 (추가 임무 컨텍스트용) ────────────────────────────
+        const agentMissionHistory = []; // [{mission, result}]
+
+        // ── 임무 실행 (task → ask 폴백) ────────────────────────────────────────
+        async function runAgentMission(mission, isModify, appendToCard) {
+            // appendToCard: 기존 카드에 추가 임무로 붙이는 경우의 cardRefs
             if (!mission || agentInFlight) return;
             currentMission = mission;
             agentInFlight  = true;
             agentAbortCtrl = new AbortController();
             if (agentSendBtn) { agentSendBtn.disabled = true; agentSendBtn.textContent = "실행 중…"; }
 
-            const cardTitle = (isModify ? "[수정] " : "") + mission;
-            setAgentStatus("loading", (isModify ? "수정 중: " : "실행 중: ") + mission);
-            const cardRefs = appendAgentCard(cardTitle);
+            let cardRefs;
+            if (appendToCard) {
+                // 기존 카드에 추가 임무 섹션 삽입
+                cardRefs = appendMissionToCard(appendToCard, mission);
+            } else {
+                const cardTitle = (isModify ? "[수정] " : "") + mission;
+                setAgentStatus("loading", (isModify ? "수정 중: " : "실행 중: ") + mission);
+                cardRefs = appendAgentCard(cardTitle);
+            }
 
-            // 카드의 중단 버튼 연결
+            // 중단 버튼
             cardRefs.actionsEl.querySelector(".stop")?.addEventListener("click", () => {
                 if (agentAbortCtrl) { agentAbortCtrl.abort(); agentAbortCtrl = null; }
             });
 
             const startTime = Date.now();
-            try {
-                const res = await fetch(`${API_URL}/agent/task`, {
+            let usedFallback = false;
+
+            const doFetch = async (endpoint, body) => {
+                return fetch(`${API_URL}${endpoint}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query: mission }),
+                    body: JSON.stringify(body),
                     signal: agentAbortCtrl?.signal,
                 });
+            };
+
+            try {
+                // 1차: 브라우저 자동화 시도
+                let res = await doFetch("/agent/task", { query: mission });
+
+                // 브라우저 오류(503) → LLM 폴백
+                if (res.status === 503) {
+                    usedFallback = true;
+                    const recentHistory = agentMissionHistory.slice(-3);
+                    res = await doFetch("/agent/ask", { query: mission, history: recentHistory });
+                }
+
                 const data = await res.json();
                 if (!res.ok || data.status === "error") throw new Error(data.message || `서버 오류 (${res.status})`);
+
                 const content = data.result || data.response || data.message || "(결과 없음)";
-                finalizeCard(cardRefs, "ok", content, mission, Date.now() - startTime);
+                const suffix  = usedFallback ? "\n\n⚠️ [브라우저 없이 LLM으로 실행됨]" : "";
+                finalizeCard(cardRefs, "ok", content + suffix, mission, Date.now() - startTime);
+
+                // 기록 추가
+                agentMissionHistory.push({ mission, result: content.slice(0, 300) });
 
             } catch (err) {
                 const elapsed = Date.now() - startTime;
@@ -2986,6 +3036,54 @@
             }
         }
 
+        // ── 기존 카드에 추가 임무 섹션 삽입 ──────────────────────────────────
+        function appendMissionToCard(existingCardRefs, mission) {
+            const { card } = existingCardRefs;
+
+            // 구분선 + 새 임무 섹션
+            const section = document.createElement("div");
+            section.className = "agent-card-extra";
+            section.innerHTML = `
+                <div class="agent-card-extra-title">➕ 추가 임무: ${mission}</div>
+                <div class="agent-card-progress">${PROGRESS_STEPS.map((s, i) =>
+                    `<div class="agent-progress-step${i===0?" active":""}" data-step="${i}">${s}</div>`
+                ).join("")}</div>
+                <div class="agent-card-body extra-body" style="display:none;"></div>
+                <div class="agent-card-meta extra-meta" style="display:none;"></div>
+                <div class="agent-card-actions extra-actions">
+                    <button class="agent-card-action-btn stop" type="button">⏹ 중단</button>
+                </div>`;
+
+            // 기존 actionsEl 앞에 삽입
+            const oldActions = card.querySelector(".agent-card-actions");
+            oldActions.style.display = "none"; // 기존 버튼 숨김
+            card.insertBefore(section, oldActions);
+            agentHistory.scrollTop = agentHistory.scrollHeight;
+
+            const progressEl = section.querySelector(".agent-card-progress");
+            const bodyEl     = section.querySelector(".extra-body");
+            const metaEl     = section.querySelector(".extra-meta");
+            const actionsEl  = section.querySelector(".extra-actions");
+            const badge      = card.querySelector(".agent-card-badge");
+
+            // 진행 스텝 애니메이션 재시작
+            let stepIdx = 0;
+            const stepInterval = setInterval(() => {
+                stepIdx = Math.min(stepIdx + 1, PROGRESS_STEPS.length - 1);
+                progressEl.querySelectorAll(".agent-progress-step").forEach((el, i) => {
+                    el.className = "agent-progress-step" +
+                        (i < stepIdx ? " done" : i === stepIdx ? " active" : "");
+                });
+                agentHistory.scrollTop = agentHistory.scrollHeight;
+            }, 1800);
+
+            badge.textContent = "실행 중";
+            badge.className   = "agent-card-badge loading";
+            setAgentStatus("loading", "추가 임무 실행 중: " + mission);
+
+            return { card, badge, progressEl, bodyEl, metaEl, actionsEl, stepInterval };
+        }
+
         // ── 패널 이벤트 ────────────────────────────────────────────────────────
         agentMinBtn?.addEventListener("click", () => {
             // 내리기: 패널 닫고 런처 표시
@@ -2996,13 +3094,15 @@
         agentSendBtn?.addEventListener("click", () => {
             const val = agentInputEl?.value.trim();
             if (!val) return;
-            const isModify = !!agentSendBtn._nextIsModify;
+            const isModify    = !!agentSendBtn._nextIsModify;
+            const appendTo    = agentSendBtn._appendToCard || null;
             agentSendBtn._nextIsModify = false;
+            agentSendBtn._appendToCard = null;
             agentSendBtn.textContent = "실행 ▶";
             agentInputEl.value = "";
             agentInputEl.placeholder = "에이전트에게 임무를 지시하세요…";
             autoResizeTA(agentInputEl);
-            runAgentMission(val, isModify);
+            runAgentMission(val, isModify, appendTo);
         });
 
         agentInputEl?.addEventListener("input",   () => autoResizeTA(agentInputEl));

@@ -247,6 +247,11 @@ class AgentRequest(BaseModel):
     query: str
 
 
+class AgentAskRequest(BaseModel):
+    query: str
+    history: list[dict] = Field(default_factory=list)  # [{mission, result}, ...]
+
+
 # /agent/step (확장 기반 무상태 두뇌)용 요청 모델.
 # [보안] elements에는 비밀번호/카드번호 등 민감 입력값이 들어오면 안 된다.
 # 확장(background.js)의 스캔이 input[type="password"] 값은 수집하지 않고
@@ -1755,6 +1760,81 @@ async def agent_task(request: AgentRequest):
                 status_code=500,
                 content={"status": "error", "message": "브라우저 에이전트 작업 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."},
             )
+
+
+@app.post("/agent/ask")
+async def agent_ask(request: AgentAskRequest):
+    """브라우저 없이 순수 LLM으로 임무를 수행한다.
+    /agent/task(Playwright)가 실패할 때의 폴백이자, 단순 분석/답변 임무에 사용."""
+    query = request.query.strip()
+    if not query:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "임무를 입력해주세요."},
+        )
+
+    await ensure_model_cache_fresh()
+    models = _resolve_agent_models()
+    headers = build_openrouter_headers()
+
+    # 이전 임무 기록을 컨텍스트로 추가
+    history_ctx = ""
+    for item in (request.history or [])[-3:]:
+        m = item.get("mission", "").strip()
+        r = item.get("result", "").strip()
+        if m and r:
+            history_ctx += f"\n[이전 임무] {m}\n[결과 요약] {r[:300]}\n"
+
+    system_prompt = (
+        "당신은 ArenaX AI 에이전트입니다. 사용자가 지시한 임무를 분석하고 "
+        "최선의 결과를 한국어로 제공합니다. "
+        "웹 자동화가 필요한 임무는 일반 지식과 추론으로 최대한 지원하고, "
+        "다음에 취해야 할 행동이나 확인 방법을 구체적으로 안내합니다."
+    )
+    user_msg = (
+        f"{history_ctx}\n[현재 임무]\n{query}" if history_ctx
+        else f"[임무]\n{query}"
+    )
+
+    last_err = "AI 응답을 받지 못했습니다."
+    for model in models[:5]:
+        try:
+            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                resp = await client.post(
+                    OPENROUTER_CHAT_URL,
+                    headers=headers,
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user",   "content": user_msg},
+                        ],
+                        "max_tokens": 1200,
+                    },
+                )
+            if resp.status_code == 429:
+                last_err = "요청 한도 초과. 잠시 후 다시 시도해주세요."
+                continue
+            if resp.status_code != 200:
+                last_err = f"AI 서버 오류 ({resp.status_code})"
+                continue
+            data = resp.json()
+            result = (
+                data.get("choices", [{}])[0]
+                .get("message", {})
+                .get("content", "")
+                .strip()
+            )
+            if result:
+                return {"status": "success", "result": result, "mode": "llm"}
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "message": last_err},
+    )
 
 
 @app.get("/")
