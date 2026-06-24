@@ -1678,6 +1678,59 @@
             0%, 100% { opacity: 1; }
             50%       { opacity: .45; }
         }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: .5; }
+        }
+
+        @keyframes toastSlideIn {
+            from { transform: translateX(calc(100% + 20px)); opacity: 0; }
+            to   { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes toastFadeOut {
+            from { opacity: 1; }
+            to   { opacity: 0; transform: translateY(8px); }
+        }
+
+        /* ── 토스트 알림 ── */
+        .ax-toast {
+            position: fixed;
+            bottom: 88px;
+            right: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .ax-toast-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            min-width: 220px;
+            max-width: 320px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.45;
+            box-shadow: 0 4px 18px rgba(0,0,0,.14);
+            backdrop-filter: blur(10px);
+            animation: toastSlideIn .25s ease both;
+            pointer-events: auto;
+            word-break: break-word;
+        }
+
+        .ax-toast-item.info    { background: rgba(239,246,255,.97); color: #1e40af; border: 1px solid #bfdbfe; }
+        .ax-toast-item.success { background: rgba(240,253,244,.97); color: #15803d; border: 1px solid #86efac; }
+        .ax-toast-item.error   { background: rgba(254,242,242,.97); color: #b91c1c; border: 1px solid #fca5a5; }
+        .ax-toast-item.warn    { background: rgba(254,252,232,.97); color: #92400e; border: 1px solid #fde68a; }
+
+        .ax-toast-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+        .ax-toast-msg  { flex: 1; }
         .acw-input-row {
             display: flex;
             gap: 8px;
@@ -2005,10 +2058,18 @@
 
                 <!-- 쿼터 안내 -->
                 <div style="margin:0 20px 4px;padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:12px;font-size:12px;color:#166534;line-height:1.6;">
-                    <strong style="display:block;margin-bottom:3px;">📊 무료 사용 쿼터 안내</strong>
-                    • 하루 <strong>비교 20회 · 토론 10회 · 에이전트 30회</strong> 무료<br>
-                    • 쿼터 초과 시 다음날 자동 리셋됩니다<br>
-                    • 로그인 시 쿼터가 추가로 제공됩니다
+                    <strong style="display:block;margin-bottom:4px;">📊 무료 사용 쿼터 안내 (1일 기준)</strong>
+                    • 비교 <strong>50회</strong> · 토론 <strong>10회</strong> · 협업 <strong>5회</strong> · 에이전트 <strong>20회</strong><br>
+                    • 쿼터 초과 시 다음날 자정(KST) 자동 리셋<br>
+                    • 로그인 시 쿼터 추가 제공
+                </div>
+                <!-- Browserless 안내 -->
+                <div style="margin:8px 20px 4px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;font-size:12px;color:#1e40af;line-height:1.6;">
+                    <strong style="display:block;margin-bottom:4px;">🌐 에이전트 브라우저 안내</strong>
+                    ArenaX 에이전트는 실제 브라우저를 원격으로 조종해 임무를 수행합니다.<br>
+                    • 에이전트 기능은 <strong>서버 브라우저(Browserless)</strong>를 통해 실행됩니다<br>
+                    • 브라우저 세션도 에이전트 쿼터에 포함되어 하루 <strong>20회</strong> 제한<br>
+                    • 서버 상황에 따라 실행 시간이 길어질 수 있습니다
                 </div>
 
                 <a href="/static/arenax-agent.apk" class="install-apk-btn" id="apkDownloadLink">
@@ -2052,6 +2113,9 @@
                 </div>
             </div>
         </footer>
+
+        <!-- 토스트 알림 컨테이너 -->
+        <div id="axToast" class="ax-toast" aria-live="polite" aria-atomic="false"></div>
 
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
@@ -2331,6 +2395,23 @@
                 const value = char === "x" ? random : (random & 0x3) | 0x8;
                 return value.toString(16);
             });
+        }
+
+        // ── 토스트 알림 ──────────────────────────────────────────────────────
+        const TOAST_ICONS = { info: "ℹ️", success: "✅", error: "❌", warn: "⚠️" };
+        const axToastEl = document.getElementById("axToast");
+
+        function showToast(message, type = "info", duration = 3500) {
+            if (!axToastEl) return;
+            const item = document.createElement("div");
+            item.className = "ax-toast-item " + type;
+            item.innerHTML = `<span class="ax-toast-icon">${TOAST_ICONS[type] || "ℹ️"}</span><span class="ax-toast-msg">${message}</span>`;
+            axToastEl.appendChild(item);
+            // 자동 제거
+            setTimeout(() => {
+                item.style.animation = "toastFadeOut .3s ease forwards";
+                item.addEventListener("animationend", () => item.remove(), { once: true });
+            }, duration);
         }
 
         function showNotice(id, message) {
@@ -2615,14 +2696,11 @@
             const card   = bodyEl.closest(".agent-card");
 
             try {
-                const res = await fetch(`${API_URL}/agent/run`, {
+                const res = await fetch(`${API_URL}/agent/task`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        task: mission,
-                        session_id: agentSessionId,
-                        user_id: getDeviceId(),
-                        is_modify: !!isModify,
+                        query: mission,
                     }),
                 });
                 if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
@@ -2663,11 +2741,13 @@
                 card.querySelector(".agent-card-badge").textContent = "완료";
                 card.querySelector(".agent-card-badge").className = "agent-card-badge ok";
                 setAgentStatus("ok", "완료: " + mission);
+                showToast(`임무 완료: ${mission.length > 30 ? mission.slice(0, 30) + "…" : mission}`, "success");
             } catch (err) {
                 bodyEl.textContent = `오류: ${err.message}`;
                 card.querySelector(".agent-card-badge").textContent = "오류";
                 card.querySelector(".agent-card-badge").className = "agent-card-badge error";
                 setAgentStatus("error", `AI 호출 오류: ${err.message}`);
+                showToast(`에이전트 오류: ${err.message}`, "error", 5000);
             } finally {
                 agentInFlight = false;
                 if (agentSendBtn) agentSendBtn.disabled = false;
@@ -2711,14 +2791,31 @@
         agentPanelEndBtn?.addEventListener("click", () => setAgentActive(false));
 
         // ── 에이전트 토글 버튼 (사이트 dock) ─────────────────────────────────
+        // 모바일 판별: UA에 Mobi/Android가 있고 앱 소스가 아닌 경우
+        const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent);
+
         agentToggleBtn.addEventListener("click", () => {
+            // 에이전트가 활성화된 상태면 패널 접기/펼치기
             if (agentActive) {
-                // 이미 켜진 상태 → 패널 접기/펼치기
                 if (agentPanel) {
                     agentPanel.style.display = agentPanel.style.display === "none" ? "flex" : "none";
                 }
                 return;
             }
+
+            // 모바일 비앱 환경 → 안드로이드 설치 팝업
+            if (isMobileDevice && !isAppSource) {
+                openAndroidInstallModal();
+                return;
+            }
+
+            // PC + 확장 미설치 → 설치 페이지로 이동
+            if (!isMobileDevice && !arenaxExtReady) {
+                window.open("/install", "_blank");
+                return;
+            }
+
+            // 앱 내부 또는 확장 설치됨 → 에이전트 패널 켜기
             setAgentActive(true);
             if (agentInputEl) setTimeout(() => agentInputEl.focus(), 100);
         });
