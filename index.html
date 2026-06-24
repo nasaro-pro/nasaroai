@@ -978,20 +978,20 @@
             right: 0;
             bottom: var(--input-dock-height, 120px);
             z-index: 230;
-            width: min(400px, 100vw);
-            height: min(60dvh, 520px);
-            background: rgba(255, 255, 255, 0.98);
+            width: min(460px, 100vw);
+            height: min(72dvh, 640px);
+            background: rgba(255, 255, 255, 0.99);
             backdrop-filter: blur(14px);
             border: 1px solid #e5e7eb;
             border-bottom: none;
             border-radius: 18px 0 0 0;
-            box-shadow: -4px -4px 28px rgba(15, 23, 42, 0.12);
+            box-shadow: -6px -4px 32px rgba(15, 23, 42, 0.14);
             overflow: hidden;
             flex-direction: column;
         }
 
         /* 모바일: 전체 너비 */
-        @media (max-width: 500px) {
+        @media (max-width: 520px) {
             .agent-panel {
                 left: 0;
                 width: 100%;
@@ -1103,6 +1103,22 @@
 
         .agent-card-action-btn.continue:hover { background: #ddd6fe; }
 
+        .agent-card-action-btn.stop {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #b91c1c;
+        }
+
+        .agent-card-action-btn.stop:hover { background: #fee2e2; }
+
+        .agent-card-action-btn.resume {
+            background: #ecfdf5;
+            border-color: #86efac;
+            color: #15803d;
+        }
+
+        .agent-card-action-btn.resume:hover { background: #dcfce7; }
+
         .agent-status-bar {
             padding: 10px 16px;
             font-size: 14px;
@@ -1206,6 +1222,47 @@
             background: #dbeafe;
             color: #1d4ed8;
             animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        .agent-card-badge.warn {
+            background: #fef9c3;
+            color: #92400e;
+        }
+
+        /* 카드 메타 정보 (소요시간 등) */
+        .agent-card-meta {
+            padding: 2px 14px 6px;
+            font-size: 11px;
+            color: #9ca3af;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* 진행 스텝 영역 */
+        .agent-card-progress {
+            padding: 8px 14px 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .agent-progress-step {
+            font-size: 12px;
+            color: #6b7280;
+            padding: 3px 0;
+            opacity: 0.5;
+            transition: opacity .3s, color .3s;
+        }
+
+        .agent-progress-step.active {
+            opacity: 1;
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+
+        .agent-progress-step.done {
+            opacity: 0.6;
+            color: #15803d;
         }
 
         .agent-card-meta {
@@ -1324,7 +1381,8 @@
 
         .agent-input-actions {
             display: flex;
-            justify-content: flex-end;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .agent-send-btn {
@@ -2142,11 +2200,18 @@
             </div>
         </div>
 
+        <!-- 에이전트 플로팅 런처 (패널 닫혔을 때만 표시, 드래그 가능) -->
+        <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 패널 열기" aria-label="에이전트 열기">
+            <div class="ax-logo">
+                <span class="ax-logo-text">AX</span>
+                <span class="ax-logo-sub">Agent</span>
+            </div>
+        </button>
+
         <!-- 에이전트 패널 (우측 하단 도킹, 임무 카드형) -->
         <div id="agentPanel" class="agent-panel" aria-label="ArenaX 에이전트">
             <div class="agent-panel-header">
                 <span class="agent-panel-title">🌐 ArenaX 에이전트</span>
-                <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="패널 최소화">▾</button>
                 <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
             </div>
             <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
@@ -2156,6 +2221,7 @@
             <div class="agent-input-row">
                 <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
                 <div class="agent-input-actions">
+                    <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾ 내리기</button>
                     <button id="agentSendBtn" class="agent-send-btn" type="button">실행 ▶</button>
                 </div>
             </div>
@@ -2695,17 +2761,19 @@
         }
 
         // ── 에이전트 패널 (임무 카드형) ─────────────────────────────────────
-        const agentPanel       = document.getElementById("agentPanel");
-        const agentHistory     = document.getElementById("agentHistory");
-        const agentStatusBar   = document.getElementById("agentStatusBar");
-        const agentInputEl     = document.getElementById("agentInput");
-        const agentSendBtn     = document.getElementById("agentSendBtn");
-        const agentPanelEndBtn = document.getElementById("agentPanelEndBtn");
-        const agentMinBtn      = document.getElementById("agentMinBtn");
+        const agentPanel         = document.getElementById("agentPanel");
+        const agentHistory       = document.getElementById("agentHistory");
+        const agentStatusBar     = document.getElementById("agentStatusBar");
+        const agentInputEl       = document.getElementById("agentInput");
+        const agentSendBtn       = document.getElementById("agentSendBtn");
+        const agentPanelEndBtn   = document.getElementById("agentPanelEndBtn");
+        const agentMinBtn        = document.getElementById("agentMinBtn");
+        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
 
-        let agentActive   = false;
-        let agentInFlight = false;
+        let agentActive    = false;
+        let agentInFlight  = false;
         let currentMission = "";
+        let agentAbortCtrl = null; // AbortController for current task
 
         // ── 상태바 ────────────────────────────────────────────────────────────
         function setAgentStatus(type, text) {
@@ -2714,27 +2782,33 @@
             agentStatusBar.textContent  = text;
         }
 
+        // ── 런처 표시/숨김 ────────────────────────────────────────────────────
+        function showLauncher() { agentFloatLauncher?.classList.add("visible"); }
+        function hideLauncher() { agentFloatLauncher?.classList.remove("visible"); }
+
         // ── 패널 열기 / 닫기 / 최소화 ─────────────────────────────────────────
         function openAgentPanel() {
             if (!agentPanel) return;
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
+            hideLauncher();
             setTimeout(() => agentInputEl?.focus(), 100);
         }
 
         function closeAgentPanel() {
-            if (!agentPanel) return;
-            agentPanel.style.display = "none";
+            // 에이전트 켜진 상태에서 패널 닫으면 런처 표시
+            if (agentPanel) agentPanel.style.display = "none";
+            if (agentActive) showLauncher();
         }
 
         function toggleMinimize() {
             if (!agentPanel) return;
             if (agentPanel.classList.contains("minimized")) {
                 agentPanel.classList.remove("minimized");
-                if (agentMinBtn) agentMinBtn.textContent = "▾";
+                if (agentMinBtn) agentMinBtn.textContent = "▾ 내리기";
             } else {
                 agentPanel.classList.add("minimized");
-                if (agentMinBtn) agentMinBtn.textContent = "▴";
+                if (agentMinBtn) agentMinBtn.textContent = "▴ 펼치기";
             }
         }
 
@@ -2746,123 +2820,177 @@
             if (active) {
                 openAgentPanel();
             } else {
-                closeAgentPanel();
+                // 진행 중인 임무 중단
+                if (agentAbortCtrl) { agentAbortCtrl.abort(); agentAbortCtrl = null; }
+                if (agentPanel) agentPanel.style.display = "none";
+                hideLauncher();
                 currentMission = "";
-                if (agentHistory) {
-                    agentHistory.innerHTML =
-                        `<div class="agent-empty" id="agentEmptyMsg">임무를 입력하면 에이전트가 실행됩니다.</div>`;
-                }
+                if (agentHistory) agentHistory.innerHTML =
+                    `<div class="agent-empty" id="agentEmptyMsg">임무를 입력하면 에이전트가 실행됩니다.</div>`;
                 setAgentStatus("idle", "대기 중 — 아래에 임무를 입력하세요.");
             }
         }
 
-        // ── 카드 생성 (임무 시작할 때 호출) ──────────────────────────────────
-        function appendAgentCard(title, status) {
+        // ── 카드 생성 ─────────────────────────────────────────────────────────
+        const PROGRESS_STEPS = [
+            "🔍 임무 분석 중…",
+            "🌐 브라우저 시작 중…",
+            "📄 페이지 로딩 중…",
+            "🤖 AI 판단 중…",
+            "⚡ 명령 수행 중…",
+            "📋 결과 정리 중…",
+        ];
+
+        function appendAgentCard(title) {
             const emptyEl = agentHistory.querySelector(".agent-empty");
             if (emptyEl) emptyEl.remove();
+
+            const progressHtml = PROGRESS_STEPS.map((s, i) =>
+                `<div class="agent-progress-step${i === 0 ? " active" : ""}" data-step="${i}">${s}</div>`
+            ).join("");
 
             const card = document.createElement("div");
             card.className = "agent-card";
             card.innerHTML = `
                 <div class="agent-card-header">
                     <span class="agent-card-title">${title}</span>
-                    <span class="agent-card-badge ${status}">${status === "loading" ? "실행 중" : status === "ok" ? "완료" : "오류"}</span>
+                    <span class="agent-card-badge loading">실행 중</span>
                 </div>
-                <div class="agent-card-body">처리 중…</div>
-                <div class="agent-card-actions" style="display:none;">
-                    <button class="agent-card-action-btn modify" type="button">✏️ 임무 수정</button>
-                    <button class="agent-card-action-btn continue" type="button">➕ 추가 임무</button>
+                <div class="agent-card-progress">${progressHtml}</div>
+                <div class="agent-card-body" style="display:none;"></div>
+                <div class="agent-card-meta" style="display:none;"></div>
+                <div class="agent-card-actions">
+                    <button class="agent-card-action-btn stop" type="button">⏹ 중단</button>
                 </div>`;
 
             agentHistory.appendChild(card);
             agentHistory.scrollTop = agentHistory.scrollHeight;
 
-            const bodyEl    = card.querySelector(".agent-card-body");
-            const actionsEl = card.querySelector(".agent-card-actions");
-            const badge     = card.querySelector(".agent-card-badge");
+            const badge       = card.querySelector(".agent-card-badge");
+            const progressEl  = card.querySelector(".agent-card-progress");
+            const bodyEl      = card.querySelector(".agent-card-body");
+            const metaEl      = card.querySelector(".agent-card-meta");
+            const actionsEl   = card.querySelector(".agent-card-actions");
 
-            return { card, bodyEl, actionsEl, badge };
+            // 진행 스텝 애니메이션
+            let stepIdx = 0;
+            const stepInterval = setInterval(() => {
+                stepIdx = Math.min(stepIdx + 1, PROGRESS_STEPS.length - 1);
+                progressEl.querySelectorAll(".agent-progress-step").forEach((el, i) => {
+                    el.className = "agent-progress-step" +
+                        (i < stepIdx ? " done" : i === stepIdx ? " active" : "");
+                });
+                agentHistory.scrollTop = agentHistory.scrollHeight;
+            }, 1800);
+
+            return { card, badge, progressEl, bodyEl, metaEl, actionsEl, stepInterval };
         }
 
-        // 카드에 버튼 이벤트 연결 (임무 완료/오류 후 호출)
-        function attachCardActions(card, mission) {
-            const actionsEl = card.querySelector(".agent-card-actions");
-            if (!actionsEl) return;
-            actionsEl.style.display = "flex";
+        // 카드 완료 처리
+        function finalizeCard({ card, badge, progressEl, bodyEl, metaEl, actionsEl, stepInterval }, state, content, mission, elapsed) {
+            clearInterval(stepInterval);
+            progressEl.style.display = "none";
+            bodyEl.style.display = "";
+            bodyEl.textContent = content;
+            metaEl.style.display = "flex";
+            metaEl.textContent = `소요: ${(elapsed / 1000).toFixed(1)}초`;
 
+            if (state === "ok") {
+                badge.textContent = "✅ 완료";
+                badge.className   = "agent-card-badge ok";
+                setAgentStatus("ok", "완료: " + mission);
+                showToast(`임무 완료: ${mission.length > 28 ? mission.slice(0, 28) + "…" : mission}`, "success");
+                actionsEl.innerHTML = `
+                    <button class="agent-card-action-btn modify" type="button">✏️ 수정</button>
+                    <button class="agent-card-action-btn continue" type="button">➕ 추가 임무</button>`;
+            } else if (state === "aborted") {
+                badge.textContent = "⏸ 중단";
+                badge.className   = "agent-card-badge warn";
+                card.style.borderLeftColor = "#f59e0b";
+                setAgentStatus("idle", "중단됨 — 새 임무를 입력하세요.");
+                actionsEl.innerHTML = `
+                    <button class="agent-card-action-btn resume" type="button">🔄 재개</button>
+                    <button class="agent-card-action-btn modify" type="button">✏️ 수정</button>`;
+            } else {
+                badge.textContent = "❌ 오류";
+                badge.className   = "agent-card-badge error";
+                card.classList.add("error-card");
+                setAgentStatus("error", `오류: ${content}`);
+                showToast(`에이전트 오류: ${content}`, "error", 5000);
+                actionsEl.innerHTML = `
+                    <button class="agent-card-action-btn resume" type="button">🔄 재개</button>
+                    <button class="agent-card-action-btn modify" type="button">✏️ 수정</button>`;
+            }
+            agentHistory.scrollTop = agentHistory.scrollHeight;
+
+            // 카드 버튼 이벤트
             actionsEl.querySelector(".modify")?.addEventListener("click", () => {
                 if (agentInFlight) return;
-                if (agentInputEl) {
-                    agentInputEl.value = mission;
-                    autoResizeTA(agentInputEl);
-                    agentInputEl.focus();
-                    agentInputEl.select();
-                }
+                if (agentInputEl) { agentInputEl.value = mission; autoResizeTA(agentInputEl); agentInputEl.focus(); agentInputEl.select(); }
                 if (agentSendBtn) agentSendBtn.textContent = "수정 실행";
                 agentSendBtn._nextIsModify = true;
-                // 최소화 해제 후 입력창 노출
                 if (agentPanel?.classList.contains("minimized")) toggleMinimize();
             });
-
             actionsEl.querySelector(".continue")?.addEventListener("click", () => {
                 if (agentInFlight) return;
-                if (agentInputEl) {
-                    agentInputEl.value = "";
-                    agentInputEl.focus();
-                    agentInputEl.placeholder = `"${mission.slice(0,20)}…" 다음 임무를 입력하세요`;
-                }
+                if (agentInputEl) { agentInputEl.value = ""; agentInputEl.placeholder = `"${mission.slice(0,20)}…" 다음 임무`; agentInputEl.focus(); }
                 if (agentPanel?.classList.contains("minimized")) toggleMinimize();
+            });
+            actionsEl.querySelector(".resume")?.addEventListener("click", () => {
+                if (agentInFlight) return;
+                runAgentMission(mission, false);
             });
         }
 
-        // ── 임무 실행 (JSON 응답, SSE 아님) ───────────────────────────────────
+        // ── 임무 실행 ─────────────────────────────────────────────────────────
         async function runAgentMission(mission, isModify) {
             if (!mission || agentInFlight) return;
             currentMission = mission;
             agentInFlight  = true;
+            agentAbortCtrl = new AbortController();
             if (agentSendBtn) { agentSendBtn.disabled = true; agentSendBtn.textContent = "실행 중…"; }
 
             const cardTitle = (isModify ? "[수정] " : "") + mission;
-            setAgentStatus("loading", (isModify ? "임무 수정 중: " : "실행 중: ") + mission);
-            const { card, bodyEl, badge } = appendAgentCard(cardTitle, "loading");
+            setAgentStatus("loading", (isModify ? "수정 중: " : "실행 중: ") + mission);
+            const cardRefs = appendAgentCard(cardTitle);
 
+            // 카드의 중단 버튼 연결
+            cardRefs.actionsEl.querySelector(".stop")?.addEventListener("click", () => {
+                if (agentAbortCtrl) { agentAbortCtrl.abort(); agentAbortCtrl = null; }
+            });
+
+            const startTime = Date.now();
             try {
                 const res = await fetch(`${API_URL}/agent/task`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ query: mission }),
+                    signal: agentAbortCtrl?.signal,
                 });
-
                 const data = await res.json();
-
-                if (!res.ok || data.status === "error") {
-                    throw new Error(data.message || `서버 오류 (${res.status})`);
-                }
-
+                if (!res.ok || data.status === "error") throw new Error(data.message || `서버 오류 (${res.status})`);
                 const content = data.result || data.response || data.message || "(결과 없음)";
-                bodyEl.textContent = content;
-                badge.textContent  = "완료";
-                badge.className    = "agent-card-badge ok";
-                setAgentStatus("ok", "완료: " + mission);
-                showToast(`임무 완료: ${mission.length > 28 ? mission.slice(0, 28) + "…" : mission}`, "success");
-                attachCardActions(card, mission);
+                finalizeCard(cardRefs, "ok", content, mission, Date.now() - startTime);
 
             } catch (err) {
-                bodyEl.textContent = `오류: ${err.message}`;
-                badge.textContent  = "오류";
-                badge.className    = "agent-card-badge error";
-                card.classList.add("error-card");
-                setAgentStatus("error", `오류: ${err.message}`);
-                showToast(`에이전트 오류: ${err.message}`, "error", 5000);
-                attachCardActions(card, mission);
+                const elapsed = Date.now() - startTime;
+                if (err.name === "AbortError") {
+                    finalizeCard(cardRefs, "aborted", "임무가 중단되었습니다.", mission, elapsed);
+                } else {
+                    finalizeCard(cardRefs, "error", err.message, mission, elapsed);
+                }
             } finally {
-                agentInFlight = false;
-                if (agentSendBtn) { agentSendBtn.disabled = false; agentSendBtn.textContent = "실행"; agentSendBtn._nextIsModify = false; }
+                agentInFlight  = false;
+                agentAbortCtrl = null;
+                if (agentSendBtn) { agentSendBtn.disabled = false; agentSendBtn.textContent = "실행 ▶"; agentSendBtn._nextIsModify = false; }
             }
         }
 
         // ── 패널 이벤트 ────────────────────────────────────────────────────────
-        agentMinBtn?.addEventListener("click", toggleMinimize);
+        agentMinBtn?.addEventListener("click", () => {
+            // 내리기: 패널 닫고 런처 표시
+            closeAgentPanel();
+        });
         agentPanelEndBtn?.addEventListener("click", () => setAgentActive(false));
 
         agentSendBtn?.addEventListener("click", () => {
@@ -2870,7 +2998,7 @@
             if (!val) return;
             const isModify = !!agentSendBtn._nextIsModify;
             agentSendBtn._nextIsModify = false;
-            agentSendBtn.textContent = "실행";
+            agentSendBtn.textContent = "실행 ▶";
             agentInputEl.value = "";
             agentInputEl.placeholder = "에이전트에게 임무를 지시하세요…";
             autoResizeTA(agentInputEl);
@@ -2882,18 +3010,56 @@
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); agentSendBtn?.click(); }
         });
 
+        // ── 플로팅 런처: 누르면 패널 열기 ─────────────────────────────────────
+        agentFloatLauncher?.addEventListener("click", () => {
+            if (!agentActive) return;
+            openAgentPanel();
+        });
+
+        // ── 런처 드래그 ────────────────────────────────────────────────────────
+        (function draggableLauncher(el) {
+            if (!el) return;
+            let active = false, moved = false, ox = 0, oy = 0, startR = 0, startB = 0;
+            const getXY = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
+            const onStart = e => {
+                const [cx, cy] = getXY(e);
+                ox = cx; oy = cy;
+                const r = el.getBoundingClientRect();
+                startR = window.innerWidth - r.right;
+                startB = window.innerHeight - r.bottom;
+                active = true; moved = false;
+                el.style.transition = "box-shadow .15s";
+            };
+            const onMove = e => {
+                if (!active) return;
+                const [cx, cy] = getXY(e);
+                const dx = cx - ox, dy = cy - oy;
+                if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+                if (!moved) return;
+                if (e.cancelable) e.preventDefault();
+                el.style.right  = Math.max(8, Math.min(window.innerWidth  - 62, startR - dx)) + "px";
+                el.style.bottom = Math.max(8, Math.min(window.innerHeight - 62, startB - dy)) + "px";
+            };
+            const onEnd = () => {
+                el.style.transition = "transform .2s, box-shadow .2s";
+                if (moved) el.addEventListener("click", e => { e.stopPropagation(); e.preventDefault(); }, { once: true, capture: true });
+                active = false;
+            };
+            el.addEventListener("mousedown",  onStart);
+            el.addEventListener("touchstart", onStart, { passive: true });
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("touchmove", onMove, { passive: false });
+            window.addEventListener("mouseup",  onEnd);
+            window.addEventListener("touchend", onEnd);
+        })(agentFloatLauncher);
+
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
             if (agentActive) {
-                // 이미 켜진 상태 → 패널 토글
-                if (agentPanel?.style.display === "none") {
-                    openAgentPanel();
-                } else {
-                    closeAgentPanel();
-                }
+                if (agentPanel?.style.display === "none") openAgentPanel();
+                else closeAgentPanel();
                 return;
             }
-            // 에이전트는 서버사이드 → 누구든 패널 열기
             setAgentActive(true);
         });
 
