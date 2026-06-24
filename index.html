@@ -1897,6 +1897,36 @@
             </section>
         </main>
 
+        <!-- 확장/앱 미설치 안내 배너 (앱 소스에서는 숨김) -->
+        <div id="extInstallBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
+            background:linear-gradient(135deg,#1e1b4b,#312e81);border-top:1px solid #4c1d95;
+            padding:12px 16px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px;">
+                <div class="acw-logo-icon" style="width:34px;height:34px;border-radius:9px;flex-shrink:0;">
+                    <span style="font-size:12px;font-weight:900;color:#fff;letter-spacing:-0.04em;font-family:system-ui,sans-serif;">AX</span>
+                    <span style="font-size:5px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.14em;text-transform:uppercase;">Arena</span>
+                </div>
+                <div>
+                    <div style="color:#e9d5ff;font-weight:700;font-size:13px;">ArenaX 에이전트 미설치</div>
+                    <div style="color:#a78bfa;font-size:11px;margin-top:1px;">확장 프로그램(PC) 또는 앱(Android)을 설치하세요.</div>
+                </div>
+            </div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;">
+                <a href="/install" target="_blank"
+                    style="background:#7c3aed;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;">
+                    💻 PC 설치
+                </a>
+                <button onclick="openAndroidInstallModal()"
+                    style="background:#059669;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;">
+                    📱 Android 설치
+                </button>
+                <button onclick="this.closest('#extInstallBanner').style.display='none';"
+                    style="background:transparent;border:1px solid #6b7280;color:#9ca3af;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap;">
+                    닫기
+                </button>
+            </div>
+        </div>
+
         <!-- Android APK 설치 안내 모달 -->
         <div id="androidInstallModal" class="install-modal-overlay" onclick="if(event.target===this)closeAndroidInstallModal()">
             <div class="install-modal">
@@ -2491,27 +2521,53 @@
             return fromUrl || fromUA || localStorage.getItem("arenax_is_app") === "1";
         })();
 
+        const extInstallBanner   = document.getElementById("extInstallBanner");
         const agentFloatLauncher = document.getElementById("agentFloatLauncher");
         const agentChatWindow    = document.getElementById("agentChatWindow");
         const acwMessages        = document.getElementById("acwMessages");
         const acwInput           = document.getElementById("acwInput");
         const acwSendBtn         = document.getElementById("acwSendBtn");
 
+        // ── 확장/앱 감지 → 배너 표시 ─────────────────────────────────────────
+        let arenaxExtReady = isAppSource;
+        function setExtReady(ready) {
+            arenaxExtReady = ready;
+            if (!extInstallBanner) return;
+            extInstallBanner.style.display = (ready || isAppSource) ? "none" : "flex";
+        }
+        window.addEventListener("message", (e) => {
+            if (e.source !== window) return;
+            const d = e.data;
+            if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
+        });
+        window.postMessage({ __arenax: "agent", type: "PING" }, "*");
+        setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
+        if (isAppSource && extInstallBanner) extInstallBanner.style.display = "none";
+
         // ── 에이전트 상태 (에이전트 ON/OFF) ──────────────────────────────────
-        let agentActive = false;
+        // localStorage에 저장해 앱 재시작·페이지 리로드 후에도 런처 유지
+        let agentActive = localStorage.getItem("arenax_agent_active") === "1";
         let agentChatInFlight = false;
         let agentSessionId = createUUID();
         const AGENT_CHAT_KEY = "arenax_agent_chat_" + getDeviceId();
         let agentChatLog = []; // { role, content }[]
 
-        // 에이전트 ON 여부에 따라 런처 버튼 표시. 켜져 있으면 채팅창을 닫아도
-        // (창을 나가도) 런처는 '에이전트 종료' 전까지 계속 떠있는다.
+        // 에이전트 ON 여부에 따라 런처 버튼 표시.
+        // 켜져 있으면 채팅창을 내려도 런처는 '에이전트 종료' 전까지 계속 떠있는다.
         function setAgentActive(active) {
             agentActive = active;
+            try { localStorage.setItem("arenax_agent_active", active ? "1" : "0"); } catch {}
             agentToggleBtn.classList.toggle("active", active);
             agentToggleBtn.textContent = active ? "● 에이전트" : "🌐 에이전트";
             if (agentFloatLauncher) agentFloatLauncher.classList.toggle("visible", active);
             if (!active) closeAgentChat();
+        }
+
+        // 페이지 로드 시 이전에 켜진 에이전트 상태 복원 (런처만, 채팅창은 닫힌 채)
+        if (agentActive) {
+            agentToggleBtn.classList.add("active");
+            agentToggleBtn.textContent = "● 에이전트";
+            if (agentFloatLauncher) agentFloatLauncher.classList.add("visible");
         }
 
         // 채팅 패널 열기: 패널이 하단을 덮으므로 런처는 잠시 숨김
@@ -2663,8 +2719,47 @@
             openAgentChat();
         });
 
-        // 설치 배너 제거됨: 앱/사이트를 열면 곧바로 사이트가 표시되고,
-        // 에이전트는 '에이전트' 버튼을 눌렀을 때만 런처와 채팅창이 생성된다.
+        // ── 런처 버튼 드래그로 위치 이동 ────────────────────────────────────────
+        (function draggableLauncher(el) {
+            if (!el) return;
+            let active = false, moved = false, ox = 0, oy = 0, startR = 0, startB = 0;
+            const getXY = (e) => e.touches ? [e.touches[0].clientX, e.touches[0].clientY]
+                                            : [e.clientX, e.clientY];
+            const onStart = (e) => {
+                const [cx, cy] = getXY(e);
+                ox = cx; oy = cy;
+                const r = el.getBoundingClientRect();
+                startR = window.innerWidth  - r.right;
+                startB = window.innerHeight - r.bottom;
+                active = true; moved = false;
+                el.style.transition = "box-shadow .15s";
+            };
+            const onMove = (e) => {
+                if (!active) return;
+                const [cx, cy] = getXY(e);
+                const dx = cx - ox, dy = cy - oy;
+                if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+                if (!moved) return;
+                if (e.cancelable) e.preventDefault();
+                el.style.right  = Math.max(8, Math.min(window.innerWidth  - 62, startR - dx)) + "px";
+                el.style.bottom = Math.max(8, Math.min(window.innerHeight - 62, startB - dy)) + "px";
+            };
+            const onEnd = () => {
+                el.style.transition = "transform .2s, box-shadow .2s";
+                if (moved) {
+                    el.addEventListener("click", (e) => {
+                        e.stopPropagation(); e.preventDefault();
+                    }, { once: true, capture: true });
+                }
+                active = false;
+            };
+            el.addEventListener("mousedown",  onStart);
+            el.addEventListener("touchstart", onStart, { passive: true });
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("touchmove", onMove, { passive: false });
+            window.addEventListener("mouseup",  onEnd);
+            window.addEventListener("touchend", onEnd);
+        })(agentFloatLauncher);
 
         dockPrimaryBtn.addEventListener("click", () => {
             if (currentMode === "compare") handleCompare();
