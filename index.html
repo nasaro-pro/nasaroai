@@ -1066,6 +1066,11 @@
             color: #b91c1c;
         }
 
+        .agent-status-bar[data-type="ok"] {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
         .agent-history {
             flex: 1;
             overflow-y: auto;
@@ -1126,6 +1131,17 @@
         .agent-card-badge.error {
             background: #fee2e2;
             color: #b91c1c;
+        }
+
+        .agent-card-badge.ok {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .agent-card-badge.loading {
+            background: #dbeafe;
+            color: #1d4ed8;
+            animation: pulse 1.4s ease-in-out infinite;
         }
 
         .agent-card-meta {
@@ -2001,42 +2017,21 @@
             </div>
         </div>
 
-        <!-- 에이전트 플로팅 런처 버튼 (에이전트 ON 시 표시, 종료 전까지 항상 떠있음) -->
-        <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 질문창 열기" aria-label="에이전트 열기">
-            <div class="ax-logo">
-                <span class="ax-logo-text">AX</span>
-                <span class="ax-logo-sub">Arena</span>
+        <!-- 에이전트 패널 (원래 방식: 임무 카드형, input-dock 위에 표시) -->
+        <div id="agentPanel" class="agent-panel" aria-label="ArenaX 에이전트">
+            <div class="agent-panel-header">
+                <span class="agent-panel-title" id="agentPanelTitle">🌐 ArenaX 에이전트</span>
+                <button id="agentModifyBtn" class="agent-panel-end" type="button"
+                    style="display:none;background:#fef9c3;border-color:#fde68a;color:#92400e;">✏️ 임무 수정</button>
+                <button id="agentPanelEndBtn" class="agent-panel-end" type="button">에이전트 종료</button>
             </div>
-        </button>
-
-        <!-- 에이전트 채팅 패널 (하단 도킹) -->
-        <div id="agentChatWindow" class="agent-chat-window" role="dialog" aria-label="ArenaX 에이전트">
-            <div class="acw-grabber" id="acwGrabber" title="내리기"></div>
-            <div class="acw-header">
-                <button class="acw-logo-btn" id="acwLogoBtn" title="내리기">
-                    <div class="acw-logo-icon">
-                        <span>AX</span>
-                        <span>Arena</span>
-                    </div>
-                    <div class="acw-logo-name">
-                        ArenaX
-                        <small>에이전트</small>
-                    </div>
-                </button>
-                <div class="acw-header-spacer"></div>
-                <button class="acw-min-btn" id="acwMinBtn" type="button" title="내리기" aria-label="내리기">▾</button>
-                <button class="acw-end-btn" id="acwEndBtn" type="button">에이전트 종료</button>
+            <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
+            <div class="agent-history" id="agentHistory">
+                <div class="agent-empty" id="agentEmptyMsg">임무를 입력하면 에이전트가 실행됩니다.</div>
             </div>
-            <div class="acw-messages" id="acwMessages">
-                <div class="acw-welcome">
-                    <strong>ArenaX 에이전트</strong>
-                    AI 모델에게 자유롭게 질문하세요.<br>
-                    내리기(▾)를 누르면 종료하지 않고 창만 내려갑니다.
-                </div>
-            </div>
-            <div class="acw-input-row">
-                <textarea id="acwInput" class="acw-input" rows="1" placeholder="질문을 입력하세요…"></textarea>
-                <button id="acwSendBtn" class="acw-send-btn" type="button">전송</button>
+            <div class="agent-input-row">
+                <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
+                <button id="agentSendBtn" class="agent-send-btn" type="button">실행</button>
             </div>
         </div>
 
@@ -2373,6 +2368,12 @@
             syncMainPadding();
         }
 
+        function autoResizeTA(ta) {
+            if (!ta) return;
+            ta.style.height = "auto";
+            ta.style.height = Math.min(ta.scrollHeight, 130) + "px";
+        }
+
         function updateDockUI() {
             dockSecondaryBtn.style.display = "none";
             dockNewDebateBtn.style.display = "none";
@@ -2521,12 +2522,7 @@
             return fromUrl || fromUA || localStorage.getItem("arenax_is_app") === "1";
         })();
 
-        const extInstallBanner   = document.getElementById("extInstallBanner");
-        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
-        const agentChatWindow    = document.getElementById("agentChatWindow");
-        const acwMessages        = document.getElementById("acwMessages");
-        const acwInput           = document.getElementById("acwInput");
-        const acwSendBtn         = document.getElementById("acwSendBtn");
+        const extInstallBanner = document.getElementById("extInstallBanner");
 
         // ── 확장/앱 감지 → 배너 표시 ─────────────────────────────────────────
         let arenaxExtReady = isAppSource;
@@ -2544,99 +2540,99 @@
         setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
         if (isAppSource && extInstallBanner) extInstallBanner.style.display = "none";
 
-        // ── 에이전트 상태 (에이전트 ON/OFF) ──────────────────────────────────
-        // localStorage에 저장해 앱 재시작·페이지 리로드 후에도 런처 유지
-        let agentActive = localStorage.getItem("arenax_agent_active") === "1";
-        let agentChatInFlight = false;
-        let agentSessionId = createUUID();
-        const AGENT_CHAT_KEY = "arenax_agent_chat_" + getDeviceId();
-        let agentChatLog = []; // { role, content }[]
+        // ── 원래 에이전트 패널 (임무 카드형) ─────────────────────────────────
+        const agentPanel      = document.getElementById("agentPanel");
+        const agentHistory    = document.getElementById("agentHistory");
+        const agentStatusBar  = document.getElementById("agentStatusBar");
+        const agentInputEl    = document.getElementById("agentInput");
+        const agentSendBtn    = document.getElementById("agentSendBtn");
+        const agentModifyBtn  = document.getElementById("agentModifyBtn");
+        const agentPanelEndBtn= document.getElementById("agentPanelEndBtn");
+        const agentEmptyMsg   = document.getElementById("agentEmptyMsg");
 
-        // 에이전트 ON 여부에 따라 런처 버튼 표시.
-        // 켜져 있으면 채팅창을 내려도 런처는 '에이전트 종료' 전까지 계속 떠있는다.
+        let agentActive       = false;
+        let agentInFlight     = false;
+        let agentSessionId    = createUUID();
+        let currentMission    = "";   // 현재 실행 중인 임무 텍스트
+
+        function setAgentStatus(type, text) {
+            if (!agentStatusBar) return;
+            agentStatusBar.dataset.type = type; // idle | loading | ok | error
+            agentStatusBar.textContent = text;
+        }
+
+        function appendAgentCard(title, body, status) {
+            if (agentEmptyMsg) agentEmptyMsg.style.display = "none";
+            const card = document.createElement("div");
+            card.className = "agent-card";
+            card.innerHTML = `
+                <div class="agent-card-header">
+                    <span class="agent-card-title">${title}</span>
+                    <span class="agent-card-badge ${status}">${status === "loading" ? "실행 중" : status === "ok" ? "완료" : "오류"}</span>
+                </div>
+                <div class="agent-card-body"></div>`;
+            const bodyEl = card.querySelector(".agent-card-body");
+            bodyEl.textContent = body || "";
+            agentHistory.appendChild(card);
+            agentHistory.scrollTop = agentHistory.scrollHeight;
+            return bodyEl;
+        }
+
         function setAgentActive(active) {
             agentActive = active;
-            try { localStorage.setItem("arenax_agent_active", active ? "1" : "0"); } catch {}
             agentToggleBtn.classList.toggle("active", active);
-            agentToggleBtn.textContent = active ? "● 에이전트" : "🌐 에이전트";
-            if (agentFloatLauncher) agentFloatLauncher.classList.toggle("visible", active);
-            if (!active) closeAgentChat();
+            agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
+            if (agentPanel) {
+                agentPanel.style.display = active ? "flex" : "none";
+            }
+            if (!active) {
+                // 종료: 패널 초기화
+                currentMission = "";
+                if (agentModifyBtn) agentModifyBtn.style.display = "none";
+                if (agentHistory) {
+                    agentHistory.innerHTML = "";
+                    const empty = document.createElement("div");
+                    empty.className = "agent-empty";
+                    empty.id = "agentEmptyMsg";
+                    empty.textContent = "임무를 입력하면 에이전트가 실행됩니다.";
+                    agentHistory.appendChild(empty);
+                }
+                setAgentStatus("idle", "대기 중 — 아래에 임무를 입력하세요.");
+            }
         }
 
-        // 페이지 로드 시 이전에 켜진 에이전트 상태 복원 (런처만, 채팅창은 닫힌 채)
-        if (agentActive) {
-            agentToggleBtn.classList.add("active");
-            agentToggleBtn.textContent = "● 에이전트";
-            if (agentFloatLauncher) agentFloatLauncher.classList.add("visible");
-        }
+        // ── 에이전트 임무 실행 ─────────────────────────────────────────────────
+        async function runAgentMission(mission, isModify) {
+            if (!mission || agentInFlight) return;
+            currentMission = mission;
+            agentInFlight = true;
+            if (agentSendBtn) agentSendBtn.disabled = true;
+            if (agentModifyBtn) agentModifyBtn.style.display = "inline-flex";
 
-        // 채팅 패널 열기: 패널이 하단을 덮으므로 런처는 잠시 숨김
-        function openAgentChat() {
-            if (!agentChatWindow) return;
-            agentChatWindow.classList.add("open");
-            if (agentFloatLauncher) agentFloatLauncher.classList.remove("visible");
-            setTimeout(() => acwInput?.focus(), 200);
-        }
-        // 채팅 패널 내리기(최소화): 종료하지 않고 창만 내림 → 런처는 다시 표시
-        function closeAgentChat() {
-            agentChatWindow?.classList.remove("open");
-            agentChatWindow && (agentChatWindow.style.bottom = "");
-            if (agentActive && agentFloatLauncher) agentFloatLauncher.classList.add("visible");
-        }
-
-        // ── 에이전트 채팅 메시지 렌더 ─────────────────────────────────────────
-        function appendAcwMsg(role, text, id) {
-            const el = document.createElement("div");
-            el.className = "acw-msg " + role;
-            if (id) el.id = id;
-            el.textContent = text;
-            acwMessages?.appendChild(el);
-            if (acwMessages) acwMessages.scrollTop = acwMessages.scrollHeight;
-            return el;
-        }
-
-        function autoResizeAcwInput() {
-            if (!acwInput) return;
-            acwInput.style.height = "auto";
-            acwInput.style.height = Math.min(acwInput.scrollHeight, 130) + "px";
-        }
-
-        // ── 에이전트 메시지 전송 ───────────────────────────────────────────────
-        async function sendAgentMessage() {
-            const text = acwInput ? acwInput.value.trim() : "";
-            if (!text || agentChatInFlight) return;
-
-            acwInput.value = "";
-            autoResizeAcwInput();
-            appendAcwMsg("user", text);
-            agentChatLog.push({ role: "user", content: text });
-
-            const loadingId = "acw-l-" + Date.now();
-            const loadingEl = appendAcwMsg("loading", "응답 생성 중…", loadingId);
-            agentChatInFlight = true;
-            if (acwSendBtn) acwSendBtn.disabled = true;
+            setAgentStatus("loading", (isModify ? "임무 수정 중: " : "실행 중: ") + mission);
+            const cardTitle = (isModify ? "[수정] " : "") + mission;
+            const bodyEl = appendAgentCard(cardTitle, "처리 중…", "loading");
+            const card   = bodyEl.closest(".agent-card");
 
             try {
-                const res = await fetch(`${API_URL}/agent/chat`, {
+                const res = await fetch(`${API_URL}/agent/run`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        message: text,
+                        task: mission,
                         session_id: agentSessionId,
                         user_id: getDeviceId(),
-                        history: agentChatLog.slice(-12),
+                        is_modify: !!isModify,
                     }),
                 });
-                loadingEl.remove();
                 if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
 
+                let content = "";
                 if (res.body) {
-                    // SSE 스트리밍 응답
                     const reader  = res.body.getReader();
                     const decoder = new TextDecoder();
                     let buf = "";
-                    let content = "";
-                    const msgEl = appendAcwMsg("agent", "");
+                    bodyEl.textContent = "";
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
@@ -2650,116 +2646,82 @@
                                 const d = JSON.parse(line.slice(6));
                                 if (d.chunk) {
                                     content += d.chunk;
-                                    msgEl.textContent = content;
-                                    if (acwMessages) acwMessages.scrollTop = acwMessages.scrollHeight;
+                                    bodyEl.textContent = content;
+                                    agentHistory.scrollTop = agentHistory.scrollHeight;
                                 }
+                                if (d.done) break;
                             } catch {}
                         }
                     }
-                    if (content) agentChatLog.push({ role: "agent", content });
+                    if (!content) content = "(응답 없음)";
                 } else {
                     const data = await res.json();
-                    const reply = data.response || data.message || "응답을 받지 못했습니다.";
-                    appendAcwMsg("agent", reply);
-                    agentChatLog.push({ role: "agent", content: reply });
+                    content = data.result || data.response || data.message || "(응답 없음)";
+                    bodyEl.textContent = content;
                 }
+
+                card.querySelector(".agent-card-badge").textContent = "완료";
+                card.querySelector(".agent-card-badge").className = "agent-card-badge ok";
+                setAgentStatus("ok", "완료: " + mission);
             } catch (err) {
-                loadingEl?.remove();
-                appendAcwMsg("error", `오류: ${err.message}`);
+                bodyEl.textContent = `오류: ${err.message}`;
+                card.querySelector(".agent-card-badge").textContent = "오류";
+                card.querySelector(".agent-card-badge").className = "agent-card-badge error";
+                setAgentStatus("error", `AI 호출 오류: ${err.message}`);
             } finally {
-                agentChatInFlight = false;
-                if (acwSendBtn) acwSendBtn.disabled = false;
+                agentInFlight = false;
+                if (agentSendBtn) agentSendBtn.disabled = false;
             }
         }
 
-        // ── 에이전트 채팅 패널 이벤트 리스너 ─────────────────────────────────
-        // 내리기(최소화): 로고 · 그래버 · 내리기 버튼 → 종료하지 않고 창만 내림
-        document.getElementById("acwLogoBtn")?.addEventListener("click", closeAgentChat);
-        document.getElementById("acwMinBtn")?.addEventListener("click", closeAgentChat);
-        document.getElementById("acwGrabber")?.addEventListener("click", closeAgentChat);
-        // 에이전트 종료: 런처까지 완전히 제거
-        document.getElementById("acwEndBtn")?.addEventListener("click", () => setAgentActive(false));
-        acwSendBtn?.addEventListener("click", sendAgentMessage);
-        acwInput?.addEventListener("input", autoResizeAcwInput);
-        acwInput?.addEventListener("keydown", e => {
-            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAgentMessage(); }
-        });
-        // visualViewport: 키보드가 올라오면 하단 패널을 키보드 위로 띄움
-        if (window.visualViewport && agentChatWindow) {
-            window.visualViewport.addEventListener("resize", () => {
-                if (!agentChatWindow.classList.contains("open")) return;
-                const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.offsetTop - window.visualViewport.height);
-                agentChatWindow.style.bottom = kbHeight > 60 ? kbHeight + "px" : "";
-            });
+        // ── 에이전트 패널 이벤트 ──────────────────────────────────────────────
+        // isModifyMode: true면 수정 실행, false면 새 임무 실행
+        let agentModifyMode = false;
+
+        function agentSubmit() {
+            const val = agentInputEl?.value.trim();
+            if (!val) return;
+            agentInputEl.value = "";
+            autoResizeTA(agentInputEl);
+            const isModify = agentModifyMode;
+            agentModifyMode = false;
+            if (agentSendBtn) agentSendBtn.textContent = "실행";
+            runAgentMission(val, isModify);
         }
 
-        // ── 플로팅 런처: 채팅창 토글 ─────────────────────────────────────────
-        agentFloatLauncher?.addEventListener("click", () => {
-            if (!agentActive) return;
-            if (agentChatWindow?.classList.contains("open")) {
-                closeAgentChat();
-            } else {
-                openAgentChat();
+        agentSendBtn?.addEventListener("click", agentSubmit);
+        agentInputEl?.addEventListener("input",   () => autoResizeTA(agentInputEl));
+        agentInputEl?.addEventListener("keydown",  e => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); agentSubmit(); }
+        });
+
+        // 임무 수정 버튼: 현재 임무를 입력창에 불러오고 수정 모드 활성화
+        agentModifyBtn?.addEventListener("click", () => {
+            if (agentInFlight) return;
+            agentModifyMode = true;
+            if (agentSendBtn) agentSendBtn.textContent = "수정 실행";
+            if (agentInputEl) {
+                agentInputEl.value = currentMission;
+                autoResizeTA(agentInputEl);
+                agentInputEl.focus();
+                agentInputEl.select();
             }
         });
+
+        agentPanelEndBtn?.addEventListener("click", () => setAgentActive(false));
 
         // ── 에이전트 토글 버튼 (사이트 dock) ─────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
             if (agentActive) {
-                // 이미 켜진 상태 → 채팅창 열기/닫기만
-                if (agentChatWindow?.classList.contains("open")) {
-                    closeAgentChat();
-                } else {
-                    openAgentChat();
+                // 이미 켜진 상태 → 패널 접기/펼치기
+                if (agentPanel) {
+                    agentPanel.style.display = agentPanel.style.display === "none" ? "flex" : "none";
                 }
                 return;
             }
-            // 에이전트 켜기 (ext 확인 없이 자체 채팅창 사용)
             setAgentActive(true);
-            openAgentChat();
+            if (agentInputEl) setTimeout(() => agentInputEl.focus(), 100);
         });
-
-        // ── 런처 버튼 드래그로 위치 이동 ────────────────────────────────────────
-        (function draggableLauncher(el) {
-            if (!el) return;
-            let active = false, moved = false, ox = 0, oy = 0, startR = 0, startB = 0;
-            const getXY = (e) => e.touches ? [e.touches[0].clientX, e.touches[0].clientY]
-                                            : [e.clientX, e.clientY];
-            const onStart = (e) => {
-                const [cx, cy] = getXY(e);
-                ox = cx; oy = cy;
-                const r = el.getBoundingClientRect();
-                startR = window.innerWidth  - r.right;
-                startB = window.innerHeight - r.bottom;
-                active = true; moved = false;
-                el.style.transition = "box-shadow .15s";
-            };
-            const onMove = (e) => {
-                if (!active) return;
-                const [cx, cy] = getXY(e);
-                const dx = cx - ox, dy = cy - oy;
-                if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-                if (!moved) return;
-                if (e.cancelable) e.preventDefault();
-                el.style.right  = Math.max(8, Math.min(window.innerWidth  - 62, startR - dx)) + "px";
-                el.style.bottom = Math.max(8, Math.min(window.innerHeight - 62, startB - dy)) + "px";
-            };
-            const onEnd = () => {
-                el.style.transition = "transform .2s, box-shadow .2s";
-                if (moved) {
-                    el.addEventListener("click", (e) => {
-                        e.stopPropagation(); e.preventDefault();
-                    }, { once: true, capture: true });
-                }
-                active = false;
-            };
-            el.addEventListener("mousedown",  onStart);
-            el.addEventListener("touchstart", onStart, { passive: true });
-            window.addEventListener("mousemove", onMove);
-            window.addEventListener("touchmove", onMove, { passive: false });
-            window.addEventListener("mouseup",  onEnd);
-            window.addEventListener("touchend", onEnd);
-        })(agentFloatLauncher);
 
         dockPrimaryBtn.addEventListener("click", () => {
             if (currentMode === "compare") handleCompare();
