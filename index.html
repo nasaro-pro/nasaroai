@@ -1466,30 +1466,58 @@
             text-transform: uppercase;
         }
 
-        /* ── 에이전트 채팅 윈도우 ── */
+        /* ── 에이전트 채팅 패널 (하단 도킹, 웹·모바일 통일) ── */
         .agent-chat-window {
             position: fixed;
-            inset: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 480px;
+            height: min(68dvh, 600px);
             z-index: 10002;
             background: #f9fafb;
             display: flex;
             flex-direction: column;
-            transform: translateY(100%);
-            transition: transform .3s cubic-bezier(.4,0,.2,1);
+            border-radius: 18px 18px 0 0;
+            box-shadow: 0 -12px 48px rgba(15, 23, 42, 0.22);
+            transform: translateY(110%);
+            transition: transform .3s cubic-bezier(.4, 0, .2, 1), bottom .2s ease;
             will-change: transform;
+            overflow: hidden;
+        }
+        /* 데스크톱에서는 오른쪽 하단에 도킹 */
+        @media (min-width: 768px) {
+            .agent-chat-window {
+                left: auto;
+                right: 20px;
+                margin: 0;
+                max-width: 400px;
+                height: min(72dvh, 640px);
+            }
         }
         .agent-chat-window.open {
             transform: translateY(0);
         }
+        .acw-grabber {
+            width: 38px;
+            height: 4px;
+            border-radius: 999px;
+            background: #d1d5db;
+            margin: 7px auto 0;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
         .acw-header {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px 14px;
+            gap: 8px;
+            padding: 8px 12px 10px;
             background: #fff;
             border-bottom: 1px solid #e5e7eb;
             flex-shrink: 0;
-            min-height: 54px;
+            min-height: 52px;
         }
         .acw-logo-btn {
             display: flex;
@@ -1546,6 +1574,22 @@
             letter-spacing: 0;
         }
         .acw-header-spacer { flex: 1; }
+        .acw-min-btn {
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            color: #374151;
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .acw-min-btn:hover { background: #f3f4f6; }
         .acw-end-btn {
             border: 1px solid #fecaca;
             background: #fef2f2;
@@ -1935,10 +1979,11 @@
             </div>
         </button>
 
-        <!-- 에이전트 채팅 윈도우 -->
+        <!-- 에이전트 채팅 패널 (하단 도킹) -->
         <div id="agentChatWindow" class="agent-chat-window" role="dialog" aria-label="ArenaX 에이전트">
+            <div class="acw-grabber" id="acwGrabber" title="내리기"></div>
             <div class="acw-header">
-                <button class="acw-logo-btn" id="acwLogoBtn" title="ArenaX로 돌아가기">
+                <button class="acw-logo-btn" id="acwLogoBtn" title="내리기">
                     <div class="acw-logo-icon">
                         <span>AX</span>
                         <span>Arena</span>
@@ -1949,13 +1994,14 @@
                     </div>
                 </button>
                 <div class="acw-header-spacer"></div>
+                <button class="acw-min-btn" id="acwMinBtn" type="button" title="내리기" aria-label="내리기">▾</button>
                 <button class="acw-end-btn" id="acwEndBtn" type="button">에이전트 종료</button>
             </div>
             <div class="acw-messages" id="acwMessages">
                 <div class="acw-welcome">
                     <strong>ArenaX 에이전트</strong>
                     AI 모델에게 자유롭게 질문하세요.<br>
-                    왼쪽 상단 로고를 누르면 사이트로 돌아갑니다.
+                    내리기(▾)를 누르면 종료하지 않고 창만 내려갑니다.
                 </div>
             </div>
             <div class="acw-input-row">
@@ -2468,17 +2514,17 @@
             if (!active) closeAgentChat();
         }
 
-        // 에이전트 채팅창 열기 / 닫기 (닫아도 런처는 유지됨)
+        // 채팅 패널 열기: 패널이 하단을 덮으므로 런처는 잠시 숨김
         function openAgentChat() {
             if (!agentChatWindow) return;
             agentChatWindow.classList.add("open");
-            // 채팅창을 열어도 런처는 계속 떠있도록 유지
-            if (agentActive && agentFloatLauncher) agentFloatLauncher.classList.add("visible");
+            if (agentFloatLauncher) agentFloatLauncher.classList.remove("visible");
             setTimeout(() => acwInput?.focus(), 200);
         }
+        // 채팅 패널 내리기(최소화): 종료하지 않고 창만 내림 → 런처는 다시 표시
         function closeAgentChat() {
             agentChatWindow?.classList.remove("open");
-            // 창을 나가도 에이전트가 켜져 있으면 런처 유지
+            agentChatWindow && (agentChatWindow.style.bottom = "");
             if (agentActive && agentFloatLauncher) agentFloatLauncher.classList.add("visible");
         }
 
@@ -2570,20 +2616,24 @@
             }
         }
 
-        // ── 에이전트 채팅창 이벤트 리스너 ────────────────────────────────────
+        // ── 에이전트 채팅 패널 이벤트 리스너 ─────────────────────────────────
+        // 내리기(최소화): 로고 · 그래버 · 내리기 버튼 → 종료하지 않고 창만 내림
         document.getElementById("acwLogoBtn")?.addEventListener("click", closeAgentChat);
+        document.getElementById("acwMinBtn")?.addEventListener("click", closeAgentChat);
+        document.getElementById("acwGrabber")?.addEventListener("click", closeAgentChat);
+        // 에이전트 종료: 런처까지 완전히 제거
         document.getElementById("acwEndBtn")?.addEventListener("click", () => setAgentActive(false));
         acwSendBtn?.addEventListener("click", sendAgentMessage);
         acwInput?.addEventListener("input", autoResizeAcwInput);
         acwInput?.addEventListener("keydown", e => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAgentMessage(); }
         });
-        // visualViewport: 채팅창에서도 키보드 처리
+        // visualViewport: 키보드가 올라오면 하단 패널을 키보드 위로 띄움
         if (window.visualViewport && agentChatWindow) {
             window.visualViewport.addEventListener("resize", () => {
                 if (!agentChatWindow.classList.contains("open")) return;
                 const kbHeight = Math.max(0, window.innerHeight - window.visualViewport.offsetTop - window.visualViewport.height);
-                agentChatWindow.style.paddingBottom = kbHeight > 60 ? kbHeight + "px" : "";
+                agentChatWindow.style.bottom = kbHeight > 60 ? kbHeight + "px" : "";
             });
         }
 
