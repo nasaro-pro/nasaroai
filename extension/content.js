@@ -19,16 +19,27 @@
   :host { all: initial; }
   * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif; }
 
+  /* AX 로고 텍스트 */
+  .ax-logo {
+    font-size: 15px; font-weight: 900; letter-spacing: -1px; line-height: 1; pointer-events: none;
+    background: linear-gradient(135deg, #fff 20%, #d8b4fe 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .ax-logo-sm {
+    font-size: 13px; font-weight: 900; letter-spacing: -1px; color: #7c3aed; pointer-events: none;
+  }
+
   .launcher {
     pointer-events: auto; position: fixed; right: 16px;
     width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: grab;
-    background: #7c3aed; color: #fff; font-size: 22px; line-height: 1;
-    box-shadow: 0 6px 20px rgba(124,58,237,.45);
+    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: #fff;
+    box-shadow: 0 6px 24px rgba(124,58,237,.5);
     display: none; touch-action: none; user-select: none; z-index: 1;
+    flex-direction: column; gap: 1px;
   }
   .launcher.show { display: flex; align-items: center; justify-content: center; }
   .launcher:active { cursor: grabbing; }
-  .launcher:hover { background: #6d28d9; }
+  .launcher:hover { background: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%); }
 
   /* 활성 임무 표시 도트 */
   .launcher-dot {
@@ -65,15 +76,26 @@
   .bubble.handoff  { --bg: #78350f; }
   .bubble.cancelled { --bg: #374151; }
 
-  .wrap { pointer-events: none; display: flex; flex-direction: column; align-items: center; padding: 0 12px 12px; }
+  .wrap { display: contents; /* bar가 position:fixed이므로 wrap은 투명 컨테이너 */ }
   .bar {
-    pointer-events: auto; width: 100%; max-width: 940px;
-    background: #fff; color: #111827;
-    border: 1px solid #e5e7eb; border-radius: 16px 16px 12px 12px;
-    box-shadow: 0 -6px 30px rgba(0,0,0,.18);
+    pointer-events: auto; position: fixed; /* applyBarPos()가 left/top 동적 설정 */
+    background: #fff; color: #111827; z-index: 1;
+    border: 1px solid #e5e7eb; border-radius: 18px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.18);
     display: flex; flex-direction: column; overflow: hidden;
+    width: 440px;
   }
-  .bar[hidden] { display: none; }
+  .bar[hidden] { display: none !important; }
+
+  /* 모바일: 전체 너비 바텀 시트 */
+  @media (max-width: 640px) {
+    .bar {
+      left: 0 !important; right: 0 !important;
+      bottom: 0 !important; top: auto !important;
+      width: 100% !important; border-radius: 16px 16px 0 0;
+      max-height: 90dvh; max-height: 90vh;
+    }
+  }
 
   /* ── 모바일 (≤ 640px) : 풀스크린 바텀시트 스타일 ── */
   @media (max-width: 640px) {
@@ -212,7 +234,7 @@
 
   const root = document.createElement("div");
   root.innerHTML = `
-    <button class="launcher" id="ax-launcher" title="ArenaX 에이전트 (드래그로 이동)">🤖<span class="launcher-dot"></span></button>
+    <button class="launcher" id="ax-launcher" title="ArenaX 에이전트 (드래그로 이동)"><span class="ax-logo">AX</span><span class="launcher-dot"></span></button>
     <div class="bubble" id="ax-bubble">
       <span class="bubble-text" id="ax-bubble-text"></span>
       <button class="bubble-close" id="ax-bubble-close" title="닫기">✕</button>
@@ -220,7 +242,7 @@
     <div class="wrap">
       <div class="bar" id="ax-bar" hidden>
         <div class="head">
-          <span class="title">🤖 ArenaX</span>
+          <span class="title"><span class="ax-logo-sm">AX</span> 에이전트</span>
           <span class="task-counter" id="ax-counter">0/5 활성</span>
           <div class="head-btns">
             <button class="icon-btn" id="ax-gear" title="서버 설정">설정</button>
@@ -283,6 +305,7 @@
   let enabled       = false;
   let pendingConfirm= null;
   let launcherBottom= 96;
+  let launcherRight = 16;
   let kbOffset = 0; // 모바일 키보드 높이 오프셋
   let tasksHeight   = 260;
   let bubbleTimer   = null;
@@ -311,7 +334,7 @@
   function showBar(show) {
     bar.hidden = !show;
     render();
-    if (show) input.focus();
+    if (show) { applyBarPos(); setTimeout(() => input.focus(), 50); }
     // 모든 탭에 동기화 — 한 탭에서 접으면 다른 탭도 같이 접힘
     try { chrome.storage.local.set({ barOpen: show }); } catch {}
   }
@@ -322,7 +345,41 @@
   }
   function applyLauncherPos() {
     launcher.style.bottom = (launcherBottom + kbOffset) + "px";
+    launcher.style.right  = launcherRight + "px";
     bubble.style.bottom   = (launcherBottom + 58 + kbOffset) + "px";
+    bubble.style.right    = (launcherRight + 60) + "px";
+    if (!bar.hidden) applyBarPos();
+  }
+  // 패널을 런처 옆에 배치 (desktop 전용; 모바일은 CSS @media가 처리)
+  function applyBarPos() {
+    if (bar.hidden) return;
+    if (window.innerWidth <= 640) {
+      // 모바일: CSS @media에서 이미 처리하므로 JS 재정의 제거
+      ["left","top","right","bottom","width"].forEach(p => bar.style.removeProperty(p));
+      return;
+    }
+    const lRect = launcher.getBoundingClientRect();
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const bW = Math.min(440, W - 32);
+    const bH = Math.min(Math.floor(H * 0.72), 620);
+
+    // 런처 왼쪽 시도 → 공간 부족하면 오른쪽
+    let left = lRect.left - bW - 12;
+    if (left < 8) left = lRect.right + 12;
+    if (left + bW > W - 8) left = W - bW - 8;
+    if (left < 8) left = 8;
+
+    // 수직: 런처 하단 기준 패널 하단 맞춤
+    let top = lRect.bottom - bH;
+    if (top < 8) top = 8;
+    if (top + bH > H - 8) top = H - bH - 8;
+
+    bar.style.left   = left + "px";
+    bar.style.top    = top  + "px";
+    bar.style.right  = "auto";
+    bar.style.bottom = "auto";
+    bar.style.width  = bW + "px";
   }
   function applyTasksHeight() { tasksWrap.style.height = tasksHeight + "px"; }
 
@@ -491,25 +548,27 @@
     await setEnabled(false);
   }
 
-  // ── 런처 드래그 (위아래) ─────────────────────────────────────────────
+  // ── 런처 드래그 (상하좌우 2D) ──────────────────────────────────────
   let launcherDrag = null;
   launcher.addEventListener("pointerdown", e => {
-    launcherDrag = { y: e.clientY, b: launcherBottom, moved: false };
+    launcherDrag = { y: e.clientY, b: launcherBottom, x: e.clientX, r: launcherRight, moved: false };
     try { launcher.setPointerCapture(e.pointerId); } catch {}
     e.preventDefault();
   });
   launcher.addEventListener("pointermove", e => {
     if (!launcherDrag) return;
     const dy = launcherDrag.y - e.clientY;
-    if (Math.abs(dy) > 4) launcherDrag.moved = true;
+    const dx = launcherDrag.x - e.clientX;
+    if (Math.abs(dy) + Math.abs(dx) > 4) launcherDrag.moved = true;
     launcherBottom = Math.max(12, Math.min(window.innerHeight - 64, launcherDrag.b + dy));
-    applyLauncherPos();
+    launcherRight  = Math.max(8,  Math.min(window.innerWidth  - 60, launcherDrag.r + dx));
+    applyLauncherPos(); // bar가 열려있으면 applyLauncherPos 내부에서 applyBarPos 호출
   });
   function endLauncherDrag(e) {
     if (!launcherDrag) return;
     try { launcher.releasePointerCapture(e.pointerId); } catch {}
     const moved = launcherDrag.moved; launcherDrag = null;
-    if (moved) { try { chrome.storage.local.set({ launcherBottom }); } catch {} }
+    if (moved) { try { chrome.storage.local.set({ launcherBottom, launcherRight }); } catch {} }
     else showBar(true);
   }
   launcher.addEventListener("pointerup",     endLauncherDrag);
@@ -595,6 +654,9 @@
     if (changes.launcherBottom && typeof changes.launcherBottom.newValue === "number") {
       launcherBottom = changes.launcherBottom.newValue; applyLauncherPos();
     }
+    if (changes.launcherRight && typeof changes.launcherRight.newValue === "number") {
+      launcherRight = changes.launcherRight.newValue; applyLauncherPos();
+    }
     if (changes.tasksHeight && typeof changes.tasksHeight.newValue === "number") {
       tasksHeight = changes.tasksHeight.newValue; applyTasksHeight();
     }
@@ -639,11 +701,15 @@
   });
 
   // ── 초기화 ───────────────────────────────────────────────────────────
+  // 창 크기 변경 시 패널 재배치
+  window.addEventListener("resize", () => { if (!bar.hidden) applyBarPos(); });
+
   chrome.storage.local
-    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "tasksHeight", "barOpen"])
+    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "launcherRight", "tasksHeight", "barOpen"])
     .then(s => {
       if (s.serverUrl) serverInput.value = s.serverUrl;
       if (typeof s.launcherBottom === "number") launcherBottom = s.launcherBottom;
+      if (typeof s.launcherRight  === "number") launcherRight  = s.launcherRight;
       if (typeof s.tasksHeight    === "number") tasksHeight    = s.tasksHeight;
       applyLauncherPos();
       applyTasksHeight();
