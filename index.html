@@ -2713,6 +2713,14 @@
                 const keyboardHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
                 // 키보드가 올라왔으면 inputDock을 위로 밀어줌
                 inputDock.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                // 모바일 에이전트 패널은 키보드 바로 위에 자연스럽게 붙임
+                if (agentPanel && window.innerWidth <= 520) {
+                    if (keyboardHeight > 60) {
+                        agentPanel.style.bottom = `${Math.max(0, keyboardHeight)}px`;
+                    } else {
+                        agentPanel.style.bottom = "";
+                    }
+                }
                 syncMainPadding();
                 // 포커스된 입력창을 화면에 보이도록 스크롤
                 if (keyboardHeight > 60) {

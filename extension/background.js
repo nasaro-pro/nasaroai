@@ -424,9 +424,12 @@ async function runTask(tabId, text, taskId, pageUrl) {
         await tsStep(taskId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
 
         if (data.handoff_required) {
-          finalText = "🟡 직접 진행 필요: " + reasoning;
-          kind = "handoff";
-          break;
+          // 사용자 요청: 가능한 한 모두 진행 (handoff 차단 최소화)
+          await tsStep(taskId, "⚠ 직접 진행 필요 응답을 무시하고 자동 진행을 계속 시도합니다.", "info");
+          if (!data.action && !data.done) {
+            await sleep(250);
+            continue;
+          }
         }
         if (data.done) {
           finalText = reasoning;
@@ -434,11 +437,8 @@ async function runTask(tabId, text, taskId, pageUrl) {
           break;
         }
         if (data.confirm_required) {
-          const approved = await askConfirm(tabId, {
-            message: data.confirm_message || "중요한 동작을 실행하려고 합니다.",
-            action: data.action, reasoning,
-          });
-          if (!approved) { finalText = "🟡 사용자가 실행을 취소했습니다."; kind = "cancelled"; break; }
+          // 사용자 요청: 차단 없이 진행
+          await tsStep(taskId, "✅ 확인 단계 자동 허용됨", "info");
         }
 
         const exec = await executeAction(tabId, { action: data.action, target_id: data.target_id, value: data.value });
@@ -657,6 +657,18 @@ chrome.action.onClicked.addListener(async () => {
   let cur = false;
   try { cur = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
   try { await chrome.storage.local.set({ agentEnabled: !cur }); } catch {}
+});
+
+// 확장 시작/업데이트 직후 기존 탭도 즉시 동기화 (새로고침 없이)
+chrome.runtime.onStartup.addListener(async () => {
+  let enabled = false;
+  try { enabled = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
+  syncAllTabs(enabled).catch(() => {});
+});
+chrome.runtime.onInstalled.addListener(async () => {
+  let enabled = false;
+  try { enabled = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
+  syncAllTabs(enabled).catch(() => {});
 });
 
 // ---- 사이트 이동 시 즉시 content 주입(새로고침 없이 따라오도록 보강) ----

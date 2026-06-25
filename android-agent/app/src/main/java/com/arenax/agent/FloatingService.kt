@@ -16,16 +16,20 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
 import androidx.core.app.NotificationCompat
 
 class FloatingService : Service() {
 
     private lateinit var wm: WindowManager
     private var floatView: View? = null
+    private var panelView: View? = null
 
     private val CHANNEL_ID = "arenax_float"
     private val NOTIF_ID   = 1001
-    private val ARENA_URL  = "https://arenax-4812.onrender.com"
+    private val ARENA_URL  = "https://arenax-4812.onrender.com/?source=app"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -39,7 +43,9 @@ class FloatingService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         floatView?.let { wm.removeView(it) }
+        panelView?.let { wm.removeView(it) }
         floatView = null
+        panelView = null
     }
 
     private fun showButton() {
@@ -99,7 +105,7 @@ class FloatingService : Service() {
                         if (elapsed > 600L) {
                             stopSelf()           // 길게 누르면 종료
                         } else {
-                            openArenaX()         // 탭하면 열기
+                            togglePanel()        // 탭하면 오버레이 질문창 토글
                         }
                     } else {
                         // 위치 저장
@@ -133,6 +139,53 @@ class FloatingService : Service() {
         }
     }
 
+    private fun togglePanel() {
+        if (panelView != null) {
+            panelView?.let { wm.removeView(it) }
+            panelView = null
+            return
+        }
+        showPanel()
+    }
+
+    @Suppress("SetJavaScriptEnabled")
+    private fun showPanel() {
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else
+            @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+
+        val web = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
+            settings.userAgentString = settings.userAgentString + " ArenaXApp"
+            webChromeClient = WebChromeClient()
+            loadUrl(ARENA_URL)
+            setBackgroundColor(0xFFFFFFFF.toInt())
+        }
+
+        panelView = web
+
+        val dm = resources.displayMetrics
+        val width = (dm.widthPixels * 0.92f).toInt().coerceAtLeast(720)
+        val height = (dm.heightPixels * 0.70f).toInt().coerceAtLeast(900)
+
+        val params = WindowManager.LayoutParams(
+            width,
+            height,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = ((dm.widthPixels - width) / 2).coerceAtLeast(8)
+            y = (dm.heightPixels * 0.12f).toInt().coerceAtLeast(8)
+        }
+
+        wm.addView(panelView, params)
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
@@ -151,7 +204,7 @@ class FloatingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif)
             .setContentTitle("ArenaX 에이전트")
-            .setContentText("탭해서 ArenaX 열기 · 길게 누르면 닫기")
+            .setContentText("탭해서 질문창 열기 · 길게 누르면 닫기")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setContentIntent(pi)
