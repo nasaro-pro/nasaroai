@@ -3207,6 +3207,33 @@
             const startTime = Date.now();
             let usedFallback = false;
 
+            if (isAgentOverlay && window.NasaroAndroidAgent?.runNativeTask) {
+                try {
+                    if (window.NasaroAndroidAgent.isAccessibilityReady && !window.NasaroAndroidAgent.isAccessibilityReady()) {
+                        window.NasaroAndroidAgent.openAccessibilitySettings?.();
+                        finalizeCard(
+                            cardRefs,
+                            "ok",
+                            "Android 접근성 권한이 필요합니다. 열린 설정 화면에서 Nasaro AI 에이전트를 켠 뒤 다시 요청해주세요.",
+                            mission,
+                            Date.now() - startTime
+                        );
+                        return;
+                    }
+                    const nativeResult = window.NasaroAndroidAgent.runNativeTask(mission);
+                    finalizeCard(cardRefs, "ok", nativeResult || "Android 접근성 작업을 실행했습니다.", mission, Date.now() - startTime);
+                    agentMissionHistory.push({ mission, result: String(nativeResult || "").slice(0, 300) });
+                    return;
+                } catch (err) {
+                    finalizeCard(cardRefs, "error", "Android 접근성 작업 실행 실패: " + err.message, mission, Date.now() - startTime);
+                    return;
+                } finally {
+                    agentInFlight  = false;
+                    agentAbortCtrl = null;
+                    if (agentSendBtn) { agentSendBtn.disabled = false; agentSendBtn.textContent = "실행 ▶"; agentSendBtn._nextIsModify = false; }
+                }
+            }
+
             const doFetch = async (endpoint, body) => {
                 return fetch(`${API_URL}${endpoint}`, {
                     method: "POST",

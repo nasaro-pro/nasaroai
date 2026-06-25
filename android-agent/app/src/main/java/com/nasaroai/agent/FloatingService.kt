@@ -9,6 +9,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -237,6 +238,25 @@ class FloatingService : Service() {
                     .apply()
                 stopSelf()
             }
+        }
+
+        @JavascriptInterface
+        fun isAccessibilityReady(): Boolean {
+            return AccessibilityAgentService.isRunning()
+        }
+
+        @JavascriptInterface
+        fun openAccessibilitySettings() {
+            android.os.Handler(mainLooper).post {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            }
+        }
+
+        @JavascriptInterface
+        fun runNativeTask(task: String): String {
+            return AccessibilityAgentService.performTask(task)
         }
     }
 

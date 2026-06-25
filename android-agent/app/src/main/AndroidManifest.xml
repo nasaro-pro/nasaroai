@@ -28,6 +28,19 @@
             android:name=".FloatingService"
             android:exported="false"/>
 
+        <service
+            android:name=".AccessibilityAgentService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_agent_config" />
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
