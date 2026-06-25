@@ -181,7 +181,21 @@
     margin-left: auto; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c;
     border-radius: 6px; font-size: 10px; font-weight: 700; padding: 3px 6px; cursor: pointer;
   }
-  .task-mini-list { overflow-y: auto; min-height: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .task-mini-sections {
+    flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 6px;
+  }
+  .task-mini-section {
+    min-height: 0; display: flex; flex-direction: column; border: 1px solid #f1f1f4;
+    border-radius: 8px; background: #fff; overflow: hidden;
+  }
+  .task-mini-section.active { flex: 1 1 45%; }
+  .task-mini-section.done { flex: 1 1 55%; }
+  .task-mini-section-title {
+    flex: 0 0 auto; padding: 5px 7px; font-size: 10px; font-weight: 900; color: #6b7280;
+    background: #f9fafb; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between;
+  }
+  .task-mini-list { overflow-y: auto; min-height: 0; padding: 5px; display: flex; flex-direction: column; gap: 4px; }
+  .task-mini-empty { font-size: 10px; color: #9ca3af; padding: 5px 2px; line-height: 1.35; }
   .task-mini-item {
     display: flex; align-items: center; gap: 4px; border: 1px solid #e5e7eb; border-radius: 7px;
     background: #fff; padding: 4px 5px;
@@ -319,7 +333,16 @@
               <span class="task-sidebar-title">임무 목록</span>
               <button class="task-clear-btn" id="ax-clear-all" title="기록 전체 삭제">전체삭제</button>
             </div>
-            <div class="task-mini-list" id="ax-mini-list"></div>
+            <div class="task-mini-sections" id="ax-mini-sections">
+              <section class="task-mini-section active">
+                <div class="task-mini-section-title"><span>활동중</span><span id="ax-active-count">0</span></div>
+                <div class="task-mini-list" id="ax-active-list"></div>
+              </section>
+              <section class="task-mini-section done">
+                <div class="task-mini-section-title"><span>완료됨</span><span id="ax-done-count">0</span></div>
+                <div class="task-mini-list" id="ax-done-list"></div>
+              </section>
+            </div>
           </aside>
           <div class="tasks-wrap" id="ax-tasks-wrap">
             <div class="tasks-inner" id="ax-tasks"></div>
@@ -361,7 +384,11 @@
   const resizeHandle=$("ax-resize");
   const tasksWrap  = $("ax-tasks-wrap");
   const tasksEl    = $("ax-tasks");
-  const miniListEl = $("ax-mini-list");
+  const miniSectionsEl = $("ax-mini-sections");
+  const activeListEl = $("ax-active-list");
+  const doneListEl = $("ax-done-list");
+  const activeCountEl = $("ax-active-count");
+  const doneCountEl = $("ax-done-count");
   const clearAllBtn= $("ax-clear-all");
   const confirmBox = $("ax-confirm");
   const confirmMsg = $("ax-confirm-msg");
@@ -511,6 +538,22 @@
   }
   function applyTasksHeight() { if (taskArea) taskArea.style.height = tasksHeight + "px"; }
 
+  let pendingUiSync = {};
+  let uiSyncTimer = 0;
+  function flushUiSync() {
+    if (uiSyncTimer) clearTimeout(uiSyncTimer);
+    uiSyncTimer = 0;
+    const payload = pendingUiSync;
+    pendingUiSync = {};
+    if (!Object.keys(payload).length) return;
+    try { chrome.storage.local.set(payload); } catch {}
+  }
+  function syncUiSoon(values, immediate = false) {
+    pendingUiSync = { ...pendingUiSync, ...values };
+    if (immediate) { flushUiSync(); return; }
+    if (!uiSyncTimer) uiSyncTimer = setTimeout(flushUiSync, 60);
+  }
+
   // ── 말풍선 ───────────────────────────────────────────────────────────
   const BUBBLE_CLS = { success:"success", error:"error", handoff:"handoff", cancelled:"cancelled" };
   function showBubble(text, kind) {
@@ -593,21 +636,34 @@
       : "이 화면에서 할 일을 지시하세요.";
 
     tasksEl.innerHTML = "";
-    if (miniListEl) miniListEl.innerHTML = "";
+    if (activeListEl) activeListEl.innerHTML = "";
+    if (doneListEl) doneListEl.innerHTML = "";
+    if (activeCountEl) activeCountEl.textContent = String(active.length);
+    if (doneCountEl) doneCountEl.textContent = String(archived.length);
 
-    // 왼쪽 미니바: 최신이 아래에 쌓이도록 원본 순서로 렌더
-    if (miniListEl) {
-      for (const t of list) {
+    function appendMiniTask(container, taskList, emptyText) {
+      if (!container) return;
+      if (!taskList.length) {
+        const empty = document.createElement("div");
+        empty.className = "task-mini-empty";
+        empty.textContent = emptyText;
+        container.appendChild(empty);
+        return;
+      }
+      for (const t of taskList) {
         const item = document.createElement("div");
         item.className = "task-mini-item";
         item.innerHTML = `
           <button class="task-mini-link" data-id="${esc(t.id)}" title="${esc(t.text)}">${esc(t.text)}</button>
           <button class="task-mini-del" data-id="${esc(t.id)}" title="삭제">✕</button>
         `;
-        miniListEl.appendChild(item);
+        container.appendChild(item);
       }
-      miniListEl.scrollTop = miniListEl.scrollHeight;
     }
+    appendMiniTask(activeListEl, active, "활동중인 임무가 없습니다.");
+    appendMiniTask(doneListEl, archived, "완료된 기록이 없습니다.");
+    if (activeListEl) activeListEl.scrollTop = activeListEl.scrollHeight;
+    if (doneListEl) doneListEl.scrollTop = doneListEl.scrollHeight;
 
     // ── 기록 먼저(위) — 위로 스크롤하면 볼 수 있음 ──
     if (archived.length) {
@@ -700,7 +756,7 @@
   });
 
   // ── 왼쪽 임무 미니바 이벤트 ────────────────────────────────────────────
-  miniListEl && miniListEl.addEventListener("click", async e => {
+  miniSectionsEl && miniSectionsEl.addEventListener("click", async e => {
     const link = e.target.closest(".task-mini-link");
     const del = e.target.closest(".task-mini-del");
     if (link?.dataset.id) {
@@ -751,12 +807,13 @@
     launcherBottom = Math.max(12, Math.min(window.innerHeight - 64, launcherDrag.b + dy));
     launcherRight  = Math.max(8,  Math.min(window.innerWidth  - 60, launcherDrag.r + dx));
     applyLauncherPos(); // bar가 열려있으면 applyLauncherPos 내부에서 applyBarPos 호출
+    syncUiSoon({ launcherBottom, launcherRight });
   });
   function endLauncherDrag(e) {
     if (!launcherDrag) return;
     try { launcher.releasePointerCapture(e.pointerId); } catch {}
     const moved = launcherDrag.moved; launcherDrag = null;
-    if (moved) { try { chrome.storage.local.set({ launcherBottom, launcherRight }); } catch {} }
+    if (moved) syncUiSoon({ launcherBottom, launcherRight }, true);
     else showBar(true);
   }
   launcher.addEventListener("pointerup",     endLauncherDrag);
@@ -788,6 +845,10 @@
     bar.style.top = top + "px";
     bar.style.right = "auto";
     bar.style.bottom = "auto";
+    barLeft = Math.round(left);
+    barTop = Math.round(top);
+    barManualPos = true;
+    syncUiSoon({ barLeft, barTop, barManualPos: true });
   });
   function endBarDrag(e) {
     if (!barDrag) return;
@@ -797,7 +858,7 @@
       barLeft = Math.round(r.left);
       barTop = Math.round(r.top);
       barManualPos = true;
-      try { chrome.storage.local.set({ barLeft, barTop, barManualPos: true }); } catch {}
+      syncUiSoon({ barLeft, barTop, barManualPos: true }, true);
     }
     barDrag = null;
   }
@@ -814,7 +875,7 @@
       if (Math.abs(w - barWidth) < 2 && Math.abs(h - barHeight) < 2) return;
       barWidth = w;
       barHeight = h;
-      try { chrome.storage.local.set({ barWidth, barHeight }); } catch {}
+      syncUiSoon({ barWidth, barHeight });
     });
     barResizeObs.observe(bar);
   }
@@ -832,12 +893,13 @@
     const dy = e.clientY - resizing.y;
     tasksHeight = Math.max(80, Math.min(Math.round(window.innerHeight * 0.6), resizing.h + dy));
     applyTasksHeight();
+    syncUiSoon({ tasksHeight });
   });
   function endResize(e) {
     if (!resizing) return;
     try { resizeHandle.releasePointerCapture(e.pointerId); } catch {}
     resizing = null;
-    try { chrome.storage.local.set({ tasksHeight }); } catch {}
+    syncUiSoon({ tasksHeight }, true);
   }
   resizeHandle.addEventListener("pointerup",     endResize);
   resizeHandle.addEventListener("pointercancel", () => { resizing = null; });
@@ -881,6 +943,17 @@
     if (msg.type === "AX_SYNC_STATE") {
       const enabledNow = !!msg.enabled;
       const openNow = !!msg.barOpen;
+      if (typeof msg.launcherBottom === "number") launcherBottom = msg.launcherBottom;
+      if (typeof msg.launcherRight === "number") launcherRight = msg.launcherRight;
+      if (typeof msg.barLeft === "number") barLeft = msg.barLeft;
+      if (typeof msg.barTop === "number") barTop = msg.barTop;
+      if (msg.barManualPos !== undefined) barManualPos = !!msg.barManualPos;
+      if (typeof msg.barWidth === "number") barWidth = msg.barWidth;
+      if (typeof msg.barHeight === "number") barHeight = msg.barHeight;
+      if (typeof msg.tasksHeight === "number") tasksHeight = msg.tasksHeight;
+      applyLauncherPos();
+      applyBarSize();
+      applyTasksHeight();
       applyEnabled(enabledNow);
       if (!enabledNow) {
         bar.hidden = true;
@@ -939,7 +1012,7 @@
         const r = bar.getBoundingClientRect();
         barLeft = Math.round(r.left);
         barTop = Math.round(r.top);
-        try { chrome.storage.local.set({ barLeft, barTop, barManualPos: true }); } catch {}
+        syncUiSoon({ barLeft, barTop, barManualPos: true }, true);
       }
     }
     else if (d.type === "CLOSE") endAgent();
@@ -952,19 +1025,25 @@
     if (area !== "local") return;
     if (changes.agentEnabled) applyEnabled(!!changes.agentEnabled.newValue);
     if (changes.agentTasks)   renderTasks(changes.agentTasks.newValue || []);
+    let repositionBar = false;
     if (changes.launcherBottom && typeof changes.launcherBottom.newValue === "number") {
       launcherBottom = changes.launcherBottom.newValue; applyLauncherPos();
     }
     if (changes.launcherRight && typeof changes.launcherRight.newValue === "number") {
       launcherRight = changes.launcherRight.newValue; applyLauncherPos();
     }
-    if (changes.barLeft && typeof changes.barLeft.newValue === "number") barLeft = changes.barLeft.newValue;
-    if (changes.barTop && typeof changes.barTop.newValue === "number") barTop = changes.barTop.newValue;
-    if (changes.barManualPos !== undefined) barManualPos = !!changes.barManualPos.newValue;
-    if (changes.barWidth && typeof changes.barWidth.newValue === "number") barWidth = changes.barWidth.newValue;
-    if (changes.barHeight && typeof changes.barHeight.newValue === "number") barHeight = changes.barHeight.newValue;
+    if (changes.barLeft && typeof changes.barLeft.newValue === "number") { barLeft = changes.barLeft.newValue; repositionBar = true; }
+    if (changes.barTop && typeof changes.barTop.newValue === "number") { barTop = changes.barTop.newValue; repositionBar = true; }
+    if (changes.barManualPos !== undefined) { barManualPos = !!changes.barManualPos.newValue; repositionBar = true; }
+    if (changes.barWidth && typeof changes.barWidth.newValue === "number") { barWidth = changes.barWidth.newValue; repositionBar = true; }
+    if (changes.barHeight && typeof changes.barHeight.newValue === "number") { barHeight = changes.barHeight.newValue; repositionBar = true; }
     if (changes.tasksHeight && typeof changes.tasksHeight.newValue === "number") {
       tasksHeight = changes.tasksHeight.newValue; applyTasksHeight();
+    }
+    if (repositionBar && !bar.hidden) {
+      applyBarSize();
+      if (barManualPos && window.innerWidth > 640) applyManualBarPos();
+      else applyBarPos();
     }
     if (changes.latestNotification) {
       const n = changes.latestNotification.newValue;
@@ -1057,7 +1136,8 @@
             applyBarPos();
           }
           tasksWrap.scrollTop = tasksWrap.scrollHeight;
-          if (miniListEl) miniListEl.scrollTop = miniListEl.scrollHeight;
+          if (activeListEl) activeListEl.scrollTop = activeListEl.scrollHeight;
+          if (doneListEl) doneListEl.scrollTop = doneListEl.scrollHeight;
         };
         // 런처 DOM이 완전히 렌더된 후 위치 복원
         setTimeout(restore, 80);

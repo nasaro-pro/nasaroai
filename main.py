@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from playwright.async_api import async_playwright
@@ -1878,7 +1878,7 @@ def extension_update(request: Request):
         f"<app appid='{ext_id}'>"
         "<updatecheck"
         " status='ok'"
-        " version='2.3.0'"
+        " version='2.3.1'"
         " prodversionmin='88.0'"
         " codebase='https://nasaroai.onrender.com/static/nasaroai-extension.zip'"
         "/>"

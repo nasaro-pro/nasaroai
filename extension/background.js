@@ -608,10 +608,47 @@ async function syncAllTabs(enabled) {
 
 async function getUiSyncState() {
   try {
-    const s = await chrome.storage.local.get(["agentEnabled", "barOpen"]);
-    return { enabled: !!s.agentEnabled, barOpen: !!s.barOpen };
+    const s = await chrome.storage.local.get([
+      "agentEnabled",
+      "barOpen",
+      "launcherBottom",
+      "launcherRight",
+      "barLeft",
+      "barTop",
+      "barManualPos",
+      "barWidth",
+      "barHeight",
+      "tasksHeight",
+    ]);
+    return {
+      enabled: !!s.agentEnabled,
+      barOpen: !!s.barOpen,
+      launcherBottom: s.launcherBottom,
+      launcherRight: s.launcherRight,
+      barLeft: s.barLeft,
+      barTop: s.barTop,
+      barManualPos: s.barManualPos,
+      barWidth: s.barWidth,
+      barHeight: s.barHeight,
+      tasksHeight: s.tasksHeight,
+    };
   } catch {
     return { enabled: false, barOpen: false };
+  }
+}
+
+async function broadcastUiState({ ensureContent = false } = {}) {
+  const ui = await getUiSyncState();
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({}); } catch { return; }
+  for (const t of tabs) {
+    if (!t.id || !t.url || INTERNAL_URL_RE.test(t.url)) continue;
+    try {
+      if (ensureContent && ui.enabled) {
+        await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["content.js"] });
+      }
+      chrome.tabs.sendMessage(t.id, { type: "AX_SYNC_STATE", ...ui }, () => void chrome.runtime.lastError);
+    } catch {}
   }
 }
 
@@ -640,14 +677,20 @@ chrome.storage.onChanged.addListener((changes, area) => {
     syncAllTabs(!!changes.agentEnabled.newValue).catch(() => {});
   }
   if (changes.barOpen !== undefined) {
-    getUiSyncState().then(ui => {
-      chrome.tabs.query({}).then(tabs => {
-        for (const t of tabs) {
-          if (!t.id || !t.url || INTERNAL_URL_RE.test(t.url)) continue;
-          chrome.tabs.sendMessage(t.id, { type: "AX_SYNC_STATE", ...ui }, () => void chrome.runtime.lastError);
-        }
-      }).catch(() => {});
-    }).catch(() => {});
+    broadcastUiState({ ensureContent: true }).catch(() => {});
+  }
+  const uiKeys = [
+    "launcherBottom",
+    "launcherRight",
+    "barLeft",
+    "barTop",
+    "barManualPos",
+    "barWidth",
+    "barHeight",
+    "tasksHeight",
+  ];
+  if (uiKeys.some(key => changes[key] !== undefined)) {
+    broadcastUiState({ ensureContent: false }).catch(() => {});
   }
 });
 
