@@ -156,7 +156,36 @@
   .resize-handle:hover, .resize-handle:hover::before { background: #c4b5fd; }
 
   /* 임무 영역 */
-  .tasks-wrap { overflow-y: auto; flex-shrink: 0; }
+  .task-area { display: flex; flex: 1 1 auto; min-height: 140px; }
+  .task-sidebar {
+    width: 148px; flex: 0 0 148px; border-right: 1px solid #f1f1f4; background: #fcfcff;
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .task-sidebar-head {
+    padding: 8px 8px 6px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 6px;
+  }
+  .task-sidebar-title { font-size: 11px; font-weight: 800; color: #6b7280; }
+  .task-clear-btn {
+    margin-left: auto; border: 1px solid #fecaca; background: #fff1f2; color: #b91c1c;
+    border-radius: 6px; font-size: 10px; font-weight: 700; padding: 3px 6px; cursor: pointer;
+  }
+  .task-mini-list { overflow-y: auto; min-height: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .task-mini-item {
+    display: flex; align-items: center; gap: 4px; border: 1px solid #e5e7eb; border-radius: 7px;
+    background: #fff; padding: 4px 5px;
+  }
+  .task-mini-link {
+    flex: 1 1 auto; min-width: 0; border: 0; background: transparent; text-align: left; cursor: pointer;
+    font-size: 11px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .task-mini-del {
+    flex: 0 0 auto; border: 1px solid #e5e7eb; background: #f9fafb; color: #9ca3af;
+    border-radius: 5px; font-size: 10px; font-weight: 700; padding: 2px 5px; cursor: pointer;
+  }
+  .task-mini-list::-webkit-scrollbar { width: 5px; }
+  .task-mini-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+  .tasks-wrap { overflow-y: auto; flex: 1 1 auto; min-width: 0; }
   .tasks-inner { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
   .section-label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 0 2px; }
   .empty { font-size: 13px; color: #9ca3af; padding: 2px 0; }
@@ -181,6 +210,7 @@
   .task-badge.handoff   { background: #fef3c7; color: #b45309; }
   .task-badge.cancelled { background: #f3f4f6; color: #6b7280; }
 
+  .task-site { font-size: 11px; color: #6b7280; padding: 0 10px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .task-latest { font-size: 12px; color: #4b5563; padding: 0 10px 2px; overflow-wrap: anywhere; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .task-log {
     margin: 2px 10px 6px;
@@ -271,8 +301,17 @@
           <input id="ax-server" type="text" placeholder="https://arenax-4812.onrender.com" />
           <button id="ax-save">저장</button>
         </div>
-        <div class="tasks-wrap" id="ax-tasks-wrap">
-          <div class="tasks-inner" id="ax-tasks"></div>
+        <div class="task-area" id="ax-task-area">
+          <aside class="task-sidebar">
+            <div class="task-sidebar-head">
+              <span class="task-sidebar-title">임무 목록</span>
+              <button class="task-clear-btn" id="ax-clear-all" title="기록 전체 삭제">전체삭제</button>
+            </div>
+            <div class="task-mini-list" id="ax-mini-list"></div>
+          </aside>
+          <div class="tasks-wrap" id="ax-tasks-wrap">
+            <div class="tasks-inner" id="ax-tasks"></div>
+          </div>
         </div>
         <div class="resize-handle" id="ax-resize"></div>
         <div class="confirm" id="ax-confirm">
@@ -306,9 +345,12 @@
   const settings   = $("ax-settings");
   const serverInput= $("ax-server");
   const saveBtn    = $("ax-save");
+  const taskArea   = $("ax-task-area");
   const resizeHandle=$("ax-resize");
   const tasksWrap  = $("ax-tasks-wrap");
   const tasksEl    = $("ax-tasks");
+  const miniListEl = $("ax-mini-list");
+  const clearAllBtn= $("ax-clear-all");
   const confirmBox = $("ax-confirm");
   const confirmMsg = $("ax-confirm-msg");
   const approveBtn = $("ax-approve");
@@ -324,6 +366,9 @@
   let pendingConfirm= null;
   let launcherBottom= 96;
   let launcherRight = 16;
+  let barLeft = 0;
+  let barTop = 0;
+  let barManualPos = false;
   let kbOffset = 0; // 모바일 키보드 높이 오프셋
   let tasksHeight   = 260;
   let bubbleTimer   = null;
@@ -352,7 +397,24 @@
   function showBar(show) {
     bar.hidden = !show;
     render();
-    if (show) { applyBarPos(); setTimeout(() => input.focus(), 50); }
+    if (show) {
+      if (window.innerWidth > 640 && barManualPos) {
+        const bW = bar.offsetWidth || 560;
+        const bH = bar.offsetHeight || 760;
+        const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
+        const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
+        bar.style.left = left + "px";
+        bar.style.top = top + "px";
+        bar.style.right = "auto";
+        bar.style.bottom = "auto";
+      } else {
+        applyBarPos();
+      }
+      setTimeout(() => {
+        input.focus();
+        tasksWrap.scrollTop = tasksWrap.scrollHeight;
+      }, 50);
+    }
     // 모든 탭에 동기화 — 한 탭에서 접으면 다른 탭도 같이 접힘
     try { chrome.storage.local.set({ barOpen: show }); } catch {}
   }
@@ -405,8 +467,9 @@
     bar.style.right  = "auto";
     bar.style.bottom = "auto";
     bar.style.width  = bW + "px";
+    if (!barManualPos) { barLeft = left; barTop = top; }
   }
-  function applyTasksHeight() { tasksWrap.style.height = tasksHeight + "px"; }
+  function applyTasksHeight() { if (taskArea) taskArea.style.height = tasksHeight + "px"; }
 
   // ── 말풍선 ───────────────────────────────────────────────────────────
   const BUBBLE_CLS = { success:"success", error:"error", handoff:"handoff", cancelled:"cancelled" };
@@ -430,6 +493,8 @@
     const isActive = ACTIVE_SET.has(task.status);
     const latestStep = isActive && task.steps?.length ? task.steps[task.steps.length - 1] : null;
     const latestHtml = latestStep ? `<div class="task-latest">${esc(latestStep.text)}</div>` : "";
+    const siteLabel = task.pageHost || task.pageUrl || "";
+    const siteHtml = siteLabel ? `<div class="task-site">사이트: ${esc(siteLabel)}</div>` : "";
     const resultHtml = task.result ? `<div class="task-result ${esc(s.cls)}">${esc(task.result)}</div>` : "";
 
     let btnHtml = "";
@@ -463,6 +528,7 @@
         <span class="task-text" title="${esc(task.text)}">${esc(task.text)}</span>
         <span class="task-badge ${esc(s.cls)}">${esc(s.label)}</span>
       </div>
+      ${siteHtml}
       ${latestHtml}
       ${logHtml}
       ${resultHtml}
@@ -487,6 +553,21 @@
       : "이 화면에서 할 일을 지시하세요.";
 
     tasksEl.innerHTML = "";
+    if (miniListEl) miniListEl.innerHTML = "";
+
+    // 왼쪽 미니바: 최신이 아래에 쌓이도록 원본 순서로 렌더
+    if (miniListEl) {
+      for (const t of list) {
+        const item = document.createElement("div");
+        item.className = "task-mini-item";
+        item.innerHTML = `
+          <button class="task-mini-link" data-id="${esc(t.id)}" title="${esc(t.text)}">${esc(t.text)}</button>
+          <button class="task-mini-del" data-id="${esc(t.id)}" title="삭제">✕</button>
+        `;
+        miniListEl.appendChild(item);
+      }
+      miniListEl.scrollTop = miniListEl.scrollHeight;
+    }
 
     // ── 기록 먼저(위) — 위로 스크롤하면 볼 수 있음 ──
     if (archived.length) {
@@ -578,6 +659,25 @@
     }
   });
 
+  // ── 왼쪽 임무 미니바 이벤트 ────────────────────────────────────────────
+  miniListEl && miniListEl.addEventListener("click", async e => {
+    const link = e.target.closest(".task-mini-link");
+    const del = e.target.closest(".task-mini-del");
+    if (link?.dataset.id) {
+      const target = tasksEl.querySelector(`.task-card[data-id="${link.dataset.id}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+    if (del?.dataset.id) {
+      try { await chrome.runtime.sendMessage({ type: "DELETE_TASK", taskId: del.dataset.id }); } catch {}
+    }
+  });
+  clearAllBtn && clearAllBtn.addEventListener("click", async () => {
+    try { await chrome.runtime.sendMessage({ type: "CLEAR_TASKS" }); } catch {}
+  });
+
   // ── 임무 제출 ────────────────────────────────────────────────────────
   function submitTask() {
     const task = input.value.trim();
@@ -652,6 +752,13 @@
   function endBarDrag(e) {
     if (!barDrag) return;
     try { headEl && headEl.releasePointerCapture(e.pointerId); } catch {}
+    if (barDrag.moved) {
+      const r = bar.getBoundingClientRect();
+      barLeft = Math.round(r.left);
+      barTop = Math.round(r.top);
+      barManualPos = true;
+      try { chrome.storage.local.set({ barLeft, barTop, barManualPos: true }); } catch {}
+    }
     barDrag = null;
   }
   headEl && headEl.addEventListener("pointerup", endBarDrag);
@@ -741,6 +848,9 @@
     if (changes.launcherRight && typeof changes.launcherRight.newValue === "number") {
       launcherRight = changes.launcherRight.newValue; applyLauncherPos();
     }
+    if (changes.barLeft && typeof changes.barLeft.newValue === "number") barLeft = changes.barLeft.newValue;
+    if (changes.barTop && typeof changes.barTop.newValue === "number") barTop = changes.barTop.newValue;
+    if (changes.barManualPos !== undefined) barManualPos = !!changes.barManualPos.newValue;
     if (changes.tasksHeight && typeof changes.tasksHeight.newValue === "number") {
       tasksHeight = changes.tasksHeight.newValue; applyTasksHeight();
     }
@@ -756,6 +866,20 @@
       const open = !!changes.barOpen.newValue;
       bar.hidden = !open;
       render();
+      if (open) {
+        if (barManualPos && window.innerWidth > 640) {
+          const bW = bar.offsetWidth || 560;
+          const bH = bar.offsetHeight || 760;
+          const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
+          const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
+          bar.style.left = left + "px";
+          bar.style.top = top + "px";
+          bar.style.right = "auto";
+          bar.style.bottom = "auto";
+        } else {
+          applyBarPos();
+        }
+      }
     }
   });
 
@@ -786,14 +910,31 @@
 
   // ── 초기화 ───────────────────────────────────────────────────────────
   // 창 크기 변경 시 패널 재배치
-  window.addEventListener("resize", () => { if (!bar.hidden) applyBarPos(); });
+  window.addEventListener("resize", () => {
+    if (bar.hidden) return;
+    if (barManualPos && window.innerWidth > 640) {
+      const bW = bar.offsetWidth || 560;
+      const bH = bar.offsetHeight || 760;
+      const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
+      const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
+      bar.style.left = left + "px";
+      bar.style.top = top + "px";
+      bar.style.right = "auto";
+      bar.style.bottom = "auto";
+    } else {
+      applyBarPos();
+    }
+  });
 
   chrome.storage.local
-    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "launcherRight", "tasksHeight", "barOpen"])
+    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "launcherRight", "barLeft", "barTop", "barManualPos", "tasksHeight", "barOpen"])
     .then(s => {
       if (s.serverUrl) serverInput.value = s.serverUrl;
       if (typeof s.launcherBottom === "number") launcherBottom = s.launcherBottom;
       if (typeof s.launcherRight  === "number") launcherRight  = s.launcherRight;
+      if (typeof s.barLeft === "number") barLeft = s.barLeft;
+      if (typeof s.barTop === "number") barTop = s.barTop;
+      barManualPos = !!s.barManualPos;
       if (typeof s.tasksHeight    === "number") tasksHeight    = s.tasksHeight;
       applyLauncherPos();
       applyTasksHeight();
@@ -805,9 +946,25 @@
       if (!!s.agentEnabled && s.barOpen === true) {
         bar.hidden = false;
         render();
-        // 런처 DOM이 완전히 렌더된 후에 패널 위치 계산 (타이밍 여유)
-        setTimeout(applyBarPos, 80);
-        setTimeout(applyBarPos, 250); // 느린 기기 대비 2차 보정
+        const restore = () => {
+          if (barManualPos && window.innerWidth > 640) {
+            const bW = bar.offsetWidth || 560;
+            const bH = bar.offsetHeight || 760;
+            const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
+            const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
+            bar.style.left = left + "px";
+            bar.style.top = top + "px";
+            bar.style.right = "auto";
+            bar.style.bottom = "auto";
+          } else {
+            applyBarPos();
+          }
+          tasksWrap.scrollTop = tasksWrap.scrollHeight;
+          if (miniListEl) miniListEl.scrollTop = miniListEl.scrollHeight;
+        };
+        // 런처 DOM이 완전히 렌더된 후 위치 복원
+        setTimeout(restore, 80);
+        setTimeout(restore, 250);
       }
     })
     .catch(() => {});

@@ -62,7 +62,11 @@ _withTasks(async (ts) => {
   }
 });
 
-function tsCreate(taskId, text, tabId) {
+function parseHost(url) {
+  try { return new URL(String(url || "")).host || ""; } catch { return ""; }
+}
+
+function tsCreate(taskId, text, tabId, pageUrl) {
   return _withTasks(async (ts) => {
     // 활성(실행중/중단됨) 임무는 최대 5개 — 이미 5개이면 오류 표시 후 생성 안 함
     const active = ts.filter(t => t.status === "running" || t.status === "paused").length;
@@ -70,7 +74,8 @@ function tsCreate(taskId, text, tabId) {
     // push(append) — 최신이 마지막(UI에서 아래 = 최신)
     ts.push({
       id: taskId, text, status: "running", result: "", steps: [],
-      tabId, createdAt: Date.now(), updatedAt: Date.now(),
+      tabId, pageUrl: pageUrl || "", pageHost: parseHost(pageUrl),
+      createdAt: Date.now(), updatedAt: Date.now(),
     });
     // 완료된 기록은 최대 50개 유지
     if (ts.length > 55) ts.splice(0, ts.length - 55);
@@ -99,6 +104,12 @@ function tsFinish(taskId, status, result) {
     const t = ts.find(x => x.id === taskId);
     if (t) { t.status = status; t.result = result; t.updatedAt = Date.now(); }
     return { latestNotification: { text: result, kind: status, t: Date.now() } };
+  });
+}
+
+function tsClearAll() {
+  return _withTasks(async (ts) => {
+    ts.splice(0, ts.length);
   });
 }
 
@@ -342,7 +353,7 @@ function askConfirm(tabId, payload) {
 }
 
 // ---- 작업 루프 ----
-async function runTask(tabId, text, taskId) {
+async function runTask(tabId, text, taskId, pageUrl) {
   const serverUrl = await getServerUrl();
   cancelFlags.delete(taskId);
   pauseFlags.delete(taskId);
@@ -351,7 +362,7 @@ async function runTask(tabId, text, taskId) {
   try {
     // 1) 태스크 생성 — MAX_ACTIVE이면 에러 throw (이제 _withTasks가 에러를 전파함)
     try {
-      await tsCreate(taskId, text, tabId);
+      await tsCreate(taskId, text, tabId, pageUrl);
     } catch (e) {
       const msg = String(e?.message ?? e);
       if (msg === "MAX_ACTIVE") {
@@ -456,6 +467,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
       if (message.type === "RUN_TASK") {
         const tabId = sender.tab?.id;
+        const tabUrl = sender.tab?.url || "";
         if (tabId == null) { sendResponse({ ok: false, finalText: "탭 정보를 찾을 수 없습니다.", kind: "error" }); return; }
         if (runningTabs.has(tabId)) {
           sendResponse({ ok: false, finalText: "⚠️ 이미 이 탭에서 작업 중입니다.", kind: "error" });
@@ -475,7 +487,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         runningTabs.add(tabId);
         tabToTask.set(tabId, taskId);
         // runTask의 외부 finally가 runningTabs/tabToTask cleanup을 보장함
-        runTask(tabId, message.task, taskId)
+        runTask(tabId, message.task, taskId, tabUrl)
           .then(sendResponse)
           .catch(e => {
             sendResponse({ ok: false, finalText: String(e?.message ?? e), kind: "error" });
@@ -513,6 +525,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const idx = ts.findIndex(x => x.id === taskId);
           if (idx >= 0) ts.splice(idx, 1);
         });
+        sendResponse({ ok: true });
+
+      } else if (message.type === "CLEAR_TASKS") {
+        // 실행/중단 중인 임무들은 취소 플래그 후, 기록을 모두 삭제
+        for (const taskId of tabToTask.values()) {
+          pauseFlags.delete(taskId);
+          cancelFlags.add(taskId);
+        }
+        await tsClearAll();
         sendResponse({ ok: true });
 
       } else if (message.type === "STOP_TASK") {
@@ -599,4 +620,16 @@ chrome.action.onClicked.addListener(async () => {
   let cur = false;
   try { cur = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
   try { await chrome.storage.local.set({ agentEnabled: !cur }); } catch {}
+});
+
+// ---- 사이트 이동 시 즉시 content 주입(새로고침 없이 따라오도록 보강) ----
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (!tab?.url || INTERNAL_URL_RE.test(tab.url)) return;
+  if (changeInfo.status !== "loading") return;
+  let enabled = false;
+  try { enabled = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
+  if (!enabled) return;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  } catch {}
 });
