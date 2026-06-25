@@ -2,6 +2,7 @@ package com.arenax.agent
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -39,6 +40,9 @@ class MainActivity : AppCompatActivity() {
         // 앱에서는 설치 팝업이 뜨지 않도록 source=app 전달
         webView.loadUrl("https://arenax-4812.onrender.com/?source=app")
 
+        val prefs = getSharedPreferences("arenax_float", MODE_PRIVATE)
+        prefs.edit().putBoolean("auto_start", true).apply()
+
         // 권한이 있으면 플로팅 런처 서비스 자동 시작 (홈 화면에서도 사용)
         if (Settings.canDrawOverlays(this)) {
             val intent = Intent(this, FloatingService::class.java)
@@ -47,6 +51,14 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(intent)
             }
+        } else {
+            // 버튼 화면 없이 권한 화면으로 바로 이동
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
