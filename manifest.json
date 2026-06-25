@@ -1,6 +1,6 @@
 {
-  "name": "ArenaX",
-  "short_name": "ArenaX",
+  "name": "Nasaro AI",
+  "short_name": "Nasaro AI",
   "description": "AI 모델 비교·토론·협업·에이전트 실험실",
   "start_url": "/",
   "display": "standalone",

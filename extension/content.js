@@ -1,22 +1,22 @@
-// ArenaX 에이전트 하단 바 (content script v5)
+// Nasaro AI 에이전트 하단 바 (content script v5)
 // - 활성 임무(실행중/중단됨) 최대 5개, 기록(완료/오류 등)은 별도 섹션
 // - 임무 목록 높이를 드래그로 조절 가능
 // - 최신 임무가 아래에 표시 (push 순서)
 // - 런처 말풍선: 3초 + X닫기
 (() => {
   // 주입 중복 방지: 전역 가드 + DOM 호스트 중복 체크
-  if (window.__arenaxAgentInjected) return;
-  const existingHost = document.getElementById("__arenax_agent_host");
+  if (window.__nasaroaiAgentInjected) return;
+  const existingHost = document.getElementById("__nasaroai_agent_host");
   if (existingHost?.shadowRoot?.getElementById("ax-launcher")) {
-    window.__arenaxAgentInjected = true;
+    window.__nasaroaiAgentInjected = true;
     return;
   }
   // 중간 실패로 남은 고아 호스트 정리 후 재주입
   if (existingHost) existingHost.remove();
-  window.__arenaxAgentInjected = true;
+  window.__nasaroaiAgentInjected = true;
 
   const host = document.createElement("div");
-  host.id = "__arenax_agent_host";
+  host.id = "__nasaroai_agent_host";
   Object.assign(host.style, {
     position: "fixed", left: "0", right: "0", bottom: "0",
     width: "100%", zIndex: "2147483647", pointerEvents: "none",
@@ -453,7 +453,7 @@
     try { chrome.storage.local.set({ barOpen: show }); } catch {}
   }
   function broadcastAgentState(v) {
-    try { window.postMessage({ __arenax: "agent", type: "STATE", enabled: !!v }, "*"); } catch {}
+    try { window.postMessage({ __nasaroai: "agent", type: "STATE", enabled: !!v }, "*"); } catch {}
   }
   function applyEnabled(v) {
     enabled = v;
@@ -927,10 +927,10 @@
   window.addEventListener("message", event => {
     if (event.source !== window) return;
     const d = event.data;
-    if (!d || d.__arenax !== "agent") return;
-    if (d.type === "PING") window.postMessage({ __arenax: "agent", type: "READY" }, "*");
+    if (!d || d.__nasaroai !== "agent") return;
+    if (d.type === "PING") window.postMessage({ __nasaroai: "agent", type: "READY" }, "*");
     else if (d.type === "OPEN") {
-      window.postMessage({ __arenax: "agent", type: "READY" }, "*");
+      window.postMessage({ __nasaroai: "agent", type: "READY" }, "*");
       setEnabled(true);
       showBar(true);
       // 에이전트 버튼에서 열었으면 버튼 위로 배치
@@ -944,7 +944,7 @@
     }
     else if (d.type === "CLOSE") endAgent();
   });
-  window.postMessage({ __arenax: "agent", type: "READY" }, "*");
+  window.postMessage({ __nasaroai: "agent", type: "READY" }, "*");
   broadcastAgentState(enabled);
 
   // ── storage.onChanged ────────────────────────────────────────────────

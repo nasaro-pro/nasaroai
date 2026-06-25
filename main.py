@@ -24,7 +24,7 @@ from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("arenax")
+logger = logging.getLogger("nasaroai")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -81,7 +81,7 @@ META_RESPONSE_KEYWORDS = [
     "as an ai",
 ]
 
-app = FastAPI(title="ArenaX Backend")
+app = FastAPI(title="Nasaro AI Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -341,8 +341,8 @@ def build_openrouter_headers() -> dict[str, str]:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     return {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://arenax.com",
-        "X-Title": "ArenaX",
+        "HTTP-Referer": "https://nasaroai.onrender.com",
+        "X-Title": "Nasaro AI",
         "Content-Type": "application/json",
     }
 
@@ -1871,7 +1871,7 @@ def extension_update(request: Request):
         if part.startswith("id="):
             ext_id = part[3:]
     if not ext_id:
-        ext_id = "arenax-agent"
+        ext_id = "nasaroai-agent"
     xml = (
         "<?xml version='1.0' encoding='UTF-8'?>"
         "<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>"
@@ -1880,7 +1880,7 @@ def extension_update(request: Request):
         " status='ok'"
         " version='2.3.0'"
         " prodversionmin='88.0'"
-        " codebase='https://nasaroai.onrender.com/static/arenax-extension.zip'"
+        " codebase='https://nasaroai.onrender.com/static/nasaroai-extension.zip'"
         "/>"
         "</app>"
         "</gupdate>"

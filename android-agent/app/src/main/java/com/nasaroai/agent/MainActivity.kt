@@ -1,4 +1,4 @@
-package com.arenax.agent
+package com.nasaroai.agent
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -34,13 +34,13 @@ class MainActivity : AppCompatActivity() {
             javaScriptEnabled = true
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = userAgentString + " ArenaXApp"
+            userAgentString = userAgentString + " NasaroAIApp"
         }
 
         // 앱에서는 설치 팝업이 뜨지 않도록 source=app 전달
         webView.loadUrl("https://nasaroai.onrender.com/?source=app")
 
-        val prefs = getSharedPreferences("arenax_float", MODE_PRIVATE)
+        val prefs = getSharedPreferences("nasaroai_float", MODE_PRIVATE)
         prefs.edit().putBoolean("auto_start", true).apply()
 
         // 권한이 있으면 플로팅 런처 서비스 자동 시작 (홈 화면에서도 사용)

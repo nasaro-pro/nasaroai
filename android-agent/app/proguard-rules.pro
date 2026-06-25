@@ -1,2 +1,2 @@
-# ArenaX Agent ProGuard rules
--keep class com.arenax.agent.** { *; }
+# Nasaro AI Agent ProGuard rules
+-keep class com.nasaroai.agent.** { *; }

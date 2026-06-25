@@ -1,4 +1,4 @@
-// ArenaX 에이전트 백그라운드 서비스 워커 (v3 — 임무 관리)
+// Nasaro AI 에이전트 백그라운드 서비스 워커 (v3 — 임무 관리)
 // 역할:
 //  - content.js(하단 바)가 보낸 RUN_TASK를 받아 "그 탭"에서 작업 루프를 돌린다.
 //  - 화면 스캔/실제 입력은 chrome.debugger(CDP)로 수행한다.
@@ -577,11 +577,11 @@ async function syncAllTabs(enabled) {
         await chrome.scripting.executeScript({
           target: { tabId: t.id },
           func: () => {
-            if (!window.__arenaxAgentInjected) return;
+            if (!window.__nasaroaiAgentInjected) return;
             // chrome.runtime.id가 undefined면 고아(orphaned) 인스턴스
             if (typeof chrome === "undefined" || !chrome.runtime?.id) {
-              window.__arenaxAgentInjected = false;
-              document.getElementById("__arenax_agent_host")?.remove();
+              window.__nasaroaiAgentInjected = false;
+              document.getElementById("__nasaroai_agent_host")?.remove();
             }
           },
         });
@@ -592,7 +592,7 @@ async function syncAllTabs(enabled) {
         await chrome.scripting.executeScript({
           target: { tabId: t.id },
           func: () => {
-            const host = document.getElementById("__arenax_agent_host");
+            const host = document.getElementById("__nasaroai_agent_host");
             if (!host?.shadowRoot) return;
             const s = host.shadowRoot;
             const launcher = s.getElementById("ax-launcher");
@@ -632,7 +632,7 @@ async function ensureInjectedIfEnabled(tabId, url) {
 }
 
 // ---- storage.onChanged → 모든 탭 자동 동기화 ----
-// 아이콘 클릭, ArenaX 사이트 버튼, 종료 버튼 등 어떤 경로로 agentEnabled가 바뀌어도
+// 아이콘 클릭, Nasaro AI 사이트 버튼, 종료 버튼 등 어떤 경로로 agentEnabled가 바뀌어도
 // 모든 탭에 즉시 반영된다.
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;

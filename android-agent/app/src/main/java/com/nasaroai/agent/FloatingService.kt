@@ -1,4 +1,4 @@
-package com.arenax.agent
+package com.nasaroai.agent
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -27,9 +27,9 @@ class FloatingService : Service() {
     private var floatView: View? = null
     private var panelView: View? = null
 
-    private val CHANNEL_ID = "arenax_float"
+    private val CHANNEL_ID = "nasaroai_float"
     private val NOTIF_ID   = 1001
-    private val ARENA_URL  = "https://nasaroai.onrender.com/?source=app"
+    private val NASAROAI_URL  = "https://nasaroai.onrender.com/?source=app"
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -66,7 +66,7 @@ class FloatingService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            val prefs = getSharedPreferences("arenax_float", MODE_PRIVATE)
+            val prefs = getSharedPreferences("nasaroai_float", MODE_PRIVATE)
             x = prefs.getInt("btn_x", 30)
             y = prefs.getInt("btn_y", 400)
         }
@@ -109,7 +109,7 @@ class FloatingService : Service() {
                         }
                     } else {
                         // 위치 저장
-                        getSharedPreferences("arenax_float", MODE_PRIVATE).edit()
+                        getSharedPreferences("nasaroai_float", MODE_PRIVATE).edit()
                             .putInt("btn_x", params.x)
                             .putInt("btn_y", params.y)
                             .apply()
@@ -121,8 +121,8 @@ class FloatingService : Service() {
         }
     }
 
-    private fun openArenaX() {
-        val uri = Uri.parse(ARENA_URL)
+    private fun openNasaroAI() {
+        val uri = Uri.parse(NASAROAI_URL)
         // Quetta Browser 먼저 시도
         try {
             startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
@@ -159,9 +159,9 @@ class FloatingService : Service() {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.cacheMode = WebSettings.LOAD_DEFAULT
-            settings.userAgentString = settings.userAgentString + " ArenaXApp"
+            settings.userAgentString = settings.userAgentString + " NasaroAIApp"
             webChromeClient = WebChromeClient()
-            loadUrl(ARENA_URL)
+            loadUrl(NASAROAI_URL)
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
 
@@ -189,7 +189,7 @@ class FloatingService : Service() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
-                CHANNEL_ID, "ArenaX 에이전트", NotificationManager.IMPORTANCE_LOW
+                CHANNEL_ID, "Nasaro AI 에이전트", NotificationManager.IMPORTANCE_LOW
             ).apply { description = "플로팅 버튼 실행 중" }
             getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
         }
@@ -203,7 +203,7 @@ class FloatingService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif)
-            .setContentTitle("ArenaX 에이전트")
+            .setContentTitle("Nasaro AI 에이전트")
             .setContentText("탭해서 질문창 열기 · 길게 누르면 닫기")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)

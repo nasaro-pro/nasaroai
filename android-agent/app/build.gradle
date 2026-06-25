@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.arenax.agent'
+    namespace 'com.nasaroai.agent'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.arenax.agent"
+        applicationId "com.nasaroai.agent"
         minSdk 26
         targetSdk 33
         versionCode 1

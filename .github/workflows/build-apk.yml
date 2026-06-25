@@ -1,4 +1,4 @@
-name: Build ArenaX Agent APK
+name: Build Nasaro AI Agent APK
 
 on:
   push:
@@ -35,17 +35,17 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: arenax-agent-apk
+          name: nasaroai-agent-apk
           path: android-agent/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
       - name: Deploy APK to static folder
         run: |
-          cp android-agent/app/build/outputs/apk/debug/app-debug.apk static/arenax-agent.apk
+          cp android-agent/app/build/outputs/apk/debug/app-debug.apk static/nasaroai-agent.apk
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add static/arenax-agent.apk
-          git diff --staged --quiet || git commit -m "ci: update arenax-agent.apk [skip ci]"
+          git add static/nasaroai-agent.apk
+          git diff --staged --quiet || git commit -m "ci: update nasaroai-agent.apk [skip ci]"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

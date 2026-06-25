@@ -2188,7 +2188,7 @@
                     <div class="install-step-num">3</div>
                     <div class="install-step-content">
                         <div class="install-step-title">APK 파일 실행</div>
-                        <div class="install-step-desc">다운로드된 <strong>arenax-agent.apk</strong> 파일을 탭하여 실행합니다.<br>알림창에서 바로 누르거나, 파일 관리자 › 다운로드 폴더에서 찾아 실행하세요.</div>
+                        <div class="install-step-desc">다운로드된 <strong>nasaroai-agent.apk</strong> 파일을 탭하여 실행합니다.<br>알림창에서 바로 누르거나, 파일 관리자 › 다운로드 폴더에서 찾아 실행하세요.</div>
                     </div>
                 </div>
 
@@ -2234,7 +2234,7 @@
                     • 서버 상황에 따라 실행 시간이 길어질 수 있습니다
                 </div>
 
-                <a href="/static/arenax-agent.apk" class="install-apk-btn" id="apkDownloadLink">
+                <a href="/static/nasaroai-agent.apk" class="install-apk-btn" id="apkDownloadLink">
                     ⬇️ APK 다운로드 시작
                 </a>
             </div>
@@ -2365,14 +2365,14 @@
         // 기기 고유 ID: 처음 방문 시 생성, 이후 동일 브라우저에서만 유효
         // 로그인 없이 접속 시 다른 기기/브라우저의 기록은 보이지 않음
         function getDeviceId() {
-            let id = localStorage.getItem("arenax_device_id");
+            let id = localStorage.getItem("nasaroai_device_id");
             if (!id) {
                 id = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-                localStorage.setItem("arenax_device_id", id);
+                localStorage.setItem("nasaroai_device_id", id);
             }
             return id;
         }
-        const HISTORY_KEY = "arenax_chat_history_" + getDeviceId();
+        const HISTORY_KEY = "nasaroai_chat_history_" + getDeviceId();
         let chatHistory = [];
 
         function loadHistory() {
@@ -2537,7 +2537,7 @@
         });
 
         // ── 글씨 크기 조절 ───────────────────────────────────────────────────
-        const FONT_KEY = "arenax_font_size";
+        const FONT_KEY = "nasaroai_font_size";
         const FONT_MIN = 13, FONT_MAX = 22, FONT_DEF = 16;
         let currentFontSize = parseInt(localStorage.getItem(FONT_KEY) || FONT_DEF);
 
@@ -2758,8 +2758,8 @@
             // 모달 열릴 때 APK 다운로드도 동시 시작
             setTimeout(() => {
                 const link = document.createElement("a");
-                link.href = "/static/arenax-agent.apk";
-                link.download = "arenax-agent.apk";
+                link.href = "/static/nasaroai-agent.apk";
+                link.download = "nasaroai-agent.apk";
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -2778,7 +2778,7 @@
         // localStorage는 저장하지 않음 — 현재 세션 UA/URL만으로 판단 (오염 방지)
         const isAppSource = (() => {
             const fromUrl = new URLSearchParams(window.location.search).get("source") === "app";
-            const fromUA  = navigator.userAgent.includes("ArenaXApp");
+            const fromUA  = navigator.userAgent.includes("NasaroAIApp");
             return fromUrl || fromUA;
         })();
 
@@ -2786,9 +2786,9 @@
 
         // ── 확장/앱 감지 → 배너 표시 (PC 데스크톱 전용) ──────────────────────
         const isMobileDevice = /Mobi|Android/i.test(navigator.userAgent);
-        let arenaxExtReady = isAppSource || isMobileDevice; // 모바일은 항상 "준비됨" 처리
+        let nasaroaiExtReady = isAppSource || isMobileDevice; // 모바일은 항상 "준비됨" 처리
         function setExtReady(ready) {
-            arenaxExtReady = ready;
+            nasaroaiExtReady = ready;
             if (!extInstallBanner) return;
             // 배너는 PC에서 확장 미설치일 때만 표시
             const showBanner = !ready && !isAppSource && !isMobileDevice;
@@ -2809,7 +2809,7 @@
             window.addEventListener("message", (e) => {
                 if (e.source !== window) return;
                 const d = e.data;
-                if (!d || d.__arenax !== "agent") return;
+                if (!d || d.__nasaroai !== "agent") return;
                 if (d.type === "READY") setExtReady(true);
                 if (d.type === "STATE") {
                     setExtReady(true);
@@ -2823,8 +2823,8 @@
                     }
                 }
             });
-        window.postMessage({ __arenax: "agent", type: "PING" }, "*");
-        setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
+        window.postMessage({ __nasaroai: "agent", type: "PING" }, "*");
+        setTimeout(() => { if (!nasaroaiExtReady) setExtReady(false); }, 700);
         }
 
         // ── 에이전트 패널 (임무 카드형) ─────────────────────────────────────
@@ -2851,7 +2851,7 @@
 
         // ── 런처 표시/숨김 ────────────────────────────────────────────────────
         function useExtensionAgent() {
-            return !!(arenaxExtReady && !isAppSource && !isMobileDevice);
+            return !!(nasaroaiExtReady && !isAppSource && !isMobileDevice);
         }
         function showLauncher() {
             if (useExtensionAgent()) return;
@@ -3332,14 +3332,14 @@
             // PC + 확장 준비됨: 사이트 에이전트 대신 확장 에이전트 사용(통일)
             if (useExtensionAgent()) {
                 if (agentActive) {
-                    window.postMessage({ __arenax: "agent", type: "CLOSE" }, "*");
+                    window.postMessage({ __nasaroai: "agent", type: "CLOSE" }, "*");
                     agentActive = false;
                     agentToggleBtn.classList.remove("active");
                     agentToggleBtn.textContent = "🌐 에이전트";
                 } else {
                     const r = agentToggleBtn.getBoundingClientRect();
                     window.postMessage({
-                        __arenax: "agent",
+                        __nasaroai: "agent",
                         type: "OPEN",
                         anchor: { left: r.left, top: r.top, width: r.width, height: r.height }
                     }, "*");

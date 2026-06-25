@@ -1,11 +1,11 @@
-# ArenaX 플로팅 에이전트 버튼 (Android 앱)
+# Nasaro AI 플로팅 에이전트 버튼 (Android 앱)
 
 어떤 앱을 쓰든 화면 위에 항상 떠 있는 보라색 버튼.
-탭하면 Quetta Browser로 ArenaX를 열어줍니다.
+탭하면 Quetta Browser로 Nasaro AI를 열어줍니다.
 
 ## 기능
 - 화면 어디서나 떠 있는 보라색 🤖 버튼
-- 탭 → Quetta Browser로 ArenaX 열기 (Quetta 없으면 기본 브라우저)
+- 탭 → Quetta Browser로 Nasaro AI 열기 (Quetta 없으면 기본 브라우저)
 - 드래그로 위치 조절 (위치 자동 저장)
 - 길게 누르기(600ms) → 버튼 닫기
 - 부팅 시 자동 시작 옵션
@@ -43,7 +43,7 @@
 android-agent/
 ├── app/src/main/
 │   ├── AndroidManifest.xml
-│   ├── java/com/arenax/agent/
+│   ├── java/com/nasaroai/agent/
 │   │   ├── MainActivity.kt      ← 앱 메인 화면
 │   │   ├── FloatingService.kt   ← 플로팅 버튼 서비스
 │   │   └── BootReceiver.kt      ← 부팅 시 자동 시작
@@ -53,10 +53,10 @@ android-agent/
 └── app/build.gradle
 ```
 
-## ArenaX URL 변경
+## Nasaro AI URL 변경
 
 `FloatingService.kt` 12번째 줄:
 ```kotlin
-private val ARENA_URL = "https://nasaroai.onrender.com"
+private val NASAROAI_URL = "https://nasaroai.onrender.com"
 ```
 원하는 URL로 바꾸고 다시 빌드하면 됩니다.

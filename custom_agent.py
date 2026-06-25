@@ -11,7 +11,7 @@ import httpx
 from playwright.async_api import Page
 from pydantic import BaseModel, model_validator
 
-logger = logging.getLogger("arenax")
+logger = logging.getLogger("nasaroai")
 
 MAX_STEPS = 15
 HISTORY_WINDOW = 5
