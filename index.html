@@ -979,8 +979,8 @@
             right: 0;
             bottom: var(--input-dock-height, 120px);
             z-index: 230;
-            width: min(460px, calc(100vw - 16px));
-            height: min(72dvh, 640px);
+            width: min(560px, calc(100vw - 16px));
+            height: min(78dvh, 760px);
             background: rgba(255, 255, 255, 0.99);
             backdrop-filter: blur(14px);
             border: 1px solid #e5e7eb;
@@ -1015,9 +1015,10 @@
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            padding: 14px 16px;
+            padding: 16px 18px;
             border-bottom: 1px solid #f3f4f6;
             background: rgba(249, 250, 251, 0.9);
+            cursor: move;
         }
 
         .agent-panel-title {
@@ -1035,10 +1036,10 @@
             border: 1px solid #fecaca;
             background: #fef2f2;
             color: #b91c1c;
-            padding: 7px 14px;
-            border-radius: 8px;
+            padding: 10px 16px;
+            border-radius: 10px;
             font: inherit;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
             line-height: 1;
             cursor: pointer;
@@ -1302,6 +1303,22 @@
         }
         .agent-card-body::-webkit-scrollbar { width: 5px; }
         .agent-card-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+        .agent-card-log {
+            margin: 0 14px 10px;
+            padding: 8px 10px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            max-height: 140px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #4b5563;
+        }
+        .agent-card-log-line { white-space: pre-wrap; word-break: break-word; }
+        .agent-card-log::-webkit-scrollbar { width: 5px; }
+        .agent-card-log::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
         .agent-card-toggle {
             margin: 0 14px 12px;
@@ -2837,12 +2854,12 @@
             const r  = agentFloatLauncher.getBoundingClientRect();
             const W  = window.innerWidth;
             const H  = window.innerHeight;
-            const pW = Math.min(460, W - 32);
-            const pH = Math.min(Math.floor(H * 0.72), 640);
+            const pW = Math.min(560, W - 32);
+            const pH = Math.min(Math.floor(H * 0.78), 760);
 
-            // 런처 오른쪽 배치 시도 → 화면 밖이면 왼쪽
-            let left = r.right + 12;
-            if (left + pW > W - 8) left = r.left - pW - 12;
+            // 런처 X 기준으로 같은 위치를 따라가며 화면 안으로만 클램프
+            let left = r.left;
+            if (left + pW > W - 8) left = W - pW - 8;
             if (left < 8) left = 8;
 
             // 수직: 런처 하단 기준으로 패널 하단 맞춤
@@ -2857,46 +2874,11 @@
             agentPanel.style.width  = pW + "px";
         }
 
-        // ── 패널을 dock 에이전트 버튼 위에 배치 ────────────────────────────
-        function positionPanelAboveToggle() {
-            if (!agentPanel) return;
-            if (window.innerWidth <= 520) {
-                agentPanel.style.removeProperty("left");
-                agentPanel.style.removeProperty("top");
-                agentPanel.style.right = "";
-                agentPanel.style.bottom = "";
-                return;
-            }
-            const btn = document.getElementById("agentToggleBtn");
-            if (!btn) { positionPanelNearLauncher(); return; }
-            const r  = btn.getBoundingClientRect();
-            const W  = window.innerWidth;
-            const H  = window.innerHeight;
-            const pW = Math.min(460, W - 32);
-            const pH = Math.min(Math.floor(H * 0.72), 640);
-            // 버튼 상단 바로 위
-            let top  = r.top - pH - 8;
-            if (top < 8) top = 8;
-            // 버튼 중앙 기준 수평 배치
-            let left = r.left + r.width / 2 - pW / 2;
-            if (left + pW > W - 8) left = W - pW - 8;
-            if (left < 8) left = 8;
-            agentPanel.style.left   = left + "px";
-            agentPanel.style.top    = top  + "px";
-            agentPanel.style.right  = "auto";
-            agentPanel.style.bottom = "auto";
-            agentPanel.style.width  = pW + "px";
-        }
-
         // ── 패널 열기 / 닫기 / 최소화 ─────────────────────────────────────────
-        // fromLauncher=true 이면 런처 옆, false 이면 토글 버튼 위
-        function openAgentPanel(fromLauncher = false) {
+        // 항상 런처 위치 기준으로 열림
+        function openAgentPanel(fromLauncher = true) {
             if (!agentPanel) return;
-            if (fromLauncher) {
-                positionPanelNearLauncher();
-            } else {
-                positionPanelAboveToggle();
-            }
+            positionPanelNearLauncher();
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
             hideLauncher();
@@ -2949,6 +2931,19 @@
             "📋 결과 정리 중…",
         ];
 
+        function appendCardLog(logEl, text) {
+            if (!logEl) return;
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, "0");
+            const mm = String(now.getMinutes()).padStart(2, "0");
+            const ss = String(now.getSeconds()).padStart(2, "0");
+            const line = document.createElement("div");
+            line.className = "agent-card-log-line";
+            line.textContent = `[${hh}:${mm}:${ss}] ${text}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
         function appendAgentCard(title) {
             const emptyEl = agentHistory.querySelector(".agent-empty");
             if (emptyEl) emptyEl.remove();
@@ -2965,6 +2960,7 @@
                     <span class="agent-card-badge loading">실행 중</span>
                 </div>
                 <div class="agent-card-progress">${progressHtml}</div>
+                <div class="agent-card-log"></div>
                 <div class="agent-card-body" style="display:none;"></div>
                 <div class="agent-card-meta" style="display:none;"></div>
                 <div class="agent-card-actions">
@@ -2976,9 +2972,12 @@
 
             const badge       = card.querySelector(".agent-card-badge");
             const progressEl  = card.querySelector(".agent-card-progress");
+            const logEl       = card.querySelector(".agent-card-log");
             const bodyEl      = card.querySelector(".agent-card-body");
             const metaEl      = card.querySelector(".agent-card-meta");
             const actionsEl   = card.querySelector(".agent-card-actions");
+            appendCardLog(logEl, "임무 실행 시작");
+            appendCardLog(logEl, PROGRESS_STEPS[0]);
 
             // 진행 스텝 애니메이션
             let stepIdx = 0;
@@ -2988,24 +2987,27 @@
                     el.className = "agent-progress-step" +
                         (i < stepIdx ? " done" : i === stepIdx ? " active" : "");
                 });
+                appendCardLog(logEl, PROGRESS_STEPS[stepIdx]);
                 agentHistory.scrollTop = agentHistory.scrollHeight;
             }, 1800);
 
-            return { card, badge, progressEl, bodyEl, metaEl, actionsEl, stepInterval };
+            return { card, badge, progressEl, logEl, bodyEl, metaEl, actionsEl, stepInterval };
         }
 
         // 카드 완료 처리
-        function finalizeCard({ card, badge, progressEl, bodyEl, metaEl, actionsEl, stepInterval }, state, content, mission, elapsed) {
+        function finalizeCard({ card, badge, progressEl, logEl, bodyEl, metaEl, actionsEl, stepInterval }, state, content, mission, elapsed) {
             clearInterval(stepInterval);
             progressEl.style.display = "none";
             bodyEl.style.display = "";
             bodyEl.textContent = content;
             metaEl.style.display = "flex";
             metaEl.textContent = `소요: ${(elapsed / 1000).toFixed(1)}초`;
+            const cardRefsForContinue = { card, badge, progressEl, logEl, bodyEl, metaEl, actionsEl, stepInterval: null };
 
             if (state === "ok") {
                 badge.textContent = "✅ 완료";
                 badge.className   = "agent-card-badge ok";
+                appendCardLog(logEl, "임무 완료");
                 setAgentStatus("ok", "완료: " + mission);
                 showToast(`임무 완료: ${mission.length > 28 ? mission.slice(0, 28) + "…" : mission}`, "success");
                 actionsEl.innerHTML = `
@@ -3015,6 +3017,7 @@
                 badge.textContent = "⏸ 중단";
                 badge.className   = "agent-card-badge warn";
                 card.style.borderLeftColor = "#f59e0b";
+                appendCardLog(logEl, "사용자 요청으로 중단");
                 setAgentStatus("idle", "중단됨 — 새 임무를 입력하세요.");
                 actionsEl.innerHTML = `
                     <button class="agent-card-action-btn resume" type="button">🔄 재개</button>
@@ -3023,6 +3026,7 @@
                 badge.textContent = "❌ 오류";
                 badge.className   = "agent-card-badge error";
                 card.classList.add("error-card");
+                appendCardLog(logEl, `오류: ${content}`);
                 setAgentStatus("error", `오류: ${content}`);
                 showToast(`에이전트 오류: ${content}`, "error", 5000);
                 actionsEl.innerHTML = `
@@ -3049,7 +3053,7 @@
                 }
                 if (agentPanel?.classList.contains("minimized")) toggleMinimize();
                 // 전송 시 기존 카드에 추가하도록 표시
-                agentSendBtn._appendToCard = { card, badge: cardRefs.badge, progressEl: cardRefs.progressEl, bodyEl: cardRefs.bodyEl, metaEl: cardRefs.metaEl, actionsEl: cardRefs.actionsEl, stepInterval: null };
+                agentSendBtn._appendToCard = cardRefsForContinue;
             });
             actionsEl.querySelector(".resume")?.addEventListener("click", () => {
                 if (agentInFlight) return;
@@ -3143,6 +3147,7 @@
                 <div class="agent-card-progress">${PROGRESS_STEPS.map((s, i) =>
                     `<div class="agent-progress-step${i===0?" active":""}" data-step="${i}">${s}</div>`
                 ).join("")}</div>
+                <div class="agent-card-log extra-log"></div>
                 <div class="agent-card-body extra-body" style="display:none;"></div>
                 <div class="agent-card-meta extra-meta" style="display:none;"></div>
                 <div class="agent-card-actions extra-actions">
@@ -3156,10 +3161,13 @@
             agentHistory.scrollTop = agentHistory.scrollHeight;
 
             const progressEl = section.querySelector(".agent-card-progress");
+            const logEl      = section.querySelector(".extra-log");
             const bodyEl     = section.querySelector(".extra-body");
             const metaEl     = section.querySelector(".extra-meta");
             const actionsEl  = section.querySelector(".extra-actions");
             const badge      = card.querySelector(".agent-card-badge");
+            appendCardLog(logEl, "추가 임무 시작");
+            appendCardLog(logEl, PROGRESS_STEPS[0]);
 
             // 진행 스텝 애니메이션 재시작
             let stepIdx = 0;
@@ -3169,6 +3177,7 @@
                     el.className = "agent-progress-step" +
                         (i < stepIdx ? " done" : i === stepIdx ? " active" : "");
                 });
+                appendCardLog(logEl, PROGRESS_STEPS[stepIdx]);
                 agentHistory.scrollTop = agentHistory.scrollHeight;
             }, 1800);
 
@@ -3176,7 +3185,7 @@
             badge.className   = "agent-card-badge loading";
             setAgentStatus("loading", "추가 임무 실행 중: " + mission);
 
-            return { card, badge, progressEl, bodyEl, metaEl, actionsEl, stepInterval };
+            return { card, badge, progressEl, logEl, bodyEl, metaEl, actionsEl, stepInterval };
         }
 
         // ── 패널 이벤트 ────────────────────────────────────────────────────────
@@ -3249,6 +3258,49 @@
             window.addEventListener("mouseup",  onEnd);
             window.addEventListener("touchend", onEnd);
         })(agentFloatLauncher);
+
+        // ── 에이전트 패널 드래그 (헤더 잡고 이동) ─────────────────────────────
+        (function draggableAgentPanel(panel) {
+            if (!panel) return;
+            const header = panel.querySelector(".agent-panel-header");
+            if (!header) return;
+            let dragging = false, moved = false, ox = 0, oy = 0, sx = 0, sy = 0;
+            const getXY = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
+            const onStart = e => {
+                if (window.innerWidth <= 520 || panel.style.display === "none") return;
+                // 버튼 클릭 시는 드래그 시작하지 않음
+                if (e.target.closest("button")) return;
+                const [cx, cy] = getXY(e);
+                const r = panel.getBoundingClientRect();
+                ox = cx; oy = cy; sx = r.left; sy = r.top;
+                dragging = true; moved = false;
+            };
+            const onMove = e => {
+                if (!dragging) return;
+                const [cx, cy] = getXY(e);
+                const dx = cx - ox, dy = cy - oy;
+                if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+                if (!moved) return;
+                if (e.cancelable) e.preventDefault();
+                const pW = panel.offsetWidth || 560;
+                const pH = panel.offsetHeight || 760;
+                let left = sx + dx;
+                let top  = sy + dy;
+                left = Math.max(8, Math.min(window.innerWidth - pW - 8, left));
+                top  = Math.max(8, Math.min(window.innerHeight - pH - 8, top));
+                panel.style.left = left + "px";
+                panel.style.top = top + "px";
+                panel.style.right = "auto";
+                panel.style.bottom = "auto";
+            };
+            const onEnd = () => { dragging = false; };
+            header.addEventListener("mousedown", onStart);
+            header.addEventListener("touchstart", onStart, { passive: true });
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("touchmove", onMove, { passive: false });
+            window.addEventListener("mouseup", onEnd);
+            window.addEventListener("touchend", onEnd);
+        })(agentPanel);
 
         // 창 크기 변경 시 패널 재배치
         window.addEventListener("resize", () => {
