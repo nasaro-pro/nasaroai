@@ -29,7 +29,7 @@ class FloatingService : Service() {
 
     private val CHANNEL_ID = "arenax_float"
     private val NOTIF_ID   = 1001
-    private val ARENA_URL  = "https://arenax-4812.onrender.com/?source=app"
+    private val ARENA_URL  = "https://nasaroai.onrender.com/?source=app"
 
     override fun onBind(intent: Intent?): IBinder? = null
 

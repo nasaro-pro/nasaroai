@@ -38,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 앱에서는 설치 팝업이 뜨지 않도록 source=app 전달
-        webView.loadUrl("https://arenax-4812.onrender.com/?source=app")
+        webView.loadUrl("https://nasaroai.onrender.com/?source=app")
 
         val prefs = getSharedPreferences("arenax_float", MODE_PRIVATE)
         prefs.edit().putBoolean("auto_start", true).apply()

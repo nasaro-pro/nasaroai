@@ -5,7 +5,7 @@
 //  - 임무 상태는 chrome.storage.local(agentTasks)에 저장 → 모든 탭이 storage.onChanged로 공유한다.
 //  - PAUSE_TASK / RESUME_TASK / CANCEL_TASK 메시지로 임무를 제어한다.
 
-const DEFAULT_SERVER    = "https://arenax-4812.onrender.com";
+const DEFAULT_SERVER    = "https://nasaroai.onrender.com";
 const DEBUGGER_VERSION  = "1.3";
 const MAX_ROUNDS        = 20;
 const INTERNAL_URL_RE   = /^(chrome|edge|brave|about|chrome-extension|devtools|view-source):/i;

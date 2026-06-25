@@ -310,7 +310,7 @@
           </div>
         </div>
         <div class="settings" id="ax-settings">
-          <input id="ax-server" type="text" placeholder="https://arenax-4812.onrender.com" />
+          <input id="ax-server" type="text" placeholder="https://nasaroai.onrender.com" />
           <button id="ax-save">저장</button>
         </div>
         <div class="task-area" id="ax-task-area">

@@ -57,6 +57,6 @@ android-agent/
 
 `FloatingService.kt` 12번째 줄:
 ```kotlin
-private val ARENA_URL = "https://arenax-4812.onrender.com"
+private val ARENA_URL = "https://nasaroai.onrender.com"
 ```
 원하는 URL로 바꾸고 다시 빌드하면 됩니다.
