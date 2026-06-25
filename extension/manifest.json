@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "ArenaX 에이전트",
-  "version": "2.2.1",
+  "name": "Nasaro AI 에이전트",
+  "version": "2.3.0",
   "update_url": "https://arenax-4812.onrender.com/extension-update",
-  "description": "어떤 사이트에서든 화면 하단의 요청창으로 ArenaX 에이전트가 그 탭을 직접 조작합니다.",
+  "description": "어떤 사이트에서든 Nasaro AI 에이전트가 그 탭을 직접 조작합니다.",
   "icons": {
     "16":  "icons/icon16.png",
     "48":  "icons/icon48.png",
@@ -30,7 +30,7 @@
     }
   ],
   "action": {
-    "default_title": "ArenaX 에이전트 켜기/끄기",
+    "default_title": "Nasaro AI 에이전트 켜기/끄기",
     "default_icon": {
       "16":  "icons/icon16.png",
       "48":  "icons/icon48.png",

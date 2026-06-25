@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>ArenaX</title>
+    <title>Nasaro AI</title>
     <!-- PWA: 홈화면 추가 지원 -->
     <meta name="theme-color" content="#7c3aed">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ArenaX">
+    <meta name="apple-mobile-web-app-title" content="Nasaro AI">
     <link rel="manifest" href="/manifest.json">
     <style>
         * {
@@ -1052,11 +1052,12 @@
 
         .agent-min-btn {
             flex: 0 0 auto;
-            padding: 5px 9px;
+            padding: 0 10px;
+            height: 38px;
             background: #f3f4f6;
             border: 1px solid #e5e7eb;
-            border-radius: 7px;
-            font-size: 17px;
+            border-radius: 10px;
+            font-size: 16px;
             line-height: 1;
             cursor: pointer;
             color: #6b7280;
@@ -1296,7 +1297,11 @@
             white-space: pre-wrap;
             word-break: break-word;
             overflow-wrap: anywhere;
+            max-height: 240px;
+            overflow-y: auto;
         }
+        .agent-card-body::-webkit-scrollbar { width: 5px; }
+        .agent-card-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
 
         .agent-card-toggle {
             margin: 0 14px 12px;
@@ -1399,7 +1404,7 @@
         .agent-input-actions {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 4px;
         }
 
         .agent-send-btn {
@@ -1924,7 +1929,7 @@
         <div id="sideMenuOverlay" class="side-menu-overlay"></div>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
-                <span class="side-menu-brand">ArenaX</span>
+                <span class="side-menu-brand">Nasaro AI</span>
             </div>
             <div class="side-menu-auth">
                 <button id="loginBtn" class="side-menu-btn primary" type="button">로그인</button>
@@ -1986,7 +1991,7 @@
                     <span></span><span></span><span></span>
                 </button>
                 <div class="header-brand">
-                    <h1>ArenaX</h1>
+                    <h1>Nasaro AI</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
                 </div>
             </div>
@@ -2111,11 +2116,11 @@
             padding:12px 16px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px;">
                 <div class="acw-logo-icon" style="width:34px;height:34px;border-radius:9px;flex-shrink:0;">
-                    <span style="font-size:12px;font-weight:900;color:#fff;letter-spacing:-0.04em;font-family:system-ui,sans-serif;">AX</span>
-                    <span style="font-size:5px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.14em;text-transform:uppercase;">Arena</span>
+                    <span style="font-size:9px;font-weight:900;color:#fff;letter-spacing:-0.04em;font-family:system-ui,sans-serif;">Nasaro</span>
+                    <span style="font-size:5px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:.14em;text-transform:uppercase;">AI</span>
                 </div>
                 <div>
-                    <div style="color:#e9d5ff;font-weight:700;font-size:13px;">ArenaX 에이전트 미설치</div>
+                    <div style="color:#e9d5ff;font-weight:700;font-size:13px;">Nasaro AI 에이전트 미설치</div>
                     <div style="color:#a78bfa;font-size:11px;margin-top:1px;">확장 프로그램(PC) 또는 앱(Android)을 설치하세요.</div>
                 </div>
             </div>
@@ -2190,8 +2195,8 @@
                     <div class="install-step-num">6</div>
                     <div class="install-step-content">
                         <div class="install-step-title">설치 완료 → "열기"</div>
-                        <div class="install-step-desc">설치가 끝나면 <strong>"열기"</strong>를 눌러 ArenaX 앱을 실행하세요.</div>
-                        <div class="install-step-tag ok">✅ 앱을 열면 ArenaX 사이트가 바로 시작됩니다!</div>
+                        <div class="install-step-desc">설치가 끝나면 <strong>"열기"</strong>를 눌러 Nasaro AI 앱을 실행하세요.</div>
+                        <div class="install-step-tag ok">✅ 앱을 열면 Nasaro AI 사이트가 바로 시작됩니다!</div>
                     </div>
                 </div>
 
@@ -2205,7 +2210,7 @@
                 <!-- Browserless 안내 -->
                 <div style="margin:8px 20px 4px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;font-size:12px;color:#1e40af;line-height:1.6;">
                     <strong style="display:block;margin-bottom:4px;">🌐 에이전트 브라우저 안내</strong>
-                    ArenaX 에이전트는 실제 브라우저를 원격으로 조종해 임무를 수행합니다.<br>
+                    Nasaro AI 에이전트는 실제 브라우저를 원격으로 조종해 임무를 수행합니다.<br>
                     • 에이전트 기능은 <strong>서버 브라우저(Browserless)</strong>를 통해 실행됩니다<br>
                     • 브라우저 세션도 에이전트 쿼터에 포함되어 하루 <strong>20회</strong> 제한<br>
                     • 서버 상황에 따라 실행 시간이 길어질 수 있습니다
@@ -2220,15 +2225,15 @@
         <!-- 에이전트 플로팅 런처 (패널 닫혔을 때만 표시, 드래그 가능) -->
         <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 패널 열기" aria-label="에이전트 열기">
             <div class="ax-logo">
-                <span class="ax-logo-text">AX</span>
-                <span class="ax-logo-sub">Agent</span>
+                <span class="ax-logo-text" style="font-size:9px;letter-spacing:-.3px;">Nasaro</span>
+                <span class="ax-logo-sub">AI</span>
             </div>
         </button>
 
         <!-- 에이전트 패널 (우측 하단 도킹, 임무 카드형) -->
-        <div id="agentPanel" class="agent-panel" aria-label="ArenaX 에이전트">
+        <div id="agentPanel" class="agent-panel" aria-label="Nasaro AI 에이전트">
             <div class="agent-panel-header">
-                <span class="agent-panel-title">🌐 ArenaX 에이전트</span>
+                <span class="agent-panel-title">🌐 Nasaro AI 에이전트</span>
                 <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
             </div>
             <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
@@ -2238,7 +2243,7 @@
             <div class="agent-input-row">
                 <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
                 <div class="agent-input-actions">
-                    <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾ 내리기</button>
+                    <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾</button>
                     <button id="agentSendBtn" class="agent-send-btn" type="button">실행 ▶</button>
                 </div>
             </div>
@@ -2743,12 +2748,12 @@
             // download attribute가 직접 처리하므로 추가 작업 없음
         });
 
-        // ── APK 앱 / ?source=app 감지 (앱 열면 바로 사이트 표시) ───────────────
+        // ── APK 앱 / ?source=app 감지 ─────────────────────────────────────────
+        // localStorage는 저장하지 않음 — 현재 세션 UA/URL만으로 판단 (오염 방지)
         const isAppSource = (() => {
             const fromUrl = new URLSearchParams(window.location.search).get("source") === "app";
             const fromUA  = navigator.userAgent.includes("ArenaXApp");
-            if (fromUrl) { try { localStorage.setItem("arenax_is_app", "1"); } catch {} }
-            return fromUrl || fromUA || localStorage.getItem("arenax_is_app") === "1";
+            return fromUrl || fromUA;
         })();
 
         const extInstallBanner = document.getElementById("extInstallBanner");
@@ -2838,10 +2843,46 @@
             agentPanel.style.width  = pW + "px";
         }
 
-        // ── 패널 열기 / 닫기 / 최소화 ─────────────────────────────────────────
-        function openAgentPanel() {
+        // ── 패널을 dock 에이전트 버튼 위에 배치 ────────────────────────────
+        function positionPanelAboveToggle() {
             if (!agentPanel) return;
-            positionPanelNearLauncher();        // 런처 옆에 위치 설정 먼저
+            if (window.innerWidth <= 520) {
+                agentPanel.style.removeProperty("left");
+                agentPanel.style.removeProperty("top");
+                agentPanel.style.right = "";
+                agentPanel.style.bottom = "";
+                return;
+            }
+            const btn = document.getElementById("agentToggleBtn");
+            if (!btn) { positionPanelNearLauncher(); return; }
+            const r  = btn.getBoundingClientRect();
+            const W  = window.innerWidth;
+            const H  = window.innerHeight;
+            const pW = Math.min(460, W - 32);
+            const pH = Math.min(Math.floor(H * 0.72), 640);
+            // 버튼 상단 바로 위
+            let top  = r.top - pH - 8;
+            if (top < 8) top = 8;
+            // 버튼 중앙 기준 수평 배치
+            let left = r.left + r.width / 2 - pW / 2;
+            if (left + pW > W - 8) left = W - pW - 8;
+            if (left < 8) left = 8;
+            agentPanel.style.left   = left + "px";
+            agentPanel.style.top    = top  + "px";
+            agentPanel.style.right  = "auto";
+            agentPanel.style.bottom = "auto";
+            agentPanel.style.width  = pW + "px";
+        }
+
+        // ── 패널 열기 / 닫기 / 최소화 ─────────────────────────────────────────
+        // fromLauncher=true 이면 런처 옆, false 이면 토글 버튼 위
+        function openAgentPanel(fromLauncher = false) {
+            if (!agentPanel) return;
+            if (fromLauncher) {
+                positionPanelNearLauncher();
+            } else {
+                positionPanelAboveToggle();
+            }
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
             hideLauncher();
@@ -3150,10 +3191,10 @@
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); agentSendBtn?.click(); }
         });
 
-        // ── 플로팅 런처: 누르면 패널 열기 ─────────────────────────────────────
+        // ── 플로팅 런처: 누르면 패널 열기 (런처 위치 기준) ────────────────────
         agentFloatLauncher?.addEventListener("click", () => {
             if (!agentActive) return;
-            openAgentPanel();
+            openAgentPanel(true);
         });
 
         // ── 런처 드래그 ────────────────────────────────────────────────────────
@@ -3203,8 +3244,8 @@
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
             if (agentActive) {
-                if (agentPanel?.style.display === "none") openAgentPanel();
-                else closeAgentPanel();
+                // 다시 누르면 에이전트 종료
+                setAgentActive(false);
                 return;
             }
             // 모바일이고 앱이 아니면 → 설치 팝업 (앱 없이는 에이전트 사용 불가)

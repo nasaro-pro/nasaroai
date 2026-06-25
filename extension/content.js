@@ -234,7 +234,7 @@
 
   const root = document.createElement("div");
   root.innerHTML = `
-    <button class="launcher" id="ax-launcher" title="ArenaX 에이전트 (드래그로 이동)"><span class="ax-logo">AX</span><span class="launcher-dot"></span></button>
+    <button class="launcher" id="ax-launcher" title="Nasaro AI 에이전트 (드래그로 이동)"><span class="ax-logo" style="font-size:11px;letter-spacing:-.5px;">Nasaro</span><span class="launcher-dot"></span></button>
     <div class="bubble" id="ax-bubble">
       <span class="bubble-text" id="ax-bubble-text"></span>
       <button class="bubble-close" id="ax-bubble-close" title="닫기">✕</button>
@@ -242,7 +242,7 @@
     <div class="wrap">
       <div class="bar" id="ax-bar" hidden>
         <div class="head">
-          <span class="title"><span class="ax-logo-sm">AX</span> 에이전트</span>
+          <span class="title"><span class="ax-logo-sm">Nasaro AI</span> 에이전트</span>
           <span class="task-counter" id="ax-counter">0/5 활성</span>
           <div class="head-btns">
             <button class="icon-btn" id="ax-gear" title="서버 설정">설정</button>
@@ -719,8 +719,10 @@
       // barOpen: 에이전트가 켜져 있고 바가 열린 상태였으면 복원
       if (!!s.agentEnabled && s.barOpen === true) {
         bar.hidden = false;
-        // 새 페이지에서도 런처 옆에 패널 배치 (position:fixed이므로 rAF 후 계산)
-        requestAnimationFrame(() => { applyBarPos(); render(); });
+        render();
+        // 런처 DOM이 완전히 렌더된 후에 패널 위치 계산 (타이밍 여유)
+        setTimeout(applyBarPos, 80);
+        setTimeout(applyBarPos, 250); // 느린 기기 대비 2차 보정
       }
     })
     .catch(() => {});

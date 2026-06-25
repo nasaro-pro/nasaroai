@@ -52,10 +52,18 @@ DAILY_LIMIT_MSG = (
 )
 
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
-LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
+LAST_RESORT_MODEL = "openai/gpt-4o-mini"
+
+# 에이전트 전용 우선 모델 목록 (작동 확인된 순서)
+AGENT_PREFERRED_MODELS = [
+    "openai/gpt-4o-mini",
+    "openai/gpt-4.1-mini",
+    "meta-llama/llama-3.1-8b-instruct:free",
+    "meta-llama/llama-4-scout:free",
+]
 
 SUMMARY_MODEL_WHITELIST = [
-    "openai/gpt-oss-120b:free",
+    "openai/gpt-4o-mini",
     "meta-llama/llama-4-maverick:free",
     "nvidia/nemotron-ultra-253b-v1:free",
     "deepseek/deepseek-r1:free",
@@ -1623,19 +1631,21 @@ AGENT_STEP_MAX_CANDIDATES = 4
 
 
 def _resolve_agent_models() -> list[str]:
-    """에이전트가 시도할 모델 목록(우선순위, 무료 폴백 체인).
+    """에이전트가 시도할 모델 목록(우선순위 폴백 체인).
 
-    [유료 호출 차단] 기본적으로 무료 모델만 사용한다. AGENT_MODEL 환경변수는
-    그것이 ':free' 모델이거나 AGENT_ALLOW_PAID=true일 때만 1순위로 추가한다.
-    (지금은 무료만 호출하라는 요구사항. 나중에 실제 유료 API를 붙일 땐
-    AGENT_ALLOW_PAID=true 로 켜면 된다.)"""
-    allow_paid = os.environ.get("AGENT_ALLOW_PAID", "").strip().lower() == "true"
+    1순위: AGENT_MODEL 환경변수 (설정된 경우)
+    2순위: AGENT_PREFERRED_MODELS (gpt-4o-mini 등 확인된 모델)
+    3순위: OpenRouter에서 가져온 무료 모델 목록
+    """
     configured = os.environ.get("AGENT_MODEL", "").strip()
     candidates: list[str] = []
-    if configured and (allow_paid or ":free" in configured):
+    if configured:
         candidates.append(configured)
+    # 작동 확인된 선호 모델 먼저 추가
+    candidates.extend(AGENT_PREFERRED_MODELS)
+    # 추가로 무료 모델도 폴백으로
     candidates.extend(get_all_available_free_models())
-    deduped = list(dict.fromkeys(candidate for candidate in candidates if candidate))
+    deduped = list(dict.fromkeys(c for c in candidates if c))
     if not deduped:
         deduped = [LAST_RESORT_MODEL]
     return deduped[:AGENT_STEP_MAX_CANDIDATES]
@@ -1786,10 +1796,11 @@ async def agent_ask(request: AgentAskRequest):
             history_ctx += f"\n[이전 임무] {m}\n[결과 요약] {r[:300]}\n"
 
     system_prompt = (
-        "당신은 ArenaX AI 에이전트입니다. 사용자가 지시한 임무를 분석하고 "
-        "최선의 결과를 한국어로 제공합니다. "
+        "당신은 Nasaro AI 에이전트입니다. 사용자가 지시한 임무를 분석하고 "
+        "최선의 결과를 한국어로 상세하게 제공합니다. "
         "웹 자동화가 필요한 임무는 일반 지식과 추론으로 최대한 지원하고, "
-        "다음에 취해야 할 행동이나 확인 방법을 구체적으로 안내합니다."
+        "다음에 취해야 할 행동이나 확인 방법을 구체적으로 안내합니다. "
+        "응답은 충분히 자세하고 실용적이어야 합니다."
     )
     user_msg = (
         f"{history_ctx}\n[현재 임무]\n{query}" if history_ctx
