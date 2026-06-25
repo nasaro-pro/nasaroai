@@ -83,7 +83,8 @@
     border: 1px solid #e5e7eb; border-radius: 18px;
     box-shadow: 0 8px 40px rgba(0,0,0,.18);
     display: flex; flex-direction: column; overflow: hidden;
-    width: 440px;
+    width: 560px;
+    max-height: min(78vh, 760px);
   }
   .bar[hidden] { display: none !important; }
 
@@ -121,11 +122,11 @@
     .tasks-wrap { max-height: 45vh; }
   }
 
-  .head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #f1f1f4; background: #faf5ff; flex-shrink: 0; }
-  .title { font-size: 14px; font-weight: 800; color: #6d28d9; flex: 0 0 auto; }
-  .task-counter { flex: 1 1 auto; font-size: 11px; font-weight: 700; color: #7c3aed; background: #ede9fe; border-radius: 20px; padding: 2px 9px; white-space: nowrap; display: inline-block; align-self: center; }
+  .head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #f1f1f4; background: #faf5ff; flex-shrink: 0; cursor: move; }
+  .title { font-size: 15px; font-weight: 800; color: #6d28d9; flex: 0 0 auto; }
+  .task-counter { flex: 1 1 auto; min-width: 74px; font-size: 11px; font-weight: 700; color: #7c3aed; background: #ede9fe; border-radius: 20px; padding: 2px 9px; white-space: nowrap; display: inline-block; align-self: center; overflow: hidden; text-overflow: ellipsis; }
   .task-counter.full { background: #fecaca; color: #b91c1c; }
-  .head-btns { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; }
+  .head-btns { display: flex; gap: 6px; flex: 0 0 auto; align-items: center; margin-left: auto; }
   .icon-btn { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; cursor: pointer; font-size: 12px; padding: 5px 11px; color: #6b7280; white-space: nowrap; }
   .icon-btn:hover { background: #f3f4f6; }
   /* 접기 버튼 — 눈에 띄게 크게 */
@@ -181,6 +182,22 @@
   .task-badge.cancelled { background: #f3f4f6; color: #6b7280; }
 
   .task-latest { font-size: 12px; color: #4b5563; padding: 0 10px 2px; overflow-wrap: anywhere; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-log {
+    margin: 2px 10px 6px;
+    padding: 7px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    max-height: 130px;
+    overflow-y: auto;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #4b5563;
+    white-space: pre-wrap;
+  }
+  .task-log-line { padding: 1px 0; }
+  .task-log::-webkit-scrollbar { width: 5px; }
+  .task-log::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
   .task-result { font-size: 12px; font-weight: 600; padding: 2px 10px 5px; overflow-wrap: anywhere; white-space: pre-wrap; }
   .task-result.success   { color: #047857; }
   .task-result.error     { color: #b91c1c; }
@@ -282,6 +299,7 @@
   const bubbleClose= $("ax-bubble-close");
   const bar        = $("ax-bar");
   const counter    = $("ax-counter");
+  const headEl     = shadow.querySelector(".head");
   const gearBtn    = $("ax-gear");
   const minBtn     = $("ax-min");
   const endBtn     = $("ax-end");
@@ -369,12 +387,12 @@
     const lRect = launcher.getBoundingClientRect();
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const bW = Math.min(440, W - 32);
-    const bH = Math.min(Math.floor(H * 0.72), 620);
+    const bW = Math.min(560, W - 32);
+    const bH = Math.min(Math.floor(H * 0.78), 760);
 
-    // 런처 오른쪽 시도 → 화면 밖이면 왼쪽
-    let left = lRect.right + 12;
-    if (left + bW > W - 8) left = lRect.left - bW - 12;
+    // 런처 위치를 그대로 따라가되 화면 안으로만 보정
+    let left = lRect.left;
+    if (left + bW > W - 8) left = W - bW - 8;
     if (left < 8) left = 8;
 
     // 수직: 런처 하단 기준 패널 하단 맞춤
@@ -417,16 +435,28 @@
     let btnHtml = "";
     if (task.status === "running") {
       btnHtml = `<button class="tbtn pause-btn"  data-id="${esc(task.id)}">중단</button>
+                 <button class="tbtn continue-btn" data-id="${esc(task.id)}" data-text="${esc(task.text)}">추가 임무</button>
                  <button class="tbtn amend-btn"  data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>
                  <button class="tbtn cancel-btn" data-id="${esc(task.id)}">취소</button>`;
     } else if (task.status === "paused") {
       btnHtml = `<button class="tbtn resume-btn" data-id="${esc(task.id)}">재개</button>
+                 <button class="tbtn continue-btn" data-id="${esc(task.id)}" data-text="${esc(task.text)}">추가 임무</button>
                  <button class="tbtn amend-btn"  data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>
                  <button class="tbtn cancel-btn" data-id="${esc(task.id)}">취소</button>`;
     } else {
-      btnHtml = `<button class="tbtn edit-btn" data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>`;
+      btnHtml = `<button class="tbtn continue-btn" data-id="${esc(task.id)}" data-text="${esc(task.text)}">추가 임무</button>
+                 <button class="tbtn edit-btn" data-id="${esc(task.id)}" data-text="${esc(task.text)}">수정</button>`;
     }
     btnHtml += `<button class="tbtn delete-btn" data-id="${esc(task.id)}">삭제</button>`;
+
+    const logs = (task.steps || []).map(step => {
+      const ts = step?.t ? new Date(step.t) : null;
+      const stamp = ts && !Number.isNaN(ts.getTime())
+        ? `${String(ts.getHours()).padStart(2, "0")}:${String(ts.getMinutes()).padStart(2, "0")}:${String(ts.getSeconds()).padStart(2, "0")}`
+        : "--:--:--";
+      return `<div class="task-log-line">[${stamp}] ${esc(step?.text || "")}</div>`;
+    }).join("");
+    const logHtml = logs ? `<div class="task-log">${logs}</div>` : "";
 
     card.innerHTML = `
       <div class="task-head">
@@ -434,6 +464,7 @@
         <span class="task-badge ${esc(s.cls)}">${esc(s.label)}</span>
       </div>
       ${latestHtml}
+      ${logHtml}
       ${resultHtml}
       <div class="task-btns">${btnHtml}</div>
     `;
@@ -494,6 +525,16 @@
       { try { await chrome.runtime.sendMessage({ type: "CANCEL_TASK", taskId }); } catch {} }
     else if (btn.classList.contains("delete-btn"))
       { try { await chrome.runtime.sendMessage({ type: "DELETE_TASK", taskId }); } catch {} }
+    else if (btn.classList.contains("continue-btn")) {
+      try {
+        const base = (btn.dataset.text || "").trim();
+        input.value = `${base}\n\n추가 임무: `;
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 120) + "px";
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      } catch {}
+    }
     else if (btn.classList.contains("edit-btn")) {
       // 완료된 임무: 입력창에 복사해서 재실행 준비
       try {
@@ -580,6 +621,41 @@
   }
   launcher.addEventListener("pointerup",     endLauncherDrag);
   launcher.addEventListener("pointercancel", () => { launcherDrag = null; });
+
+  // ── 패널 드래그 (헤더 잡고 이동) ──────────────────────────────────────
+  let barDrag = null;
+  headEl && headEl.addEventListener("pointerdown", e => {
+    if (window.innerWidth <= 640 || bar.hidden) return;
+    if (e.target.closest("button,input,textarea")) return;
+    const r = bar.getBoundingClientRect();
+    barDrag = { x: e.clientX, y: e.clientY, l: r.left, t: r.top, moved: false };
+    try { headEl.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+  });
+  headEl && headEl.addEventListener("pointermove", e => {
+    if (!barDrag) return;
+    const dx = e.clientX - barDrag.x;
+    const dy = e.clientY - barDrag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) barDrag.moved = true;
+    if (!barDrag.moved) return;
+    const bW = bar.offsetWidth || 560;
+    const bH = bar.offsetHeight || 760;
+    let left = barDrag.l + dx;
+    let top = barDrag.t + dy;
+    left = Math.max(8, Math.min(window.innerWidth - bW - 8, left));
+    top = Math.max(8, Math.min(window.innerHeight - bH - 8, top));
+    bar.style.left = left + "px";
+    bar.style.top = top + "px";
+    bar.style.right = "auto";
+    bar.style.bottom = "auto";
+  });
+  function endBarDrag(e) {
+    if (!barDrag) return;
+    try { headEl && headEl.releasePointerCapture(e.pointerId); } catch {}
+    barDrag = null;
+  }
+  headEl && headEl.addEventListener("pointerup", endBarDrag);
+  headEl && headEl.addEventListener("pointercancel", () => { barDrag = null; });
 
   // ── 임무 목록 높이 조절 (드래그 핸들) ───────────────────────────────
   let resizing = null;
