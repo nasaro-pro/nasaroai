@@ -13,7 +13,8 @@
     "activeTab",
     "storage",
     "scripting",
-    "debugger"
+    "debugger",
+    "webNavigation"
   ],
   "host_permissions": [
     "<all_urls>"

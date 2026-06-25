@@ -606,22 +606,49 @@ async function syncAllTabs(enabled) {
   }
 }
 
+async function getUiSyncState() {
+  try {
+    const s = await chrome.storage.local.get(["agentEnabled", "barOpen"]);
+    return { enabled: !!s.agentEnabled, barOpen: !!s.barOpen };
+  } catch {
+    return { enabled: false, barOpen: false };
+  }
+}
+
+async function syncOneTabUi(tabId, url) {
+  if (!tabId || !url || INTERNAL_URL_RE.test(url)) return;
+  const ui = await getUiSyncState();
+  try {
+    if (ui.enabled) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+    }
+    chrome.tabs.sendMessage(tabId, { type: "AX_SYNC_STATE", ...ui }, () => void chrome.runtime.lastError);
+  } catch {}
+}
+
 async function ensureInjectedIfEnabled(tabId, url) {
   if (!tabId || !url || INTERNAL_URL_RE.test(url)) return;
-  let enabled = false;
-  try { enabled = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
-  if (!enabled) return;
-  try {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
-  } catch {}
+  await syncOneTabUi(tabId, url);
 }
 
 // ---- storage.onChanged → 모든 탭 자동 동기화 ----
 // 아이콘 클릭, ArenaX 사이트 버튼, 종료 버튼 등 어떤 경로로 agentEnabled가 바뀌어도
 // 모든 탭에 즉시 반영된다.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || changes.agentEnabled === undefined) return;
-  syncAllTabs(!!changes.agentEnabled.newValue).catch(() => {});
+  if (area !== "local") return;
+  if (changes.agentEnabled !== undefined) {
+    syncAllTabs(!!changes.agentEnabled.newValue).catch(() => {});
+  }
+  if (changes.barOpen !== undefined) {
+    getUiSyncState().then(ui => {
+      chrome.tabs.query({}).then(tabs => {
+        for (const t of tabs) {
+          if (!t.id || !t.url || INTERNAL_URL_RE.test(t.url)) continue;
+          chrome.tabs.sendMessage(t.id, { type: "AX_SYNC_STATE", ...ui }, () => void chrome.runtime.lastError);
+        }
+      }).catch(() => {});
+    }).catch(() => {});
+  }
 });
 
 // ---- 아이콘 클릭 = 에이전트 켜기/끄기 토글 ----
@@ -648,4 +675,16 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 chrome.tabs.onCreated.addListener(async (tab) => {
   if (!tab?.id) return;
   await ensureInjectedIfEnabled(tab.id, tab.url || "");
+});
+
+// SPA 라우팅/히스토리 이동에서도 즉시 따라오도록 보강
+chrome.webNavigation.onCommitted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  const tab = await chrome.tabs.get(details.tabId).catch(() => null);
+  await ensureInjectedIfEnabled(details.tabId, tab?.url || "");
+});
+chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  const tab = await chrome.tabs.get(details.tabId).catch(() => null);
+  await ensureInjectedIfEnabled(details.tabId, tab?.url || "");
 });

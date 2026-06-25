@@ -878,6 +878,26 @@
       pendingConfirm = sendResponse;
       return true;
     }
+    if (msg.type === "AX_SYNC_STATE") {
+      const enabledNow = !!msg.enabled;
+      const openNow = !!msg.barOpen;
+      applyEnabled(enabledNow);
+      if (!enabledNow) {
+        bar.hidden = true;
+        render();
+        return;
+      }
+      if (openNow) {
+        bar.hidden = false;
+        render();
+        if (barManualPos && window.innerWidth > 640) applyManualBarPos();
+        else applyBarPos();
+        tasksWrap.scrollTop = tasksWrap.scrollHeight;
+      } else {
+        bar.hidden = true;
+        render();
+      }
+    }
   });
 
   // ── 사이트 브리지 ────────────────────────────────────────────────────
