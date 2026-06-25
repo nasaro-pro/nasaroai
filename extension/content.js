@@ -4,7 +4,15 @@
 // - 최신 임무가 아래에 표시 (push 순서)
 // - 런처 말풍선: 3초 + X닫기
 (() => {
+  // 주입 중복 방지: 전역 가드 + DOM 호스트 중복 체크
   if (window.__arenaxAgentInjected) return;
+  const existingHost = document.getElementById("__arenax_agent_host");
+  if (existingHost?.shadowRoot?.getElementById("ax-launcher")) {
+    window.__arenaxAgentInjected = true;
+    return;
+  }
+  // 중간 실패로 남은 고아 호스트 정리 후 재주입
+  if (existingHost) existingHost.remove();
   window.__arenaxAgentInjected = true;
 
   const host = document.createElement("div");

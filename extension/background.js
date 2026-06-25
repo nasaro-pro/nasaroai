@@ -606,6 +606,16 @@ async function syncAllTabs(enabled) {
   }
 }
 
+async function ensureInjectedIfEnabled(tabId, url) {
+  if (!tabId || !url || INTERNAL_URL_RE.test(url)) return;
+  let enabled = false;
+  try { enabled = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
+  if (!enabled) return;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  } catch {}
+}
+
 // ---- storage.onChanged → 모든 탭 자동 동기화 ----
 // 아이콘 클릭, ArenaX 사이트 버튼, 종료 버튼 등 어떤 경로로 agentEnabled가 바뀌어도
 // 모든 탭에 즉시 반영된다.
@@ -624,12 +634,18 @@ chrome.action.onClicked.addListener(async () => {
 
 // ---- 사이트 이동 시 즉시 content 주입(새로고침 없이 따라오도록 보강) ----
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (!tab?.url || INTERNAL_URL_RE.test(tab.url)) return;
   if (changeInfo.status !== "loading") return;
-  let enabled = false;
-  try { enabled = !!(await chrome.storage.local.get("agentEnabled")).agentEnabled; } catch {}
-  if (!enabled) return;
+  await ensureInjectedIfEnabled(tabId, tab?.url || "");
+});
+
+// 탭 전환/신규 탭에서도 즉시 사용 가능하도록 보강
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+    const tab = await chrome.tabs.get(tabId);
+    await ensureInjectedIfEnabled(tabId, tab?.url || "");
   } catch {}
+});
+chrome.tabs.onCreated.addListener(async (tab) => {
+  if (!tab?.id) return;
+  await ensureInjectedIfEnabled(tab.id, tab.url || "");
 });
