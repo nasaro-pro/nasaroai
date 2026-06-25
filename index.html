@@ -1031,6 +1031,22 @@
             white-space: nowrap;
         }
 
+        .agent-panel-newtask {
+            border: 1px solid #c4b5fd;
+            background: #ede9fe;
+            color: #7c3aed;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+        .agent-panel-newtask:hover { background: #ddd6fe; }
+
         .agent-panel-end {
             border: 1px solid #fecaca;
             background: #fef2f2;
@@ -2234,7 +2250,10 @@
         <div id="agentPanel" class="agent-panel" aria-label="Nasaro AI 에이전트">
             <div class="agent-panel-header">
                 <span class="agent-panel-title">🌐 Nasaro AI 에이전트</span>
-                <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button id="agentNewTaskBtn" class="agent-panel-newtask" type="button" title="새 임무 추가">➕ 임무 추가</button>
+                    <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
+                </div>
             </div>
             <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
             <div class="agent-history" id="agentHistory">
@@ -3171,6 +3190,24 @@
             closeAgentPanel();
         });
         agentPanelEndBtn?.addEventListener("click", () => setAgentActive(false));
+
+        // 새 임무 추가 버튼: 현재 카드에 이어붙이지 않고 새 카드로 실행
+        document.getElementById("agentNewTaskBtn")?.addEventListener("click", () => {
+            if (agentInFlight) return;
+            agentSendBtn._nextIsModify = false;
+            agentSendBtn._appendToCard = null;
+            if (agentSendBtn) agentSendBtn.textContent = "실행 ▶";
+            if (agentInputEl) {
+                agentInputEl.value = "";
+                agentInputEl.placeholder = "새 임무를 입력하세요…";
+                autoResizeTA(agentInputEl);
+                agentInputEl.focus();
+            }
+            // 패널이 최소화되어 있으면 펼치기
+            if (agentPanel?.classList.contains("minimized")) toggleMinimize();
+            // 기록 영역 맨 아래로 스크롤
+            if (agentHistory) agentHistory.scrollTop = agentHistory.scrollHeight;
+        });
 
         agentSendBtn?.addEventListener("click", () => {
             const val = agentInputEl?.value.trim();
