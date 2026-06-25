@@ -251,6 +251,256 @@ class CollabRecommendRequest(BaseModel):
     task: str
 
 
+COLLAB_TYPE_RULES: list[dict] = [
+    {
+        "type": "동영상 제작",
+        "keywords": ["동영상", "영상", "숏츠", "유튜브", "릴스", "틱톡", "편집", "자막", "나레이션"],
+        "tools": {
+            "research": ["Perplexity", "YouTube 트렌드", "Google Trends"],
+            "structure": ["Claude", "ChatGPT", "Whimsical AI"],
+            "production": ["CapCut", "Vrew", "HeyGen", "ElevenLabs", "Suno"],
+            "review": ["Claude", "Grammarly", "YouTube Studio 분석"],
+        },
+        "algorithm": [
+            "시청자, 플랫폼, 길이, 핵심 메시지를 먼저 확정한다.",
+            "상위 5개 유사 콘텐츠를 조사해 훅/전개/CTA 패턴을 추출한다.",
+            "3초 훅, 장면별 스크립트, 자막 문장, 컷 전환표를 만든다.",
+            "영상 생성/편집 도구로 1차본을 만들고 음성·자막·BGM을 붙인다.",
+            "무음 시청 가독성, 첫 3초 이탈, 저작권, CTA 명확성을 검증한다.",
+            "검증 실패 항목을 장면 단위로 재제작하고 다시 검사한다.",
+            "썸네일/제목/설명/태그까지 패키지화하면 통과 처리한다.",
+        ],
+        "acceptance": ["첫 3초 안에 주제가 보임", "자막만 봐도 이해됨", "저작권 위험 없음", "CTA가 명확함"],
+    },
+    {
+        "type": "문서 제작",
+        "keywords": ["문서", "보고서", "제안서", "기획서", "논문", "정리", "요약", "계약서"],
+        "tools": {
+            "research": ["Perplexity", "NotebookLM", "ChatPDF"],
+            "structure": ["Claude", "ChatGPT", "Notion AI"],
+            "production": ["Notion AI", "Google Docs", "DeepL"],
+            "review": ["Grammarly", "QuillBot", "Claude"],
+        },
+        "algorithm": [
+            "문서 목적, 독자, 분량, 필수 포함 항목을 정의한다.",
+            "근거 자료를 수집하고 출처별 신뢰도를 표시한다.",
+            "목차, 핵심 주장, 근거, 예시, 결론 구조를 만든다.",
+            "초안을 작성하고 문단별 역할이 겹치지 않게 정리한다.",
+            "사실 오류, 논리 비약, 문체, 중복, 출처 누락을 검증한다.",
+            "검증 실패 문단을 재작성하고 다시 교정한다.",
+            "요약본, 원문, 체크리스트를 함께 제공하면 통과 처리한다.",
+        ],
+        "acceptance": ["목적과 독자가 명확함", "근거 출처가 있음", "목차 흐름이 자연스러움", "중복 문단이 없음"],
+    },
+    {
+        "type": "앱·웹 개발",
+        "keywords": ["앱", "웹", "사이트", "개발", "코드", "프로그램", "기능", "버그", "배포", "api"],
+        "tools": {
+            "research": ["Docs", "Stack Overflow", "GitHub"],
+            "structure": ["Claude", "ChatGPT", "Mermaid"],
+            "production": ["Cursor", "GitHub Copilot", "Vercel/Render"],
+            "review": ["테스트 러너", "ESLint", "Playwright", "Security Review"],
+        },
+        "algorithm": [
+            "요구사항을 사용자 흐름, 데이터, API, 화면 단위로 쪼갠다.",
+            "기존 코드 구조와 의존성을 조사해 수정 지점을 확정한다.",
+            "상태, 오류 처리, 보안, 배포 경로를 포함한 설계를 만든다.",
+            "작게 구현하고 각 단위마다 실행 가능한 검증을 붙인다.",
+            "런타임 오류, 린트, 회귀, 권한/보안 문제를 검증한다.",
+            "실패한 테스트와 사용자 흐름을 기준으로 재수정한다.",
+            "배포 후 실제 URL/API 응답까지 확인하면 통과 처리한다.",
+        ],
+        "acceptance": ["실제 실행됨", "오류/빈 상태 처리됨", "테스트 또는 수동 검증 기록 있음", "배포 URL에서 확인됨"],
+    },
+    {
+        "type": "PPT·발표자료",
+        "keywords": ["ppt", "발표", "프레젠테이션", "슬라이드", "강의자료"],
+        "tools": {
+            "research": ["Perplexity", "NotebookLM"],
+            "structure": ["Claude", "Gamma", "Tome"],
+            "production": ["Gamma", "Beautiful.ai", "Canva"],
+            "review": ["Claude", "Grammarly"],
+        },
+        "algorithm": [
+            "청중, 발표 시간, 설득 목표를 정한다.",
+            "핵심 메시지 1개와 보조 근거 3개를 뽑는다.",
+            "슬라이드별 제목, 한 줄 메시지, 시각자료 지시를 만든다.",
+            "디자인 도구로 초안을 만들고 시각 계층을 정리한다.",
+            "텍스트 과밀, 대비, 흐름, 발표 대본 연결성을 검증한다.",
+            "문제가 있는 슬라이드를 줄이고 도표/이미지로 대체한다.",
+            "발표자 노트와 예상 질문까지 만들면 통과 처리한다.",
+        ],
+        "acceptance": ["슬라이드당 메시지 1개", "발표 시간 안에 가능", "시각자료가 메시지를 보조", "예상 질문 대응 가능"],
+    },
+    {
+        "type": "이미지·디자인",
+        "keywords": ["이미지", "디자인", "로고", "배너", "포스터", "썸네일", "아이콘"],
+        "tools": {
+            "research": ["Pinterest", "Dribbble", "Perplexity"],
+            "structure": ["ChatGPT", "Claude"],
+            "production": ["Midjourney", "DALL·E 3", "Canva", "Photoroom"],
+            "review": ["Canva", "Claude"],
+        },
+        "algorithm": [
+            "브랜드 톤, 용도, 크기, 금지 요소를 정의한다.",
+            "레퍼런스를 모아 색상, 구도, 폰트 방향을 추출한다.",
+            "프롬프트와 레이아웃 시안을 여러 버전으로 만든다.",
+            "생성/편집 도구로 후보안을 만들고 용도별 크기로 맞춘다.",
+            "가독성, 대비, 저작권, 모바일 축소 시 인식성을 검증한다.",
+            "선택안의 색/문구/여백을 재조정한다.",
+            "원본, 압축본, 투명 배경본을 준비하면 통과 처리한다.",
+        ],
+        "acceptance": ["작게 봐도 식별됨", "브랜드 톤 일치", "저작권 위험 낮음", "필요 포맷 제공"],
+    },
+    {
+        "type": "데이터 분석",
+        "keywords": ["데이터", "엑셀", "분석", "통계", "차트", "csv", "매출", "지표"],
+        "tools": {
+            "research": ["Julius AI", "ChatExcel"],
+            "structure": ["Claude", "ChatGPT"],
+            "production": ["Python", "Julius AI", "Excel"],
+            "review": ["통계 검증", "데이터 품질 체크"],
+        },
+        "algorithm": [
+            "분석 질문, 기준 기간, 지표 정의를 고정한다.",
+            "데이터 타입, 결측치, 이상치, 중복을 점검한다.",
+            "집계 기준과 비교군을 설계한다.",
+            "표, 차트, 핵심 인사이트를 생성한다.",
+            "표본 수, 편향, 단위 오류, 시각화 왜곡을 검증한다.",
+            "오류 데이터를 수정하거나 제외 기준을 명시하고 재분석한다.",
+            "결론, 한계, 다음 액션이 있으면 통과 처리한다.",
+        ],
+        "acceptance": ["지표 정의가 명확함", "결측/이상치 처리됨", "차트가 결론을 왜곡하지 않음", "다음 액션 제시"],
+    },
+    {
+        "type": "마케팅·카피",
+        "keywords": ["마케팅", "광고", "카피", "랜딩", "세일즈", "브랜딩", "홍보"],
+        "tools": {
+            "research": ["Perplexity", "Google Trends"],
+            "structure": ["Claude", "ChatGPT"],
+            "production": ["Copy.ai", "Jasper", "Canva"],
+            "review": ["A/B 체크리스트", "Grammarly"],
+        },
+        "algorithm": [
+            "타깃, 문제, 제안, 전환 목표를 정의한다.",
+            "경쟁 메시지와 고객 언어를 조사한다.",
+            "훅, 가치제안, 증거, CTA 순서로 구조화한다.",
+            "채널별 카피와 랜딩 섹션을 만든다.",
+            "과장 표현, 신뢰 근거, CTA 일관성을 검증한다.",
+            "약한 훅과 모호한 혜택 문구를 재작성한다.",
+            "A/B 테스트 후보 3개와 측정 지표를 만들면 통과 처리한다.",
+        ],
+        "acceptance": ["타깃이 선명함", "혜택이 구체적임", "증거가 있음", "CTA가 하나로 모임"],
+    },
+    {
+        "type": "학습·강의",
+        "keywords": ["공부", "학습", "강의", "커리큘럼", "문제", "시험", "교육"],
+        "tools": {
+            "research": ["NotebookLM", "Perplexity"],
+            "structure": ["Claude", "ChatGPT"],
+            "production": ["Notion AI", "Quizlet"],
+            "review": ["자가진단 퀴즈", "Claude"],
+        },
+        "algorithm": [
+            "학습자 수준, 목표, 기간을 정한다.",
+            "필수 개념과 선행 지식을 조사한다.",
+            "개념→예제→연습→피드백 순서로 커리큘럼을 만든다.",
+            "요약 노트, 예제, 퀴즈를 제작한다.",
+            "난이도, 누락 개념, 오답 유도 요소를 검증한다.",
+            "틀린 문제 유형을 보강 자료로 재제작한다.",
+            "진단 테스트와 복습 계획이 있으면 통과 처리한다.",
+        ],
+        "acceptance": ["수준에 맞음", "연습 문제가 있음", "오답 피드백 가능", "복습 계획 포함"],
+    },
+    {
+        "type": "리서치·아이디어",
+        "keywords": ["조사", "리서치", "아이디어", "시장", "경쟁사", "트렌드"],
+        "tools": {
+            "research": ["Perplexity", "Google Trends", "Liner"],
+            "structure": ["Claude", "Whimsical AI"],
+            "production": ["Notion AI", "ChatGPT"],
+            "review": ["출처 검증", "반례 체크"],
+        },
+        "algorithm": [
+            "질문 범위와 판단 기준을 정한다.",
+            "최신 자료와 1차 출처를 우선 조사한다.",
+            "자료를 기회, 위험, 근거, 반례로 분류한다.",
+            "실행 가능한 아이디어 후보를 만든다.",
+            "출처 신뢰도, 최신성, 편향을 검증한다.",
+            "근거가 약한 후보는 폐기하거나 추가 조사한다.",
+            "우선순위와 실행 실험안을 제시하면 통과 처리한다.",
+        ],
+        "acceptance": ["출처가 있음", "반례 검토됨", "우선순위가 있음", "실행 실험 가능"],
+    },
+    {
+        "type": "업무 자동화",
+        "keywords": ["자동화", "반복", "봇", "스크립트", "업무", "크롤링", "알림"],
+        "tools": {
+            "research": ["Docs", "Zapier", "Make"],
+            "structure": ["Claude", "ChatGPT"],
+            "production": ["Python", "Zapier", "Make", "GitHub Actions"],
+            "review": ["로그 점검", "예외 케이스 테스트"],
+        },
+        "algorithm": [
+            "반복 업무의 입력, 처리, 출력, 주기를 정의한다.",
+            "권한, API 한도, 실패 시 복구 경로를 조사한다.",
+            "트리거, 처리 단계, 저장소, 알림 구조를 설계한다.",
+            "작은 자동화부터 구현하고 로그를 남긴다.",
+            "중복 실행, 실패 재시도, 보안 키 노출을 검증한다.",
+            "예외 케이스를 추가해 재실행한다.",
+            "운영 체크리스트와 중단 방법이 있으면 통과 처리한다.",
+        ],
+        "acceptance": ["반복 실행 가능", "실패 로그 있음", "비밀키 노출 없음", "중단/재시도 가능"],
+    },
+]
+
+
+def build_collab_plan(task: str) -> dict:
+    lowered = task.lower()
+    selected = COLLAB_TYPE_RULES[-2]  # 리서치·아이디어 기본값
+    best_score = -1
+    for rule in COLLAB_TYPE_RULES:
+        score = sum(1 for keyword in rule["keywords"] if keyword.lower() in lowered)
+        if score > best_score:
+            best_score = score
+            selected = rule
+
+    tools = selected["tools"]
+    stages = [
+        {
+            "name": "1단계 · 조사/아이디어",
+            "goal": "작업 방향을 정할 근거와 후보를 모읍니다.",
+            "tools": tools["research"],
+            "actions": selected["algorithm"][:2],
+        },
+        {
+            "name": "2단계 · 논리구조/지시문",
+            "goal": "작업물을 만들 수 있는 구조와 프롬프트를 확정합니다.",
+            "tools": tools["structure"],
+            "actions": selected["algorithm"][2:3],
+        },
+        {
+            "name": "3단계 · 제작/초안",
+            "goal": "실제 결과물 초안을 만듭니다.",
+            "tools": tools["production"],
+            "actions": selected["algorithm"][3:4],
+        },
+        {
+            "name": "4단계 · 검증/재제작/통과",
+            "goal": "오류를 찾고 고쳐 최종 통과 기준을 만족시킵니다.",
+            "tools": tools["review"],
+            "actions": selected["algorithm"][4:],
+        },
+    ]
+    return {
+        "task": task,
+        "work_type": selected["type"],
+        "stages": stages,
+        "acceptance": selected["acceptance"],
+        "handoff": "각 단계 결과를 다음 단계 입력으로 넘기고, 검증 실패 항목만 되돌려 재제작합니다.",
+    }
+
+
 class AgentRequest(BaseModel):
     query: str
 
@@ -1505,23 +1755,26 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
 
 @app.post("/collab/recommend")
 async def collab_recommend(data: CollabRecommendRequest) -> dict:
-    """사용자 작업 설명을 받아 OpenAI label로 각 단계별 추천 AI 목록을 반환한다."""
+    """사용자 작업 설명을 작업 유형별 협업 알고리즘으로 변환한다."""
     await ensure_model_cache_fresh()
+    plan = build_collab_plan(data.task.strip())
 
     prompt = (
-        f"사용자가 원하는 작업: {data.task}\n\n"
-        "아래 4단계에 맞춰 각 단계에서 가장 적합한 AI 도구를 2~3개 추천하고, "
-        "각각 한 줄 이유를 달아주세요. 한국어로 답변하세요.\n\n"
-        "1단계 — 정보 조사 및 아이디어 생성\n"
-        "2단계 — 논리구조 생성 및 프롬프트 지시\n"
-        "3단계 — 작업물 생성\n"
-        "4단계 — 오류 검증 및 업그레이드"
+        f"사용자 작업: {data.task}\n"
+        f"분류된 작업 유형: {plan['work_type']}\n\n"
+        "이 작업을 실제로 끝내기 위해 가장 중요한 주의점 3개와 "
+        "처음 실행할 구체적 액션 3개를 한국어로 짧게 제안하세요."
     )
 
-    result = await call_ai_model("OpenAI", prompt, max_tokens=600)
+    result = await call_ai_model("OpenAI", prompt, max_tokens=500)
+    recommendation = result.content if result.success else (
+        "AI 보완 코멘트 생성은 실패했지만, 아래 작업 유형별 협업 알고리즘은 바로 사용할 수 있습니다."
+    )
     return {
-        "recommendation": result.content if result.success else "추천 생성에 실패했습니다. 다시 시도해주세요.",
-        "success": result.success,
+        "recommendation": recommendation,
+        "plan": plan,
+        "success": True,
+        "ai_comment_success": result.success,
     }
 
 
@@ -1878,7 +2131,7 @@ def extension_update(request: Request):
         f"<app appid='{ext_id}'>"
         "<updatecheck"
         " status='ok'"
-        " version='2.3.1'"
+        " version='2.3.2'"
         " prodversionmin='88.0'"
         " codebase='https://nasaroai.onrender.com/static/nasaroai-extension.zip'"
         "/>"

@@ -5,12 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.PixelFormat
-import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.webkit.JavascriptInterface
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -22,6 +21,12 @@ import android.webkit.WebView
 import androidx.core.app.NotificationCompat
 
 class FloatingService : Service() {
+
+    companion object {
+        const val ACTION_OPEN_PANEL = "com.nasaroai.agent.OPEN_PANEL"
+        const val ACTION_SHOW_LAUNCHER = "com.nasaroai.agent.SHOW_LAUNCHER"
+        const val ACTION_STOP_AGENT = "com.nasaroai.agent.STOP_AGENT"
+    }
 
     private lateinit var wm: WindowManager
     private var floatView: View? = null
@@ -35,9 +40,37 @@ class FloatingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        wm = getSystemService(WINDOW_SERVICE) as WindowManager
         createChannel()
         startForeground(NOTIF_ID, buildNotification())
-        showButton()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_OPEN_PANEL -> {
+                getSharedPreferences("nasaroai_float", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("agent_enabled", true)
+                    .apply()
+                hideButton()
+                showPanel()
+            }
+            ACTION_SHOW_LAUNCHER -> {
+                getSharedPreferences("nasaroai_float", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("agent_enabled", true)
+                    .apply()
+                hidePanel()
+                showButton()
+            }
+            ACTION_STOP_AGENT -> stopSelf()
+            else -> {
+                if (getSharedPreferences("nasaroai_float", MODE_PRIVATE).getBoolean("agent_enabled", false)) {
+                    showButton()
+                }
+            }
+        }
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -49,7 +82,7 @@ class FloatingService : Service() {
     }
 
     private fun showButton() {
-        wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        if (floatView != null) return
 
         floatView = LayoutInflater.from(this).inflate(R.layout.floating_button, null)
 
@@ -73,6 +106,11 @@ class FloatingService : Service() {
 
         wm.addView(floatView, params)
         attachTouchListener(params)
+    }
+
+    private fun hideButton() {
+        floatView?.let { runCatching { wm.removeView(it) } }
+        floatView = null
     }
 
     private fun attachTouchListener(params: WindowManager.LayoutParams) {
@@ -121,35 +159,23 @@ class FloatingService : Service() {
         }
     }
 
-    private fun openNasaroAI() {
-        val uri = Uri.parse(NASAROAI_URL)
-        // Quetta Browser 먼저 시도
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
-                setPackage("net.quetta.browser")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            })
-        } catch (e: ActivityNotFoundException) {
-            // 어떤 브라우저든 열기 (폴백)
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                })
-            } catch (_: Exception) {}
-        }
-    }
-
     private fun togglePanel() {
         if (panelView != null) {
-            panelView?.let { wm.removeView(it) }
-            panelView = null
+            hidePanel()
             return
         }
+        hideButton()
         showPanel()
+    }
+
+    private fun hidePanel() {
+        panelView?.let { runCatching { wm.removeView(it) } }
+        panelView = null
     }
 
     @Suppress("SetJavaScriptEnabled")
     private fun showPanel() {
+        if (panelView != null) return
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else
@@ -161,15 +187,16 @@ class FloatingService : Service() {
             settings.cacheMode = WebSettings.LOAD_DEFAULT
             settings.userAgentString = settings.userAgentString + " NasaroAIApp"
             webChromeClient = WebChromeClient()
-            loadUrl(NASAROAI_URL)
+            addJavascriptInterface(OverlayBridge(), "NasaroAndroidAgent")
+            loadUrl("$NASAROAI_URL&agent_overlay=1")
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
 
         panelView = web
 
         val dm = resources.displayMetrics
-        val width = (dm.widthPixels * 0.92f).toInt().coerceAtLeast(720)
-        val height = (dm.heightPixels * 0.70f).toInt().coerceAtLeast(900)
+        val width = WindowManager.LayoutParams.MATCH_PARENT
+        val height = (dm.heightPixels * 0.52f).toInt().coerceAtLeast((360 * dm.density).toInt())
 
         val params = WindowManager.LayoutParams(
             width,
@@ -178,12 +205,39 @@ class FloatingService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = ((dm.widthPixels - width) / 2).coerceAtLeast(8)
-            y = (dm.heightPixels * 0.12f).toInt().coerceAtLeast(8)
+            gravity = Gravity.BOTTOM or Gravity.START
+            x = 0
+            y = 0
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
 
         wm.addView(panelView, params)
+    }
+
+    inner class OverlayBridge {
+        @JavascriptInterface
+        fun openAgent() {
+            // 이미 오버레이 패널 안이므로 별도 동작 없음.
+        }
+
+        @JavascriptInterface
+        fun minimizeAgent() {
+            android.os.Handler(mainLooper).post {
+                hidePanel()
+                showButton()
+            }
+        }
+
+        @JavascriptInterface
+        fun stopAgent() {
+            android.os.Handler(mainLooper).post {
+                getSharedPreferences("nasaroai_float", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("agent_enabled", false)
+                    .apply()
+                stopSelf()
+            }
+        }
     }
 
     private fun createChannel() {

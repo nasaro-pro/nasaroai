@@ -531,6 +531,57 @@
             }
         }
 
+        .collab-plan-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .collab-plan-card {
+            background: #fff;
+            border: 1px solid #dbeafe;
+            border-radius: 12px;
+            padding: 14px;
+            color: #1f2937;
+            box-shadow: 0 1px 6px rgba(37, 99, 235, 0.08);
+        }
+
+        .collab-plan-card h3 {
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: #1d4ed8;
+        }
+
+        .collab-plan-card p,
+        .collab-plan-card li {
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .collab-plan-card ul,
+        .collab-plan-card ol {
+            padding-left: 18px;
+            margin-top: 6px;
+        }
+
+        .collab-type-badge {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 12px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 700px) {
+            .collab-plan-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .notice {
             display: none;
             margin-bottom: 16px;
@@ -988,6 +1039,47 @@
             box-shadow: 0 8px 40px rgba(15, 23, 42, 0.18);
             overflow: hidden;
             flex-direction: column;
+        }
+
+        body.native-agent-overlay {
+            background: transparent;
+            overflow: hidden;
+        }
+
+        body.native-agent-overlay .site-header,
+        body.native-agent-overlay .side-menu,
+        body.native-agent-overlay .side-menu-overlay,
+        body.native-agent-overlay .settings-panel,
+        body.native-agent-overlay main,
+        body.native-agent-overlay .input-dock,
+        body.native-agent-overlay #extInstallBanner,
+        body.native-agent-overlay #androidInstallModal,
+        body.native-agent-overlay #agentFloatLauncher {
+            display: none !important;
+        }
+
+        body.native-agent-overlay .app {
+            min-height: 100dvh;
+            padding: 0 !important;
+            display: block;
+        }
+
+        body.native-agent-overlay .agent-panel {
+            display: flex !important;
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            max-height: none !important;
+            border: 0;
+            border-radius: 18px 18px 0 0;
+            box-shadow: none;
+            z-index: 99999;
+        }
+
+        body.native-agent-overlay .agent-panel-header {
+            cursor: default;
+            padding: 12px 14px;
         }
 
         /* 모바일: 전체 너비 바텀 시트 */
@@ -2714,7 +2806,7 @@
                 // 키보드가 올라왔으면 inputDock을 위로 밀어줌
                 inputDock.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
                 // 모바일 에이전트 패널은 키보드 바로 위에 자연스럽게 붙임
-                if (agentPanel && window.innerWidth <= 520) {
+                if (agentPanel && window.innerWidth <= 520 && !document.body.classList.contains("native-agent-overlay")) {
                     if (keyboardHeight > 60) {
                         agentPanel.style.bottom = `${Math.max(0, keyboardHeight)}px`;
                     } else {
@@ -2777,10 +2869,14 @@
         // ── APK 앱 / ?source=app 감지 ─────────────────────────────────────────
         // localStorage는 저장하지 않음 — 현재 세션 UA/URL만으로 판단 (오염 방지)
         const isAppSource = (() => {
-            const fromUrl = new URLSearchParams(window.location.search).get("source") === "app";
+            const params = new URLSearchParams(window.location.search);
+            const fromUrl = params.get("source") === "app";
             const fromUA  = navigator.userAgent.includes("NasaroAIApp");
             return fromUrl || fromUA;
         })();
+        const isAgentOverlay = new URLSearchParams(window.location.search).get("agent_overlay") === "1";
+        const hasNativeAndroidAgent = !!(window.NasaroAndroidAgent && isAppSource);
+        if (isAgentOverlay) document.body.classList.add("native-agent-overlay");
 
         const extInstallBanner = document.getElementById("extInstallBanner");
 
@@ -2854,7 +2950,7 @@
             return !!(nasaroaiExtReady && !isAppSource && !isMobileDevice);
         }
         function showLauncher() {
-            if (useExtensionAgent()) return;
+            if (useExtensionAgent() || isAppSource) return;
             agentFloatLauncher?.classList.add("visible");
         }
         function hideLauncher() { agentFloatLauncher?.classList.remove("visible"); }
@@ -2946,7 +3042,7 @@
             "🔍 임무 분석 중…",
             "🌐 브라우저 시작 중…",
             "📄 페이지 로딩 중…",
-            "🤖 AI 판단 중…",
+            "🧠 AI 판단 중…",
             "⚡ 명령 수행 중…",
             "📋 결과 정리 중…",
         ];
@@ -3210,10 +3306,20 @@
 
         // ── 패널 이벤트 ────────────────────────────────────────────────────────
         agentMinBtn?.addEventListener("click", () => {
+            if (isAgentOverlay && window.NasaroAndroidAgent?.minimizeAgent) {
+                window.NasaroAndroidAgent.minimizeAgent();
+                return;
+            }
             // 내리기: 패널 닫고 런처 표시
             closeAgentPanel();
         });
-        agentPanelEndBtn?.addEventListener("click", () => setAgentActive(false));
+        agentPanelEndBtn?.addEventListener("click", () => {
+            if (isAgentOverlay && window.NasaroAndroidAgent?.stopAgent) {
+                window.NasaroAndroidAgent.stopAgent();
+                return;
+            }
+            setAgentActive(false);
+        });
 
         agentSendBtn?.addEventListener("click", () => {
             const val = agentInputEl?.value.trim();
@@ -3327,8 +3433,29 @@
             if (agentPanel?.style.display !== "none") positionPanelNearLauncher();
         });
 
+        if (isAgentOverlay) {
+            agentActive = true;
+            if (agentToggleBtn) {
+                agentToggleBtn.classList.add("active");
+                agentToggleBtn.textContent = "● 에이전트 ON";
+            }
+            openAgentPanel(false);
+        }
+
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
+            if (hasNativeAndroidAgent && !isAgentOverlay) {
+                try {
+                    window.NasaroAndroidAgent.openAgent();
+                    agentActive = true;
+                    agentToggleBtn.classList.add("active");
+                    agentToggleBtn.textContent = "● 에이전트 ON";
+                    showToast("에이전트 오버레이를 열었습니다. 접기하면 런처가 남습니다.", "success");
+                } catch (err) {
+                    showToast("에이전트 오버레이를 열지 못했습니다. 권한을 확인해주세요.", "error");
+                }
+                return;
+            }
             // PC + 확장 준비됨: 사이트 에이전트 대신 확장 에이전트 사용(통일)
             if (useExtensionAgent()) {
                 if (agentActive) {
@@ -3397,7 +3524,7 @@
                 });
                 if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
                 const data = await response.json();
-                resultEl.textContent = data.recommendation || "추천 결과가 없습니다.";
+                renderCollabPlan(resultEl, data);
             } catch (err) {
                 resultEl.textContent = `오류: ${err.message}`;
             } finally {
@@ -3405,6 +3532,35 @@
                 collabTaskAsked = true;
                 updateDockUI();
             }
+        }
+
+        function renderCollabPlan(container, data) {
+            const plan = data.plan;
+            if (!plan) {
+                container.textContent = data.recommendation || "추천 결과가 없습니다.";
+                return;
+            }
+            const escList = value => escapeHtml(value || "");
+            const stageHtml = (plan.stages || []).map(stage => `
+                <article class="collab-plan-card">
+                    <h3>${escList(stage.name)}</h3>
+                    <p><strong>목표:</strong> ${escList(stage.goal)}</p>
+                    <p><strong>추천 도구:</strong> ${(stage.tools || []).map(escList).join(" · ")}</p>
+                    <ol>
+                        ${(stage.actions || []).map(action => `<li>${escList(action)}</li>`).join("")}
+                    </ol>
+                </article>
+            `).join("");
+            container.innerHTML = `
+                <span class="collab-type-badge">${escList(plan.work_type)}</span>
+                <div><strong>AI 보완 코멘트</strong><br>${escList(data.recommendation || "")}</div>
+                <div class="collab-plan-grid">${stageHtml}</div>
+                <div class="collab-plan-card" style="margin-top:12px;">
+                    <h3>통과 기준</h3>
+                    <ul>${(plan.acceptance || []).map(item => `<li>${escList(item)}</li>`).join("")}</ul>
+                    <p style="margin-top:8px;"><strong>협업 흐름:</strong> ${escList(plan.handoff)}</p>
+                </div>
+            `;
         }
 
         dockSecondaryBtn.addEventListener("click", handleAddUserInput);

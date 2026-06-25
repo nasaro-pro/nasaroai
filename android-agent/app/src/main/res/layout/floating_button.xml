@@ -7,8 +7,10 @@
         android:id="@+id/floatingBtn"
         android:layout_width="60dp"
         android:layout_height="60dp"
-        android:text="🤖"
-        android:textSize="26sp"
+        android:text="Nasaro\nAI"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:lineSpacingExtra="-2dp"
         android:gravity="center"
         android:background="@drawable/circle_button"
         android:elevation="8dp"/>

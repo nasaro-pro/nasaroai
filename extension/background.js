@@ -716,7 +716,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // ---- 사이트 이동 시 즉시 content 주입(새로고침 없이 따라오도록 보강) ----
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "loading") return;
+  if (changeInfo.status !== "loading" && changeInfo.status !== "complete" && !changeInfo.url) return;
   await ensureInjectedIfEnabled(tabId, tab?.url || "");
 });
 

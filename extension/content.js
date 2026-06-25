@@ -397,7 +397,16 @@
   const input      = $("ax-input");
   const sendBtnEl  = $("ax-send");
 
-  document.documentElement.appendChild(host);
+  function ensureHostAttached() {
+    const parent = document.documentElement || document.body;
+    if (parent && host.parentNode !== parent) parent.appendChild(host);
+  }
+  ensureHostAttached();
+  const hostObserver = new MutationObserver(() => {
+    ensureHostAttached();
+    if (initialized) render();
+  });
+  try { hostObserver.observe(document, { childList: true, subtree: true }); } catch {}
 
   const MAX_ACTIVE  = 5;
   let initialized   = false; // storage 확인 전까지 런처를 절대 표시하지 않음

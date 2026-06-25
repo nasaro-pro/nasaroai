@@ -9,8 +9,10 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val prefs = context.getSharedPreferences("nasaroai_float", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("auto_start", false)) {
-            val svc = Intent(context, FloatingService::class.java)
+        if (prefs.getBoolean("agent_enabled", false)) {
+            val svc = Intent(context, FloatingService::class.java).apply {
+                action = FloatingService.ACTION_SHOW_LAUNCHER
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 context.startForegroundService(svc)
             else

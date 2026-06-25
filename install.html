@@ -171,7 +171,7 @@
   <div class="container">
 
     <div class="tab-row">
-      <button class="tab-btn active" onclick="switchTab('android')">🤖 Android</button>
+      <button class="tab-btn active" onclick="switchTab('android')">📱 Android</button>
       <button class="tab-btn" onclick="switchTab('pc')">🖥️ PC (Chrome)</button>
       <button class="tab-btn" onclick="switchTab('ios')">🍎 iOS (iPhone)</button>
     </div>
@@ -215,22 +215,17 @@
         <div class="step">
           <div class="step-num">4</div>
           <div class="step-body">
-            <h3>플로팅 버튼 탭 → Quetta에서 Nasaro AI 열림</h3>
-            <p>홈 화면 어디서든 🤖 버튼을 탭하면 Quetta 브라우저에서 Nasaro AI가 열립니다.</p>
-            <div class="tip">Quetta Browser가 없다면 Play 스토어에서 설치하세요. 확장 프로그램을 지원하는 무료 브라우저입니다.</div>
+            <h3>에이전트 버튼 → 오버레이 질문창</h3>
+            <p>앱 안의 <strong>에이전트</strong> 버튼을 누르면 화면 위에 질문창이 열립니다. 접기하면 Nasaro AI 런처가 남고, 다시 누르면 질문창이 열립니다.</p>
+            <div class="tip">오버레이 권한을 허용해야 앱 밖 화면 위에도 런처와 질문창이 표시됩니다.</div>
           </div>
         </div>
 
         <div class="step">
           <div class="step-num">5</div>
           <div class="step-body">
-            <h3>(선택) 에이전트 확장도 설치</h3>
-            <p>Quetta에서 에이전트 기능까지 쓰려면 아래 ZIP도 설치하세요.</p>
-            <p style="margin-top:6px;">Quetta 하단 <strong>⋮</strong> → 퍼즐 아이콘 → <strong>+ (from .zip)</strong> → 아래 ZIP 선택</p>
-            <a href="/static/nasaroai-extension.zip" download
-               style="display:inline-block;margin-top:10px;padding:8px 16px;background:#7c3aed;color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;">
-              ⬇️ 확장 ZIP 다운로드
-            </a>
+            <h3>접기/다시 열기</h3>
+            <p>질문창에서 <strong>접기</strong>를 누르면 Nasaro AI 런처만 남습니다. 런처를 누르면 질문창이 다시 열리고, 종료를 누르면 둘 다 사라집니다.</p>
           </div>
         </div>
 
@@ -343,7 +338,7 @@
 
       <div style="margin-top:24px;padding:16px 18px;background:#1a1030;border:1px solid #4b2d6b;border-radius:12px;">
         <p style="font-size:13px;color:#c4b5fd;line-height:1.8;">
-          <strong>현재 에이전트 기능은 Android(Quetta Browser + 확장)</strong> 또는
+          <strong>현재 에이전트 기능은 Android 앱 오버레이</strong> 또는
           <strong>PC(Chrome/Edge/Brave)</strong>에서만 이용 가능합니다.
         </p>
       </div>
