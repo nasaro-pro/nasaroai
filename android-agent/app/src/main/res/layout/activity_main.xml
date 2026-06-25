@@ -1,81 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="32dp"
-    android:background="#0F0A1A">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="ArenaX"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:textColor="#A78BFA"
-        android:layout_marginBottom="4dp"/>
+    <WebView
+        android:id="@+id/mainWebView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="플로팅 에이전트 버튼"
-        android:textSize="14sp"
-        android:textColor="#6B7280"
-        android:layout_marginBottom="52dp"/>
-
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="○ 버튼 꺼짐"
-        android:textSize="15sp"
-        android:textColor="#9CA3AF"
-        android:layout_marginBottom="20dp"/>
-
-    <Button
-        android:id="@+id/btnToggle"
-        android:layout_width="220dp"
-        android:layout_height="52dp"
-        android:text="버튼 켜기"
-        android:textSize="16sp"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#7C3AED"
-        android:stateListAnimator="@null"
-        android:layout_marginBottom="40dp"/>
-
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="12dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="부팅 시 자동 시작"
-            android:textSize="14sp"
-            android:textColor="#D1D5DB"
-            android:layout_marginEnd="12dp"/>
-
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/switchBoot"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:thumbTint="#A78BFA"
-            app:trackTint="#4C1D95"/>
-
-    </LinearLayout>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="탭 → ArenaX 열기   |   길게 누르기 → 버튼 닫기"
-        android:textSize="11sp"
-        android:textColor="#4B5563"
-        android:gravity="center"
-        android:layout_marginTop="24dp"/>
-
-</LinearLayout>
+</FrameLayout>

@@ -52,18 +52,18 @@ DAILY_LIMIT_MSG = (
 )
 
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
-LAST_RESORT_MODEL = "openai/gpt-4o-mini"
+LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
 
-# 에이전트 전용 우선 모델 목록 (작동 확인된 순서)
+# 에이전트 전용 우선 모델 목록 (무료 모델만 사용)
 AGENT_PREFERRED_MODELS = [
-    "openai/gpt-4o-mini",
-    "openai/gpt-4.1-mini",
+    "openai/gpt-oss-20b:free",
+    "openai/gpt-oss-120b:free",
     "meta-llama/llama-3.1-8b-instruct:free",
     "meta-llama/llama-4-scout:free",
 ]
 
 SUMMARY_MODEL_WHITELIST = [
-    "openai/gpt-4o-mini",
+    "openai/gpt-oss-120b:free",
     "meta-llama/llama-4-maverick:free",
     "nvidia/nemotron-ultra-253b-v1:free",
     "deepseek/deepseek-r1:free",
@@ -1631,21 +1631,15 @@ AGENT_STEP_MAX_CANDIDATES = 4
 
 
 def _resolve_agent_models() -> list[str]:
-    """에이전트가 시도할 모델 목록(우선순위 폴백 체인).
-
-    1순위: AGENT_MODEL 환경변수 (설정된 경우)
-    2순위: AGENT_PREFERRED_MODELS (gpt-4o-mini 등 확인된 모델)
-    3순위: OpenRouter에서 가져온 무료 모델 목록
-    """
+    """에이전트가 시도할 모델 목록(무료 모델만 사용)."""
     configured = os.environ.get("AGENT_MODEL", "").strip()
     candidates: list[str] = []
-    if configured:
+    if configured and ":free" in configured:
         candidates.append(configured)
-    # 작동 확인된 선호 모델 먼저 추가
     candidates.extend(AGENT_PREFERRED_MODELS)
-    # 추가로 무료 모델도 폴백으로
-    candidates.extend(get_all_available_free_models())
-    deduped = list(dict.fromkeys(c for c in candidates if c))
+    # 모델 캐시에서 받은 값도 ':free'만 허용 (402 방지)
+    candidates.extend(m for m in get_all_available_free_models() if ":free" in m)
+    deduped = list(dict.fromkeys(c for c in candidates if c and ":free" in c))
     if not deduped:
         deduped = [LAST_RESORT_MODEL]
     return deduped[:AGENT_STEP_MAX_CANDIDATES]

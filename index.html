@@ -1031,22 +1031,6 @@
             white-space: nowrap;
         }
 
-        .agent-panel-newtask {
-            border: 1px solid #c4b5fd;
-            background: #ede9fe;
-            color: #7c3aed;
-            padding: 7px 12px;
-            border-radius: 8px;
-            font: inherit;
-            font-size: 12px;
-            font-weight: 700;
-            line-height: 1;
-            cursor: pointer;
-            flex: 0 0 auto;
-            white-space: nowrap;
-        }
-        .agent-panel-newtask:hover { background: #ddd6fe; }
-
         .agent-panel-end {
             border: 1px solid #fecaca;
             background: #fef2f2;
@@ -1068,12 +1052,12 @@
 
         .agent-min-btn {
             flex: 0 0 auto;
-            padding: 0 10px;
-            height: 38px;
+            padding: 0 16px;
+            height: 46px;
             background: #f3f4f6;
             border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 16px;
+            border-radius: 12px;
+            font-size: 14px;
             line-height: 1;
             cursor: pointer;
             color: #6b7280;
@@ -1420,7 +1404,8 @@
         .agent-input-actions {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 8px;
+            margin-left: auto;
         }
 
         .agent-send-btn {
@@ -1429,11 +1414,11 @@
             background: linear-gradient(135deg, #3b82f6, #7c3aed);
             color: #fff;
             font: inherit;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
-            padding: 0 22px;
-            height: 38px;
-            border-radius: 10px;
+            padding: 0 26px;
+            height: 46px;
+            border-radius: 12px;
             cursor: pointer;
         }
 
@@ -2250,10 +2235,7 @@
         <div id="agentPanel" class="agent-panel" aria-label="Nasaro AI 에이전트">
             <div class="agent-panel-header">
                 <span class="agent-panel-title">🌐 Nasaro AI 에이전트</span>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <button id="agentNewTaskBtn" class="agent-panel-newtask" type="button" title="새 임무 추가">➕ 임무 추가</button>
-                    <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
-                </div>
+                <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
             </div>
             <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
             <div class="agent-history" id="agentHistory">
@@ -2262,7 +2244,7 @@
             <div class="agent-input-row">
                 <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
                 <div class="agent-input-actions">
-                    <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾</button>
+                    <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾ 내리기</button>
                     <button id="agentSendBtn" class="agent-send-btn" type="button">실행 ▶</button>
                 </div>
             </div>
@@ -2786,6 +2768,13 @@
             // 배너는 PC에서 확장 미설치일 때만 표시
             const showBanner = !ready && !isAppSource && !isMobileDevice;
             extInstallBanner.style.display = showBanner ? "flex" : "none";
+            // 확장 에이전트 사용 시 사이트 런처/패널은 숨김 (중복 런처 방지)
+            if (ready && !isAppSource && !isMobileDevice) {
+                const localLauncher = document.getElementById("agentFloatLauncher");
+                const localPanel = document.getElementById("agentPanel");
+                localLauncher?.classList.remove("visible");
+                if (localPanel) localPanel.style.display = "none";
+            }
         }
         // 모바일·앱 환경에서는 배너 즉시 숨김
         if (isMobileDevice || isAppSource) {
@@ -2824,7 +2813,13 @@
         }
 
         // ── 런처 표시/숨김 ────────────────────────────────────────────────────
-        function showLauncher() { agentFloatLauncher?.classList.add("visible"); }
+        function useExtensionAgent() {
+            return !!(arenaxExtReady && !isAppSource && !isMobileDevice);
+        }
+        function showLauncher() {
+            if (useExtensionAgent()) return;
+            agentFloatLauncher?.classList.add("visible");
+        }
         function hideLauncher() { agentFloatLauncher?.classList.remove("visible"); }
 
         // ── 패널을 런처 근처에 배치 ───────────────────────────────────────────
@@ -3191,24 +3186,6 @@
         });
         agentPanelEndBtn?.addEventListener("click", () => setAgentActive(false));
 
-        // 새 임무 추가 버튼: 현재 카드에 이어붙이지 않고 새 카드로 실행
-        document.getElementById("agentNewTaskBtn")?.addEventListener("click", () => {
-            if (agentInFlight) return;
-            agentSendBtn._nextIsModify = false;
-            agentSendBtn._appendToCard = null;
-            if (agentSendBtn) agentSendBtn.textContent = "실행 ▶";
-            if (agentInputEl) {
-                agentInputEl.value = "";
-                agentInputEl.placeholder = "새 임무를 입력하세요…";
-                autoResizeTA(agentInputEl);
-                agentInputEl.focus();
-            }
-            // 패널이 최소화되어 있으면 펼치기
-            if (agentPanel?.classList.contains("minimized")) toggleMinimize();
-            // 기록 영역 맨 아래로 스크롤
-            if (agentHistory) agentHistory.scrollTop = agentHistory.scrollHeight;
-        });
-
         agentSendBtn?.addEventListener("click", () => {
             const val = agentInputEl?.value.trim();
             if (!val) return;
@@ -3280,6 +3257,23 @@
 
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
+            // PC + 확장 준비됨: 사이트 에이전트 대신 확장 에이전트 사용(통일)
+            if (useExtensionAgent()) {
+                if (agentActive) {
+                    window.postMessage({ __arenax: "agent", type: "CLOSE" }, "*");
+                    agentActive = false;
+                    agentToggleBtn.classList.remove("active");
+                    agentToggleBtn.textContent = "🌐 에이전트";
+                } else {
+                    window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
+                    agentActive = true;
+                    agentToggleBtn.classList.add("active");
+                    agentToggleBtn.textContent = "● 에이전트 ON";
+                }
+                if (agentPanel) agentPanel.style.display = "none";
+                hideLauncher();
+                return;
+            }
             if (agentActive) {
                 // 다시 누르면 에이전트 종료
                 setAgentActive(false);
