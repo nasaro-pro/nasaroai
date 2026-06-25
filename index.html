@@ -2801,7 +2801,19 @@
             window.addEventListener("message", (e) => {
                 if (e.source !== window) return;
                 const d = e.data;
-                if (d && d.__arenax === "agent" && d.type === "READY") setExtReady(true);
+                if (!d || d.__arenax !== "agent") return;
+                if (d.type === "READY") setExtReady(true);
+                if (d.type === "STATE") {
+                    setExtReady(true);
+                    const on = !!d.enabled;
+                    agentActive = on;
+                    agentToggleBtn.classList.toggle("active", on);
+                    agentToggleBtn.textContent = on ? "● 에이전트 ON" : "🌐 에이전트";
+                    if (!on) {
+                        hideLauncher();
+                        if (agentPanel) agentPanel.style.display = "none";
+                    }
+                }
             });
             window.postMessage({ __arenax: "agent", type: "PING" }, "*");
             setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);

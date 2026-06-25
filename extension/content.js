@@ -338,7 +338,15 @@
     // 모든 탭에 동기화 — 한 탭에서 접으면 다른 탭도 같이 접힘
     try { chrome.storage.local.set({ barOpen: show }); } catch {}
   }
-  function applyEnabled(v) { enabled = v; if (!v) bar.hidden = true; render(); }
+  function broadcastAgentState(v) {
+    try { window.postMessage({ __arenax: "agent", type: "STATE", enabled: !!v }, "*"); } catch {}
+  }
+  function applyEnabled(v) {
+    enabled = v;
+    if (!v) bar.hidden = true;
+    render();
+    broadcastAgentState(v);
+  }
   async function setEnabled(v) {
     try { await chrome.storage.local.set({ agentEnabled: v }); } catch {}
     applyEnabled(v);
@@ -644,6 +652,7 @@
     else if (d.type === "CLOSE") endAgent();
   });
   window.postMessage({ __arenax: "agent", type: "READY" }, "*");
+  broadcastAgentState(enabled);
 
   // ── storage.onChanged ────────────────────────────────────────────────
   chrome.storage.onChanged.addListener((changes, area) => {
