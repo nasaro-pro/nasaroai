@@ -2795,8 +2795,8 @@
         }
         // 모바일·앱 환경에서는 배너 즉시 숨김
         if (isMobileDevice || isAppSource) {
-            if (extInstallBanner) extInstallBanner.style.display = "none";
-        } else {
+                if (extInstallBanner) extInstallBanner.style.display = "none";
+            } else {
             // PC: 확장 PING 확인
             window.addEventListener("message", (e) => {
                 if (e.source !== window) return;
@@ -2815,8 +2815,8 @@
                     }
                 }
             });
-            window.postMessage({ __arenax: "agent", type: "PING" }, "*");
-            setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
+        window.postMessage({ __arenax: "agent", type: "PING" }, "*");
+        setTimeout(() => { if (!arenaxExtReady) setExtReady(false); }, 700);
         }
 
         // ── 에이전트 패널 (임무 카드형) ─────────────────────────────────────
@@ -3329,7 +3329,12 @@
                     agentToggleBtn.classList.remove("active");
                     agentToggleBtn.textContent = "🌐 에이전트";
                 } else {
-                    window.postMessage({ __arenax: "agent", type: "OPEN" }, "*");
+                    const r = agentToggleBtn.getBoundingClientRect();
+                    window.postMessage({
+                        __arenax: "agent",
+                        type: "OPEN",
+                        anchor: { left: r.left, top: r.top, width: r.width, height: r.height }
+                    }, "*");
                     agentActive = true;
                     agentToggleBtn.classList.add("active");
                     agentToggleBtn.textContent = "● 에이전트 ON";
@@ -3900,16 +3905,16 @@
             if (debateInFlight) {
                 dockSecondaryBtn.disabled = true;
                 try {
-                        const response = await fetch(`${API_URL}/debate/continue`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                session_id: debateSessionId,
-                                topic: debateTopic,
-                                user_input: userInput,
+                    const response = await fetch(`${API_URL}/debate/continue`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            session_id: debateSessionId,
+                            topic: debateTopic,
+                            user_input: userInput,
                                 user_id: getDeviceId(),
-                            }),
-                        });
+                        }),
+                    });
                     if (!response.ok) throw new Error(`큐잉 실패 (${response.status})`);
                     const data = await response.json();
                     if (data.queued) {

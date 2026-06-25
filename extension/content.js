@@ -85,6 +85,10 @@
     display: flex; flex-direction: column; overflow: hidden;
     width: 560px;
     max-height: min(78vh, 760px);
+    min-width: 420px;
+    min-height: 360px;
+    max-width: calc(100vw - 16px);
+    resize: both;
   }
   .bar[hidden] { display: none !important; }
 
@@ -369,6 +373,8 @@
   let barLeft = 0;
   let barTop = 0;
   let barManualPos = false;
+  let barWidth = 560;
+  let barHeight = 0;
   let kbOffset = 0; // 모바일 키보드 높이 오프셋
   let tasksHeight   = 260;
   let bubbleTimer   = null;
@@ -394,19 +400,39 @@
     if (!initialized) { launcher.classList.remove("show"); return; }
     launcher.classList.toggle("show", enabled && bar.hidden);
   }
+  function applyBarSize() {
+    if (window.innerWidth <= 640) {
+      bar.style.removeProperty("width");
+      bar.style.removeProperty("height");
+      return;
+    }
+    const w = Math.max(420, Math.min(window.innerWidth - 16, barWidth || 560));
+    bar.style.width = w + "px";
+    if (barHeight > 0) {
+      const h = Math.max(360, Math.min(window.innerHeight - 16, barHeight));
+      bar.style.height = h + "px";
+    } else {
+      bar.style.removeProperty("height");
+    }
+  }
+  function applyManualBarPos() {
+    const bW = bar.offsetWidth || 560;
+    const bH = bar.offsetHeight || 760;
+    const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
+    const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
+    bar.style.left = left + "px";
+    bar.style.top = top + "px";
+    bar.style.right = "auto";
+    bar.style.bottom = "auto";
+  }
+
   function showBar(show) {
     bar.hidden = !show;
     render();
     if (show) {
+      applyBarSize();
       if (window.innerWidth > 640 && barManualPos) {
-        const bW = bar.offsetWidth || 560;
-        const bH = bar.offsetHeight || 760;
-        const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
-        const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
-        bar.style.left = left + "px";
-        bar.style.top = top + "px";
-        bar.style.right = "auto";
-        bar.style.bottom = "auto";
+        applyManualBarPos();
       } else {
         applyBarPos();
       }
@@ -436,7 +462,10 @@
     launcher.style.right  = launcherRight + "px";
     bubble.style.bottom   = (launcherBottom + 58 + kbOffset) + "px";
     bubble.style.right    = (launcherRight + 60) + "px";
-    if (!bar.hidden) applyBarPos();
+    if (!bar.hidden) {
+      if (barManualPos && window.innerWidth > 640) applyManualBarPos();
+      else applyBarPos();
+    }
   }
   // 패널을 런처 옆에 배치 (desktop 전용; 모바일은 CSS @media가 처리)
   function applyBarPos() {
@@ -467,6 +496,9 @@
     bar.style.right  = "auto";
     bar.style.bottom = "auto";
     bar.style.width  = bW + "px";
+    bar.style.removeProperty("height");
+    barWidth = bW;
+    barHeight = 0;
     if (!barManualPos) { barLeft = left; barTop = top; }
   }
   function applyTasksHeight() { if (taskArea) taskArea.style.height = tasksHeight + "px"; }
@@ -764,6 +796,21 @@
   headEl && headEl.addEventListener("pointerup", endBarDrag);
   headEl && headEl.addEventListener("pointercancel", () => { barDrag = null; });
 
+  // ── 패널 크기 변경 저장 (모든 사이트 공통) ─────────────────────────────
+  if (typeof ResizeObserver !== "undefined") {
+    const barResizeObs = new ResizeObserver(() => {
+      if (bar.hidden || window.innerWidth <= 640) return;
+      const r = bar.getBoundingClientRect();
+      const w = Math.round(r.width);
+      const h = Math.round(r.height);
+      if (Math.abs(w - barWidth) < 2 && Math.abs(h - barHeight) < 2) return;
+      barWidth = w;
+      barHeight = h;
+      try { chrome.storage.local.set({ barWidth, barHeight }); } catch {}
+    });
+    barResizeObs.observe(bar);
+  }
+
   // ── 임무 목록 높이 조절 (드래그 핸들) ───────────────────────────────
   let resizing = null;
   resizeHandle.addEventListener("pointerdown", e => {
@@ -826,12 +873,47 @@
   });
 
   // ── 사이트 브리지 ────────────────────────────────────────────────────
+  function openAboveAnchor(anchor) {
+    if (!anchor || window.innerWidth <= 640) return false;
+    applyBarSize();
+    const bW = bar.offsetWidth || 560;
+    const bH = bar.offsetHeight || 760;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const width = Number(anchor.width || 0);
+    const left0 = Number(anchor.left || 0);
+    const top0 = Number(anchor.top || 0);
+    let left = left0 + width / 2 - bW / 2;
+    let top = top0 - bH - 8;
+    if (top < 8) top = 8;
+    if (left < 8) left = 8;
+    if (left + bW > W - 8) left = W - bW - 8;
+    if (top + bH > H - 8) top = H - bH - 8;
+    bar.style.left = left + "px";
+    bar.style.top = top + "px";
+    bar.style.right = "auto";
+    bar.style.bottom = "auto";
+    return true;
+  }
+
   window.addEventListener("message", event => {
     if (event.source !== window) return;
     const d = event.data;
     if (!d || d.__arenax !== "agent") return;
     if (d.type === "PING") window.postMessage({ __arenax: "agent", type: "READY" }, "*");
-    else if (d.type === "OPEN") { window.postMessage({ __arenax: "agent", type: "READY" }, "*"); setEnabled(true); showBar(true); }
+    else if (d.type === "OPEN") {
+      window.postMessage({ __arenax: "agent", type: "READY" }, "*");
+      setEnabled(true);
+      showBar(true);
+      // 에이전트 버튼에서 열었으면 버튼 위로 배치
+      if (openAboveAnchor(d.anchor)) {
+        barManualPos = true;
+        const r = bar.getBoundingClientRect();
+        barLeft = Math.round(r.left);
+        barTop = Math.round(r.top);
+        try { chrome.storage.local.set({ barLeft, barTop, barManualPos: true }); } catch {}
+      }
+    }
     else if (d.type === "CLOSE") endAgent();
   });
   window.postMessage({ __arenax: "agent", type: "READY" }, "*");
@@ -851,6 +933,8 @@
     if (changes.barLeft && typeof changes.barLeft.newValue === "number") barLeft = changes.barLeft.newValue;
     if (changes.barTop && typeof changes.barTop.newValue === "number") barTop = changes.barTop.newValue;
     if (changes.barManualPos !== undefined) barManualPos = !!changes.barManualPos.newValue;
+    if (changes.barWidth && typeof changes.barWidth.newValue === "number") barWidth = changes.barWidth.newValue;
+    if (changes.barHeight && typeof changes.barHeight.newValue === "number") barHeight = changes.barHeight.newValue;
     if (changes.tasksHeight && typeof changes.tasksHeight.newValue === "number") {
       tasksHeight = changes.tasksHeight.newValue; applyTasksHeight();
     }
@@ -867,15 +951,9 @@
       bar.hidden = !open;
       render();
       if (open) {
+        applyBarSize();
         if (barManualPos && window.innerWidth > 640) {
-          const bW = bar.offsetWidth || 560;
-          const bH = bar.offsetHeight || 760;
-          const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
-          const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
-          bar.style.left = left + "px";
-          bar.style.top = top + "px";
-          bar.style.right = "auto";
-          bar.style.bottom = "auto";
+          applyManualBarPos();
         } else {
           applyBarPos();
         }
@@ -912,22 +990,16 @@
   // 창 크기 변경 시 패널 재배치
   window.addEventListener("resize", () => {
     if (bar.hidden) return;
+    applyBarSize();
     if (barManualPos && window.innerWidth > 640) {
-      const bW = bar.offsetWidth || 560;
-      const bH = bar.offsetHeight || 760;
-      const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
-      const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
-      bar.style.left = left + "px";
-      bar.style.top = top + "px";
-      bar.style.right = "auto";
-      bar.style.bottom = "auto";
+      applyManualBarPos();
     } else {
       applyBarPos();
     }
   });
 
   chrome.storage.local
-    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "launcherRight", "barLeft", "barTop", "barManualPos", "tasksHeight", "barOpen"])
+    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "launcherRight", "barLeft", "barTop", "barManualPos", "barWidth", "barHeight", "tasksHeight", "barOpen"])
     .then(s => {
       if (s.serverUrl) serverInput.value = s.serverUrl;
       if (typeof s.launcherBottom === "number") launcherBottom = s.launcherBottom;
@@ -935,8 +1007,11 @@
       if (typeof s.barLeft === "number") barLeft = s.barLeft;
       if (typeof s.barTop === "number") barTop = s.barTop;
       barManualPos = !!s.barManualPos;
+      if (typeof s.barWidth === "number") barWidth = s.barWidth;
+      if (typeof s.barHeight === "number") barHeight = s.barHeight;
       if (typeof s.tasksHeight    === "number") tasksHeight    = s.tasksHeight;
       applyLauncherPos();
+      applyBarSize();
       applyTasksHeight();
       renderTasks(s.agentTasks || []);
       // storage 확인 완료 → 이제부터 render()가 실제로 동작
@@ -947,15 +1022,9 @@
         bar.hidden = false;
         render();
         const restore = () => {
+          applyBarSize();
           if (barManualPos && window.innerWidth > 640) {
-            const bW = bar.offsetWidth || 560;
-            const bH = bar.offsetHeight || 760;
-            const left = Math.max(8, Math.min(window.innerWidth - bW - 8, barLeft));
-            const top = Math.max(8, Math.min(window.innerHeight - bH - 8, barTop));
-            bar.style.left = left + "px";
-            bar.style.top = top + "px";
-            bar.style.right = "auto";
-            bar.style.bottom = "auto";
+            applyManualBarPos();
           } else {
             applyBarPos();
           }
