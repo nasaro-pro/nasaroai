@@ -355,6 +355,11 @@
             width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
             font: inherit; font-size: 14px;
         }
+        .auth-check {
+            display: flex; align-items: center; gap: 8px; font-size: 12px; color: #475569;
+            margin: 6px 0; cursor: pointer;
+        }
+        .auth-check input { width: auto; margin: 0; }
         .auth-actions { display: flex; gap: 8px; margin-top: 14px; }
         .auth-btn {
             flex: 1; border: none; border-radius: 10px; padding: 11px 12px;
@@ -425,7 +430,7 @@
             margin: 0 auto;
             flex: 1;
             padding: 18px;
-            padding-bottom: calc(var(--input-dock-height, 120px) + 32px);
+            padding-bottom: calc(var(--input-dock-height, 96px) + 24px);
             overflow-x: hidden;
             min-width: 0;
         }
@@ -1174,10 +1179,29 @@
             justify-content: center;
         }
 
+        .dock-input-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .dock-input-row #mainInput {
+            flex: 1;
+            min-height: 40px;
+            max-height: 100px;
+        }
+
+        .dock-submit-btn {
+            flex-shrink: 0;
+            min-height: 40px;
+            padding: 10px 18px;
+            white-space: nowrap;
+        }
+
         #mainInput {
             width: 100%;
-            min-height: 44px;
-            max-height: 168px;
+            min-height: 40px;
+            max-height: 100px;
             resize: none;
             overflow-y: auto;
             border: 1px solid #d1d5db;
@@ -2330,8 +2354,38 @@
 
         /* ── 입력 툴바 (AI·프라이버시·음성) ── */
         .input-tool-row {
-            display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px;
         }
+        .model-picker-wrap { flex: 1 1 200px; min-width: 0; }
+        .ai-chips-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; max-width: 100%; }
+        .ai-chip {
+            font-size: 10px; padding: 3px 8px; border-radius: 999px; border: 1px solid #d1d5db;
+            background: #fff; color: #374151; cursor: pointer; line-height: 1.3;
+        }
+        .ai-chip.active { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; font-weight: 600; }
+        .privacy-btn-wide {
+            display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+            min-width: 128px; padding: 4px 10px 4px 12px;
+        }
+        .privacy-btn-wide .priv-q {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 18px; height: 18px; border-radius: 50%; background: #e5e7eb; font-size: 11px; font-weight: 700;
+        }
+        .side-account-box {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 10px 14px; margin: 0 12px 8px; border-radius: 10px; background: #f3f4f6;
+        }
+        .side-account-name { font-size: 13px; font-weight: 700; color: #111827; overflow: hidden; text-overflow: ellipsis; }
+        .side-logout-btn {
+            flex-shrink: 0; font-size: 11px; padding: 4px 8px; border-radius: 6px;
+            border: 1px solid #d1d5db; background: #fff; color: #6b7280; cursor: pointer;
+        }
+        .session-history-item {
+            font-size: 12px; padding: 8px 10px; margin-bottom: 6px; border-radius: 8px;
+            background: #f9fafb; border: 1px solid #e5e7eb; cursor: default; line-height: 1.4;
+        }
+        .session-history-item .sh-mode { font-size: 10px; color: #6b7280; font-weight: 600; }
+        .agent-card-badge.scheduled { background: #fef3c7; color: #92400e; }
         .input-tool-group { display: flex; align-items: center; gap: 4px; }
         .input-tool-label { font-size: 11px; color: #64748b; font-weight: 600; }
         .input-tool-select {
@@ -2453,9 +2507,18 @@
             <div class="side-menu-header">
                 <span class="side-menu-brand">Nasaro AI</span>
             </div>
-            <div class="side-menu-auth">
-                <button id="loginBtn" class="side-menu-btn primary" type="button">로그인</button>
-                <button id="signupBtn" class="side-menu-btn outline" type="button">회원가입</button>
+            <div id="sideAccountBox" class="side-account-box" style="display:none;">
+                <span id="sideAccountName" class="side-account-name"></span>
+                <button id="sideLogoutBtn" class="side-logout-btn" type="button" data-i18n="logout">로그아웃</button>
+            </div>
+            <div class="side-menu-auth" id="sideAuthBtns">
+                <button id="loginBtn" class="side-menu-btn primary" type="button" data-i18n="login">로그인</button>
+                <button id="signupBtn" class="side-menu-btn outline" type="button" data-i18n="signup">회원가입</button>
+            </div>
+            <div class="side-menu-section" id="sessionHistorySection">
+                <div class="works-section-title" data-i18n="session_history">기록</div>
+                <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="session_history_hint">이번 세션 질문·답변</div>
+                <div id="sessionHistoryList"><div class="works-empty" data-i18n="session_empty">아직 기록이 없습니다.</div></div>
             </div>
             <div class="side-menu-section works-section" id="activeCollabSection">
                 <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
@@ -2508,15 +2571,10 @@
                 </div>
             </div>
 
-            <!-- 권한 바로가기 (멈추지 않고 설정만 연결) -->
+            <!-- 진단 -->
             <div class="settings-row">
-                <div class="settings-row-label">권한 · 진단</div>
-                <div class="settings-perm-grid">
-                    <button id="permOverlayBtn" class="settings-action-btn primary-action" type="button">📱 오버레이 권한 열기</button>
-                    <button id="permAccessibilityBtn" class="settings-action-btn primary-action" type="button">♿ 접근성 권한 열기</button>
-                    <button id="permExtensionBtn" class="settings-action-btn" type="button">💻 PC 확장 설치 페이지</button>
-                    <button id="permHealthBtn" class="settings-action-btn" type="button">🌐 서버 상태 확인</button>
-                </div>
+                <div class="settings-row-label">진단</div>
+                <button id="permHealthBtn" class="settings-action-btn" type="button">🌐 서버 상태 확인</button>
                 <div id="settingsDiagMeta" class="settings-meta" style="margin-top:8px;">진단 정보를 불러오려면 설정을 열어주세요.</div>
             </div>
 
@@ -2542,20 +2600,9 @@
                 </select>
             </div>
 
-            <!-- 예약 에이전트 -->
+            <!-- 사용 가이드 -->
             <div class="settings-row">
-                <div class="settings-row-label" data-i18n="schedule_agent">예약 에이전트</div>
-                <div id="scheduleList" class="settings-meta">예약된 임무가 없습니다.</div>
-                <form id="scheduleForm" class="schedule-form">
-                    <input type="datetime-local" name="at" required>
-                    <textarea name="mission" rows="2" placeholder="실행할 임무"></textarea>
-                    <button type="submit" class="settings-action-btn primary-action">+ 예약 추가</button>
-                </form>
-            </div>
-
-            <!-- 저장 동의 -->
-            <div class="settings-row">
-                <div class="settings-row-label">📘 구조 · 아이디어 가이드</div>
+                <div class="settings-row-label" data-i18n="user_guide">사용 가이드</div>
                 <div id="settingsGuideBox" class="settings-guide-box"></div>
             </div>
 
@@ -2582,13 +2629,15 @@
                     <input id="authNameInput" type="text" autocomplete="name" placeholder="선택 입력">
                 </div>
                 <div class="auth-field">
-                    <label for="authEmailInput">이메일</label>
-                    <input id="authEmailInput" type="email" autocomplete="email" placeholder="you@example.com">
+                    <label for="authUsernameInput" data-i18n="username">아이디</label>
+                    <input id="authUsernameInput" type="text" autocomplete="username" placeholder="my_id">
                 </div>
                 <div class="auth-field">
-                    <label for="authPasswordInput">비밀번호</label>
+                    <label for="authPasswordInput" data-i18n="password">비밀번호</label>
                     <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="8자 이상">
                 </div>
+                <label class="auth-check"><input id="authRememberUser" type="checkbox"> <span data-i18n="remember_username">아이디 기억</span></label>
+                <label class="auth-check"><input id="authRememberPwd" type="checkbox"> <span data-i18n="remember_password">비밀번호 저장 (자동 로그인)</span></label>
                 <div id="authError" class="auth-error"></div>
                 <div class="auth-actions">
                     <button id="authSubmitBtn" class="auth-btn primary" type="button">로그인</button>
@@ -2877,19 +2926,21 @@
 
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
-                <div class="dock-mode-row">
-                    <button class="mode-btn active" type="button" data-mode="compare">비교</button>
-                    <button class="mode-btn" type="button" data-mode="debate">토론</button>
-                    <button class="mode-btn" type="button" data-mode="collab">협업</button>
-                    <button id="newChatBtn" class="dock-btn muted" type="button" title="새 채팅 시작">✦ 새 채팅</button>
-                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
+                <div class="dock-input-row">
+                    <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                    <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
                 <div id="mainInputTools"></div>
-                <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                <div class="dock-mode-row">
+                    <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                    <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
+                    <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
+                    <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
+                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
+                </div>
                 <div class="dock-actions">
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
-                    <button id="dockPrimaryBtn" class="dock-btn primary" type="button">비교 시작 ▶</button>
                 </div>
             </div>
         </footer>
@@ -2918,7 +2969,69 @@
         };
         const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
         function getActiveModels() {
-            return window.NasaroFeatures?.getSelectedModels?.() || MODELS;
+            return window.NasaroFeatures?.getSelectedModels?.(currentMode) || MODELS;
+        }
+
+        const sessionHistory = [];
+
+        function addSessionHistory(entry) {
+            sessionHistory.unshift({
+                id: createUUID(),
+                time: Date.now(),
+                mode: entry.mode,
+                title: entry.title,
+                preview: entry.preview || "",
+            });
+            if (sessionHistory.length > 50) sessionHistory.length = 50;
+            renderSessionHistory();
+        }
+
+        function renderSessionHistory() {
+            const list = document.getElementById("sessionHistoryList");
+            const NF = window.NasaroFeatures;
+            if (!list) return;
+            if (!sessionHistory.length) {
+                list.innerHTML = `<div class="works-empty">${NF?.t?.("session_empty") || "아직 기록이 없습니다."}</div>`;
+                return;
+            }
+            const modeLabel = m => ({
+                compare: NF?.t?.("mode_compare") || "비교",
+                debate: NF?.t?.("mode_debate") || "토론",
+                collab: NF?.t?.("mode_collab") || "협업",
+                agent: NF?.t?.("mode_agent") || "에이전트",
+            }[m] || m);
+            list.innerHTML = sessionHistory.map(h => {
+                const when = new Date(h.time).toLocaleString();
+                return `<div class="session-history-item"><div class="sh-mode">${modeLabel(h.mode)} · ${when}</div><div>${escapeHtml(h.title)}</div></div>`;
+            }).join("");
+        }
+
+        function rebuildMainToolbar() {
+            const NF = window.NasaroFeatures;
+            const mainTools = document.getElementById("mainInputTools");
+            if (!NF || !mainTools || !mainInput) return;
+            mainTools.innerHTML = "";
+            mainTools.appendChild(NF.buildInputToolbar(mainInput, { mode: currentMode, showToast }));
+        }
+
+        function rebuildAgentToolbar() {
+            const NF = window.NasaroFeatures;
+            const agentTools = document.getElementById("agentInputTools");
+            if (!NF || !agentTools || !agentInputEl) return;
+            agentTools.innerHTML = "";
+            agentTools.appendChild(NF.buildInputToolbar(agentInputEl, { mode: "agent", showToast }));
+        }
+
+        function refreshAppLang() {
+            const NF = window.NasaroFeatures;
+            if (!NF) return;
+            rebuildMainToolbar();
+            rebuildAgentToolbar();
+            updateDockUI();
+            updateAuthUI();
+            renderSessionHistory();
+            renderSettingsGuide();
+            renderResultFilesList();
         }
 
         const COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요.";
@@ -3087,7 +3200,11 @@
         }
 
         const AUTH_TOKEN_KEY = "nasaroai_auth_token";
-        let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || "";
+        const REMEMBER_USER_KEY = "nasaroai_remember_user";
+        const REMEMBER_PWD_KEY = "nasaroai_auto_login";
+        let authToken = localStorage.getItem(REMEMBER_PWD_KEY) === "1"
+            ? (localStorage.getItem(AUTH_TOKEN_KEY) || "")
+            : "";
         let currentUser = null;
         let authModalMode = "login";
         let syncTimer = null;
@@ -3306,40 +3423,62 @@
         }
 
         function updateAuthUI() {
+            const NF = window.NasaroFeatures;
             const meta = document.getElementById("settingsAccountMeta");
             const loginBtn = document.getElementById("settingsLoginBtn");
             const logoutBtn = document.getElementById("settingsLogoutBtn");
-            const sideLogin = document.getElementById("loginBtn");
-            const sideSignup = document.getElementById("signupBtn");
+            const sideAuth = document.getElementById("sideAuthBtns");
+            const sideAccount = document.getElementById("sideAccountBox");
+            const sideAccountName = document.getElementById("sideAccountName");
             loadSavedResults();
             if (currentUser) {
-                const label = `${currentUser.display_name || currentUser.email} (${currentUser.email})`;
-                if (meta) meta.textContent = `로그인됨 — ${label}\n결과물·협업이 서버에 저장됩니다.`;
+                const name = currentUser.display_name || currentUser.username || currentUser.email;
+                if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${name}`;
                 if (loginBtn) loginBtn.style.display = "none";
                 if (logoutBtn) logoutBtn.style.display = "";
-                if (sideLogin) sideLogin.textContent = "내 계정";
-                if (sideSignup) sideSignup.textContent = "로그아웃";
+                if (sideAuth) sideAuth.style.display = "none";
+                if (sideAccount) sideAccount.style.display = "flex";
+                if (sideAccountName) sideAccountName.textContent = name;
             } else {
-                if (meta) meta.textContent = "비로그인 — 자동 기록 없음. 결과물 저장은 이 탭에서만 유지됩니다.";
+                if (meta) meta.textContent = NF?.lang === "en"
+                    ? "Not signed in — results stay in this tab only."
+                    : "비로그인 — 결과물은 이 탭에서만 유지됩니다.";
                 if (loginBtn) loginBtn.style.display = "";
                 if (logoutBtn) logoutBtn.style.display = "none";
-                if (sideLogin) sideLogin.textContent = "로그인";
-                if (sideSignup) sideSignup.textContent = "회원가입";
+                if (sideAuth) sideAuth.style.display = "flex";
+                if (sideAccount) sideAccount.style.display = "none";
             }
             renderResultFilesList();
             notifyExtensionAuth();
         }
 
         function openAuthModal(mode = "login") {
+            const NF = window.NasaroFeatures;
             authModalMode = mode;
-            document.getElementById("authModalTitle").textContent = mode === "signup" ? "회원가입" : "로그인";
+            document.getElementById("authModalTitle").textContent = mode === "signup"
+                ? (NF?.t?.("signup") || "회원가입")
+                : (NF?.t?.("login") || "로그인");
             document.getElementById("authModalDesc").textContent = mode === "signup"
-                ? "가입하면 결과물 파일·협업 진행이 서버에 저장됩니다. (비밀번호 8자 이상)"
-                : "로그인하면 다른 기기에서도 결과물을 이어갈 수 있습니다.";
+                ? (NF?.lang === "en" ? "Sign up to sync saved results across devices. (Password 8+ chars)" : "가입하면 결과물·협업이 서버에 저장됩니다. (비밀번호 8자 이상)")
+                : (NF?.lang === "en" ? "Sign in to continue saved results on other devices." : "로그인하면 다른 기기에서도 결과물을 이어갈 수 있습니다.");
             document.getElementById("authNameField").style.display = mode === "signup" ? "" : "none";
-            document.getElementById("authSubmitBtn").textContent = mode === "signup" ? "가입하기" : "로그인";
-            document.getElementById("authToggleModeBtn").textContent = mode === "signup" ? "로그인으로" : "회원가입";
+            document.getElementById("authSubmitBtn").textContent = mode === "signup"
+                ? (NF?.t?.("signup") || "가입하기")
+                : (NF?.t?.("login") || "로그인");
+            document.getElementById("authToggleModeBtn").textContent = mode === "signup"
+                ? (NF?.t?.("login") || "로그인으로")
+                : (NF?.t?.("signup") || "회원가입");
             document.getElementById("authError").textContent = "";
+            const userInput = document.getElementById("authUsernameInput");
+            const rememberUser = document.getElementById("authRememberUser");
+            const rememberPwd = document.getElementById("authRememberPwd");
+            const savedUser = localStorage.getItem(REMEMBER_USER_KEY) || "";
+            if (userInput) userInput.value = savedUser;
+            if (rememberUser) rememberUser.checked = !!savedUser;
+            if (rememberPwd) rememberPwd.checked = localStorage.getItem(REMEMBER_PWD_KEY) === "1";
+            if (!localStorage.getItem(REMEMBER_PWD_KEY)) {
+                document.getElementById("authPasswordInput").value = "";
+            }
             document.getElementById("authModalOverlay").classList.add("open");
         }
 
@@ -3348,20 +3487,24 @@
         }
 
         async function submitAuth() {
-            const email = document.getElementById("authEmailInput").value.trim();
+            const username = document.getElementById("authUsernameInput").value.trim();
             const password = document.getElementById("authPasswordInput").value;
             const displayName = document.getElementById("authNameInput").value.trim();
+            const rememberUser = document.getElementById("authRememberUser")?.checked;
+            const rememberPwd = document.getElementById("authRememberPwd")?.checked;
             const errEl = document.getElementById("authError");
             errEl.textContent = "";
             if (authModalMode === "signup" && password.length < 8) {
-                errEl.textContent = "비밀번호는 8자 이상이어야 합니다.";
+                errEl.textContent = window.NasaroFeatures?.lang === "en"
+                    ? "Password must be at least 8 characters."
+                    : "비밀번호는 8자 이상이어야 합니다.";
                 return;
             }
             try {
                 const path = authModalMode === "signup" ? "/auth/signup" : "/auth/login";
                 const body = authModalMode === "signup"
-                    ? { email, password, display_name: displayName }
-                    : { email, password };
+                    ? { username, password, display_name: displayName }
+                    : { username, password };
                 const res = await apiFetch(path, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -3374,14 +3517,22 @@
                 }
                 authToken = data.token;
                 currentUser = data.user;
-                localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+                if (rememberUser) localStorage.setItem(REMEMBER_USER_KEY, username);
+                else localStorage.removeItem(REMEMBER_USER_KEY);
+                if (rememberPwd) {
+                    localStorage.setItem(REMEMBER_PWD_KEY, "1");
+                    localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+                } else {
+                    localStorage.removeItem(REMEMBER_PWD_KEY);
+                    localStorage.removeItem(AUTH_TOKEN_KEY);
+                }
                 migrateSessionResultsToAccount();
                 closeAuthModal();
                 updateAuthUI();
                 notifyExtensionAuth();
                 await syncUserData();
                 await pullUserData();
-                showToast("계정 연결 완료", "success");
+                showToast(window.NasaroFeatures?.lang === "en" ? "Signed in" : "계정 연결 완료", "success");
             } catch (err) {
                 errEl.textContent = err.message || "오류가 발생했습니다.";
             }
@@ -3392,9 +3543,10 @@
             authToken = "";
             currentUser = null;
             localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem(REMEMBER_PWD_KEY);
             updateAuthUI();
             notifyExtensionAuth();
-            showToast("로그아웃했습니다.", "success");
+            showToast(window.NasaroFeatures?.lang === "en" ? "Signed out" : "로그아웃했습니다.", "success");
         }
 
         async function bootstrapAuth() {
@@ -3441,32 +3593,7 @@
         function renderSettingsGuide() {
             const box = document.getElementById("settingsGuideBox");
             if (!box) return;
-            box.innerHTML = `
-                <p><strong>Nasaro AI</strong> — 여러 AI를 한곳에서 비교·토론·협업·에이전트 실행.</p>
-                <h4>왜 쓰나 (대중)</h4>
-                <ul>
-                    <li>ChatGPT·Claude·Gemini 등 <strong>한 번에 비교</strong> — 어느 답이 나은지 바로 판단</li>
-                    <li>토론·협업으로 <strong>기획·글쓰기·조사</strong>를 단계별로</li>
-                    <li>PC/폰 에이전트로 <strong>반복 클릭·검색</strong> 대신 말로 시키기</li>
-                </ul>
-                <h4>저장 방식</h4>
-                <ul>
-                    <li>자동 기록 없음 — 답변 옆 <strong>「결과물 저장」</strong>만 저장</li>
-                    <li>메뉴 <strong>「결과물 파일」</strong>에서 목록·미리보기</li>
-                    <li>로그인: 서버 + 앱 오프라인 / 비로그인: 이 탭만</li>
-                    <li>🔒 프라이버시: 이 화면에서만, 저장은 수동 가능</li>
-                </ul>
-                <h4>보완 예정 (우선순위)</h4>
-                <ol>
-                    <li>베스트 답변 원탭 복사</li>
-                    <li>메일·SNS·카톡 초안 템플릿</li>
-                    <li>질문 추천 칩 (오늘 뭐 물어볼까)</li>
-                    <li>즐겨찾는 AI 고정</li>
-                    <li>QR로 폰↔PC 공유</li>
-                    <li>초보 모드 (기능 하나씩 크게)</li>
-                    <li>Android 홈 위젯 · 완료 알림</li>
-                </ol>
-                <p style="margin-top:8px;"><a href="/guide" target="_blank" rel="noopener">전체 가이드 열기 ↗</a></p>`;
+            box.innerHTML = window.NasaroFeatures?.getUserGuideHtml?.() || "";
         }
 
         async function refreshSettingsDiagnostics() {
@@ -3623,21 +3750,13 @@
 
         document.getElementById("settingsLoginBtn")?.addEventListener("click", () => openAuthModal("login"));
         document.getElementById("settingsLogoutBtn")?.addEventListener("click", logoutAccount);
-        document.getElementById("loginBtn")?.addEventListener("click", () => currentUser ? null : openAuthModal("login"));
-        document.getElementById("signupBtn")?.addEventListener("click", () => currentUser ? logoutAccount() : openAuthModal("signup"));
+        document.getElementById("loginBtn")?.addEventListener("click", () => openAuthModal("login"));
+        document.getElementById("signupBtn")?.addEventListener("click", () => openAuthModal("signup"));
+        document.getElementById("sideLogoutBtn")?.addEventListener("click", logoutAccount);
         document.getElementById("authSubmitBtn")?.addEventListener("click", submitAuth);
         document.getElementById("authToggleModeBtn")?.addEventListener("click", () => openAuthModal(authModalMode === "signup" ? "login" : "signup"));
         document.getElementById("authCloseBtn")?.addEventListener("click", closeAuthModal);
         document.getElementById("authModalOverlay")?.addEventListener("click", (e) => { if (e.target.id === "authModalOverlay") closeAuthModal(); });
-        document.getElementById("permOverlayBtn")?.addEventListener("click", () => {
-            if (window.NasaroAndroidAgent?.openOverlaySettings) window.NasaroAndroidAgent.openOverlaySettings();
-            else showToast("Android 앱에서만 오버레이 설정을 열 수 있습니다.", "warn");
-        });
-        document.getElementById("permAccessibilityBtn")?.addEventListener("click", () => {
-            if (window.NasaroAndroidAgent?.openAccessibilitySettings) window.NasaroAndroidAgent.openAccessibilitySettings();
-            else showToast("Android 앱에서만 접근성 설정을 열 수 있습니다.", "warn");
-        });
-        document.getElementById("permExtensionBtn")?.addEventListener("click", () => { window.location.href = "/install"; });
         document.getElementById("permHealthBtn")?.addEventListener("click", refreshSettingsDiagnostics);
 
         // 패널 외부 클릭 시 닫기
@@ -3743,13 +3862,14 @@
         }
 
         function updateDockUI() {
+            const NF = window.NasaroFeatures;
             dockSecondaryBtn.style.display = "none";
             dockNewDebateBtn.style.display = "none";
 
             if (currentMode === "compare") {
-                mainInput.placeholder = "비교할 질문을 입력하세요…";
-                dockPrimaryBtn.textContent = "비교 시작 ▶";
-                dockPrimaryBtn.className = "dock-btn primary";
+                mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
+                dockPrimaryBtn.textContent = NF?.t?.("btn_compare") || "비교 ▶";
+                dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = false;
                 mainInput.disabled = false;
                 return;
@@ -3757,10 +3877,12 @@
 
             if (currentMode === "collab") {
                 mainInput.placeholder = collabTaskAsked
-                    ? "추가 질문이나 수정 사항을 입력하세요…"
-                    : "어떤 작업을 원하십니까?";
-                dockPrimaryBtn.textContent = collabRecommendInFlight ? "분석 중..." : "AI 추천 받기 ▶";
-                dockPrimaryBtn.className = "dock-btn primary";
+                    ? (NF?.t?.("ph_collab_done") || "추가 요청…")
+                    : (NF?.t?.("ph_collab") || "작업 설명…");
+                dockPrimaryBtn.textContent = collabRecommendInFlight
+                    ? (NF?.t?.("btn_collab_busy") || "분석…")
+                    : (NF?.t?.("btn_collab") || "AI 추천 ▶");
+                dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = collabRecommendInFlight;
                 mainInput.disabled = false;
                 return;
@@ -3768,14 +3890,14 @@
 
             mainInput.disabled = false;
             if (!debateStarted) {
-                mainInput.placeholder = "토론 주제를 입력하세요…";
-                dockPrimaryBtn.textContent = "토론 시작 ▶";
-                dockPrimaryBtn.className = "dock-btn secondary";
+                mainInput.placeholder = NF?.t?.("ph_debate") || "토론 주제…";
+                dockPrimaryBtn.textContent = NF?.t?.("btn_debate") || "토론 ▶";
+                dockPrimaryBtn.className = "dock-btn secondary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             } else {
-                mainInput.placeholder = "새 질문이나 의견을 입력하세요…";
-                dockPrimaryBtn.textContent = "다음 라운드 ▶";
-                dockPrimaryBtn.className = "dock-btn primary";
+                mainInput.placeholder = NF?.t?.("ph_debate_cont") || "의견 추가…";
+                dockPrimaryBtn.textContent = NF?.t?.("btn_debate_next") || "다음 ▶";
+                dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
                 dockSecondaryBtn.style.display = "inline-block";
                 dockSecondaryBtn.disabled = debateInFlight;
@@ -3802,6 +3924,7 @@
                 }
             }
 
+            rebuildMainToolbar();
             updateDockUI();
         }
 
@@ -4082,6 +4205,59 @@
             line.textContent = `[${hh}:${mm}:${ss}] ${text}`;
             logEl.appendChild(line);
             logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function ensureAgentPermissions() {
+            const aa = window.NasaroAndroidAgent;
+            if (!aa) return true;
+            if (aa.isOverlayReady && !aa.isOverlayReady()) {
+                aa.openOverlaySettings?.();
+                showToast(window.NasaroFeatures?.lang === "en"
+                    ? "Allow overlay permission for the agent."
+                    : "에이전트용 오버레이 권한을 허용해주세요.", "info", 4500);
+            }
+            if (aa.isAccessibilityReady && !aa.isAccessibilityReady()) {
+                aa.openAccessibilitySettings?.();
+                showToast(window.NasaroFeatures?.lang === "en"
+                    ? "Enable accessibility for the agent."
+                    : "에이전트용 접근성 권한을 켜주세요.", "info", 4500);
+            }
+            return true;
+        }
+
+        function appendScheduledAgentCard(mission, scheduleLabel) {
+            const emptyEl = agentHistory.querySelector(".agent-empty");
+            if (emptyEl) emptyEl.remove();
+            const badgeText = window.NasaroFeatures?.t?.("scheduled_badge") || "예약";
+            const card = document.createElement("div");
+            card.className = "agent-card scheduled-card";
+            card.innerHTML = `
+                <div class="agent-card-header">
+                    <span class="agent-card-title">${escapeHtml(mission)}</span>
+                    <span class="agent-card-badge scheduled">${badgeText}</span>
+                </div>
+                <div class="agent-card-log"></div>
+                <div class="agent-card-body" style="display:block;color:#64748b;font-size:13px;"></div>`;
+            agentHistory.appendChild(card);
+            const logEl = card.querySelector(".agent-card-log");
+            const bodyEl = card.querySelector(".agent-card-body");
+            appendCardLog(logEl, `${scheduleLabel} — ${mission}`);
+            bodyEl.textContent = scheduleLabel;
+            agentHistory.scrollTop = agentHistory.scrollHeight;
+            return { card, badge: card.querySelector(".agent-card-badge"), logEl, bodyEl };
+        }
+
+        function scheduleAgentMission(mission, scheduleInfo) {
+            const NF = window.NasaroFeatures;
+            const runAt = Date.now() + scheduleInfo.delayMs;
+            appendScheduledAgentCard(mission, scheduleInfo.label);
+            NF.addAgentSchedule({ id: createUUID(), mission, runAt, label: scheduleInfo.label }, (m) => {
+                showToast((NF.t("scheduled_done") || "예약 임무 실행") + ": " + m, "success", 5000);
+                runAgentMission(m, false);
+            });
+            setAgentStatus("idle", (NF.lang === "en" ? "Scheduled: " : "예약됨: ") + scheduleInfo.label);
+            showToast((NF.lang === "en" ? "Scheduled " : "예약: ") + scheduleInfo.label, "success");
+            addSessionHistory({ mode: "agent", title: mission, preview: scheduleInfo.label });
         }
 
         function appendAgentCard(title) {
@@ -4406,8 +4582,14 @@
             agentSendBtn._appendToCard = null;
             agentSendBtn.textContent = "실행 ▶";
             agentInputEl.value = "";
-            agentInputEl.placeholder = "에이전트에게 임무를 지시하세요…";
+            agentInputEl.placeholder = window.NasaroFeatures?.t?.("ph_agent") || "에이전트에게 임무를 지시하세요…";
             autoResizeTA(agentInputEl);
+            const NF = window.NasaroFeatures;
+            const scheduled = NF?.parseScheduleFromText?.(val);
+            if (scheduled && !isModify && !appendTo) {
+                scheduleAgentMission(scheduled.mission, scheduled);
+                return;
+            }
             runAgentMission(val, isModify, appendTo);
         });
 
@@ -4520,15 +4702,21 @@
 
         // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
         agentToggleBtn.addEventListener("click", () => {
+            const NF = window.NasaroFeatures;
             if (hasNativeAndroidAgent && !isAgentOverlay) {
                 try {
+                    ensureAgentPermissions();
                     window.NasaroAndroidAgent.openAgent();
                     agentActive = true;
                     agentToggleBtn.classList.add("active");
                     agentToggleBtn.textContent = "● 에이전트 ON";
-                    showToast("에이전트 오버레이를 열었습니다. 접기하면 런처가 남습니다.", "success");
+                    showToast(NF?.lang === "en"
+                        ? "Agent overlay opened."
+                        : "에이전트 오вер레이를 열었습니다.", "success");
                 } catch (err) {
-                    showToast("에이전트 오버레이를 열지 못했습니다. 권한을 확인해주세요.", "error");
+                    showToast(NF?.lang === "en"
+                        ? "Could not open agent overlay."
+                        : "에이전트 오버레이를 열지 못했습니다.", "error");
                 }
                 return;
             }
@@ -4559,11 +4747,18 @@
                 setAgentActive(false);
                 return;
             }
+            // PC: 확장 미설치 → 설치 페이지
+            if (!isMobileDevice && !isAppSource && !nasaroaiExtReady) {
+                showToast(NF?.t?.("install_ext") || "PC 확장이 필요합니다.", "info", 4500);
+                window.location.href = "/install";
+                return;
+            }
             // 모바일이고 앱이 아니면 → 설치 팝업 (앱 없이는 에이전트 사용 불가)
             if (isMobileDevice && !isAppSource) {
                 openAndroidInstallModal();
                 return;
             }
+            if (isAgentOverlay) ensureAgentPermissions();
             setAgentActive(true);
         });
 
@@ -4605,6 +4800,7 @@
                 }
                 const data = await response.json();
                 renderCollabPlan(resultEl, data, task);
+                addSessionHistory({ mode: "collab", title: task });
             } catch (err) {
                 resultEl.textContent = `오류: ${err.message}`;
             } finally {
@@ -5032,6 +5228,7 @@
                 showToast,
                 onSaveResult: saveResultRecord,
             });
+            addSessionHistory({ mode: "compare", title: message, preview: activeModels.join(", ") });
         }
 
         function appendLoadingCard(roundNumber, speakerIndex) {
@@ -5301,6 +5498,7 @@
                 session_id: debateSessionId,
                 topic: debateTopic,
             }, 1);
+            addSessionHistory({ mode: "debate", title: topic });
         }
 
         async function runDebateRoundSequence(firstEndpoint, firstPayload, expectedRound) {
@@ -5408,27 +5606,28 @@
         (function initNasaroFeatures() {
             const NF = window.NasaroFeatures;
             if (!NF) return;
-            const mainTools = document.getElementById("mainInputTools");
-            if (mainTools && mainInput) mainTools.appendChild(NF.buildInputToolbar(mainInput, { showToast }));
-            const agentTools = document.getElementById("agentInputTools");
-            if (agentTools && agentInputEl) agentTools.appendChild(NF.buildInputToolbar(agentInputEl, { showToast }));
+            rebuildMainToolbar();
+            rebuildAgentToolbar();
             const langSel = document.getElementById("settingsLangSelect");
             const themeSel = document.getElementById("settingsThemeSelect");
-            if (langSel) { langSel.value = NF.lang; langSel.addEventListener("change", e => { NF.lang = e.target.value; }); }
+            if (langSel) {
+                langSel.value = NF.lang;
+                langSel.addEventListener("change", e => { NF.lang = e.target.value; refreshAppLang(); });
+            }
             if (themeSel) { themeSel.value = NF.theme; themeSel.addEventListener("change", e => { NF.theme = e.target.value; }); }
-            NF.renderScheduleList(document.getElementById("scheduleList"));
-            NF.addScheduleForm(document.getElementById("scheduleForm"), agentInputEl, showToast);
-            NF.startScheduleChecker(mission => {
-                if (agentInputEl) { agentInputEl.value = mission; autoResizeTA(agentInputEl); }
-                showToast(NF.t("scheduled_done") + ": " + mission, "success", 5000);
-                agentSendBtn?.click();
-            }, showToast);
+            NF.startAgentScheduleChecker(mission => {
+                showToast((NF.t("scheduled_done") || "예약 임무 실행") + ": " + mission, "success", 5000);
+                if (!agentActive) setAgentActive(true);
+                runAgentMission(mission, false);
+            });
+            window.addEventListener("nasaroai:lang", refreshAppLang);
             NF.loadShareFromUrl(apiFetch, showToast);
             renderActiveCollabSidebar();
             loadSavedResults();
             renderResultFilesList();
             renderCollabPresetSidebar();
             renderSettingsGuide();
+            renderSessionHistory();
         })();
 
         updateDockUI();

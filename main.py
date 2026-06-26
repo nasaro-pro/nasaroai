@@ -336,13 +336,13 @@ class CollabStageRequest(BaseModel):
 
 
 class AuthSignupRequest(BaseModel):
-    email: str
+    username: str
     password: str
     display_name: str = ""
 
 
 class AuthLoginRequest(BaseModel):
-    email: str
+    username: str
     password: str
 
 
@@ -2463,7 +2463,7 @@ def quota_status(request: Request, device_id: str = "") -> dict:
 @app.post("/auth/signup")
 def auth_signup_route(body: AuthSignupRequest) -> dict:
     try:
-        return auth_signup_fn(body.email, body.password, body.display_name)
+        return auth_signup_fn(body.username, body.password, body.display_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2471,7 +2471,7 @@ def auth_signup_route(body: AuthSignupRequest) -> dict:
 @app.post("/auth/login")
 def auth_login_route(body: AuthLoginRequest) -> dict:
     try:
-        return auth_login_fn(body.email, body.password)
+        return auth_login_fn(body.username, body.password)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 

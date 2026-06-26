@@ -1,59 +1,128 @@
-/** Nasaro AI — 보완 아이디어 UI (음성·공유·작업물·i18n·다크모드 등) */
+/** Nasaro AI — UI helpers (i18n, AI pick, voice, share, agent schedule) */
 (function () {
     const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
+    const FASTEST_MODEL = "DeepSeek";
 
     const I18N = {
         ko: {
             works_in_progress: "협업 작업 중",
+            session_history: "기록",
+            session_history_hint: "이번 세션에서 한 질문·답변 (자동 저장 없음)",
+            session_empty: "아직 기록이 없습니다.",
             result_files: "결과물 파일",
-            result_files_hint: "「결과물 저장」 버튼으로만 추가됩니다.",
-            result_files_login: "로그인: 서버·오프라인 보관 지원",
-            result_files_guest: "비로그인: 이 탭에서만 (데이터 삭제 시 초기화)",
+            result_files_hint: "「결과물 저장」으로만 추가됩니다.",
+            result_files_login: "로그인: 서버·오프라인 보관",
+            result_files_guest: "비로그인: 이 탭에서만",
             save_result: "결과물 저장",
             save_result_done: "결과물에 저장했습니다.",
-            voice_start: "음성 입력",
-            voice_listening: "듣는 중…",
-            voice_unsupported: "이 브라우저는 음성 입력을 지원하지 않습니다.",
+            voice_start: "음성",
+            voice_unsupported: "음성 입력을 지원하지 않습니다.",
             privacy_on: "프라이버시 켬",
             privacy_off: "프라이버시 끔",
             privacy_tip: "자동 기록·동기화·공유 없음. 이 화면에서만 표시. 「결과물 저장」은 수동 가능.",
-            ai_pick: "AI 선택",
+            ai_pick: "AI",
+            ai_all: "전체",
+            ai_collab_pick: "추천 AI",
             export_result: "결과물 생성",
             share_link: "공유 링크",
             work_complete: "작업 완료",
-            delete_confirm: "정말 삭제할까요? 되돌릴 수 없습니다.",
+            delete_confirm: "정말 삭제할까요?",
             scheduled_done: "예약 임무 실행",
+            scheduled_badge: "예약",
             lang: "언어",
             theme: "테마",
             theme_light: "라이트",
             theme_dark: "다크",
-            schedule_agent: "예약 에이전트",
+            login: "로그인",
+            signup: "회원가입",
+            logout: "로그아웃",
+            username: "아이디",
+            password: "비밀번호",
+            remember_username: "아이디 기억",
+            remember_password: "비밀번호 저장 (자동 로그인)",
+            mode_compare: "비교",
+            mode_debate: "토론",
+            mode_collab: "협업",
+            mode_agent: "에이전트",
+            new_chat: "새 대화",
+            ph_compare: "비교할 질문…",
+            ph_debate: "토론 주제…",
+            ph_debate_cont: "의견 추가…",
+            ph_collab: "작업 설명…",
+            ph_collab_done: "추가 요청…",
+            ph_agent: "임무 지시 (예: 5분 뒤 네이버 열어줘)…",
+            btn_compare: "비교 ▶",
+            btn_debate: "토론 ▶",
+            btn_debate_next: "다음 ▶",
+            btn_collab: "AI 추천 ▶",
+            btn_collab_busy: "분석…",
+            settings: "설정",
+            guide_title: "Nasaro AI 사용법",
+            account: "계정",
+            usage_today: "오늘 사용량",
+            font_size: "글씨 크기",
+            user_guide: "사용 가이드",
+            install_ext: "PC 확장이 필요합니다. 설치 페이지로 이동합니다.",
         },
         en: {
             works_in_progress: "Collab in progress",
+            session_history: "History",
+            session_history_hint: "This session only (not auto-saved)",
+            session_empty: "No history yet.",
             result_files: "Result files",
-            result_files_hint: "Added only via Save result button.",
-            result_files_login: "Signed in: cloud + offline backup",
+            result_files_hint: "Added via Save result only.",
+            result_files_login: "Signed in: cloud backup",
             result_files_guest: "Guest: this tab only",
             save_result: "Save result",
-            save_result_done: "Saved to result files.",
-            voice_start: "Voice input",
-            voice_listening: "Listening…",
-            voice_unsupported: "Voice input is not supported in this browser.",
+            save_result_done: "Saved.",
+            voice_start: "Voice",
+            voice_unsupported: "Voice not supported.",
             privacy_on: "Privacy on",
             privacy_off: "Privacy off",
-            privacy_tip: "No auto log, sync, or share. Manual save still works.",
+            privacy_tip: "No auto log/sync/share. Manual save works.",
             ai_pick: "AI",
+            ai_all: "All",
+            ai_collab_pick: "Recommend AI",
             export_result: "Export",
-            share_link: "Share link",
-            work_complete: "Mark complete",
-            delete_confirm: "Delete permanently? This cannot be undone.",
+            share_link: "Share",
+            work_complete: "Done",
+            delete_confirm: "Delete permanently?",
             scheduled_done: "Scheduled task ran",
+            scheduled_badge: "Scheduled",
             lang: "Language",
             theme: "Theme",
             theme_light: "Light",
             theme_dark: "Dark",
-            schedule_agent: "Scheduled agent",
+            login: "Log in",
+            signup: "Sign up",
+            logout: "Log out",
+            username: "Username",
+            password: "Password",
+            remember_username: "Remember username",
+            remember_password: "Save password (auto login)",
+            mode_compare: "Compare",
+            mode_debate: "Debate",
+            mode_collab: "Collab",
+            mode_agent: "Agent",
+            new_chat: "New chat",
+            ph_compare: "Question to compare…",
+            ph_debate: "Debate topic…",
+            ph_debate_cont: "Add opinion…",
+            ph_collab: "Describe your task…",
+            ph_collab_done: "Follow-up…",
+            ph_agent: "Mission (e.g. open Naver in 5 min)…",
+            btn_compare: "Compare ▶",
+            btn_debate: "Debate ▶",
+            btn_debate_next: "Next ▶",
+            btn_collab: "Recommend ▶",
+            btn_collab_busy: "Analyzing…",
+            settings: "Settings",
+            guide_title: "How to use Nasaro AI",
+            account: "Account",
+            usage_today: "Usage today",
+            font_size: "Font size",
+            user_guide: "User guide",
+            install_ext: "Extension required. Opening install page.",
         },
     };
 
@@ -64,20 +133,44 @@
     let lang = localStorage.getItem("nasaroai_lang") || "ko";
     let theme = localStorage.getItem("nasaroai_theme") || "light";
     let privacyMode = localStorage.getItem("nasaroai_privacy") === "1";
-    let selectedModels = JSON.parse(localStorage.getItem("nasaroai_selected_models") || "null") || MODELS.slice();
-    let scheduledTasks = JSON.parse(localStorage.getItem("nasaroai_scheduled_agent") || "[]");
-    let scheduleTimer = null;
+    let modelsCompare = JSON.parse(localStorage.getItem("nasaroai_models_compare") || "null") || MODELS.slice();
+    let modelsDebate = JSON.parse(localStorage.getItem("nasaroai_models_debate") || "null") || MODELS.slice();
+    let modelsAgent = JSON.parse(localStorage.getItem("nasaroai_models_agent") || "null") || MODELS.slice();
+    let collabModel = localStorage.getItem("nasaroai_model_collab") || "Perplexity";
+    let agentScheduledTasks = JSON.parse(localStorage.getItem("nasaroai_agent_scheduled") || "[]");
+    let agentScheduleTimer = null;
 
     function t(key) {
-        return (I18N[lang] && I18N[lang][key]) || (I18N.ko[key]) || key;
+        return (I18N[lang] && I18N[lang][key]) || I18N.ko[key] || key;
     }
 
-    function isPrivacyMode() {
-        return privacyMode;
+    function isPrivacyMode() { return privacyMode; }
+
+    function saveModels(mode) {
+        if (mode === "collab") localStorage.setItem("nasaroai_model_collab", collabModel);
+        else if (mode === "debate") localStorage.setItem("nasaroai_models_debate", JSON.stringify(modelsDebate));
+        else if (mode === "agent") localStorage.setItem("nasaroai_models_agent", JSON.stringify(modelsAgent));
+        else localStorage.setItem("nasaroai_models_compare", JSON.stringify(modelsCompare));
     }
 
-    function getSelectedModels() {
-        return selectedModels.length ? selectedModels : MODELS.slice();
+    function getModelsForMode(mode) {
+        if (mode === "collab") return [collabModel || FASTEST_MODEL];
+        const list = mode === "debate" ? modelsDebate : mode === "agent" ? modelsAgent : modelsCompare;
+        return list.length ? list : MODELS.slice();
+    }
+
+    function getSelectedModels(mode = "compare") {
+        return getModelsForMode(mode);
+    }
+
+    function getPrimaryModel(mode = "compare") {
+        const m = getModelsForMode(mode);
+        if (!m.length || m.length >= MODELS.length) return FASTEST_MODEL;
+        return m[0];
+    }
+
+    function isAllModels(mode) {
+        return getModelsForMode(mode).length >= MODELS.length;
     }
 
     function applyTheme() {
@@ -92,158 +185,107 @@
             const k = el.getAttribute("data-i18n");
             if (k) el.textContent = t(k);
         });
+        window.dispatchEvent(new CustomEvent("nasaroai:lang", { detail: { lang } }));
     }
 
-    function isNativeApp() {
-        try {
-            if (window.NasaroAndroidAgent) return true;
-            return new URLSearchParams(location.search).get("source") === "app";
-        } catch {
-            return false;
-        }
-    }
+    function buildModelPicker(mode, opts) {
+        const wrap = document.createElement("div");
+        wrap.className = "input-tool-group model-picker-wrap";
 
-    function openOfflineDb() {
-        return new Promise((resolve, reject) => {
-            if (!window.indexedDB) {
-                reject(new Error("no idb"));
-                return;
-            }
-            const req = indexedDB.open(OFFLINE_DB, 1);
-            req.onupgradeneeded = () => {
-                const db = req.result;
-                if (!db.objectStoreNames.contains(OFFLINE_STORE)) {
-                    db.createObjectStore(OFFLINE_STORE, { keyPath: "id" });
-                }
-            };
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
-    }
-
-    async function saveOfflineSnapshot(record, loggedIn) {
-        if (!isNativeApp() || !loggedIn) return;
-        try {
-            const db = await openOfflineDb();
-            const item = {
-                id: record.id || `result_${Date.now()}`,
-                kind: record.kind || "result",
-                title: record.title || "결과물",
-                saved_at: record.saved_at || new Date().toISOString(),
-                payload: record,
-            };
-            await new Promise((resolve, reject) => {
-                const tx = db.transaction(OFFLINE_STORE, "readwrite");
-                tx.objectStore(OFFLINE_STORE).put(item);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
+        if (mode === "collab") {
+            const label = document.createElement("span");
+            label.className = "input-tool-label";
+            label.textContent = t("ai_collab_pick");
+            const sel = document.createElement("select");
+            sel.className = "input-tool-select";
+            MODELS.forEach(m => {
+                const o = document.createElement("option");
+                o.value = m;
+                o.textContent = m;
+                if (m === collabModel) o.selected = true;
+                sel.appendChild(o);
             });
-            db.close();
-            await trimOfflineStore();
-        } catch {}
-    }
-
-    async function trimOfflineStore() {
-        const all = await listOfflineSnapshots();
-        if (all.length <= OFFLINE_MAX) return;
-        const drop = all.sort((a, b) => a.saved_at.localeCompare(b.saved_at)).slice(0, all.length - OFFLINE_MAX);
-        const db = await openOfflineDb();
-        await new Promise((resolve, reject) => {
-            const tx = db.transaction(OFFLINE_STORE, "readwrite");
-            const store = tx.objectStore(OFFLINE_STORE);
-            drop.forEach(d => store.delete(d.id));
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-        });
-        db.close();
-    }
-
-    async function listOfflineSnapshots() {
-        if (!isNativeApp()) return [];
-        try {
-            const db = await openOfflineDb();
-            const items = await new Promise((resolve, reject) => {
-                const tx = db.transaction(OFFLINE_STORE, "readonly");
-                const req = tx.objectStore(OFFLINE_STORE).getAll();
-                req.onsuccess = () => resolve(req.result || []);
-                req.onerror = () => reject(req.error);
+            sel.addEventListener("change", () => {
+                collabModel = sel.value;
+                saveModels("collab");
+                opts.onModelsChange?.(getModelsForMode("collab"));
             });
-            db.close();
-            return items.sort((a, b) => (b.saved_at || "").localeCompare(a.saved_at || ""));
-        } catch {
-            return [];
+            wrap.append(label, sel);
+            return wrap;
         }
-    }
 
-    function escapeHtml(s) {
-        return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
+        const label = document.createElement("span");
+        label.className = "input-tool-label";
+        label.textContent = t("ai_pick");
+        const chips = document.createElement("div");
+        chips.className = "ai-chips-row";
+        let current = mode === "debate" ? modelsDebate : mode === "agent" ? modelsAgent : modelsCompare;
 
-    function downloadTextFile(filename, content) {
-        const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const sync = () => {
+            if (mode === "debate") modelsDebate = current.slice();
+            else if (mode === "agent") modelsAgent = current.slice();
+            else modelsCompare = current.slice();
+            saveModels(mode);
+            opts.onModelsChange?.(getModelsForMode(mode));
+        };
+
+        const allBtn = document.createElement("button");
+        allBtn.type = "button";
+        allBtn.className = "ai-chip" + (current.length >= MODELS.length ? " active" : "");
+        allBtn.textContent = t("ai_all");
+        allBtn.addEventListener("click", () => {
+            current = current.length >= MODELS.length ? [] : MODELS.slice();
+            renderChips();
+            sync();
+        });
+        chips.appendChild(allBtn);
+
+        const renderChips = () => {
+            chips.querySelectorAll(".ai-chip:not(:first-child)").forEach(el => el.remove());
+            MODELS.forEach(m => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "ai-chip" + (current.includes(m) ? " active" : "");
+                b.textContent = m;
+                b.addEventListener("click", () => {
+                    if (current.includes(m)) current = current.filter(x => x !== m);
+                    else current.push(m);
+                    if (!current.length) current = MODELS.slice();
+                    allBtn.classList.toggle("active", current.length >= MODELS.length);
+                    b.classList.toggle("active");
+                    renderChips();
+                    sync();
+                });
+                chips.appendChild(b);
+            });
+            allBtn.classList.toggle("active", current.length >= MODELS.length);
+        };
+        renderChips();
+        wrap.append(label, chips);
+        return wrap;
     }
 
     function buildInputToolbar(textarea, opts = {}) {
+        const mode = opts.mode || "compare";
         const row = document.createElement("div");
         row.className = "input-tool-row";
-
-        const modelWrap = document.createElement("div");
-        modelWrap.className = "input-tool-group";
-        const modelLabel = document.createElement("span");
-        modelLabel.className = "input-tool-label";
-        modelLabel.textContent = t("ai_pick");
-        const modelSelect = document.createElement("select");
-        modelSelect.className = "input-tool-select";
-        modelSelect.title = t("ai_pick");
-        const optAll = document.createElement("option");
-        optAll.value = "all";
-        optAll.textContent = lang === "en" ? "All models" : "전체 모델";
-        modelSelect.appendChild(optAll);
-        MODELS.forEach(m => {
-            const o = document.createElement("option");
-            o.value = m;
-            o.textContent = m;
-            if (selectedModels.length === 1 && selectedModels[0] === m) o.selected = true;
-            modelSelect.appendChild(o);
-        });
-        if (selectedModels.length !== 1) modelSelect.value = "all";
-        modelSelect.addEventListener("change", () => {
-            if (modelSelect.value === "all") {
-                selectedModels = MODELS.slice();
-            } else {
-                selectedModels = [modelSelect.value];
-            }
-            localStorage.setItem("nasaroai_selected_models", JSON.stringify(selectedModels));
-            opts.onModelsChange?.(getSelectedModels());
-        });
-        modelWrap.append(modelLabel, modelSelect);
+        row.appendChild(buildModelPicker(mode, opts));
 
         const privBtn = document.createElement("button");
         privBtn.type = "button";
-        privBtn.className = "input-tool-btn privacy-btn" + (privacyMode ? " active" : "");
-        privBtn.textContent = privacyMode ? "🔒" : "🔓";
-        privBtn.title = privacyMode ? t("privacy_on") : t("privacy_off");
-        const privHelp = document.createElement("button");
-        privHelp.type = "button";
-        privHelp.className = "input-tool-help";
-        privHelp.textContent = "?";
-        privHelp.setAttribute("aria-label", "Privacy help");
-        const tip = document.createElement("span");
-        tip.className = "input-tool-tip";
-        tip.textContent = t("privacy_tip");
-        privHelp.appendChild(tip);
-        privBtn.addEventListener("click", () => {
+        privBtn.className = "input-tool-btn privacy-btn privacy-btn-wide" + (privacyMode ? " active" : "");
+        privBtn.innerHTML = `<span class="priv-text">${privacyMode ? t("privacy_on") : t("privacy_off")}</span><span class="priv-q" title="${t("privacy_tip")}">?</span>`;
+        privBtn.addEventListener("click", e => {
+            if (e.target.classList.contains("priv-q")) return;
             privacyMode = !privacyMode;
             localStorage.setItem("nasaroai_privacy", privacyMode ? "1" : "0");
             privBtn.classList.toggle("active", privacyMode);
-            privBtn.textContent = privacyMode ? "🔒" : "🔓";
-            privBtn.title = privacyMode ? t("privacy_on") : t("privacy_off");
+            privBtn.querySelector(".priv-text").textContent = privacyMode ? t("privacy_on") : t("privacy_off");
             opts.onPrivacyChange?.(privacyMode);
+        });
+        privBtn.querySelector(".priv-q")?.addEventListener("click", e => {
+            e.stopPropagation();
+            opts.showToast?.(t("privacy_tip"), "info", 5000);
         });
 
         const voiceBtn = document.createElement("button");
@@ -253,33 +295,81 @@
         voiceBtn.title = t("voice_start");
         voiceBtn.addEventListener("click", () => startVoiceInput(textarea, voiceBtn, opts.showToast));
 
-        row.append(modelWrap, privBtn, privHelp, voiceBtn);
+        row.append(privBtn, voiceBtn);
         return row;
     }
 
     function startVoiceInput(textarea, btn, showToast) {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) {
-            showToast?.(t("voice_unsupported"), "warn");
-            return;
-        }
+        if (!SR) { showToast?.(t("voice_unsupported"), "warn"); return; }
         const rec = new SR();
         rec.lang = lang === "en" ? "en-US" : "ko-KR";
         rec.interimResults = false;
-        rec.maxAlternatives = 1;
         btn.disabled = true;
-        btn.textContent = "…";
         rec.onresult = e => {
             const text = e.results[0][0].transcript;
             textarea.value = (textarea.value ? textarea.value + " " : "") + text;
             textarea.dispatchEvent(new Event("input", { bubbles: true }));
         };
         rec.onerror = () => showToast?.(t("voice_unsupported"), "warn");
-        rec.onend = () => {
-            btn.disabled = false;
-            btn.textContent = "🎤";
-        };
+        rec.onend = () => { btn.disabled = false; };
         rec.start();
+    }
+
+    function parseScheduleFromText(text) {
+        const raw = String(text || "").trim();
+        if (!raw) return null;
+        const ko = raw.match(/(\d+)\s*분\s*(?:뒤|후|후에|이\s*후)?\s*(.*)$/i) || raw.match(/(\d+)분(?:뒤|후)(.*)$/);
+        if (ko) {
+            const mins = parseInt(ko[1], 10);
+            const mission = (ko[2] || raw).replace(/^(에|에\s*)/, "").trim() || raw;
+            if (mins > 0 && mins <= 1440) return { delayMs: mins * 60000, mission: mission || raw, label: `${mins}분 후` };
+        }
+        const en = raw.match(/(?:in\s*)?(\d+)\s*min(?:ute)?s?\s*(?:later|after)?\s*(.*)$/i);
+        if (en) {
+            const mins = parseInt(en[1], 10);
+            const mission = (en[2] || raw).trim() || raw;
+            if (mins > 0) return { delayMs: mins * 60000, mission: mission || raw, label: `${mins} min later` };
+        }
+        return null;
+    }
+
+    function addAgentSchedule(task, onRun) {
+        agentScheduledTasks.push(task);
+        localStorage.setItem("nasaroai_agent_scheduled", JSON.stringify(agentScheduledTasks));
+        startAgentScheduleChecker(onRun);
+        return task;
+    }
+
+    function startAgentScheduleChecker(onRun) {
+        if (agentScheduleTimer) clearInterval(agentScheduleTimer);
+        agentScheduleTimer = setInterval(() => {
+            const now = Date.now();
+            const due = [];
+            agentScheduledTasks = agentScheduledTasks.filter(task => {
+                if (task.runAt <= now) { due.push(task); return false; }
+                return true;
+            });
+            if (due.length) localStorage.setItem("nasaroai_agent_scheduled", JSON.stringify(agentScheduledTasks));
+            due.forEach(task => onRun?.(task.mission, task));
+        }, 3000);
+    }
+
+    function getUserGuideHtml() {
+        if (lang === "en") {
+            return `<p><strong>Compare</strong> — Ask once, see answers from multiple AIs side by side. Pick AIs with chips.</p>
+            <p><strong>Debate</strong> — AIs discuss your topic in rounds.</p>
+            <p><strong>Collab</strong> — 4-step workflow with one recommended AI per step.</p>
+            <p><strong>Agent</strong> — Automate on PC (extension) or Android app. Say "in 5 minutes do X" to schedule.</p>
+            <p><strong>Save results</strong> — Tap 💾 Save result after answers. Login to keep across devices.</p>
+            <p><strong>Privacy 🔒</strong> — No auto logging. Answers stay on screen until you save.</p>`;
+        }
+        return `<p><strong>비교</strong> — 한 번 질문하면 여러 AI 답을 나란히 봅니다. AI 칩으로 선택하세요.</p>
+            <p><strong>토론</strong> — AI들이 주제별로 라운드 토론합니다.</p>
+            <p><strong>협업</strong> — 4단계 작업. 단계별 AI 추천·변경 가능.</p>
+            <p><strong>에이전트</strong> — PC(확장) 또는 Android 앱으로 자동 실행. 「5분 뒤 ○○해줘」라고 하면 예약됩니다.</p>
+            <p><strong>결과물 저장</strong> — 답변 후 💾 결과물 저장. 로그인하면 기기 간 유지.</p>
+            <p><strong>프라이버시 🔒</strong> — 자동 기록 없음. 저장 버튼을 눌러야 보관됩니다.</p>`;
     }
 
     async function createShareLink(kind, title, payload, apiFetch, showToast) {
@@ -298,13 +388,11 @@
             const url = location.origin + (data.url || "/?share=" + data.id);
             try {
                 await navigator.clipboard.writeText(url);
-                showToast?.((lang === "en" ? "Link copied: " : "링크 복사됨: ") + url, "success", 5000);
-            } catch {
-                showToast?.(url, "info", 6000);
-            }
+                showToast?.((lang === "en" ? "Link: " : "링크: ") + url, "success", 5000);
+            } catch { showToast?.(url, "info", 6000); }
             return url;
         } catch {
-            showToast?.(lang === "en" ? "Share failed" : "공유 링크 생성 실패", "error");
+            showToast?.(lang === "en" ? "Share failed" : "공유 실패", "error");
             return null;
         }
     }
@@ -317,6 +405,15 @@
         });
         const safe = title.replace(/[^\w\uAC00-\uD7A3\-]+/g, "_").slice(0, 40) || "nasaroai";
         downloadTextFile(`${safe}.md`, lines.join("\n"));
+    }
+
+    function downloadTextFile(filename, content) {
+        const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
     }
 
     function addResultActions(container, { title, sections, kind, payload, apiFetch, showToast, onSaveResult }) {
@@ -345,99 +442,59 @@
     function loadShareFromUrl(apiFetch, showToast) {
         const id = new URLSearchParams(location.search).get("share");
         if (!id) return;
-        apiFetch("/share/" + encodeURIComponent(id))
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                if (!data) return;
-                const box = document.getElementById("shareViewBanner");
-                if (!box) return;
-                box.style.display = "block";
-                box.innerHTML = `<strong>${data.title || "Shared"}</strong> (${data.kind})`;
-                showToast?.((lang === "en" ? "Loaded shared: " : "공유 내용: ") + (data.title || id), "info", 4000);
-            })
-            .catch(() => {});
+        apiFetch("/share/" + encodeURIComponent(id)).then(r => r.ok ? r.json() : null).then(data => {
+            if (!data) return;
+            const box = document.getElementById("shareViewBanner");
+            if (box) { box.style.display = "block"; box.innerHTML = `<strong>${data.title || "Shared"}</strong>`; }
+        }).catch(() => {});
     }
 
-    function startScheduleChecker(runAgentMission, showToast) {
-        if (scheduleTimer) clearInterval(scheduleTimer);
-        scheduleTimer = setInterval(() => {
-            const now = Date.now();
-            let changed = false;
-            scheduledTasks = scheduledTasks.filter(task => {
-                const at = new Date(task.at).getTime();
-                if (Number.isNaN(at) || at > now) return true;
-                showToast?.(`${t("scheduled_done")}: ${task.mission}`, "success", 5000);
-                runAgentMission?.(task.mission);
-                changed = true;
-                return false;
+    function isNativeApp() {
+        try {
+            if (window.NasaroAndroidAgent) return true;
+            return new URLSearchParams(location.search).get("source") === "app";
+        } catch { return false; }
+    }
+
+    async function saveOfflineSnapshot(record, loggedIn) {
+        if (!isNativeApp() || !loggedIn) return;
+        try {
+            const db = await openOfflineDb();
+            const item = { id: record.id || `result_${Date.now()}`, kind: record.kind || "result", title: record.title || "결과물", saved_at: record.saved_at || new Date().toISOString(), payload: record };
+            await new Promise((resolve, reject) => {
+                const tx = db.transaction(OFFLINE_STORE, "readwrite");
+                tx.objectStore(OFFLINE_STORE).put(item);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
             });
-            if (changed) localStorage.setItem("nasaroai_scheduled_agent", JSON.stringify(scheduledTasks));
-        }, 30000);
+            db.close();
+        } catch {}
     }
 
-    function renderScheduleList(container) {
-        if (!container) return;
-        container.innerHTML = "";
-        if (!scheduledTasks.length) {
-            container.textContent = lang === "en" ? "No scheduled tasks." : "예약된 임무가 없습니다.";
-            return;
-        }
-        scheduledTasks.forEach((task, idx) => {
-            const div = document.createElement("div");
-            div.className = "schedule-item";
-            div.textContent = `${task.at} — ${task.mission}`;
-            const del = document.createElement("button");
-            del.type = "button";
-            del.textContent = "✕";
-            del.addEventListener("click", () => {
-                scheduledTasks.splice(idx, 1);
-                localStorage.setItem("nasaroai_scheduled_agent", JSON.stringify(scheduledTasks));
-                renderScheduleList(container);
-            });
-            div.appendChild(del);
-            container.appendChild(div);
-        });
-    }
-
-    function addScheduleForm(form, missionInput, showToast) {
-        form?.addEventListener("submit", e => {
-            e.preventDefault();
-            const at = form.querySelector('[name="at"]')?.value;
-            const mission = (missionInput?.value || form.querySelector('[name="mission"]')?.value || "").trim();
-            if (!at || !mission) return;
-            scheduledTasks.push({ at, mission, id: Date.now().toString() });
-            localStorage.setItem("nasaroai_scheduled_agent", JSON.stringify(scheduledTasks));
-            renderScheduleList(document.getElementById("scheduleList"));
-            showToast?.(lang === "en" ? "Scheduled" : "예약 등록됨", "success");
-            form.reset();
+    function openOfflineDb() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(OFFLINE_DB, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(OFFLINE_STORE)) db.createObjectStore(OFFLINE_STORE, { keyPath: "id" });
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
         });
     }
 
     window.NasaroFeatures = {
-        t,
-        I18N,
+        t, I18N, MODELS, FASTEST_MODEL,
         get lang() { return lang; },
         set lang(v) { lang = v; applyLang(); },
         get theme() { return theme; },
         set theme(v) { theme = v; applyTheme(); },
-        isPrivacyMode,
-        getSelectedModels,
-        applyTheme,
-        applyLang,
-        buildInputToolbar,
-        createShareLink,
-        exportMarkdown,
-        addResultActions,
-        loadShareFromUrl,
-        startScheduleChecker,
-        renderScheduleList,
-        addScheduleForm,
-        confirmDelete(message) {
-            return confirm(message || t("delete_confirm"));
-        },
-        isNativeApp,
-        saveOfflineSnapshot,
-        listOfflineSnapshots,
+        isPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
+        applyTheme, applyLang, buildInputToolbar,
+        createShareLink, exportMarkdown, addResultActions, loadShareFromUrl,
+        parseScheduleFromText, addAgentSchedule, startAgentScheduleChecker,
+        getUserGuideHtml, isNativeApp, saveOfflineSnapshot,
+        confirmDelete(msg) { return confirm(msg || t("delete_confirm")); },
     };
 
     applyTheme();

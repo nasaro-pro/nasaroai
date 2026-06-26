@@ -101,17 +101,19 @@ def _verify_password(password: str, stored: str) -> bool:
         return False
 
 
-def _normalize_email(email: str) -> str:
-    value = email.strip().lower()
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
-        raise ValueError("올바른 이메일 형식이 아닙니다.")
+def _normalize_username(username: str) -> str:
+    value = username.strip().lower()
+    if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+        return value
+    if not re.fullmatch(r"[a-z0-9_]{3,32}", value):
+        raise ValueError("아이디는 3~32자 (영문·숫자·_)만 사용 가능합니다.")
     return value
 
 
-def signup(email: str, password: str, display_name: str = "") -> dict[str, Any]:
+def signup(username: str, password: str, display_name: str = "") -> dict[str, Any]:
     if len(password) < 8:
         raise ValueError("비밀번호는 8자 이상이어야 합니다.")
-    email_norm = _normalize_email(email)
+    email_norm = _normalize_username(username)
     now = time.time()
     with _lock:
         conn = _connect()
@@ -123,15 +125,15 @@ def signup(email: str, password: str, display_name: str = "") -> dict[str, Any]:
             user_id = cur.lastrowid
             conn.commit()
         except sqlite3.IntegrityError as exc:
-            raise ValueError("이미 사용 중인 이메일입니다.") from exc
+            raise ValueError("이미 사용 중인 아이디입니다.") from exc
         finally:
             conn.close()
     token = create_session(int(user_id))
     return {"token": token, "user": get_user_by_id(int(user_id))}
 
 
-def login(email: str, password: str) -> dict[str, Any]:
-    email_norm = _normalize_email(email)
+def login(username: str, password: str) -> dict[str, Any]:
+    email_norm = _normalize_username(username)
     with _lock:
         conn = _connect()
         try:
@@ -142,7 +144,7 @@ def login(email: str, password: str) -> dict[str, Any]:
         finally:
             conn.close()
     if not row or not _verify_password(password, row["password_hash"]):
-        raise ValueError("이메일 또는 비밀번호가 올바르지 않습니다.")
+        raise ValueError("아이디 또는 비밀번호가 올바르지 않습니다.")
     token = create_session(int(row["id"]))
     return {"token": token, "user": _row_to_user(row)}
 
@@ -215,10 +217,16 @@ def get_user_by_id(user_id: int) -> dict[str, Any]:
 
 
 def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
+    ident = row["email"]
+    if "@" in ident:
+        default_name = ident.split("@")[0]
+    else:
+        default_name = ident
     return {
         "id": row["id"],
-        "email": row["email"],
-        "display_name": row["display_name"] or row["email"].split("@")[0],
+        "username": ident,
+        "email": ident,
+        "display_name": row["display_name"] or default_name,
         "created_at": row["created_at"],
     }
 
