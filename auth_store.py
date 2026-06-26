@@ -196,9 +196,6 @@ def signup(login_id: str, user_email: str, password: str) -> dict[str, Any]:
     email_norm = _require_email(user_email)
     if ident_norm == email_norm:
         raise ValueError("아이디와 이메일은 같을 수 없습니다.")
-    email_local = email_norm.split("@", 1)[0]
-    if ident_norm == email_local:
-        raise ValueError("아이디와 이메일(@ 앞부분)이 겹치면 가입할 수 없습니다.")
     with _lock:
         conn = _connect()
         try:
@@ -738,7 +735,7 @@ def get_admin_dashboard() -> dict[str, Any]:
         "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
         "usage_by_hour": get_usage_by_hour(day_key),
         "users": enriched,
-        "recent_activity": get_activity_log(limit=100000),
+        "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),
         "platform_stats": get_platform_stats(day_key),
     }
@@ -788,7 +785,7 @@ def get_activity_log(
     device_id: str | None = None,
     limit: int = 100,
 ) -> list[dict[str, Any]]:
-    limit = max(1, limit)
+    limit = max(1, min(50000, limit))
     with _lock:
         conn = _connect()
         try:
@@ -1088,7 +1085,7 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
     data = get_user_data(user_id)
     login_stats = get_user_login_stats(user_id)
     quotas = get_user_quota_totals(user_id)
-    activity = get_activity_log(user_id=user_id, limit=100000)
+    activity = get_activity_log(user_id=user_id, limit=10000)
     platform_counts: dict[str, int] = {}
     for a in activity:
         platform_counts[a["platform"]] = platform_counts.get(a["platform"], 0) + 1

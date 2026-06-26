@@ -12,18 +12,6 @@
     <meta name="apple-mobile-web-app-title" content="Nasaro AI">
     <link rel="manifest" href="/manifest.json">
     <style>
-        .app {
-            zoom: var(--ui-zoom, 1);
-        }
-        @supports not (zoom: 1) {
-            .app {
-                transform: scale(var(--ui-zoom, 1));
-                transform-origin: top center;
-                width: calc(100% / var(--ui-zoom, 1));
-                margin: 0 auto;
-            }
-        }
-
         * {
             box-sizing: border-box;
             margin: 0;
@@ -166,38 +154,20 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 8px;
             padding: 18px 18px 14px;
             border-bottom: 1px solid #f3f4f6;
         }
-        .side-menu-header .side-header-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
-        }
         .side-menu-admin-btn {
-            font-size: 10px;
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
+            font-size: 11px;
+            padding: 5px 10px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            color: #6b7280;
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 700;
         }
-        .side-menu-admin-btn:hover { color: #374151; background: #f3f4f6; }
-        .side-menu-header .side-logout-btn {
-            flex-shrink: 0;
-            font-size: 10px;
-            padding: 3px 7px;
-            border-radius: 5px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
-            cursor: pointer;
-        }
-        .side-menu-header .side-logout-btn:hover { color: #ef4444; background: #fef2f2; }
+        .side-menu-admin-btn:hover { background: #f3f4f6; color: #374151; }
 
         .side-menu-brand {
             font-size: 20px;
@@ -286,45 +256,37 @@
             border-top: 1px solid #f3f4f6;
             flex-shrink: 0;
             display: flex;
-            gap: 6px;
+            gap: 4px;
             align-items: center;
             justify-content: flex-end;
-            position: relative;
-        }
-        .guide-popover-anchor {
-            position: relative;
-            display: flex;
-            gap: 6px;
-            align-items: center;
         }
         .side-menu-guide-btn {
             flex: 0 0 auto;
-            width: 22px;
-            min-height: 22px;
+            width: 32px;
+            min-height: 32px;
             padding: 0;
-            border-radius: 4px;
+            border-radius: 6px;
             border: none;
             background: transparent;
-            color: #b0b0b0;
+            color: #9ca3af;
             font: inherit;
-            font-size: 11px;
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
             line-height: 1;
-            opacity: 0.85;
         }
         .side-menu-guide-btn:hover { color: #2563eb; background: #f3f4f6; }
         .side-menu-settings-btn {
-            width: 38px;
-            min-height: 38px;
+            width: 32px;
+            min-height: 32px;
             flex-shrink: 0;
             padding: 0;
-            border-radius: 8px;
+            border-radius: 6px;
             border: none;
             background: transparent;
-            color: #6b7280;
+            color: #9ca3af;
             font: inherit;
-            font-size: 20px;
+            font-size: 16px;
             font-weight: 400;
             cursor: pointer;
             display: flex;
@@ -1025,51 +987,37 @@
             position: fixed; inset: 0; z-index: 850; background: transparent;
         }
         .guide-bar {
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 0;
-            right: auto;
-            top: auto;
-            transform: none;
-            z-index: 900;
-            width: min(340px, calc(100vw - 28px));
-            max-height: min(72vh, 520px);
-            overflow: hidden;
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
-            display: none;
-            flex-direction: column;
+            position: fixed; top: 54px; right: 12px; left: auto;
+            transform: none; z-index: 900;
+            width: min(320px, calc(100vw - 24px));
+            max-height: min(36vh, 260px); overflow: hidden;
+            background: #fff; border: 1px solid #c7d2fe; border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(49, 46, 129, 0.15);
+            display: flex; flex-direction: column;
         }
-        .guide-bar.open { display: flex; }
         .guide-bar-head {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 12px; border-bottom: 1px solid #f3f4f6; background: #fafafa;
-            font-size: 13px; font-weight: 800; color: #374151;
+            padding: 7px 10px; border-bottom: 1px solid #e2e8f0; background: #eef2ff;
+            font-size: 12px; font-weight: 800; color: #4338ca;
         }
         .guide-bar-close {
-            border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748b;
+            border: none; background: transparent; font-size: 16px; cursor: pointer; color: #64748b;
         }
         .guide-bar-body {
-            padding: 12px 14px 14px; overflow-y: auto; font-size: 12px; line-height: 1.65; color: #374151;
+            padding: 8px 10px 10px; overflow-y: auto; font-size: 11px; line-height: 1.55; color: #334155;
         }
-        .guide-bar-body h3 { margin: 14px 0 4px; font-size: 13px; color: #4338ca; font-weight: 800; }
-        .guide-bar-body h3:first-of-type { margin-top: 4px; }
-        .guide-bar-body p { margin: 0 0 8px; }
-        .guide-bar-body ul, .guide-bar-body ol { margin: 0 0 10px; padding-left: 18px; }
-        .guide-bar-body li { margin-bottom: 4px; }
+        .guide-bar-body h3 { margin: 6px 0 2px; font-size: 11px; color: #4338ca; }
+        .guide-bar-body p { margin: 0 0 5px; }
+        .guide-bar-body ul { margin: 0 0 5px; padding-left: 16px; }
         .guide-bar-tip {
-            background: #f0f9ff; border-left: 3px solid #3b82f6; padding: 8px 10px;
-            border-radius: 0 8px 8px 0; font-size: 11px; margin-top: 8px; color: #1e40af;
+            background: #eff6ff; border-left: 3px solid #3b82f6; padding: 6px 8px;
+            border-radius: 0 6px 6px 0; font-size: 10px; margin-top: 4px;
         }
-        html[data-theme="dark"] .guide-bar { background: #111; border-color: #262626; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
-        html[data-theme="dark"] .guide-bar-head { background: #0a0a0a; color: #fafafa; border-color: #262626; }
-        html[data-theme="dark"] .guide-bar-body { color: #d4d4d4; }
+        html[data-theme="dark"] .guide-bar { background: #1e293b; border-color: #475569; }
+        html[data-theme="dark"] .guide-bar-head { background: #312e81; color: #e9d5ff; border-color: #475569; }
+        html[data-theme="dark"] .guide-bar-body { color: #cbd5e1; }
         html[data-theme="dark"] .guide-bar-body h3 { color: #c4b5fd; }
-        html[data-theme="dark"] .guide-bar-tip { background: #0c1929; color: #93c5fd; border-color: #2563eb; }
-        html[data-theme="dark"] .side-menu-admin-btn { color: #737373; }
-        html[data-theme="dark"] .side-menu-admin-btn:hover { color: #fafafa; background: #141414; }
+        html[data-theme="dark"] .guide-bar-tip { background: #1e3a5f; color: #bfdbfe; }
 
         html[data-theme="dark"] {
             color-scheme: dark;
@@ -1121,14 +1069,8 @@
         html[data-theme="dark"] .session-history-item { background: #111; border-color: #262626; color: #f5f5f5; }
         html[data-theme="dark"] .side-menu-btn.outline { background: transparent; border-color: #333; color: #93c5fd; }
         html[data-theme="dark"] .result-files-toggle { background: #111; border-color: #333; color: #c4b5fd; }
-        html[data-theme="dark"] .settings-panel { background: #0a0a0a; border-color: #1a1a1a; color: #f5f5f5; }
-        html[data-theme="dark"] .settings-panel-head { background: #0a0a0a; border-color: #1a1a1a; color: #fafafa; }
-        html[data-theme="dark"] .settings-row { border-color: #1a1a1a; }
-        html[data-theme="dark"] .settings-action-btn { background: #111; border-color: #262626; color: #e5e5e5; }
-        html[data-theme="dark"] .site-header { background: #080808; border-color: #141414; }
-        html[data-theme="dark"] .input-dock { background: rgba(8,8,8,.95); border-color: #141414; }
-        html[data-theme="dark"] .side-menu-header .side-logout-btn { color: #737373; }
-        html[data-theme="dark"] .side-menu-header .side-logout-btn:hover { color: #fca5a5; background: #1a0a0a; }
+        html[data-theme="dark"] .works-item,
+        html[data-theme="dark"] .active-collab-item { background: #111; border-color: #262626; }
 
         .collab-ai-btn.recommended {
             border-color: #7c3aed;
@@ -1441,38 +1383,29 @@
             padding: 8px 12px 12px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 8px;
         }
 
-        .dock-input-wrap {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .dock-textarea-shell {
-            position: relative;
-            flex: 1;
-            min-width: 0;
-        }
+        .dock-input-wrap { position: relative; }
         .dock-agent-float {
             position: absolute;
-            top: 5px;
-            right: 8px;
+            top: 6px;
+            right: 112px;
             z-index: 3;
-            min-height: 24px;
-            padding: 2px 8px;
-            font-size: 11px;
+            min-height: 30px;
+            padding: 4px 12px;
+            font-size: 12px;
             font-weight: 700;
-            border-radius: 6px;
-            line-height: 1.2;
+            border-radius: 8px;
         }
-        .dock-textarea-shell #mainInput {
-            width: 100%;
-            padding-top: 30px;
-            min-height: 44px;
+        .dock-input-row {
+            position: relative;
+        }
+        .dock-input-row #mainInput {
+            padding-top: 36px;
         }
 
-        .dock-tools-row .input-tool-row { gap: 8px; flex-wrap: wrap; justify-content: flex-start; margin-top: 4px; }
+        .dock-tools-row .input-tool-row { gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
         .dock-tools-row .input-tool-btn {
             min-height: 44px;
             padding: 8px 14px;
@@ -1485,18 +1418,17 @@
         .dock-mode-row {
             position: relative;
             display: flex;
-            gap: 6px;
+            gap: 8px;
             flex-wrap: wrap;
-            justify-content: flex-start;
-            margin-top: 2px;
+            justify-content: center;
         }
         .dock-mode-row .mode-btn,
         .dock-mode-row .dock-btn.muted {
-            min-height: 50px;
-            padding: 12px 20px;
-            font-size: 15px;
+            min-height: 46px;
+            padding: 10px 18px;
+            font-size: 14px;
             font-weight: 700;
-            border-radius: 12px;
+            border-radius: 11px;
         }
 
         .dock-input-row {
@@ -2831,10 +2763,9 @@
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
-                <div class="side-header-actions">
-                    <button id="adminEntryBtn" class="side-menu-admin-btn" type="button" title="관리자">관리</button>
-                    <button id="sideLogoutBtn" class="side-logout-btn" type="button" style="display:none;" data-i18n="logout">로그아웃</button>
-                </div>
+            </div>
+            <div id="sideAccountBox" class="side-account-box" style="display:none;">
+                <button id="sideLogoutBtn" class="side-logout-btn" type="button" data-i18n="logout">로그아웃</button>
             </div>
             <div class="side-menu-auth" id="sideAuthBtns">
                 <button id="loginBtn" class="side-menu-btn primary" type="button" data-i18n="login">로그인</button>
@@ -2856,66 +2787,7 @@
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
             <div class="side-menu-footer">
-                <div class="guide-popover-anchor">
-                    <div id="guideBar" class="guide-bar" role="dialog" aria-label="사용 가이드">
-                        <div class="guide-bar-head">
-                            <span>📘 사용 가이드</span>
-                            <button id="guideBarClose" class="guide-bar-close" type="button" aria-label="닫기">✕</button>
-                        </div>
-                        <div class="guide-bar-body">
-                            <p><strong>처음 오셨나요?</strong> 걱정 마세요. 아래 입력창에 질문을 적고, 모드를 고른 뒤 오른쪽 <strong>▶</strong> 버튼만 누르면 됩니다.</p>
-
-                            <h3>① 비교 모드</h3>
-                            <p>같은 질문을 여러 AI에게 <strong>동시에</strong> 보냅니다. 「🤖 AI」 버튼으로 비교할 모델을 고르세요. 여러 개 선택 가능합니다.</p>
-                            <ul>
-                                <li>각 답변 카드의 「복사」로 텍스트를 가져올 수 있습니다.</li>
-                                <li>마음에 드는 답은 「결과물 저장」으로 보관하세요.</li>
-                            </ul>
-
-                            <h3>② 토론 모드</h3>
-                            <p>주제 하나를 정하면 AI들이 <strong>라운드별</strong>로 의견을 주고받습니다. 기획·찬반·논점 정리에 적합합니다.</p>
-                            <ul>
-                                <li>주제 예시를 눌러 바로 시작할 수 있습니다.</li>
-                                <li>「다음 ▶」로 라운드를 진행하고, 「질문 추가」로 의견을 끼워 넣을 수 있습니다.</li>
-                            </ul>
-
-                            <h3>③ 협업 모드 (4단계)</h3>
-                            <p>작업 설명을 입력하면 AI가 순서대로 협업합니다.</p>
-                            <ol>
-                                <li><strong>조사</strong> — 사실·근거 수집</li>
-                                <li><strong>구조</strong> — 목차·논리 설계</li>
-                                <li><strong>제작</strong> — 초안·작업물 작성</li>
-                                <li><strong>검증</strong> — 오류 확인 후 필요 시 수정</li>
-                            </ol>
-                            <p>완료 후 「추가 작업 ▶」로 수정 요청도 가능합니다. 협업 AI는 추천 AI 1개만 사용합니다.</p>
-
-                            <h3>④ 에이전트</h3>
-                            <p>질문창 <strong>오른쪽 위</strong> 「🌐 에이전트」 버튼을 누르면 웹 자동 실행 패널이 열립니다.</p>
-                            <ul>
-                                <li>PC: Chrome 확장 프로그램 필요 (처음 클릭 시 설치 안내)</li>
-                                <li>Android: 전용 앱 필요</li>
-                                <li>「5분 뒤 네이버 열어줘」처럼 자연어로 예약도 됩니다.</li>
-                            </ul>
-
-                            <h3>⑤ 계정 · 기록</h3>
-                            <ul>
-                                <li><strong>로그인</strong> — 아이디로 로그인. 가입 시 실제 이메일 필요.</li>
-                                <li>로그인하면 기록·결과물이 서버에 저장되어 기기를 바꿔도 이어집니다.</li>
-                                <li>메뉴 「기록」에서 이번 세션 질문·답변을 확인할 수 있습니다.</li>
-                            </ul>
-
-                            <h3>⑥ 설정 · 기타</h3>
-                            <ul>
-                                <li>⚙️ <strong>설정</strong> — 글씨 크기, 테마(다크/라이트), 언어, 문의하기</li>
-                                <li>「✦ 새 채팅」 — 현재 모드를 유지한 채 대화만 초기화</li>
-                                <li>프라이버시 모드 — 자동 기록·동기화 없이 이 화면에서만 표시</li>
-                            </ul>
-
-                            <div class="guide-bar-tip">다른 곳을 누르면 닫힙니다. 궁금한 점은 설정 → 관리자 문의를 이용해주세요.</div>
-                        </div>
-                    </div>
-                    <button id="guideBtn" class="side-menu-guide-btn" type="button" title="가이드">?</button>
-                </div>
+                <button id="guideBtn" class="side-menu-guide-btn" type="button" title="가이드">?</button>
                 <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span>설정</span></button>
             </div>
         </aside>
@@ -3041,6 +2913,32 @@
         </header>
 
         <div id="guideBarBackdrop" class="guide-bar-backdrop" style="display:none;" aria-hidden="true"></div>
+        <div id="guideBar" class="guide-bar" style="display:none;" role="dialog" aria-label="사용 가이드">
+            <div class="guide-bar-head">
+                <span>📘 Nasaro AI 사용 가이드</span>
+                <button id="guideBarClose" class="guide-bar-close" type="button" aria-label="닫기">✕</button>
+            </div>
+            <div class="guide-bar-body">
+                <p><strong>처음이셔도 괜찮아요.</strong> 아래 입력창에 질문을 적고, 모드를 고른 뒤 ▶ 버튼으로 실행하세요.</p>
+                <h3>① 비교</h3>
+                <p>같은 질문을 여러 AI에게 동시에 보냅니다. 🤖 AI 버튼으로 모델을 고르고, 답변마다 「복사」로 텍스트를 가져올 수 있습니다.</p>
+                <h3>② 토론</h3>
+                <p>주제 하나를 놓고 AI들이 라운드별로 의견을 주고받습니다. 기획·논점 정리에 적합합니다.</p>
+                <h3>③ 협업 (4단계)</h3>
+                <ul>
+                    <li><strong>조사</strong> — 근거·팩트 수집</li>
+                    <li><strong>구조</strong> — 목차·논리 설계</li>
+                    <li><strong>제작</strong> — 초안·작업물 작성</li>
+                    <li><strong>검증</strong> — 오류 지적 후 필요 시 앞 단계가 수정</li>
+                </ul>
+                <p>작업 설명을 입력하면 AI가 단계별로 순차 실행합니다. 완료 후 「추가 작업 ▶」로 수정 요청도 가능합니다.</p>
+                <h3>④ 에이전트</h3>
+                <p>입력창 <strong>우측 상단</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
+                <h3>⑤ 계정 · 저장</h3>
+                <p>로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다. 메뉴에서 「결과물 저장」으로 마음에 드는 답을 보관하세요.</p>
+                <div class="guide-bar-tip">다른 곳을 누르면 닫힙니다.</div>
+            </div>
+        </div>
 
         <main id="mainContent">
             <div id="shareViewBanner"></div>
@@ -3356,12 +3254,13 @@
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
                 <div class="dock-input-wrap">
-                    <div class="dock-textarea-shell">
+                    <div class="dock-input-row">
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                         <button id="agentToggleBtn" class="dock-btn agent-toggle-btn dock-agent-float" type="button" data-i18n="mode_agent">🌐 에이전트</button>
+                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
-                    <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
+                <div id="mainInputTools" class="dock-tools-row"></div>
                 <div class="dock-mode-row">
                     <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
@@ -3370,7 +3269,6 @@
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                 </div>
-                <div id="mainInputTools" class="dock-tools-row"></div>
             </div>
         </footer>
 
@@ -3870,7 +3768,7 @@
             const loginBtn = document.getElementById("settingsLoginBtn");
             const logoutBtn = document.getElementById("settingsLogoutBtn");
             const sideAuth = document.getElementById("sideAuthBtns");
-            const sideLogout = document.getElementById("sideLogoutBtn");
+            const sideAccount = document.getElementById("sideAccountBox");
             const sideMenuBrand = document.getElementById("sideMenuBrand");
             loadSavedResults();
             if (currentUser) {
@@ -3879,7 +3777,7 @@
                 if (loginBtn) loginBtn.style.display = "none";
                 if (logoutBtn) logoutBtn.style.display = "";
                 if (sideAuth) sideAuth.style.display = "none";
-                if (sideLogout) sideLogout.style.display = "";
+                if (sideAccount) sideAccount.style.display = "flex";
                 if (sideMenuBrand) sideMenuBrand.textContent = id;
             } else {
                 if (meta) meta.textContent = NF?.lang === "en"
@@ -3888,7 +3786,7 @@
                 if (loginBtn) loginBtn.style.display = "";
                 if (logoutBtn) logoutBtn.style.display = "none";
                 if (sideAuth) sideAuth.style.display = "flex";
-                if (sideLogout) sideLogout.style.display = "none";
+                if (sideAccount) sideAccount.style.display = "none";
                 if (sideMenuBrand) sideMenuBrand.textContent = "Nasaro AI";
             }
             renderResultFilesList();
@@ -4020,13 +3918,6 @@
                     errEl.textContent = window.NasaroFeatures?.lang === "en"
                         ? "Enter a valid email address."
                         : "실제 사용 가능한 이메일 주소를 입력해주세요.";
-                    return;
-                }
-                const emailLocal = email.split("@")[0].toLowerCase();
-                if (username.toLowerCase() === emailLocal) {
-                    errEl.textContent = window.NasaroFeatures?.lang === "en"
-                        ? "Login ID cannot match the part before @ in your email."
-                        : "아이디와 이메일(@ 앞부분)이 겹치면 가입할 수 없습니다.";
                     return;
                 }
             }
@@ -4282,43 +4173,25 @@
 
         function openGuideBar() {
             if (!guideBar) return;
-            guideBar.classList.add("open");
+            guideBar.style.display = "flex";
             guideBarBackdrop.style.display = "block";
         }
         function closeGuideBar() {
             if (!guideBar) return;
-            guideBar.classList.remove("open");
+            guideBar.style.display = "none";
             guideBarBackdrop.style.display = "none";
         }
 
         document.getElementById("guideBtn")?.addEventListener("click", (e) => {
             e.stopPropagation();
-            guideBar?.classList.contains("open") ? closeGuideBar() : openGuideBar();
+            guideBar?.style.display === "flex" ? closeGuideBar() : openGuideBar();
         });
         document.getElementById("guideBarClose")?.addEventListener("click", closeGuideBar);
         guideBarBackdrop?.addEventListener("click", closeGuideBar);
         document.addEventListener("click", (e) => {
-            if (!guideBar || !guideBar.classList.contains("open")) return;
+            if (!guideBar || guideBar.style.display !== "flex") return;
             if (guideBar.contains(e.target) || e.target?.id === "guideBtn") return;
             closeGuideBar();
-        });
-
-        document.getElementById("adminEntryBtn")?.addEventListener("click", async () => {
-            const pw = prompt("관리자 비밀번호");
-            if (!pw) return;
-            try {
-                const res = await fetch(API_URL + "/admin/login", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ password: pw }),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "인증 실패");
-                sessionStorage.setItem("nasaroai_admin_token", data.token);
-                location.href = "/admin";
-            } catch (e) {
-                showToast(e.message || "관리자 로그인 실패", "error");
-            }
         });
 
         document.getElementById("supportInquiryBtn")?.addEventListener("click", async () => {
@@ -4389,12 +4262,9 @@
 
         function applyFontSize(sz) {
             currentFontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, sz));
-            const ratio = currentFontSize / FONT_DEF;
             document.documentElement.style.fontSize = currentFontSize + "px";
-            document.documentElement.style.setProperty("--ui-zoom", String(ratio));
             document.getElementById("fontSizeVal").textContent = currentFontSize + "px";
             try { localStorage.setItem(FONT_KEY, currentFontSize); } catch {}
-            scheduleSyncMainPadding();
         }
         applyFontSize(currentFontSize); // 초기 적용
 
@@ -4410,15 +4280,6 @@
         renderSessionHistory();
         bootstrapAuth();
         loadCollabTemplates();
-        (async () => {
-            try {
-                const res = await fetch(API_URL + "/health");
-                const data = await res.json();
-                if (data.openrouter_configured === false) {
-                    showToast("AI API 키가 서버에 없습니다. Render에서 OPENROUTER_API_KEY 환경변수를 설정해야 AI가 응답합니다.", "error", 10000);
-                }
-            } catch {}
-        })();
 
         function initCompareSuggestions() {
             const row = document.getElementById("compareSuggestRow");
@@ -5934,14 +5795,7 @@
             });
 
             if (!response.ok || !response.body) {
-                let errMsg = COMPARE_FAILURE_MSG;
-                try {
-                    const data = await response.json();
-                    const d = data.detail;
-                    if (typeof d === "string") errMsg = d;
-                    else if (d?.message) errMsg = d.message;
-                } catch {}
-                applyStreamChunk(responses, { model, success: false, error: errMsg });
+                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
                 return;
             }
 

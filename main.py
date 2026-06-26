@@ -884,14 +884,6 @@ def build_openrouter_headers() -> dict[str, str]:
     }
 
 
-def _require_openrouter_key() -> None:
-    if not os.environ.get("OPENROUTER_API_KEY", "").strip():
-        raise HTTPException(
-            status_code=503,
-            detail="AI API 키가 서버에 설정되지 않았습니다. Render 환경변수 OPENROUTER_API_KEY를 확인하세요.",
-        )
-
-
 def log_openrouter_key_status() -> None:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     prefix = api_key[:8] if api_key else "N/A"
@@ -1938,13 +1930,6 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
     session_id = data.compare_session_id.strip()
 
     async def generate() -> AsyncIterator[str]:
-        if not os.environ.get("OPENROUTER_API_KEY", "").strip():
-            yield sse({
-                "model": data.model_name,
-                "success": False,
-                "error": "AI API 키가 서버에 설정되지 않았습니다. Render 환경변수 OPENROUTER_API_KEY를 확인하세요.",
-            })
-            return
         excluded_by_failure: set[str] = set()
         await mark_compare_stream_started(session_id)
         current_model_id: str | None = None
@@ -2060,7 +2045,6 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
 @app.post("/collab/recommend")
 async def collab_recommend(data: CollabRecommendRequest, request: Request) -> dict:
     """사용자 작업 설명을 작업 유형별 협업 알고리즘으로 변환한다."""
-    _require_openrouter_key()
     _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
     task = data.task.strip()
@@ -2170,7 +2154,6 @@ def _collab_stage_prompt(data: CollabStageRequest) -> str:
 @app.post("/collab/run-stage")
 async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     """협업 워크플로우의 특정 단계를 실행한다."""
-    _require_openrouter_key()
     _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
     stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
@@ -2250,7 +2233,6 @@ def collab_templates() -> dict:
 
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest, http_request: Request) -> dict:
-    _require_openrouter_key()
     _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
     session = DebateSession(topic=request.topic)
@@ -2292,11 +2274,7 @@ async def debate_continue(request: DebateRequest) -> dict:
 
 @app.get("/health")
 async def health() -> dict:
-    key = os.environ.get("OPENROUTER_API_KEY", "").strip()
-    return {
-        "status": "ok",
-        "openrouter_configured": bool(key),
-    }
+    return {"status": "ok"}
 
 
 @app.get("/models/info")
@@ -2829,7 +2807,7 @@ def admin_activity(
     request: Request,
     user_id: int | None = None,
     device_id: str | None = None,
-    limit: int = 100000,
+    limit: int = 10000,
 ) -> dict:
     _require_admin(request)
     return {"activity": get_activity_log(user_id=user_id, device_id=device_id, limit=limit)}
