@@ -3940,58 +3940,8 @@
                 if (typeof data.detail === "string") return data.detail;
                 if (data.detail?.message) return data.detail.message;
                 if (data.message) return data.message;
-                if (data.error) return data.error;
             } catch {}
             return `${fallback} (${response.status})`;
-        }
-
-        async function readSseJsonResponse(response, fallback = "요청 실패") {
-            if (!response.ok || !response.body) {
-                throw new Error(await parseApiError(response, fallback));
-            }
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let lineBuffer = "";
-            let result = null;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (value) {
-                    lineBuffer += decoder.decode(value, { stream: true });
-                }
-                const lines = lineBuffer.split("\n");
-                lineBuffer = lines.pop() || "";
-                for (const line of lines) {
-                    if (line.startsWith("data: ") && !line.includes("[DONE]")) {
-                        try {
-                            result = JSON.parse(line.slice(6).trim());
-                        } catch (e) {}
-                    }
-                }
-                if (done) {
-                    if (lineBuffer.startsWith("data: ") && !lineBuffer.includes("[DONE]")) {
-                        try {
-                            result = JSON.parse(lineBuffer.slice(6).trim());
-                        } catch (e) {}
-                    }
-                    break;
-                }
-            }
-
-            if (!result) throw new Error(fallback);
-            if (result.success === false && result.error) throw new Error(result.error);
-            if (result.status === "error" && result.message) throw new Error(result.message);
-            return result;
-        }
-
-        async function readSsePost(path, body, fallback = "요청 실패", extra = {}) {
-            const response = await apiFetch(path, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", ...(extra.headers || {}) },
-                body: JSON.stringify(body),
-                signal: extra.signal,
-            });
-            return readSseJsonResponse(response, fallback);
         }
 
         async function sendPresencePing() {
@@ -5460,8 +5410,10 @@
                         usedFallback = true;
                         const recentHistory = agentMissionHistory.slice(-3);
                         const res = await doFetch("/agent/ask", { query: `[Android 화면 조작 도움] ${mission}`, history: recentHistory });
-                        const data = await readSseJsonResponse(res, "에이전트 요청 실패");
-                        nativeResult = (nativeResult ? nativeResult + "\n\n" : "") + (data.result || data.response || data.message || "");
+                        const data = await res.json();
+                        if (res.ok && data.status !== "error") {
+                            nativeResult = (nativeResult ? nativeResult + "\n\n" : "") + (data.result || data.response || data.message || "");
+                        }
                     }
                     finalizeCard(cardRefs, "ok", nativeResult || "Android 접근성 작업을 실행했습니다.", mission, Date.now() - startTime);
                     agentMissionHistory.push({ mission, result: String(nativeResult || "").slice(0, 300) });
@@ -5478,18 +5430,17 @@
 
             try {
                 // 1차: 브라우저 자동화 시도
-                const res = await doFetch("/agent/task", { query: mission });
-                let data = await readSseJsonResponse(res, "에이전트 요청 실패");
+                let res = await doFetch("/agent/task", { query: mission });
 
                 // 브라우저 오류(503) → LLM 폴백
-                if (data.status === "error" && data.http_status === 503) {
+                if (res.status === 503) {
                     usedFallback = true;
                     const recentHistory = agentMissionHistory.slice(-3);
-                    const askRes = await doFetch("/agent/ask", { query: mission, history: recentHistory });
-                    data = await readSseJsonResponse(askRes, "에이전트 요청 실패");
+                    res = await doFetch("/agent/ask", { query: mission, history: recentHistory });
                 }
 
-                if (data.status === "error") throw new Error(data.message || "에이전트 요청 실패");
+                const data = await res.json();
+                if (!res.ok || data.status === "error") throw new Error(data.message || `서버 오류 (${res.status})`);
 
                 const content = data.result || data.response || data.message || "(결과 없음)";
                 const suffix  = usedFallback ? "\n\n⚠️ [브라우저 없이 LLM으로 실행됨]" : "";
@@ -5790,11 +5741,16 @@
             renderCollabPresetSidebar();
 
             try {
-                const data = await readSsePost(
-                    "/collab/recommend",
-                    { task, user_id: getDeviceId() },
-                    "협업 요청 실패"
-                );
+                const response = await apiFetch("/collab/recommend", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ task, user_id: getDeviceId() }),
+                });
+                if (!response.ok) {
+                    const errMsg = await parseApiError(response, "협업 요청 실패");
+                    throw new Error(errMsg);
+                }
+                const data = await response.json();
                 renderCollabPlan(resultEl, data, task);
                 addSessionHistory({ mode: "collab", title: task });
             } catch (err) {
@@ -5922,7 +5878,16 @@
             };
 
             try {
-                const data = await readSsePost("/collab/run-stage", body, "단계 실행 실패");
+                const response = await apiFetch("/collab/run-stage", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                if (!response.ok) {
+                    const errMsg = await parseApiError(response, "단계 실행 실패");
+                    throw new Error(errMsg);
+                }
+                const data = await response.json();
                 const modelNote = data.model_label ? `[${data.model_label} · ${data.stage_role || ""}]\n` : "";
                 collabSession.stageOutputs[stageIndex] = modelNote + (data.guidance || "");
                 collabSession.stageStates[stageIndex] = "done";
@@ -5995,17 +5960,19 @@
         async function handleCollabFollowUp(additionalTask) {
             if (!collabSession?.plan || collabPipelineRunning) return;
             try {
-                const data = await readSsePost(
-                    "/collab/followup-route",
-                    {
+                const response = await apiFetch("/collab/followup-route", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
                         task: additionalTask,
                         original_task: collabSession.task,
                         work_type: collabSession.plan.work_type,
                         stage_outputs: collabSession.stageOutputs,
                         user_id: getDeviceId(),
-                    },
-                    "분석 실패"
-                );
+                    }),
+                });
+                if (!response.ok) throw new Error(`분석 실패 (${response.status})`);
+                const data = await response.json();
                 collabSession.task = data.merged_task || `${collabSession.task}. 추가: ${additionalTask}`;
                 appendCollabLog(`추가 작업 분석: ${data.reason || ""} → ${(data.start_stage ?? 0) + 1}단계부터`, "info");
                 for (let i = data.start_stage ?? 0; i < 4; i++) {
@@ -6548,7 +6515,18 @@
             if (options.showLoadingCard) appendLoadingCard(expectedRound, expectedSpeaker);
 
             try {
-                const data = await readSsePost(endpoint, payload, "토론 요청 실패");
+                const response = await apiFetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) {
+                    const errMsg = await parseApiError(response, "토론 요청 실패");
+                    throw new Error(errMsg);
+                }
+
+                const data = await response.json();
                 if (data.queued) {
                     queuedDuringFlight = true;
                     showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
@@ -6687,16 +6665,18 @@
             if (debateInFlight) {
                 dockSecondaryBtn.disabled = true;
                 try {
-                    const data = await readSsePost(
-                        "/debate/continue",
-                        {
+                    const response = await apiFetch("/debate/continue", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
                             session_id: debateSessionId,
                             topic: debateTopic,
                             user_input: userInput,
                             user_id: getDeviceId(),
-                        },
-                        "토론 요청 실패"
-                    );
+                        }),
+                    });
+                    if (!response.ok) throw new Error(`큐잉 실패 (${response.status})`);
+                    const data = await response.json();
                     if (data.queued) {
                         queuedDuringFlight = true;
                         showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
