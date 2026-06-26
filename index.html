@@ -252,49 +252,51 @@
 
         /* ── 설정 · 가이드 (사이드 메뉴 하단) ── */
         .side-menu-footer {
-            padding: 10px 14px 14px;
+            padding: 8px 14px 12px;
             border-top: 1px solid #f3f4f6;
             flex-shrink: 0;
             display: flex;
-            gap: 8px;
-            align-items: stretch;
+            gap: 4px;
+            align-items: center;
+            justify-content: flex-end;
         }
         .side-menu-guide-btn {
-            flex: 1;
-            padding: 7px 8px;
-            min-height: 34px;
-            border-radius: 9px;
-            border: 1px solid #bfdbfe;
-            background: #eff6ff;
-            color: #1d4ed8;
+            flex: 0 0 auto;
+            width: 32px;
+            min-height: 32px;
+            padding: 0;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #9ca3af;
             font: inherit;
-            font-size: 11px;
-            font-weight: 700;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
+            line-height: 1;
         }
+        .side-menu-guide-btn:hover { color: #2563eb; background: #f3f4f6; }
         .side-menu-settings-btn {
-            width: 50px;
-            min-height: 52px;
+            width: 32px;
+            min-height: 32px;
             flex-shrink: 0;
-            padding: 6px 4px;
-            border-radius: 10px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-            color: #374151;
+            padding: 0;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #9ca3af;
             font: inherit;
-            font-size: 10px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 400;
             cursor: pointer;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2px;
-            line-height: 1.2;
+            line-height: 1;
         }
-        .side-menu-settings-btn span:first-child { font-size: 16px; }
-        .side-menu-settings-btn:hover { background: #f3f4f6; }
-        .side-menu-settings-btn.active { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+        .side-menu-settings-btn span:last-child { display: none; }
+        .side-menu-settings-btn:hover { color: #374151; background: #f3f4f6; }
+        .side-menu-settings-btn.active { background: #ede9fe; color: #6d28d9; }
 
         /* ── 설정 팝오버 ── */
         .settings-panel {
@@ -1020,9 +1022,8 @@
         html[data-theme="dark"] {
             color-scheme: dark;
         }
-        html[data-theme="dark"] body { background: #0b1220; color: #e2e8f0; }
+        html[data-theme="dark"] body { background: #050505; color: #f5f5f5; }
         html[data-theme="dark"] .site-header,
-        html[data-theme="dark"] .side-menu,
         html[data-theme="dark"] .settings-panel,
         html[data-theme="dark"] section.panel,
         html[data-theme="dark"] .input-dock,
@@ -1030,33 +1031,46 @@
         html[data-theme="dark"] .compare-card,
         html[data-theme="dark"] .debate-card,
         html[data-theme="dark"] .collab-stage-card,
-        html[data-theme="dark"] .collab-intro { background: #151f32; border-color: #2d3a52; color: #e2e8f0; }
+        html[data-theme="dark"] .collab-intro { background: #0c0c0c; border-color: #1a1a1a; color: #f5f5f5; }
+        html[data-theme="dark"] .side-menu {
+            background: #080808;
+            border-color: #141414;
+            box-shadow: 4px 0 24px rgba(0,0,0,.5);
+        }
+        html[data-theme="dark"] .side-menu-header,
+        html[data-theme="dark"] .side-menu-auth,
+        html[data-theme="dark"] .side-menu-footer { border-color: #141414; }
         html[data-theme="dark"] .side-menu-brand,
         html[data-theme="dark"] h1, html[data-theme="dark"] h2,
-        html[data-theme="dark"] .header-brand p { color: #f1f5f9; }
-        html[data-theme="dark"] .side-menu-guide-btn { background: #1e3a5f; border-color: #2563eb; color: #93c5fd; }
-        html[data-theme="dark"] .side-menu-settings-btn { background: #1e293b; border-color: #334155; color: #e2e8f0; }
-        html[data-theme="dark"] .side-menu-settings-btn.active { background: #312e81; border-color: #7c3aed; color: #e9d5ff; }
+        html[data-theme="dark"] .header-brand p { color: #fafafa; }
+        html[data-theme="dark"] .side-menu-guide-btn,
+        html[data-theme="dark"] .side-menu-settings-btn { background: transparent; border: none; color: #a3a3a3; }
+        html[data-theme="dark"] .side-menu-guide-btn:hover,
+        html[data-theme="dark"] .side-menu-settings-btn:hover { background: #141414; color: #fafafa; }
+        html[data-theme="dark"] .side-menu-settings-btn.active { background: #1a1a2e; color: #c4b5fd; }
         html[data-theme="dark"] .works-section-title,
-        html[data-theme="dark"] .settings-row-label { color: #cbd5e1; }
+        html[data-theme="dark"] .settings-row-label { color: #d4d4d4; }
         html[data-theme="dark"] .settings-meta,
-        html[data-theme="dark"] .works-empty { color: #94a3b8; }
+        html[data-theme="dark"] .works-empty { color: #737373; }
         html[data-theme="dark"] #mainInput,
         html[data-theme="dark"] .agent-input,
         html[data-theme="dark"] .input-tool-select,
-        html[data-theme="dark"] .auth-field input { background: #0b1220; border-color: #3d4f6f; color: #f1f5f9; }
-        html[data-theme="dark"] .mode-btn { background: #1e293b; color: #cbd5e1; border-color: #334155; }
-        html[data-theme="dark"] .mode-btn.active { background: #312e81; color: #e0e7ff; border-color: #6366f1; }
-        html[data-theme="dark"] .dock-btn.muted { background: #1e293b; color: #cbd5e1; }
-        html[data-theme="dark"] .ai-chip { background: #1e293b; border-color: #475569; color: #e2e8f0; }
-        html[data-theme="dark"] .ai-chip.active { background: #312e81; border-color: #818cf8; color: #e0e7ff; }
+        html[data-theme="dark"] .auth-field input { background: #0a0a0a; border-color: #262626; color: #fafafa; }
+        html[data-theme="dark"] .mode-btn { background: #111; color: #d4d4d4; border-color: #262626; }
+        html[data-theme="dark"] .mode-btn.active { background: #1e1b4b; color: #e0e7ff; border-color: #4338ca; }
+        html[data-theme="dark"] .dock-btn.muted { background: #111; color: #d4d4d4; border-color: #262626; }
+        html[data-theme="dark"] .ai-chip { background: #111; border-color: #333; color: #e5e5e5; }
+        html[data-theme="dark"] .ai-chip.active { background: #1e1b4b; border-color: #6366f1; color: #e0e7ff; }
         html[data-theme="dark"] .collab-v2-summary,
-        html[data-theme="dark"] .collab-stage-live-output { background: #0b1220; border-color: #334155; color: #e2e8f0; }
-        html[data-theme="dark"] .collab-final-product { background: #14532d33; border-color: #166534; }
-        html[data-theme="dark"] .ai-picker-popover { background: #151f32; border-color: #334155; color: #e2e8f0; }
-        html[data-theme="dark"] .guide-btn { background: #1e3a5f; border-color: #2563eb; color: #93c5fd; }
-        html[data-theme="dark"] .side-account-box { background: #1e293b; }
-        html[data-theme="dark"] .session-history-item { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+        html[data-theme="dark"] .collab-stage-live-output { background: #0a0a0a; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .collab-final-product { background: #052e1622; border-color: #166534; }
+        html[data-theme="dark"] .ai-picker-popover { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .side-account-box { background: transparent; border: none; }
+        html[data-theme="dark"] .session-history-item { background: #111; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .side-menu-btn.outline { background: transparent; border-color: #333; color: #93c5fd; }
+        html[data-theme="dark"] .result-files-toggle { background: #111; border-color: #333; color: #c4b5fd; }
+        html[data-theme="dark"] .works-item,
+        html[data-theme="dark"] .active-collab-item { background: #111; border-color: #262626; }
 
         .collab-ai-btn.recommended {
             border-color: #7c3aed;
@@ -1372,14 +1386,23 @@
             gap: 8px;
         }
 
-        .dock-input-block { display: flex; flex-direction: column; gap: 6px; }
-        .dock-agent-top { display: flex; justify-content: flex-end; }
-        .agent-toggle-btn {
-            min-height: 48px;
-            padding: 10px 22px;
-            font-size: 15px;
-            font-weight: 800;
-            border-radius: 12px;
+        .dock-input-wrap { position: relative; }
+        .dock-agent-float {
+            position: absolute;
+            top: 6px;
+            right: 112px;
+            z-index: 3;
+            min-height: 30px;
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 8px;
+        }
+        .dock-input-row {
+            position: relative;
+        }
+        .dock-input-row #mainInput {
+            padding-top: 36px;
         }
 
         .dock-tools-row .input-tool-row { gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
@@ -2739,11 +2762,9 @@
         <div id="sideMenuOverlay" class="side-menu-overlay"></div>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
-                <span class="side-menu-brand">Nasaro AI</span>
-                <button id="adminEntryBtn" class="side-menu-admin-btn" type="button" title="관리자">관리</button>
+                <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
             </div>
             <div id="sideAccountBox" class="side-account-box" style="display:none;">
-                <span id="sideAccountName" class="side-account-name"></span>
                 <button id="sideLogoutBtn" class="side-logout-btn" type="button" data-i18n="logout">로그아웃</button>
             </div>
             <div class="side-menu-auth" id="sideAuthBtns">
@@ -2766,12 +2787,8 @@
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
             <div class="side-menu-footer">
-                <button id="guideBtn" class="side-menu-guide-btn" type="button">📘 가이드</button>
-                <button id="settingsBtn" class="side-menu-settings-btn" type="button"><span>⚙️</span><span>설정</span></button>
-            </div>
-            <div class="mini-site-links">
-                <a href="/guide" target="_blank" rel="noopener">📘 가이드 페이지</a>
-                <a href="/admin" target="_blank" rel="noopener">관리자</a>
+                <button id="guideBtn" class="side-menu-guide-btn" type="button" title="가이드">?</button>
+                <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span>설정</span></button>
             </div>
         </aside>
 
@@ -2854,10 +2871,6 @@
                 <div class="settings-row-label">결과물 파일</div>
                 <button id="clearResultsBtn" class="settings-action-btn" type="button">🗑 결과물 전부 삭제</button>
             </div>
-            <div class="mini-site-links">
-                <a href="/guide" target="_blank" rel="noopener">📘 가이드 페이지</a>
-                <a href="/admin" target="_blank" rel="noopener">관리자 사이트</a>
-            </div>
             </div>
         </div>
 
@@ -2865,9 +2878,9 @@
             <div class="auth-modal" role="dialog" aria-label="계정">
                 <h3 id="authModalTitle">로그인</h3>
                 <p id="authModalDesc">계정에 로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다.</p>
-                <div class="auth-field" id="authNameField" style="display:none;">
-                    <label for="authNameInput">표시 이름</label>
-                    <input id="authNameInput" type="text" autocomplete="name" placeholder="선택 입력">
+                <div class="auth-field" id="authEmailField" style="display:none;">
+                    <label for="authEmailInput">이메일</label>
+                    <input id="authEmailInput" type="email" autocomplete="email" placeholder="name@example.com">
                 </div>
                 <div class="auth-field">
                     <label for="authUsernameInput">아이디</label>
@@ -2920,10 +2933,10 @@
                 </ul>
                 <p>작업 설명을 입력하면 AI가 단계별로 순차 실행합니다. 완료 후 「추가 작업 ▶」로 수정 요청도 가능합니다.</p>
                 <h3>④ 에이전트</h3>
-                <p>입력창 <strong>위</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
+                <p>입력창 <strong>우측 상단</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
                 <h3>⑤ 계정 · 저장</h3>
                 <p>로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다. 메뉴에서 「결과물 저장」으로 마음에 드는 답을 보관하세요.</p>
-                <div class="guide-bar-tip">다른 곳을 누르면 닫힙니다. <a href="/guide" target="_blank" rel="noopener" style="color:#2563eb;">전체 가이드</a> · <a href="/admin" target="_blank" rel="noopener" style="color:#2563eb;">관리자</a></div>
+                <div class="guide-bar-tip">다른 곳을 누르면 닫힙니다.</div>
             </div>
         </div>
 
@@ -3240,12 +3253,10 @@
 
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
-                <div class="dock-input-block">
-                    <div class="dock-agent-top">
-                        <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
-                    </div>
+                <div class="dock-input-wrap">
                     <div class="dock-input-row">
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                        <button id="agentToggleBtn" class="dock-btn agent-toggle-btn dock-agent-float" type="button" data-i18n="mode_agent">🌐 에이전트</button>
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
                 </div>
@@ -3758,16 +3769,16 @@
             const logoutBtn = document.getElementById("settingsLogoutBtn");
             const sideAuth = document.getElementById("sideAuthBtns");
             const sideAccount = document.getElementById("sideAccountBox");
-            const sideAccountName = document.getElementById("sideAccountName");
+            const sideMenuBrand = document.getElementById("sideMenuBrand");
             loadSavedResults();
             if (currentUser) {
-                const name = currentUser.display_name || currentUser.username || currentUser.email;
-                if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${name}`;
+                const id = currentUser.username || currentUser.email || "";
+                if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${id}`;
                 if (loginBtn) loginBtn.style.display = "none";
                 if (logoutBtn) logoutBtn.style.display = "";
                 if (sideAuth) sideAuth.style.display = "none";
                 if (sideAccount) sideAccount.style.display = "flex";
-                if (sideAccountName) sideAccountName.textContent = name;
+                if (sideMenuBrand) sideMenuBrand.textContent = id;
             } else {
                 if (meta) meta.textContent = NF?.lang === "en"
                     ? "Not signed in — results stay in this tab only."
@@ -3776,6 +3787,7 @@
                 if (logoutBtn) logoutBtn.style.display = "none";
                 if (sideAuth) sideAuth.style.display = "flex";
                 if (sideAccount) sideAccount.style.display = "none";
+                if (sideMenuBrand) sideMenuBrand.textContent = "Nasaro AI";
             }
             renderResultFilesList();
             notifyExtensionAuth();
@@ -3856,9 +3868,9 @@
                 ? (NF?.t?.("signup") || "회원가입")
                 : (NF?.t?.("login") || "로그인");
             document.getElementById("authModalDesc").textContent = mode === "signup"
-                ? (NF?.lang === "en" ? "Pick a unique username (3–32 chars). Password 8+ chars." : "아이디(3~32자)로 가입합니다. (비밀번호 8자 이상)")
-                : (NF?.lang === "en" ? "Sign in with your username." : "가입한 아이디로 로그인하세요.");
-            document.getElementById("authNameField").style.display = mode === "signup" ? "" : "none";
+                ? (NF?.lang === "en" ? "Pick a login ID and real email. Password 8+ chars." : "아이디와 실제 이메일로 가입합니다. (비밀번호 8자 이상)")
+                : (NF?.lang === "en" ? "Sign in with your login ID." : "가입한 아이디로 로그인하세요.");
+            document.getElementById("authEmailField").style.display = mode === "signup" ? "" : "none";
             document.getElementById("authSubmitBtn").textContent = mode === "signup"
                 ? (NF?.t?.("signup") || "가입하기")
                 : (NF?.t?.("login") || "로그인");
@@ -3883,16 +3895,31 @@
 
         async function submitAuth() {
             const username = document.getElementById("authUsernameInput").value.trim();
+            const email = document.getElementById("authEmailInput").value.trim();
             const password = document.getElementById("authPasswordInput").value;
-            const displayName = document.getElementById("authNameInput").value.trim();
             const rememberPwd = document.getElementById("authRememberPwd")?.checked;
             const errEl = document.getElementById("authError");
             errEl.textContent = "";
-            if (!/^[a-zA-Z0-9_]{3,32}$/.test(username) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
-                errEl.textContent = window.NasaroFeatures?.lang === "en"
-                    ? "Username: 3–32 letters, numbers, or _"
-                    : "아이디는 3~32자 (영문·숫자·_)만 사용 가능합니다.";
-                return;
+            if (authModalMode === "login") {
+                if (!/^[a-zA-Z0-9_]{3,32}$/.test(username)) {
+                    errEl.textContent = window.NasaroFeatures?.lang === "en"
+                        ? "Login ID: 3–32 letters, numbers, or _"
+                        : "아이디는 3~32자 (영문·숫자·_)만 사용 가능합니다.";
+                    return;
+                }
+            } else {
+                if (!/^[a-zA-Z0-9_]{3,32}$/.test(username)) {
+                    errEl.textContent = window.NasaroFeatures?.lang === "en"
+                        ? "Login ID: 3–32 letters, numbers, or _"
+                        : "아이디는 3~32자 (영문·숫자·_)만 사용 가능합니다.";
+                    return;
+                }
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    errEl.textContent = window.NasaroFeatures?.lang === "en"
+                        ? "Enter a valid email address."
+                        : "실제 사용 가능한 이메일 주소를 입력해주세요.";
+                    return;
+                }
             }
             if (authModalMode === "signup" && password.length < 8) {
                 errEl.textContent = window.NasaroFeatures?.lang === "en"
@@ -3903,7 +3930,7 @@
             try {
                 const path = authModalMode === "signup" ? "/auth/signup" : "/auth/login";
                 const body = authModalMode === "signup"
-                    ? { username, password, display_name: displayName }
+                    ? { username, email, password }
                     : { username, password };
                 const res = await apiFetch(path, {
                     method: "POST",
@@ -4104,24 +4131,6 @@
             savedResults = [];
             persistSavedResults();
             renderResultFilesList();
-        });
-
-        document.getElementById("adminEntryBtn")?.addEventListener("click", async () => {
-            const pw = prompt("관리자 비밀번호");
-            if (!pw) return;
-            try {
-                const res = await fetch(API_URL + "/admin/login", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ password: pw }),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "인증 실패");
-                sessionStorage.setItem("nasaroai_admin_token", data.token);
-                location.href = "/admin";
-            } catch (e) {
-                showToast(e.message || "관리자 로그인 실패", "error");
-            }
         });
 
         document.getElementById("resultFilesToggle")?.addEventListener("click", () => {
@@ -4542,10 +4551,6 @@
             if (!extInstallBanner) return;
             const showBanner = !ready && !isAppSource && !isMobileDevice;
             extInstallBanner.style.display = showBanner ? "flex" : "none";
-            if (showBanner && !sessionStorage.getItem("nasaroai_pc_ext_prompt")) {
-                sessionStorage.setItem("nasaroai_pc_ext_prompt", "1");
-                openPcInstallModal();
-            }
             // 확장 에이전트 사용 시 사이트 런처/패널은 숨김 (중복 런처 방지)
             if (ready && !isAppSource && !isMobileDevice) {
                 const localLauncher = document.getElementById("agentFloatLauncher");

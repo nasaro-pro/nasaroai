@@ -125,9 +125,21 @@ def init_db() -> None:
                 );
                 """
             )
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+            if "user_email" not in cols:
+                conn.execute("ALTER TABLE users ADD COLUMN user_email TEXT")
+            conn.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_user_email
+                ON users(user_email) WHERE user_email IS NOT NULL AND user_email != ''
+                """
+            )
             conn.commit()
         finally:
             conn.close()
+
+
+_USER_COLS = "id, email, user_email, display_name, created_at"
 
 
 def _hash_password(password: str, salt: bytes | None = None) -> str:
@@ -146,13 +158,20 @@ def _verify_password(password: str, stored: str) -> bool:
         return False
 
 
-def _normalize_username(username: str) -> str:
-    value = username.strip().lower()
+def _require_login_id(login_id: str) -> str:
+    value = login_id.strip().lower()
     if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
-        return value
+        raise ValueError("아이디에는 이메일 형식(@)을 사용할 수 없습니다.")
     if not re.fullmatch(r"[a-z0-9_]{3,32}", value):
         raise ValueError("아이디는 3~32자 (영문·숫자·_)만 사용 가능합니다.")
     return value
+
+
+def _resolve_login_ident(username: str) -> str:
+    value = username.strip().lower()
+    if "@" in value:
+        return _require_email(value)
+    return _require_login_id(value)
 
 
 def _require_email(email: str) -> str:
@@ -162,46 +181,62 @@ def _require_email(email: str) -> str:
     return value
 
 
-def signup(username: str, password: str, display_name: str = "") -> dict[str, Any]:
+def _value_taken(conn: sqlite3.Connection, value: str) -> bool:
+    row = conn.execute(
+        "SELECT id FROM users WHERE email = ? OR user_email = ? LIMIT 1",
+        (value, value),
+    ).fetchone()
+    return row is not None
+
+
+def signup(login_id: str, user_email: str, password: str) -> dict[str, Any]:
     if len(password) < 8:
         raise ValueError("비밀번호는 8자 이상이어야 합니다.")
-    ident_norm = _normalize_username(username)
+    ident_norm = _require_login_id(login_id)
+    email_norm = _require_email(user_email)
+    if ident_norm == email_norm:
+        raise ValueError("아이디와 이메일은 같을 수 없습니다.")
     with _lock:
         conn = _connect()
         try:
-            exists = conn.execute(
-                "SELECT id FROM users WHERE email = ?", (ident_norm,)
-            ).fetchone()
+            id_taken = _value_taken(conn, ident_norm)
+            email_taken = _value_taken(conn, email_norm)
         finally:
             conn.close()
-    if exists:
+    if id_taken:
         raise ValueError("이미 사용 중인 아이디입니다. 다른 아이디를 사용하거나 로그인하세요.")
+    if email_taken:
+        raise ValueError("이미 가입된 이메일입니다. 다른 이메일을 사용하거나 로그인하세요.")
     now = time.time()
     with _lock:
         conn = _connect()
         try:
             cur = conn.execute(
-                "INSERT INTO users (email, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)",
-                (ident_norm, _hash_password(password), display_name.strip(), now),
+                """
+                INSERT INTO users (email, user_email, password_hash, display_name, created_at)
+                VALUES (?, ?, ?, '', ?)
+                """,
+                (ident_norm, email_norm, _hash_password(password), now),
             )
             user_id = cur.lastrowid
             conn.commit()
         except sqlite3.IntegrityError as exc:
-            raise ValueError("이미 가입된 이메일입니다.") from exc
+            raise ValueError("이미 사용 중인 아이디 또는 이메일입니다.") from exc
         finally:
             conn.close()
     token = create_session(int(user_id))
     log_login_event(int(user_id), "signup")
+    log_activity(ident_norm, "auth", user_id=int(user_id), action="signup", detail=email_norm[:64])
     return {"token": token, "user": get_user_by_id(int(user_id))}
 
 
 def login(username: str, password: str) -> dict[str, Any]:
-    ident_norm = _normalize_username(username)
+    ident_norm = _resolve_login_ident(username)
     with _lock:
         conn = _connect()
         try:
             row = conn.execute(
-                "SELECT id, email, password_hash, display_name, created_at FROM users WHERE email = ?",
+                f"SELECT {_USER_COLS}, password_hash FROM users WHERE email = ?",
                 (ident_norm,),
             ).fetchone()
         finally:
@@ -210,6 +245,7 @@ def login(username: str, password: str) -> dict[str, Any]:
         raise ValueError("아이디 또는 비밀번호가 올바르지 않습니다.")
     token = create_session(int(row["id"]))
     log_login_event(int(row["id"]), "login")
+    log_activity(ident_norm, "auth", user_id=int(row["id"]), action="login")
     return {"token": token, "user": _row_to_user(row)}
 
 
@@ -247,7 +283,7 @@ def get_user_by_token(token: str | None) -> dict[str, Any] | None:
         try:
             row = conn.execute(
                 """
-                SELECT u.id, u.email, u.display_name, u.created_at, s.expires_at
+                SELECT u.id, u.email, u.user_email, u.display_name, u.created_at, s.expires_at
                 FROM sessions s
                 JOIN users u ON u.id = s.user_id
                 WHERE s.token = ?
@@ -270,7 +306,7 @@ def get_user_by_id(user_id: int) -> dict[str, Any]:
         conn = _connect()
         try:
             row = conn.execute(
-                "SELECT id, email, display_name, created_at FROM users WHERE id = ?",
+                f"SELECT {_USER_COLS} FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
         finally:
@@ -282,15 +318,15 @@ def get_user_by_id(user_id: int) -> dict[str, Any]:
 
 def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
     ident = row["email"]
-    if "@" in ident:
-        default_name = ident.split("@")[0]
-    else:
-        default_name = ident
+    user_email = ""
+    try:
+        user_email = (row["user_email"] or "").strip()
+    except (IndexError, KeyError):
+        pass
     return {
         "id": row["id"],
         "username": ident,
-        "email": ident,
-        "display_name": row["display_name"] or default_name,
+        "email": user_email,
         "created_at": row["created_at"],
     }
 
@@ -621,7 +657,7 @@ def list_users_admin() -> list[dict[str, Any]]:
         conn = _connect()
         try:
             rows = conn.execute(
-                "SELECT id, email, display_name, created_at FROM users ORDER BY id DESC"
+                f"SELECT {_USER_COLS} FROM users ORDER BY id DESC"
             ).fetchall()
         finally:
             conn.close()
@@ -699,7 +735,7 @@ def get_admin_dashboard() -> dict[str, Any]:
         "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
         "usage_by_hour": get_usage_by_hour(day_key),
         "users": enriched,
-        "recent_activity": get_activity_log(limit=500),
+        "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),
         "platform_stats": get_platform_stats(day_key),
     }
@@ -749,7 +785,7 @@ def get_activity_log(
     device_id: str | None = None,
     limit: int = 100,
 ) -> list[dict[str, Any]]:
-    limit = max(1, min(500, limit))
+    limit = max(1, min(50000, limit))
     with _lock:
         conn = _connect()
         try:
@@ -846,7 +882,7 @@ def search_users_admin(query: str, limit: int = 30) -> list[dict[str, Any]]:
         return users[:limit]
     out = []
     for u in users:
-        hay = f"{u.get('username','')} {u.get('display_name','')} {u.get('email','')}".lower()
+        hay = f"{u.get('username','')} {u.get('email','')}".lower()
         if q in hay:
             out.append(u)
         if len(out) >= limit:
@@ -1049,7 +1085,7 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
     data = get_user_data(user_id)
     login_stats = get_user_login_stats(user_id)
     quotas = get_user_quota_totals(user_id)
-    activity = get_activity_log(user_id=user_id, limit=500)
+    activity = get_activity_log(user_id=user_id, limit=10000)
     platform_counts: dict[str, int] = {}
     for a in activity:
         platform_counts[a["platform"]] = platform_counts.get(a["platform"], 0) + 1

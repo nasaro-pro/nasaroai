@@ -383,8 +383,8 @@ class CollabFollowupRequest(BaseModel):
 
 class AuthSignupRequest(BaseModel):
     username: str
+    email: str
     password: str
-    display_name: str = ""
 
 
 class AuthLoginRequest(BaseModel):
@@ -2677,7 +2677,7 @@ def quota_status(request: Request, device_id: str = "") -> dict:
 @app.post("/auth/signup")
 def auth_signup_route(body: AuthSignupRequest) -> dict:
     try:
-        return auth_signup_fn(body.username, body.password, body.display_name)
+        return auth_signup_fn(body.username, body.email, body.password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2807,7 +2807,7 @@ def admin_activity(
     request: Request,
     user_id: int | None = None,
     device_id: str | None = None,
-    limit: int = 500,
+    limit: int = 10000,
 ) -> dict:
     _require_admin(request)
     return {"activity": get_activity_log(user_id=user_id, device_id=device_id, limit=limit)}
