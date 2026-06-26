@@ -79,7 +79,7 @@
         /* 좌측 메뉴 토글(햄버거) 버튼 */
         .menu-toggle-btn {
             position: absolute;
-            left: 18px;
+            left: 52px;
             top: 50%;
             transform: translateY(-50%);
             width: 40px;
@@ -258,31 +258,42 @@
         /* ── 설정 팝오버 ── */
         .settings-panel {
             position: fixed;
-            left: min(280px, 82vw); /* 사이드바 너비와 동일 */
+            left: min(280px, 82vw);
             bottom: 0;
-            width: 240px;
+            width: min(300px, 88vw);
+            max-height: min(88dvh, calc(100dvh - 56px));
             background: #fff;
             border: 1px solid #e5e7eb;
-            border-radius: 0 14px 0 0;
-            box-shadow: 6px -4px 24px rgba(15,23,42,.12);
+            border-radius: 14px 14px 0 0;
+            box-shadow: 0 -8px 32px rgba(15,23,42,.14);
             z-index: 401;
             display: none;
             flex-direction: column;
             overflow: hidden;
-            transform: translateX(-8px);
+            transform: translateY(12px);
             opacity: 0;
             transition: transform .2s cubic-bezier(.4,0,.2,1), opacity .2s;
         }
         .settings-panel.open {
             display: flex;
-            transform: translateX(0);
+            transform: translateY(0);
             opacity: 1;
         }
         .settings-panel-head {
+            flex-shrink: 0;
             padding: 12px 16px 10px;
             font-size: 13px; font-weight: 800; color: #374151;
             border-bottom: 1px solid #f3f4f6;
             display: flex; align-items: center; justify-content: space-between;
+            background: #fff;
+        }
+        .settings-panel-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
         }
         .settings-panel-close {
             border: 0; background: none; color: #9ca3af; font-size: 16px;
@@ -415,6 +426,8 @@
             flex: 1;
             padding: 18px;
             padding-bottom: calc(var(--input-dock-height, 120px) + 32px);
+            overflow-x: hidden;
+            min-width: 0;
         }
 
         .panel {
@@ -472,6 +485,76 @@
             color: #1e40af;
             white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        .collab-workspace-layout {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .collab-preset-sidebar {
+            width: 156px;
+            flex-shrink: 0;
+            background: #faf5ff;
+            border: 1px solid #e9d5ff;
+            border-radius: 10px;
+            padding: 10px 8px;
+            position: sticky;
+            top: 12px;
+        }
+        .collab-preset-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: #7c3aed;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .collab-preset-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            font-size: 11px;
+            padding: 7px 8px;
+            margin-bottom: 4px;
+            border-radius: 8px;
+            border: 1px solid #e9d5ff;
+            background: #fff;
+            cursor: pointer;
+            color: #4c1d95;
+        }
+        .collab-preset-item.active {
+            background: #7c3aed;
+            color: #fff;
+            border-color: #6d28d9;
+        }
+        .collab-preset-item small {
+            display: block;
+            font-size: 9px;
+            opacity: 0.75;
+            margin-top: 2px;
+        }
+        .collab-preset-save {
+            width: 100%;
+            margin-top: 6px;
+            font-size: 11px;
+            padding: 6px;
+            border-radius: 8px;
+            border: 1px dashed #c4b5fd;
+            background: transparent;
+            color: #6d28d9;
+            cursor: pointer;
+        }
+        .collab-workspace-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        @media (max-width: 900px) {
+            .collab-workspace-layout { flex-direction: column; }
+            .collab-preset-sidebar { width: 100%; position: static; }
         }
 
         /* 4개 사이드바 컨테이너: 화면 상단에 가로로 4등분 */
@@ -714,6 +797,60 @@
             white-space: pre-wrap;
             color: #334155;
         }
+
+        .collab-v2 { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+        .collab-v2-head h2 { font-size: 18px; font-weight: 800; margin: 6px 0 4px; line-height: 1.35; }
+        .collab-v2-summary {
+            font-size: 13px; color: #475569; line-height: 1.6;
+            padding: 10px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;
+        }
+        .collab-stage-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        @media (max-width: 640px) { .collab-stage-rail { grid-template-columns: repeat(2, 1fr); } }
+        .collab-rail-step {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+            padding: 10px; border-radius: 12px; border: 2px solid #e5e7eb; background: #fff;
+            cursor: pointer; text-align: left; position: relative; min-height: 74px;
+        }
+        .collab-rail-step .step-num { font-size: 10px; font-weight: 800; color: #9ca3af; }
+        .collab-rail-step .step-name { font-size: 12px; font-weight: 700; color: #374151; }
+        .collab-rail-step .step-ai { font-size: 11px; font-weight: 700; color: #7c3aed; margin-top: 2px; }
+        .collab-rail-step .step-state {
+            position: absolute; top: 8px; right: 8px; font-size: 9px; font-weight: 700;
+            padding: 2px 5px; border-radius: 999px; background: #f3f4f6; color: #6b7280;
+        }
+        .collab-rail-step.selected { border-color: #7c3aed; background: #faf5ff; }
+        .collab-rail-step.running { border-color: #7c3aed; animation: collabPulse 1.2s ease infinite; }
+        .collab-rail-step.done { border-color: #86efac; background: #f0fdf4; }
+        .collab-rail-step.done .step-state { background: #dcfce7; color: #15803d; }
+        @keyframes collabPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(124,58,237,.2); } 50% { box-shadow: 0 0 0 4px rgba(124,58,237,.1); } }
+        .collab-stage-panel { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px 16px; background: #fff; }
+        .collab-stage-panel h3 { font-size: 15px; font-weight: 800; margin: 0 0 6px; }
+        .collab-ai-pick-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0;
+            padding: 10px; background: #f5f3ff; border-radius: 10px; border: 1px solid #ddd6fe;
+        }
+        .collab-ai-pick-row select {
+            flex: 1; min-width: 120px; padding: 7px 10px; border-radius: 8px;
+            border: 1px solid #c4b5fd; font: inherit; font-size: 13px; font-weight: 600;
+        }
+        .collab-ai-hint { font-size: 11px; color: #7c3aed; width: 100%; }
+        .collab-v2-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+        .collab-stage-btn.primary-start {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff;
+            padding: 10px 18px; flex: 1; min-width: 140px;
+        }
+        .collab-activity-log {
+            max-height: 240px; overflow-y: auto; background: #0f172a; border-radius: 12px;
+            padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 11px; line-height: 1.55;
+        }
+        .collab-log-line { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.06); color: #cbd5e1; }
+        .collab-log-line.ok { color: #86efac; }
+        .collab-log-line.warn { color: #fde68a; }
+        .collab-log-line.err { color: #fca5a5; }
+        .collab-log-line.info { color: #93c5fd; }
+        .collab-sidebars, .collab-preset-sidebar { display: none !important; }
+        .collab-workspace-layout { display: block !important; }
+        .collab-recommend-result { max-height: none !important; overflow: visible !important; }
 
         .collab-ai-btn.recommended {
             border-color: #7c3aed;
@@ -1689,14 +1826,13 @@
         @media (max-width: 767px) {
             .settings-panel {
                 left: 0 !important;
-                width: min(280px, 82vw) !important;
-                bottom: 68px !important;
-                border-radius: 14px 14px 0 0 !important;
-                transform: translateY(20px) !important;
-                box-shadow: 0 -6px 24px rgba(15,23,42,.14) !important;
-                border-right: none !important;
-                border-left: none !important;
-                border-bottom: none !important;
+                right: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                bottom: 0 !important;
+                max-height: min(92dvh, calc(100dvh - 48px)) !important;
+                border-radius: 16px 16px 0 0 !important;
+                transform: translateY(100%) !important;
             }
             .settings-panel.open {
                 transform: translateY(0) !important;
@@ -2177,6 +2313,137 @@
         }
         .acw-send-btn:hover { background: #6d28d9; }
         .acw-send-btn:disabled { background: #c4b5fd; cursor: not-allowed; }
+
+        /* ── 다크 모드 ── */
+        html[data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+        html[data-theme="dark"] .site-header,
+        html[data-theme="dark"] .side-menu,
+        html[data-theme="dark"] .settings-panel,
+        html[data-theme="dark"] section,
+        html[data-theme="dark"] .input-dock,
+        html[data-theme="dark"] .agent-panel { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+        html[data-theme="dark"] #mainInput,
+        html[data-theme="dark"] .agent-input,
+        html[data-theme="dark"] .acw-input { background: #0f172a; border-color: #475569; color: #f1f5f9; }
+        html[data-theme="dark"] .chat-history-item { background: #1e293b; border-color: #334155; }
+        html[data-theme="dark"] .collab-stage-item { background: #1e293b; border-color: #334155; }
+
+        /* ── 입력 툴바 (AI·프라이버시·음성) ── */
+        .input-tool-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px;
+        }
+        .input-tool-group { display: flex; align-items: center; gap: 4px; }
+        .input-tool-label { font-size: 11px; color: #64748b; font-weight: 600; }
+        .input-tool-select {
+            font-size: 12px; padding: 4px 8px; border-radius: 8px;
+            border: 1px solid #d1d5db; background: #fff;
+        }
+        .input-tool-btn {
+            border: 1px solid #d1d5db; background: #f9fafb; border-radius: 8px;
+            padding: 4px 10px; font-size: 14px; cursor: pointer; line-height: 1.2;
+        }
+        .input-tool-btn.active { background: #ede9fe; border-color: #a78bfa; }
+        .input-tool-help {
+            position: relative; width: 18px; height: 18px; padding: 0; font-size: 11px;
+            border-radius: 50%; border: 1px solid #cbd5e1; background: #fff; color: #64748b; cursor: help;
+        }
+        .input-tool-tip {
+            display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+            width: 220px; padding: 8px 10px; font-size: 11px; line-height: 1.45; font-weight: 400;
+            background: #1e293b; color: #f8fafc; border-radius: 8px; z-index: 300; pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,.2);
+        }
+        .input-tool-help:hover .input-tool-tip { display: block; }
+
+        .result-action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .result-action-btn {
+            font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+            border: 1px solid #c4b5fd; background: #f5f3ff; color: #6d28d9; cursor: pointer;
+        }
+        .result-action-btn:hover { background: #ede9fe; }
+
+        .result-action-btn.primary-save { background: #7c3aed; color: #fff; border-color: #6d28d9; }
+        .result-action-btn.primary-save:hover { background: #6d28d9; }
+
+        .admin-entry-btn {
+            position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+            font-size: 10px; padding: 4px 6px; border-radius: 6px; border: 1px solid #e5e7eb;
+            background: #f9fafb; color: #9ca3af; cursor: pointer; z-index: 2;
+        }
+        .admin-entry-btn:hover { color: #6b7280; background: #f3f4f6; }
+
+        .result-files-toggle {
+            width: 100%; text-align: left; font-size: 12px; font-weight: 700; color: #6d28d9;
+            padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd6fe; background: #f5f3ff; cursor: pointer;
+        }
+        .result-files-toggle.open { background: #ede9fe; }
+        .result-file-viewer {
+            margin-top: 8px; padding: 10px; border-radius: 8px; border: 1px solid #c4b5fd;
+            background: #faf5ff; max-height: 280px; overflow: auto; font-size: 11px;
+        }
+        .result-viewer-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+        .result-viewer-head button { margin-left: auto; border: none; background: transparent; cursor: pointer; }
+        .result-viewer-body pre { white-space: pre-wrap; word-break: break-word; margin: 0 0 8px; font-family: inherit; }
+        .settings-guide-box {
+            max-height: 320px; overflow: auto; font-size: 12px; line-height: 1.55;
+            padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb;
+        }
+        .settings-guide-box h4 { margin: 12px 0 4px; font-size: 13px; color: #6d28d9; }
+        .settings-guide-box ul, .settings-guide-box ol { padding-left: 18px; margin: 4px 0; }
+
+        .works-section { margin-bottom: 16px; }
+        .works-section-title { font-size: 12px; font-weight: 700; color: #6d28d9; margin-bottom: 8px; }
+        .works-item, .active-collab-item {
+            font-size: 12px; padding: 8px 10px; border-radius: 8px; margin-bottom: 6px;
+            background: #f5f3ff; border: 1px solid #ddd6fe; cursor: pointer; position: relative;
+        }
+        .works-item:hover, .active-collab-item:hover { background: #ede9fe; }
+        .works-item-del {
+            position: absolute; right: 6px; top: 6px; border: none; background: transparent;
+            color: #9ca3af; cursor: pointer; font-size: 12px;
+        }
+        .works-empty { font-size: 11px; color: #9ca3af; }
+
+        .nasaro-consent-overlay {
+            display: none; position: fixed; inset: 0; z-index: 10050;
+            background: rgba(15, 23, 42, 0.45); align-items: center; justify-content: center; padding: 20px;
+        }
+        .nasaro-consent-overlay.open { display: flex; }
+        .nasaro-consent-box {
+            max-width: 360px; width: 100%; background: #fff; border-radius: 14px; padding: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,.18); border: 1px solid #e5e7eb;
+        }
+        .nasaro-consent-box h3 { margin: 0 0 8px; font-size: 16px; color: #111827; }
+        .nasaro-consent-box p { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #4b5563; }
+        .nasaro-consent-check {
+            display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #374151;
+            margin-bottom: 14px; cursor: pointer;
+        }
+        .nasaro-consent-check input { margin-top: 2px; }
+        .nasaro-consent-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .nasaro-consent-allow, .nasaro-consent-deny {
+            font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; border: none;
+        }
+        .nasaro-consent-deny { background: #f3f4f6; color: #374151; }
+        .nasaro-consent-allow { background: #7c3aed; color: #fff; }
+        html[data-theme="dark"] .nasaro-consent-box { background: #1f2937; border-color: #374151; }
+        html[data-theme="dark"] .nasaro-consent-box h3 { color: #f9fafb; }
+        html[data-theme="dark"] .nasaro-consent-box p, html[data-theme="dark"] .nasaro-consent-check { color: #d1d5db; }
+        html[data-theme="dark"] .nasaro-consent-deny { background: #374151; color: #e5e7eb; }
+
+        .schedule-item {
+            display: flex; justify-content: space-between; align-items: center; gap: 8px;
+            font-size: 11px; padding: 6px 0; border-bottom: 1px solid #e5e7eb;
+        }
+        .schedule-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .schedule-form input, .schedule-form textarea {
+            font-size: 12px; padding: 6px 8px; border-radius: 8px; border: 1px solid #d1d5db;
+        }
+
+        #shareViewBanner {
+            display: none; margin: 12px 18px 0; padding: 10px 14px; border-radius: 10px;
+            background: #eff6ff; border: 1px solid #bfdbfe; font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -2190,17 +2457,19 @@
                 <button id="loginBtn" class="side-menu-btn primary" type="button">로그인</button>
                 <button id="signupBtn" class="side-menu-btn outline" type="button">회원가입</button>
             </div>
-            <div class="side-menu-section">
-                <div class="side-menu-section-title">대화 기록</div>
-                <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;">이 브라우저에만 저장됩니다</div>
-                <div id="chatHistoryList" class="chat-history-list">
-                    <div class="chat-history-empty">아직 저장된 대화가 없습니다.</div>
-                </div>
+            <div class="side-menu-section works-section" id="activeCollabSection">
+                <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
+                <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
+            </div>
+            <div class="side-menu-section" id="resultFilesSection">
+                <button type="button" id="resultFilesToggle" class="result-files-toggle" data-i18n="result_files">📁 결과물 파일</button>
+                <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:8px 0;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
+                <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
+                <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
 
             <!-- 설정 버튼 (하단 고정) -->
             <div class="side-menu-footer">
-                <a href="/guide" class="side-menu-btn outline" style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:8px;">📘 구조·아이디어 가이드</a>
                 <button id="settingsBtn" class="settings-btn" type="button">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"/>
@@ -2218,6 +2487,7 @@
                 <button class="settings-panel-close" id="settingsPanelClose" aria-label="닫기">✕</button>
             </div>
 
+            <div class="settings-panel-body">
             <!-- 글씨 크기 -->
             <div class="settings-row">
                 <div class="settings-row-label">글씨 크기</div>
@@ -2256,16 +2526,50 @@
                 <div id="settingsQuotaMeta" class="settings-meta">불러오는 중…</div>
             </div>
 
+            <!-- 언어 · 테마 -->
+            <div class="settings-row">
+                <div class="settings-row-label" data-i18n="lang">언어</div>
+                <select id="settingsLangSelect" class="input-tool-select" style="width:100%;">
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label" data-i18n="theme">테마</div>
+                <select id="settingsThemeSelect" class="input-tool-select" style="width:100%;">
+                    <option value="light" data-i18n="theme_light">라이트</option>
+                    <option value="dark" data-i18n="theme_dark">다크</option>
+                </select>
+            </div>
+
+            <!-- 예약 에이전트 -->
+            <div class="settings-row">
+                <div class="settings-row-label" data-i18n="schedule_agent">예약 에이전트</div>
+                <div id="scheduleList" class="settings-meta">예약된 임무가 없습니다.</div>
+                <form id="scheduleForm" class="schedule-form">
+                    <input type="datetime-local" name="at" required>
+                    <textarea name="mission" rows="2" placeholder="실행할 임무"></textarea>
+                    <button type="submit" class="settings-action-btn primary-action">+ 예약 추가</button>
+                </form>
+            </div>
+
+            <!-- 저장 동의 -->
+            <div class="settings-row">
+                <div class="settings-row-label">📘 구조 · 아이디어 가이드</div>
+                <div id="settingsGuideBox" class="settings-guide-box"></div>
+            </div>
+
             <!-- 배포/버전 -->
             <div class="settings-row">
                 <div class="settings-row-label">배포 · 버전</div>
                 <div id="settingsVersionMeta" class="settings-meta">불러오는 중…</div>
             </div>
 
-            <!-- 기록 전부 삭제 -->
+            <!-- 결과물 삭제 -->
             <div class="settings-row">
-                <div class="settings-row-label">대화 기록</div>
-                <button id="clearHistoryBtn" class="settings-action-btn" type="button">🗑 기록 전부 삭제</button>
+                <div class="settings-row-label">결과물 파일</div>
+                <button id="clearResultsBtn" class="settings-action-btn" type="button">🗑 결과물 전부 삭제</button>
+            </div>
             </div>
         </div>
 
@@ -2296,6 +2600,7 @@
 
         <header class="site-header">
             <div class="header-inner">
+                <button id="adminEntryBtn" class="admin-entry-btn" type="button" title="관리자">관리</button>
                 <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴 열기">
                     <span></span><span></span><span></span>
                 </button>
@@ -2307,6 +2612,7 @@
         </header>
 
         <main id="mainContent">
+            <div id="shareViewBanner"></div>
             <section id="comparePanel" class="panel active">
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
@@ -2329,14 +2635,20 @@
                     <div class="collab-intro-icon">🤝</div>
                     <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
                     <p class="collab-intro-desc">
-                        아래 입력창에 작업 내용을 입력하면<br>
-                        작업 유형별 4단계 협업 알고리즘이 실행됩니다.<br>
-                        각 단계에서 <strong>단계 실행</strong> 버튼으로 AI가 구체적 체크리스트를 생성합니다.
+                        작업 내용을 입력하면 <strong>4단계 협업</strong>이 준비됩니다.<br>
+                        위에서 단계별 AI를 고르고 <strong>▶ 작업 시작</strong> — 아래에 진행 기록이 쌓입니다.
                     </p>
                     <div id="collabTemplateRow" class="collab-template-row"></div>
                 </div>
 
                 <div id="collabWorkspace" class="collab-workspace" style="display:none;">
+                    <div class="collab-workspace-layout">
+                        <aside id="collabPresetSidebar" class="collab-preset-sidebar">
+                            <div class="collab-preset-title">AI 프리셋</div>
+                            <div id="collabPresetList"></div>
+                            <button type="button" id="collabPresetSaveBtn" class="collab-preset-save">+ 현재 조합 저장</button>
+                        </aside>
+                        <div class="collab-workspace-main">
                     <div id="collabRecommendResult" class="collab-recommend-result"></div>
                     <div class="collab-sidebars">
                         <div class="collab-sidebar" data-sidebar="1">
@@ -2416,6 +2728,8 @@
                                 <button class="collab-ai-btn" data-ai="Turnitin" type="button"><span class="collab-ai-dot" style="background:#9333ea;"></span>Turnitin</button>
                             </div>
                         </div>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </section>
@@ -2552,6 +2866,7 @@
                 <div class="agent-empty" id="agentEmptyMsg">임무를 입력하면 에이전트가 실행됩니다.</div>
             </div>
             <div class="agent-input-row">
+                <div id="agentInputTools"></div>
                 <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
                 <div class="agent-input-actions">
                     <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾ 내리기</button>
@@ -2569,6 +2884,7 @@
                     <button id="newChatBtn" class="dock-btn muted" type="button" title="새 채팅 시작">✦ 새 채팅</button>
                     <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" aria-label="에이전트 모드 전환">🌐 에이전트</button>
                 </div>
+                <div id="mainInputTools"></div>
                 <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 <div class="dock-actions">
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
@@ -2584,6 +2900,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
+    <script src="/static/nasaro-features.js"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -2600,6 +2917,9 @@
             Unknown: "#6b7280",
         };
         const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
+        function getActiveModels() {
+            return window.NasaroFeatures?.getSelectedModels?.() || MODELS;
+        }
 
         const COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요.";
         const DEBATE_FAILURE_MSG = "이번 발언 생성에 실패했습니다. 다시 시도해주세요.";
@@ -2622,6 +2942,14 @@
         let collabTaskAsked = false;
         let collabRecommendInFlight = false;
         let collabSession = null;
+        let collabSelectedStage = 0;
+        const COLLAB_API_MODELS = ["Perplexity", "Anthropic", "OpenAI", "DeepSeek", "Google", "xAI"];
+        const COLLAB_STAGE_META_FALLBACK = [
+            { short: "조사", role: "조사·트렌드", default_model: "Perplexity", options: ["Perplexity", "xAI", "OpenAI", "Google"], hint: "최신 정보·출처 조사" },
+            { short: "구조", role: "구조·기획", default_model: "Anthropic", options: ["Anthropic", "OpenAI", "Google", "DeepSeek"], hint: "목차·논리 설계" },
+            { short: "제작", role: "제작·초안", default_model: "OpenAI", options: ["OpenAI", "Anthropic", "DeepSeek", "Google"], hint: "본문·초안 작성" },
+            { short: "검증", role: "검증·교정", default_model: "DeepSeek", options: ["DeepSeek", "Anthropic", "OpenAI", "Perplexity"], hint: "오류·누락 점검" },
+        ];
 
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
@@ -2666,17 +2994,96 @@
             }
             return id;
         }
-        const HISTORY_KEY = "nasaroai_chat_history_" + getDeviceId();
-        let chatHistory = [];
+        const SESSION_RESULTS_KEY = "nasaroai_session_results";
+        const SAVED_RESULTS_KEY = "nasaroai_saved_results";
+        let savedResults = [];
 
-        function loadHistory() {
-            try { chatHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
-            catch { chatHistory = []; }
+        function userDataStore() {
+            return currentUser ? localStorage : sessionStorage;
         }
 
-        function saveHistory() {
-            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(chatHistory)); } catch {}
-            scheduleUserSync();
+        function loadSavedResults() {
+            const key = currentUser ? SAVED_RESULTS_KEY : SESSION_RESULTS_KEY;
+            try { savedResults = JSON.parse(userDataStore().getItem(key) || "[]"); }
+            catch { savedResults = []; }
+        }
+
+        function persistSavedResults() {
+            const key = currentUser ? SAVED_RESULTS_KEY : SESSION_RESULTS_KEY;
+            userDataStore().setItem(key, JSON.stringify(savedResults));
+            if (currentUser) scheduleUserSync();
+        }
+
+        async function saveResultRecord({ title, sections, kind, payload }) {
+            const NF = window.NasaroFeatures;
+            const record = {
+                id: Date.now().toString(),
+                title: title || "결과물",
+                kind: kind || "compare",
+                sections: sections || [],
+                payload: payload || {},
+                saved_at: new Date().toLocaleString("ko-KR"),
+            };
+            savedResults.unshift(record);
+            if (savedResults.length > 100) savedResults.length = 100;
+            persistSavedResults();
+            if (currentUser) await NF?.saveOfflineSnapshot?.(record, true);
+            renderResultFilesList();
+            showToast(NF?.t?.("save_result_done") || "결과물에 저장했습니다.", "success");
+        }
+
+        function renderResultFileViewer(record) {
+            const viewer = document.getElementById("resultFileViewer");
+            if (!viewer) return;
+            if (!record) { viewer.style.display = "none"; return; }
+            viewer.style.display = "block";
+            const parts = (record.sections || []).map(s =>
+                `<h4>${escapeHtml(s.heading || "")}</h4><pre>${escapeHtml(String(s.body || ""))}</pre>`
+            ).join("");
+            viewer.innerHTML = `
+                <div class="result-viewer-head">
+                    <strong>${escapeHtml(record.title || "")}</strong>
+                    <small style="color:#9ca3af">${escapeHtml(record.saved_at || "")}</small>
+                    <button type="button" id="closeResultViewer" aria-label="닫기">✕</button>
+                </div>
+                <div class="result-viewer-body">${parts || escapeHtml(JSON.stringify(record.payload || {}, null, 2))}</div>`;
+            document.getElementById("closeResultViewer")?.addEventListener("click", () => { viewer.style.display = "none"; });
+        }
+
+        function renderResultFilesList() {
+            const list = document.getElementById("resultFilesList");
+            const hint = document.getElementById("resultFilesHint");
+            const NF = window.NasaroFeatures;
+            if (hint) {
+                hint.textContent = currentUser
+                    ? (NF?.t?.("result_files_login") || "로그인: 서버·오프라인 보관")
+                    : (NF?.t?.("result_files_guest") || "비로그인: 이 탭에서만");
+            }
+            if (!list) return;
+            if (!savedResults.length) {
+                list.innerHTML = '<div class="works-empty">저장된 결과물이 없습니다. 답변 옆 「결과물 저장」을 누르세요.</div>';
+                document.getElementById("resultFileViewer").style.display = "none";
+                return;
+            }
+            list.innerHTML = "";
+            savedResults.forEach((rec, idx) => {
+                const item = document.createElement("div");
+                item.className = "works-item";
+                item.innerHTML = `<div>${escapeHtml((rec.title || rec.kind || "결과물").slice(0, 40))}</div><small style="color:#9ca3af">${escapeHtml(rec.saved_at || "")} · ${escapeHtml(rec.kind || "")}</small>`;
+                item.addEventListener("click", () => renderResultFileViewer(rec));
+                const del = document.createElement("button");
+                del.className = "works-item-del";
+                del.textContent = "✕";
+                del.addEventListener("click", e => {
+                    e.stopPropagation();
+                    if (!NF?.confirmDelete?.()) return;
+                    savedResults.splice(idx, 1);
+                    persistSavedResults();
+                    renderResultFilesList();
+                });
+                item.appendChild(del);
+                list.appendChild(item);
+            });
         }
 
         const AUTH_TOKEN_KEY = "nasaroai_auth_token";
@@ -2684,8 +3091,66 @@
         let currentUser = null;
         let authModalMode = "login";
         let syncTimer = null;
-        let agentTimelineLog = JSON.parse(localStorage.getItem("nasaroai_agent_timeline") || "[]");
-        const COLLAB_PLANS_KEY = "nasaroai_collab_plans";
+        const ACTIVE_COLLAB_KEY = "nasaroai_active_collab";
+        const AI_PRESETS_KEY = "nasaroai_ai_presets";
+        const BUILTIN_AI_PRESETS = [
+            { id: "balanced", name: "균형", stages: ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"] },
+            { id: "research", name: "리서치", stages: ["Perplexity", "Perplexity", "Anthropic", "OpenAI"] },
+            { id: "speed", name: "속도", stages: ["DeepSeek", "DeepSeek", "OpenAI", "DeepSeek"] },
+        ];
+        let aiPresets = JSON.parse(localStorage.getItem(AI_PRESETS_KEY) || "null") || BUILTIN_AI_PRESETS.slice();
+        let activePresetId = localStorage.getItem("nasaroai_active_preset") || "balanced";
+        let collabStageModels = [...(aiPresets.find(p => p.id === activePresetId) || BUILTIN_AI_PRESETS[0]).stages];
+
+        function notifyExtensionAuth() {
+            try {
+                window.postMessage({ type: "NASAROAI_AUTH", token: authToken || "" }, "*");
+            } catch {}
+        }
+
+        function saveAiPresetsLocal() {
+            localStorage.setItem(AI_PRESETS_KEY, JSON.stringify(aiPresets));
+            localStorage.setItem("nasaroai_active_preset", activePresetId);
+            scheduleUserSync();
+        }
+
+        function applyAiPreset(preset) {
+            if (!preset?.stages?.length) return;
+            activePresetId = preset.id;
+            collabStageModels = preset.stages.slice(0, 4);
+            while (collabStageModels.length < 4) {
+                collabStageModels.push(["Perplexity", "Anthropic", "OpenAI", "DeepSeek"][collabStageModels.length % 4]);
+            }
+            saveAiPresetsLocal();
+            renderCollabPresetSidebar();
+            showToast(`AI 프리셋: ${preset.name}`, "success");
+        }
+
+        function renderCollabPresetSidebar() {
+            const list = document.getElementById("collabPresetList");
+            if (!list) return;
+            list.innerHTML = "";
+            aiPresets.forEach(preset => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "collab-preset-item" + (preset.id === activePresetId ? " active" : "");
+                btn.innerHTML = `${escapeHtml(preset.name)}<small>${(preset.stages || []).join(" → ")}</small>`;
+                btn.addEventListener("click", () => applyAiPreset(preset));
+                list.appendChild(btn);
+            });
+        }
+
+        document.getElementById("collabPresetSaveBtn")?.addEventListener("click", () => {
+            const name = prompt("프리셋 이름", "내 프리셋");
+            if (!name?.trim()) return;
+            const preset = {
+                id: "custom_" + Date.now(),
+                name: name.trim(),
+                stages: collabStageModels.slice(0, 4),
+            };
+            aiPresets.push(preset);
+            applyAiPreset(preset);
+        });
 
         function authHeaders(extra = {}) {
             const h = { ...extra, "X-Device-Id": getDeviceId() };
@@ -2708,16 +3173,17 @@
         }
 
         async function syncUserData() {
-            if (!authToken) return;
+            if (!authToken || !currentUser) return;
+            if (window.NasaroFeatures?.isPrivacyMode?.()) return;
             try {
-                const collabPlans = JSON.parse(localStorage.getItem(COLLAB_PLANS_KEY) || "[]");
+                const activeCollab = JSON.parse(userDataStore().getItem(ACTIVE_COLLAB_KEY) || "null");
                 await apiFetch("/user/sync", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        compare_history: chatHistory,
-                        collab_plans: collabPlans,
-                        agent_timeline: agentTimelineLog.slice(-100),
+                        saved_works: savedResults,
+                        active_collab: activeCollab,
+                        ai_presets: aiPresets,
                     }),
                 });
             } catch {}
@@ -2730,18 +3196,112 @@
                 if (!res.ok) return;
                 const payload = await res.json();
                 const data = payload.data || {};
-                if (Array.isArray(data.compare_history) && data.compare_history.length) {
-                    chatHistory = data.compare_history;
-                    saveHistory();
-                    renderChatHistory();
+                if (Array.isArray(data.saved_works) && data.saved_works.length) {
+                    savedResults = data.saved_works;
+                    localStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(savedResults));
+                    renderResultFilesList();
                 }
-                if (Array.isArray(data.collab_plans)) {
-                    localStorage.setItem(COLLAB_PLANS_KEY, JSON.stringify(data.collab_plans));
+                if (data.active_collab) {
+                    localStorage.setItem(ACTIVE_COLLAB_KEY, JSON.stringify(data.active_collab));
+                    renderActiveCollabSidebar();
                 }
-                if (Array.isArray(data.agent_timeline)) {
-                    agentTimelineLog = data.agent_timeline;
-                    localStorage.setItem("nasaroai_agent_timeline", JSON.stringify(agentTimelineLog));
+                if (Array.isArray(data.ai_presets) && data.ai_presets.length) {
+                    aiPresets = data.ai_presets;
+                    localStorage.setItem(AI_PRESETS_KEY, JSON.stringify(aiPresets));
+                    const hit = aiPresets.find(p => p.id === activePresetId) || aiPresets[0];
+                    if (hit) applyAiPreset(hit);
+                    else renderCollabPresetSidebar();
                 }
+            } catch {}
+        }
+
+        async function persistActiveCollab() {
+            if (!collabSession?.plan) {
+                userDataStore().removeItem(ACTIVE_COLLAB_KEY);
+            } else if (currentUser) {
+                const snap = {
+                    task: collabSession.task,
+                    plan: collabSession.plan,
+                    stageStates: collabSession.stageStates,
+                    stageOutputs: collabSession.stageOutputs,
+                    recommendation: collabSession.recommendation,
+                    activityLog: collabSession.activityLog || [],
+                    selectedStage: collabSelectedStage,
+                    stageModels: collabStageModels.slice(0, 4),
+                    updated_at: new Date().toISOString(),
+                };
+                userDataStore().setItem(ACTIVE_COLLAB_KEY, JSON.stringify(snap));
+                scheduleUserSync();
+            }
+            renderActiveCollabSidebar();
+        }
+
+        function renderActiveCollabSidebar() {
+            const list = document.getElementById("activeCollabList");
+            if (!list) return;
+            const raw = userDataStore().getItem(ACTIVE_COLLAB_KEY);
+            let active = null;
+            try { active = raw ? JSON.parse(raw) : null; } catch { active = null; }
+            if (!active?.task) {
+                list.innerHTML = '<div class="works-empty">진행 중인 협업이 없습니다.</div>';
+                return;
+            }
+            list.innerHTML = "";
+            const item = document.createElement("div");
+            item.className = "active-collab-item";
+            item.textContent = (active.task || "").slice(0, 48);
+            item.title = active.task;
+            item.addEventListener("click", () => {
+                collabSession = {
+                    task: active.task,
+                    plan: active.plan,
+                    recommendation: active.recommendation,
+                    stageStates: active.stageStates || [],
+                    stageOutputs: active.stageOutputs || [],
+                    activityLog: active.activityLog || [],
+                };
+                collabSelectedStage = active.selectedStage ?? 0;
+                if (Array.isArray(active.stageModels) && active.stageModels.length) {
+                    collabStageModels = active.stageModels.slice(0, 4);
+                }
+                document.getElementById("collabWorkspace").style.display = "flex";
+                document.getElementById("collabIntro").style.display = "none";
+                renderCollabRunner(document.getElementById("collabRecommendResult"));
+                setMode("collab");
+                setSideMenuOpen(false);
+            });
+            list.appendChild(item);
+        }
+
+        async function completeCollabWork() {
+            if (!collabSession?.plan) return;
+            const NF = window.NasaroFeatures;
+            const title = collabSession.task || "협업 작업";
+            const sections = (collabSession.plan.stages || []).map((st, i) => ({
+                heading: st.name,
+                body: collabSession.stageOutputs[i] || "",
+            }));
+            collabSession = null;
+            userDataStore().removeItem(ACTIVE_COLLAB_KEY);
+            renderActiveCollabSidebar();
+            document.getElementById("collabWorkspace").style.display = "none";
+            document.getElementById("collabIntro").style.display = "";
+            collabTaskAsked = false;
+            updateDockUI();
+            showToast("협업을 마쳤습니다. 「결과물 저장」으로 보관하세요.", "success");
+        }
+
+        function migrateSessionResultsToAccount() {
+            try {
+                const sessionItems = JSON.parse(sessionStorage.getItem(SESSION_RESULTS_KEY) || "[]");
+                if (!sessionItems.length) return;
+                const seen = new Set(savedResults.map(r => r.id));
+                sessionItems.forEach(item => {
+                    if (!seen.has(item.id)) savedResults.unshift(item);
+                });
+                if (savedResults.length > 100) savedResults.length = 100;
+                localStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(savedResults));
+                sessionStorage.removeItem(SESSION_RESULTS_KEY);
             } catch {}
         }
 
@@ -2751,28 +3311,31 @@
             const logoutBtn = document.getElementById("settingsLogoutBtn");
             const sideLogin = document.getElementById("loginBtn");
             const sideSignup = document.getElementById("signupBtn");
+            loadSavedResults();
             if (currentUser) {
                 const label = `${currentUser.display_name || currentUser.email} (${currentUser.email})`;
-                if (meta) meta.textContent = `로그인됨 — ${label}\n기록은 서버에 저장됩니다.`;
+                if (meta) meta.textContent = `로그인됨 — ${label}\n결과물·협업이 서버에 저장됩니다.`;
                 if (loginBtn) loginBtn.style.display = "none";
                 if (logoutBtn) logoutBtn.style.display = "";
                 if (sideLogin) sideLogin.textContent = "내 계정";
                 if (sideSignup) sideSignup.textContent = "로그아웃";
             } else {
-                if (meta) meta.textContent = "로그인하지 않음 — 앱/웹 데이터 삭제 시 기록이 초기화됩니다.";
+                if (meta) meta.textContent = "비로그인 — 자동 기록 없음. 결과물 저장은 이 탭에서만 유지됩니다.";
                 if (loginBtn) loginBtn.style.display = "";
                 if (logoutBtn) logoutBtn.style.display = "none";
                 if (sideLogin) sideLogin.textContent = "로그인";
                 if (sideSignup) sideSignup.textContent = "회원가입";
             }
+            renderResultFilesList();
+            notifyExtensionAuth();
         }
 
         function openAuthModal(mode = "login") {
             authModalMode = mode;
             document.getElementById("authModalTitle").textContent = mode === "signup" ? "회원가입" : "로그인";
             document.getElementById("authModalDesc").textContent = mode === "signup"
-                ? "계정을 만들면 비교·협업·에이전트 기록이 서버에 저장됩니다."
-                : "로그인하면 다른 기기에서도 기록을 이어갈 수 있습니다.";
+                ? "가입하면 결과물 파일·협업 진행이 서버에 저장됩니다. (비밀번호 8자 이상)"
+                : "로그인하면 다른 기기에서도 결과물을 이어갈 수 있습니다.";
             document.getElementById("authNameField").style.display = mode === "signup" ? "" : "none";
             document.getElementById("authSubmitBtn").textContent = mode === "signup" ? "가입하기" : "로그인";
             document.getElementById("authToggleModeBtn").textContent = mode === "signup" ? "로그인으로" : "회원가입";
@@ -2790,6 +3353,10 @@
             const displayName = document.getElementById("authNameInput").value.trim();
             const errEl = document.getElementById("authError");
             errEl.textContent = "";
+            if (authModalMode === "signup" && password.length < 8) {
+                errEl.textContent = "비밀번호는 8자 이상이어야 합니다.";
+                return;
+            }
             try {
                 const path = authModalMode === "signup" ? "/auth/signup" : "/auth/login";
                 const body = authModalMode === "signup"
@@ -2808,8 +3375,10 @@
                 authToken = data.token;
                 currentUser = data.user;
                 localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+                migrateSessionResultsToAccount();
                 closeAuthModal();
                 updateAuthUI();
+                notifyExtensionAuth();
                 await syncUserData();
                 await pullUserData();
                 showToast("계정 연결 완료", "success");
@@ -2824,6 +3393,7 @@
             currentUser = null;
             localStorage.removeItem(AUTH_TOKEN_KEY);
             updateAuthUI();
+            notifyExtensionAuth();
             showToast("로그아웃했습니다.", "success");
         }
 
@@ -2841,6 +3411,7 @@
                 localStorage.removeItem(AUTH_TOKEN_KEY);
             }
             updateAuthUI();
+            notifyExtensionAuth();
         }
 
         function classifyFetchError(err, resStatus) {
@@ -2852,28 +3423,50 @@
             return { kind: "unknown", retryable: true, message: msg || "알 수 없는 오류" };
         }
 
-        function saveCollabPlanSnapshot() {
+        function saveCollabAsResult() {
             if (!collabSession?.plan) return;
-            const plans = JSON.parse(localStorage.getItem(COLLAB_PLANS_KEY) || "[]");
-            const snap = {
-                id: Date.now().toString(),
-                task: collabSession.task,
-                work_type: collabSession.plan.work_type,
-                stageStates: collabSession.stageStates,
-                stageOutputs: collabSession.stageOutputs,
-                saved_at: new Date().toISOString(),
-            };
-            plans.unshift(snap);
-            localStorage.setItem(COLLAB_PLANS_KEY, JSON.stringify(plans.slice(0, 30)));
-            scheduleUserSync();
-            showToast("협업 플랜을 저장했습니다.", "success");
+            const title = collabSession.task || "협업 작업";
+            const sections = (collabSession.plan.stages || []).map((st, i) => ({
+                heading: st.name,
+                body: collabSession.stageOutputs[i] || "",
+            }));
+            saveResultRecord({
+                title,
+                sections,
+                kind: "collab",
+                payload: { task: collabSession.task, work_type: collabSession.plan.work_type },
+            });
         }
 
-        function pushAgentTimeline(mission, result, steps = []) {
-            agentTimelineLog.push({ t: Date.now(), mission, result: String(result || "").slice(0, 400), steps });
-            if (agentTimelineLog.length > 100) agentTimelineLog.splice(0, agentTimelineLog.length - 100);
-            localStorage.setItem("nasaroai_agent_timeline", JSON.stringify(agentTimelineLog));
-            scheduleUserSync();
+        function renderSettingsGuide() {
+            const box = document.getElementById("settingsGuideBox");
+            if (!box) return;
+            box.innerHTML = `
+                <p><strong>Nasaro AI</strong> — 여러 AI를 한곳에서 비교·토론·협업·에이전트 실행.</p>
+                <h4>왜 쓰나 (대중)</h4>
+                <ul>
+                    <li>ChatGPT·Claude·Gemini 등 <strong>한 번에 비교</strong> — 어느 답이 나은지 바로 판단</li>
+                    <li>토론·협업으로 <strong>기획·글쓰기·조사</strong>를 단계별로</li>
+                    <li>PC/폰 에이전트로 <strong>반복 클릭·검색</strong> 대신 말로 시키기</li>
+                </ul>
+                <h4>저장 방식</h4>
+                <ul>
+                    <li>자동 기록 없음 — 답변 옆 <strong>「결과물 저장」</strong>만 저장</li>
+                    <li>메뉴 <strong>「결과물 파일」</strong>에서 목록·미리보기</li>
+                    <li>로그인: 서버 + 앱 오프라인 / 비로그인: 이 탭만</li>
+                    <li>🔒 프라이버시: 이 화면에서만, 저장은 수동 가능</li>
+                </ul>
+                <h4>보완 예정 (우선순위)</h4>
+                <ol>
+                    <li>베스트 답변 원탭 복사</li>
+                    <li>메일·SNS·카톡 초안 템플릿</li>
+                    <li>질문 추천 칩 (오늘 뭐 물어볼까)</li>
+                    <li>즐겨찾는 AI 고정</li>
+                    <li>QR로 폰↔PC 공유</li>
+                    <li>초보 모드 (기능 하나씩 크게)</li>
+                    <li>Android 홈 위젯 · 완료 알림</li>
+                </ol>
+                <p style="margin-top:8px;"><a href="/guide" target="_blank" rel="noopener">전체 가이드 열기 ↗</a></p>`;
         }
 
         async function refreshSettingsDiagnostics() {
@@ -2952,102 +3545,6 @@
             } catch {}
         }
 
-        function saveToHistory(message, responses) {
-            if (!message || Object.keys(responses).every(k => !responses[k])) return;
-            const entry = {
-                id: Date.now().toString(),
-                query: message,
-                timestamp: new Date().toLocaleString("ko-KR"),
-                pinned: false,
-                responses: Object.fromEntries(Object.entries(responses).filter(([, v]) => v)),
-            };
-            // 고정 항목은 맨 앞, 나머지는 그 다음에 추가
-            const pinnedItems = chatHistory.filter(e => e.pinned);
-            const unpinnedItems = chatHistory.filter(e => !e.pinned);
-            unpinnedItems.unshift(entry);
-            chatHistory = [...pinnedItems, ...unpinnedItems];
-            if (chatHistory.length > 60) chatHistory.splice(60);
-            saveHistory();
-            renderChatHistory();
-        }
-
-        function renderChatHistory() {
-            const list = document.getElementById("chatHistoryList");
-            if (!list) return;
-            if (!chatHistory.length) {
-                list.innerHTML = '<div class="chat-history-empty">아직 저장된 대화가 없습니다.</div>';
-                return;
-            }
-            list.innerHTML = "";
-            chatHistory.forEach((entry, idx) => {
-                const row = document.createElement("div");
-                row.style.cssText = "display:flex;align-items:stretch;gap:3px;margin-bottom:3px;";
-
-                // 기록 항목 버튼
-                const item = document.createElement("button");
-                item.className = "chat-history-item";
-                item.style.flex = "1";
-                item.title = entry.query;
-                item.style.borderLeft = entry.pinned ? "3px solid #7c3aed" : "";
-                item.innerHTML =
-                    `<span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${entry.pinned?700:400};">${escapeHtml(entry.query)}</span>` +
-                    `<span style="display:block;font-size:11px;color:#9ca3af;margin-top:1px;">${entry.pinned ? "📌 " : ""}${escapeHtml(entry.timestamp)}</span>`;
-                item.addEventListener("click", () => restoreHistoryEntry(entry));
-
-                // 고정 버튼
-                const pinBtn = document.createElement("button");
-                pinBtn.title = entry.pinned ? "고정 해제" : "상단 고정";
-                pinBtn.style.cssText = `flex:0 0 26px;background:${entry.pinned?"#312e81":"#1a1030"};border:1px solid #2d1f50;border-radius:6px;
-                    color:${entry.pinned?"#a78bfa":"#6b7280"};font-size:13px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;`;
-                pinBtn.textContent = "📌";
-                pinBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    chatHistory[idx].pinned = !chatHistory[idx].pinned;
-                    // 고정된 항목은 목록 맨 앞으로
-                    const pinned = chatHistory.filter(e => e.pinned);
-                    const unpinned = chatHistory.filter(e => !e.pinned);
-                    chatHistory = [...pinned, ...unpinned];
-                    saveHistory();
-                    renderChatHistory();
-                });
-
-                // 삭제 버튼
-                const delBtn = document.createElement("button");
-                delBtn.title = "이 기록 삭제";
-                delBtn.style.cssText = "flex:0 0 26px;background:#1a1030;border:1px solid #2d1f50;border-radius:6px;color:#6b7280;font-size:13px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;";
-                delBtn.textContent = "✕";
-                delBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    chatHistory.splice(idx, 1);
-                    saveHistory();
-                    renderChatHistory();
-                });
-
-                row.append(item, pinBtn, delBtn);
-                list.appendChild(row);
-            });
-        }
-
-        function restoreHistoryEntry(entry) {
-            switchMode("compare");
-            lastCompareMessage = entry.query;
-            lastCompareSessionId = entry.id;
-            compareResponses = { ...entry.responses };
-
-            const responsesElement = document.getElementById("compareResponses");
-            responsesElement.innerHTML = "";
-            showNotice("compareLoading", "");
-            showNotice("compareError", "");
-
-            Object.keys(entry.responses).forEach(model => {
-                renderCompareCard(model);
-                const el = document.getElementById(`content-${model}`);
-                if (el) el.textContent = entry.responses[model];
-            });
-
-            setSideMenuOpen(false);
-        }
-
         // ── 새 채팅 ──────────────────────────────────────────────────────────
         function startNewChat() {
             switchMode("compare");
@@ -3063,12 +3560,39 @@
         }
         newChatBtn.addEventListener("click", startNewChat);
 
-        // ── 기록 전체 삭제 ───────────────────────────────────────────────────
-        document.getElementById("clearHistoryBtn")?.addEventListener("click", () => {
-            if (!confirm("대화 기록을 모두 삭제할까요?")) return;
-            chatHistory = [];
-            saveHistory();
-            renderChatHistory();
+        document.getElementById("clearResultsBtn")?.addEventListener("click", () => {
+            if (!confirm("저장된 결과물을 모두 삭제할까요?")) return;
+            savedResults = [];
+            persistSavedResults();
+            renderResultFilesList();
+        });
+
+        document.getElementById("adminEntryBtn")?.addEventListener("click", async () => {
+            const pw = prompt("관리자 비밀번호");
+            if (!pw) return;
+            try {
+                const res = await fetch(API_URL + "/admin/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ password: pw }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "인증 실패");
+                sessionStorage.setItem("nasaroai_admin_token", data.token);
+                location.href = "/admin";
+            } catch (e) {
+                showToast(e.message || "관리자 로그인 실패", "error");
+            }
+        });
+
+        document.getElementById("resultFilesToggle")?.addEventListener("click", () => {
+            const list = document.getElementById("resultFilesList");
+            const viewer = document.getElementById("resultFileViewer");
+            const btn = document.getElementById("resultFilesToggle");
+            const open = list?.style.display !== "none";
+            if (list) list.style.display = open ? "none" : "";
+            if (viewer && open) viewer.style.display = "none";
+            btn?.classList.toggle("open", !open);
         });
 
         // ── 설정 패널 ────────────────────────────────────────────────────────
@@ -3081,6 +3605,7 @@
             settingsPanel.style.display = "flex";
             requestAnimationFrame(() => settingsPanel.classList.add("open"));
             settingsBtn.classList.add("active");
+            renderSettingsGuide();
             refreshSettingsDiagnostics();
         }
         function closeSettings() {
@@ -3144,8 +3669,9 @@
         setSideMenuOpen(window.innerWidth >= 768);
 
         // 저장된 대화 기록 로드
-        loadHistory();
-        renderChatHistory();
+        loadSavedResults();
+        renderResultFilesList();
+        renderSettingsGuide();
         bootstrapAuth();
         loadCollabTemplates();
 
@@ -3622,12 +4148,20 @@
                 badge.textContent = "✅ 완료";
                 badge.className   = "agent-card-badge ok";
                 appendCardLog(logEl, "임무 완료");
-                pushAgentTimeline(mission, content, logEl ? [...logEl.querySelectorAll(".agent-card-log-item")].map(el => el.textContent) : []);
                 setAgentStatus("ok", "완료: " + mission);
                 showToast(`임무 완료: ${mission.length > 28 ? mission.slice(0, 28) + "…" : mission}`, "success");
                 actionsEl.innerHTML = `
+                    <button class="agent-card-action-btn save-result" type="button">💾 결과물 저장</button>
                     <button class="agent-card-action-btn modify" type="button">✏️ 수정</button>
                     <button class="agent-card-action-btn continue" type="button">➕ 추가 임무</button>`;
+                actionsEl.querySelector(".save-result")?.addEventListener("click", () => {
+                    saveResultRecord({
+                        title: mission,
+                        sections: [{ heading: "에이전트", body: content }],
+                        kind: "agent",
+                        payload: { mission, result: content },
+                    });
+                });
             } else if (state === "aborted") {
                 badge.textContent = "⏸ 중단";
                 badge.className   = "agent-card-badge warn";
@@ -4057,6 +4591,7 @@
             resultEl.textContent = "추천 AI를 분석하는 중입니다...";
             workspaceEl.style.display = "flex";
             introEl.style.display = "none";
+            renderCollabPresetSidebar();
 
             try {
                 const response = await apiFetch("/collab/recommend", {
@@ -4088,25 +4623,73 @@
             });
         }
 
+        function getCollabStageMeta(idx) {
+            const fromPlan = collabSession?.plan?.stage_meta;
+            if (Array.isArray(fromPlan) && fromPlan[idx]) return fromPlan[idx];
+            return COLLAB_STAGE_META_FALLBACK[idx] || COLLAB_STAGE_META_FALLBACK[0];
+        }
+
+        function collabStateLabel(state) {
+            return { idle: "대기", active: "진행", running: "실행중", done: "완료" }[state] || "대기";
+        }
+
+        function appendCollabLog(message, type = "info") {
+            if (!collabSession) return;
+            if (!collabSession.activityLog) collabSession.activityLog = [];
+            const ts = new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            collabSession.activityLog.push({ ts, message, type });
+            if (collabSession.activityLog.length > 200) collabSession.activityLog.shift();
+            renderCollabActivityLog();
+        }
+
+        function renderCollabActivityLog() {
+            const logEl = document.getElementById("collabActivityLog");
+            if (!logEl) return;
+            const lines = collabSession?.activityLog || [];
+            if (!lines.length) {
+                logEl.innerHTML = '<div class="collab-log-line info">작업 시작을 누르면 여기에 진행 기록이 쌓입니다.</div>';
+                return;
+            }
+            logEl.innerHTML = lines.map(l =>
+                `<div class="collab-log-line ${escapeHtml(l.type || "info")}">[${escapeHtml(l.ts)}] ${escapeHtml(l.message)}</div>`
+            ).join("");
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function selectCollabStage(idx) {
+            collabSelectedStage = idx;
+            renderCollabRunner(document.getElementById("collabRecommendResult"));
+        }
+
+        function setCollabStageModel(idx, model) {
+            collabStageModels[idx] = model;
+            appendCollabLog(`${idx + 1}단계 AI → ${model}`, "warn");
+            persistActiveCollab();
+            renderCollabRunner(document.getElementById("collabRecommendResult"));
+        }
+
+        function startCollabWork() {
+            const idx = collabSelectedStage;
+            if (collabSession?.stageStates[idx] === "done") {
+                showToast("이미 완료된 단계입니다. 다른 단계를 선택하세요.", "warn");
+                return;
+            }
+            appendCollabLog(`${idx + 1}단계 「${getCollabStageMeta(idx).short}」 시작 (${collabStageModels[idx]})`, "info");
+            runCollabStage(idx);
+        }
+
         function updateCollabProgress() {
-            if (!collabSession?.plan?.stages) return;
-            const total = collabSession.plan.stages.length;
-            const done = collabSession.stageStates.filter(s => s === "done").length;
-            const fill = document.getElementById("collabProgressFill");
-            const label = document.getElementById("collabProgressLabel");
-            if (fill) fill.style.width = `${Math.round((done / total) * 100)}%`;
-            if (label) label.textContent = `진행 ${done}/${total}단계 · ${collabSession.plan.work_type}`;
+            /* progress bar removed in v2 — rail shows state */
         }
 
         async function runCollabStage(stageIndex) {
             if (!collabSession?.plan) return;
             const stage = collabSession.plan.stages[stageIndex];
             if (!stage) return;
-            const outputEl = document.getElementById(`collabStageOutput-${stageIndex}`);
-            const runBtn = document.querySelector(`.collab-stage-btn.run[data-stage="${stageIndex}"]`);
-            if (runBtn) { runBtn.disabled = true; runBtn.textContent = "실행 중…"; }
             collabSession.stageStates[stageIndex] = "running";
+            collabSelectedStage = stageIndex;
             renderCollabRunner(document.getElementById("collabRecommendResult"));
+            appendCollabLog(`${stage.name} — ${collabStageModels[stageIndex]} 호출 중…`, "info");
 
             const previousNotes = collabSession.stageOutputs
                 .slice(0, stageIndex)
@@ -4127,6 +4710,7 @@
                         tools: stage.tools || [],
                         previous_notes: previousNotes,
                         acceptance: collabSession.plan.acceptance || [],
+                        stage_model: collabStageModels[stageIndex] || COLLAB_STAGE_MODELS[stageIndex % 4],
                         user_id: getDeviceId(),
                     }),
                 });
@@ -4134,20 +4718,31 @@
                 const data = await response.json();
                 const modelNote = data.model_label ? `[${data.model_label} · ${data.stage_role || "단계 AI"}]\n` : "";
                 collabSession.stageOutputs[stageIndex] = modelNote + (data.guidance || "");
+                collabSession.stageStates[stageIndex] = "active";
+                appendCollabLog(`${stageIndex + 1}단계 완료 (${data.model_label || collabStageModels[stageIndex]})`, "ok");
             } catch (err) {
                 collabSession.stageOutputs[stageIndex] = `오류: ${err.message}`;
+                collabSession.stageStates[stageIndex] = "active";
+                appendCollabLog(`오류: ${err.message}`, "err");
             } finally {
-                if (runBtn) { runBtn.disabled = false; runBtn.textContent = "단계 실행"; }
+                persistActiveCollab();
                 renderCollabRunner(document.getElementById("collabRecommendResult"));
             }
         }
 
         function markCollabStageDone(stageIndex) {
             if (!collabSession) return;
+            if (!collabSession.stageOutputs[stageIndex]) {
+                showToast("먼저 「작업 시작」으로 단계를 실행하세요.", "warn");
+                return;
+            }
             collabSession.stageStates[stageIndex] = "done";
+            appendCollabLog(`${stageIndex + 1}단계 확정 · 다음 단계로`, "ok");
             if (stageIndex + 1 < collabSession.stageStates.length && collabSession.stageStates[stageIndex + 1] === "idle") {
                 collabSession.stageStates[stageIndex + 1] = "active";
+                collabSelectedStage = stageIndex + 1;
             }
+            persistActiveCollab();
             renderCollabRunner(document.getElementById("collabRecommendResult"));
         }
 
@@ -4156,57 +4751,72 @@
         function renderCollabRunner(container) {
             if (!collabSession?.plan) return;
             const plan = collabSession.plan;
-            const escList = value => escapeHtml(value || "");
-            const stageHtml = (plan.stages || []).map((stage, idx) => {
-                const state = collabSession.stageStates[idx] || "idle";
-                const statusLabel = state === "done" ? "완료" : state === "running" ? "실행중" : state === "active" ? "진행중" : "대기";
-                const output = collabSession.stageOutputs[idx] || "";
+            const esc = v => escapeHtml(v || "");
+            const idx = collabSelectedStage;
+            const stage = plan.stages[idx];
+            const meta = getCollabStageMeta(idx);
+            const opts = (meta.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
+            const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
+                `<option value="${esc(m)}" ${collabStageModels[idx] === m ? "selected" : ""}>${esc(m)}</option>`
+            ).join("");
+
+            const railHtml = (plan.stages || []).map((st, i) => {
+                const state = collabSession.stageStates[i] || "idle";
+                const sm = getCollabStageMeta(i);
                 return `
-                <article class="collab-stage-item ${state === "active" || state === "running" ? "active" : ""} ${state === "done" ? "done" : ""}">
-                    <div class="collab-stage-head">
-                        <h3>${escList(stage.name)} <span style="font-size:11px;color:#6d28d9;">· ${COLLAB_STAGE_MODELS[idx % 4]}</span></h3>
-                        <span class="collab-stage-status ${state === "running" ? "running" : state === "done" ? "done" : ""}">${statusLabel}</span>
-                    </div>
-                    <p><strong>목표:</strong> ${escList(stage.goal)}</p>
-                    <p><strong>추천 도구:</strong> ${(stage.tools || []).map(escList).join(" · ")}</p>
-                    <ol>${(stage.actions || []).map(action => `<li>${escList(action)}</li>`).join("")}</ol>
-                    <div class="collab-stage-actions">
-                        <button class="collab-stage-btn run" type="button" data-stage="${idx}">단계 실행</button>
-                        <button class="collab-stage-btn done" type="button" data-done-stage="${idx}" ${output ? "" : "disabled"}>단계 완료</button>
-                    </div>
-                    ${output ? `<div class="collab-stage-output" id="collabStageOutput-${idx}">${escList(output)}</div>` : `<div class="collab-stage-output" id="collabStageOutput-${idx}" style="display:none;"></div>`}
-                </article>`;
+                <button type="button" class="collab-rail-step ${state} ${i === idx ? "selected" : ""}" data-rail="${i}">
+                    <span class="step-state">${collabStateLabel(state)}</span>
+                    <span class="step-num">${i + 1}단계</span>
+                    <span class="step-name">${esc(sm.short || st.name)}</span>
+                    <span class="step-ai">${esc(collabStageModels[i] || sm.default_model)}</span>
+                </button>`;
             }).join("");
 
+            const output = collabSession.stageOutputs[idx] || "";
+
             container.innerHTML = `
-                <span class="collab-type-badge">${escList(plan.work_type)}</span>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-                    <button type="button" id="collabSaveBtn" class="collab-stage-btn done">💾 플랜 저장</button>
+            <div class="collab-v2">
+                <header class="collab-v2-head">
+                    <span class="collab-type-badge">${esc(plan.work_type)}</span>
+                    <h2>${esc(collabSession.task)}</h2>
+                    <div class="collab-v2-summary">${esc(plan.summary || "")}${collabSession.recommendation ? `<br><br><strong>AI 코멘트:</strong> ${esc(collabSession.recommendation)}` : ""}</div>
+                </header>
+                <div class="collab-stage-rail">${railHtml}</div>
+                <div class="collab-stage-panel">
+                    <h3>${esc(stage?.name || `${idx + 1}단계`)}</h3>
+                    <p class="step-goal">${esc(stage?.goal || "")}</p>
+                    <div class="collab-ai-pick-row">
+                        <label for="collabAiPick">이 단계 AI</label>
+                        <select id="collabAiPick" data-stage-ai="${idx}">${modelOptions}</select>
+                        <span class="collab-ai-hint">${esc(meta.hint || "")}</span>
+                    </div>
+                    <p style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px;">이 단계에서 할 일</p>
+                    <ol class="collab-step-actions-list">${(stage?.actions || []).map(a => `<li>${esc(a)}</li>`).join("")}</ol>
+                    ${output ? `<div class="collab-stage-output">${esc(output)}</div>` : `<p style="font-size:12px;color:#9ca3af;">아래 「작업 시작」을 누르면 AI가 이 단계 결과를 생성합니다.</p>`}
                 </div>
-                <div><strong>AI 보완 코멘트</strong><br>${escList(collabSession.recommendation || "")}</div>
-                <div class="collab-progress-wrap">
-                    <div class="collab-progress-bar"><div class="collab-progress-fill" id="collabProgressFill"></div></div>
-                    <div class="collab-progress-label" id="collabProgressLabel"></div>
+                <div class="collab-v2-toolbar">
+                    <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start">▶ 작업 시작</button>
+                    <button type="button" id="collabStageDoneBtn" class="collab-stage-btn done">단계 완료</button>
+                    <button type="button" id="collabSaveBtn" class="collab-stage-btn done">💾 결과물 저장</button>
+                    <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
                 </div>
-                <div class="collab-stage-runner">${stageHtml}</div>
-                <div class="collab-plan-card" style="margin-top:12px;">
-                    <h3>통과 기준</h3>
-                    <ul>${(plan.acceptance || []).map(item => `<li>${escList(item)}</li>`).join("")}</ul>
-                    <p style="margin-top:8px;"><strong>협업 흐름:</strong> ${escList(plan.handoff)}</p>
+                <div class="collab-activity">
+                    <div class="collab-activity-title">작업 기록</div>
+                    <div id="collabActivityLog" class="collab-activity-log"></div>
                 </div>
-            `;
+            </div>`;
 
-            container.querySelectorAll(".collab-stage-btn.run").forEach(btn => {
-                btn.addEventListener("click", () => runCollabStage(Number(btn.dataset.stage)));
+            container.querySelectorAll(".collab-rail-step").forEach(btn => {
+                btn.addEventListener("click", () => selectCollabStage(Number(btn.dataset.rail)));
             });
-            document.getElementById("collabSaveBtn")?.addEventListener("click", saveCollabPlanSnapshot);
-            container.querySelectorAll(".collab-stage-btn.done").forEach(btn => {
-                btn.addEventListener("click", () => markCollabStageDone(Number(btn.dataset.doneStage)));
+            document.getElementById("collabAiPick")?.addEventListener("change", e => {
+                setCollabStageModel(idx, e.target.value);
             });
-
-            const activeStage = collabSession.plan.stages[collabSession.stageStates.findIndex(s => s === "active" || s === "running")];
-            highlightCollabTools(activeStage?.tools || []);
-            updateCollabProgress();
+            document.getElementById("collabStartBtn")?.addEventListener("click", startCollabWork);
+            document.getElementById("collabStageDoneBtn")?.addEventListener("click", () => markCollabStageDone(idx));
+            document.getElementById("collabSaveBtn")?.addEventListener("click", saveCollabAsResult);
+            document.getElementById("collabCompleteBtn")?.addEventListener("click", completeCollabWork);
+            renderCollabActivityLog();
         }
 
         function renderCollabPlan(container, data, taskText) {
@@ -4215,13 +4825,24 @@
                 container.textContent = data.recommendation || "추천 결과가 없습니다.";
                 return;
             }
+            if (Array.isArray(plan.stage_models) && plan.stage_models.length) {
+                collabStageModels = plan.stage_models.slice(0, 4);
+            }
+            while (collabStageModels.length < 4) {
+                collabStageModels.push(COLLAB_STAGE_MODELS[collabStageModels.length % 4]);
+            }
+            collabSelectedStage = 0;
             collabSession = {
                 task: taskText || plan.task || "",
                 recommendation: data.recommendation || "",
                 plan,
                 stageStates: plan.stages.map((_, i) => (i === 0 ? "active" : "idle")),
                 stageOutputs: plan.stages.map(() => ""),
+                activityLog: [],
             };
+            appendCollabLog(`「${plan.work_type}」 협업 준비 완료`, "info");
+            appendCollabLog(plan.summary || "4단계 협업을 시작할 수 있습니다.", "info");
+            persistActiveCollab();
             renderCollabRunner(container);
         }
 
@@ -4377,14 +4998,15 @@
             showNotice("compareLoading", "AI 모델들이 동시에 답변을 생성하는 중입니다.");
             responsesElement.innerHTML = "";
 
-            MODELS.forEach(model => {
+            const activeModels = getActiveModels();
+            activeModels.forEach(model => {
                 responses[model] = "";
                 renderCompareCard(model);
             });
 
             const STAGGER_MS = 500;
             const failures = [];
-            await Promise.all(MODELS.map((model, index) =>
+            await Promise.all(activeModels.map((model, index) =>
                 new Promise(resolve => setTimeout(resolve, index * STAGGER_MS))
                     .then(() => streamCompareModel(model, message, responses, lastCompareSessionId))
                     .catch(error => {
@@ -4400,8 +5022,16 @@
             showNotice("compareLoading", "");
             dockPrimaryBtn.disabled = false;
 
-            // 비교 완료 → 대화 기록에 저장
-            saveToHistory(message, responses);
+            const sections = activeModels.map(m => ({ heading: m, body: responses[m] || "" }));
+            window.NasaroFeatures?.addResultActions?.(responsesElement, {
+                title: message,
+                sections,
+                kind: "compare",
+                payload: { query: message, responses },
+                apiFetch,
+                showToast,
+                onSaveResult: saveResultRecord,
+            });
         }
 
         function appendLoadingCard(roundNumber, speakerIndex) {
@@ -4618,6 +5248,21 @@
                 }
 
                 replaceLoadingCards(data.round || expectedRound, data.turns || []);
+                if (data.turns?.length && debateTopic) {
+                    const sections = data.turns.map(t => ({
+                        heading: `${t.round_number}R ${t.speaker_index}번 (${t.actual_label || t.requested_label})`,
+                        body: t.content || "",
+                    }));
+                    window.NasaroFeatures?.addResultActions?.(document.getElementById("debateContent"), {
+                        title: debateTopic,
+                        sections,
+                        kind: "debate",
+                        payload: { topic: debateTopic, turns: data.turns },
+                        apiFetch,
+                        showToast,
+                        onSaveResult: saveResultRecord,
+                    });
+                }
                 return data;
             } catch (error) {
                 showNotice("debateError", `오류: ${error.message}`);
@@ -4759,6 +5404,32 @@
 
             await handleDebateContinue(userInput);
         }
+
+        (function initNasaroFeatures() {
+            const NF = window.NasaroFeatures;
+            if (!NF) return;
+            const mainTools = document.getElementById("mainInputTools");
+            if (mainTools && mainInput) mainTools.appendChild(NF.buildInputToolbar(mainInput, { showToast }));
+            const agentTools = document.getElementById("agentInputTools");
+            if (agentTools && agentInputEl) agentTools.appendChild(NF.buildInputToolbar(agentInputEl, { showToast }));
+            const langSel = document.getElementById("settingsLangSelect");
+            const themeSel = document.getElementById("settingsThemeSelect");
+            if (langSel) { langSel.value = NF.lang; langSel.addEventListener("change", e => { NF.lang = e.target.value; }); }
+            if (themeSel) { themeSel.value = NF.theme; themeSel.addEventListener("change", e => { NF.theme = e.target.value; }); }
+            NF.renderScheduleList(document.getElementById("scheduleList"));
+            NF.addScheduleForm(document.getElementById("scheduleForm"), agentInputEl, showToast);
+            NF.startScheduleChecker(mission => {
+                if (agentInputEl) { agentInputEl.value = mission; autoResizeTA(agentInputEl); }
+                showToast(NF.t("scheduled_done") + ": " + mission, "success", 5000);
+                agentSendBtn?.click();
+            }, showToast);
+            NF.loadShareFromUrl(apiFetch, showToast);
+            renderActiveCollabSidebar();
+            loadSavedResults();
+            renderResultFilesList();
+            renderCollabPresetSidebar();
+            renderSettingsGuide();
+        })();
 
         updateDockUI();
     </script>

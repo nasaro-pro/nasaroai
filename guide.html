@@ -28,7 +28,7 @@
     <div class="top">
       <div>
         <h1>Nasaro AI 구조·아이디어 가이드</h1>
-        <p class="lead">기능 수정 시 이 문서도 함께 갱신합니다. (<code>docs/GUIDE_SYNC.md</code> 참고)</p>
+        <p class="lead">설정 패널에도 요약이 있습니다. (<code>docs/GUIDE_SYNC.md</code> 참고)</p>
       </div>
       <a class="back" href="/">← Nasaro AI로 돌아가기</a>
     </div>
@@ -44,71 +44,60 @@
     </section>
 
     <section>
-      <h2>2. 계정 · 기록 저장</h2>
+      <h2>2. 저장 · 프라이버시</h2>
       <ul>
-        <li><strong>비로그인</strong>: 비교 기록·협업 플랜·에이전트 타임라인은 브라우저/APK <code>localStorage</code>에만 저장됩니다. 앱/웹 데이터 삭제 시 초기화됩니다.</li>
-        <li><strong>로그인</strong>: 이메일·비밀번호 계정으로 서버(SQLite)에 동기화됩니다. 다른 기기에서도 이어갈 수 있습니다.</li>
-        <li>API: <code>/auth/signup</code>, <code>/auth/login</code>, <code>/user/sync</code></li>
+        <li><strong>자동 기록 없음</strong> — 비교·토론·에이전트 결과는 그 채팅 화면에만 표시됩니다.</li>
+        <li><strong>결과물 저장</strong> — 답변 옆 「💾 결과물 저장」 버튼을 눌렀을 때만 메뉴 「결과물 파일」에 추가됩니다.</li>
+        <li><strong>비로그인</strong> — sessionStorage에만 보관 (탭/브라우저 데이터 삭제 시 사라짐).</li>
+        <li><strong>로그인</strong> — 서버 동기화 + Android 앱 IndexedDB 오프라인 보관.</li>
+        <li><strong>🔒 프라이버시</strong> — 서버 동기화·공유 링크는 막지만, 수동 「결과물 저장」은 가능합니다.</li>
       </ul>
     </section>
 
     <section>
-      <h2>3. 협업 처리 흐름</h2>
+      <h2>3. 회원 · 관리자</h2>
+      <ul>
+        <li>회원가입: <code>/auth/signup</code> (이메일, 비밀번호 8자+)</li>
+        <li>관리자: 왼쪽 상단 「관리」→ 비밀번호 → <code>/admin</code> 대시보드 (회원·사용량)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. 대중이 이 사이트를 쓰는 이유</h2>
+      <ul>
+        <li>ChatGPT만 쓰면 “이 답 맞나?” — <strong>여러 AI를 한 번에</strong> 보고 고를 수 있음</li>
+        <li>조사·기획·글쓰기를 <strong>토론·협업 4단계</strong>로 체계화</li>
+        <li>PC/폰에서 <strong>에이전트</strong>로 반복 작업 대신</li>
+        <li>원하는 것만 <strong>결과물 저장</strong> — 프라이버시 부담 적음</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. 보완 우선순위 (대중용)</h2>
       <ol>
-        <li>작업 입력 → <code>/collab/recommend</code>로 유형·4단계 플랜 생성</li>
-        <li>각 단계 <strong>단계 실행</strong> → <code>/collab/run-stage</code> (조사=Perplexity, 구조=Anthropic, 제작=OpenAI, 검증=DeepSeek)</li>
-        <li><strong>플랜 저장</strong> → 로컬 + 로그인 시 서버 동기화</li>
-        <li>빠른 시작: 협업 탭 상단 템플릿 버튼 (<code>/collab/templates</code>)</li>
+        <li>베스트 답변 원탭 복사</li>
+        <li>메일·SNS·카톡 초안 템플릿</li>
+        <li>「오늘 뭐 물어볼까」 질문 추천</li>
+        <li>즐겨찾는 AI 고정</li>
+        <li>최근 질문 재실행</li>
+        <li>QR로 폰↔PC 공유</li>
+        <li>PDF/인쇄 한 장 내보내기</li>
+        <li>초보 모드 (기능 하나씩 크게)</li>
+        <li>Android 홈 위젯</li>
+        <li>협업·에이전트 완료 알림 강화</li>
       </ol>
+      <p><strong>하지 않음:</strong> REST API 키 (개발자용, 대중 불필요). 커스텀 협업 플러그인은 보류.</p>
     </section>
 
     <section>
-      <h2>4. 설정 · 권한 · 진단</h2>
-      <p>설정 버튼을 누르면 다음을 확인·실행할 수 있습니다 (멈추지 않고 바로 설정 화면으로 연결).</p>
+      <h2>6. ✅ 구현됨</h2>
       <ul>
-        <li>오버레이 권한 / 접근성 권한 (Android 앱)</li>
-        <li>PC 확장 설치 페이지</li>
-        <li>서버 상태 · 오늘 쿼터 · 배포 SHA · 확장/APK 버전</li>
+        <li>음성·공유·다크모드·다국어·AI 프리셋·예약 에이전트</li>
+        <li>결과물 저장 버튼 + 결과물 파일 메뉴</li>
+        <li>회원가입/로그인 + 서버 동기화</li>
+        <li>관리자 대시보드</li>
+        <li>Android 다단계 명령·민감 작업 확인·자동 AI</li>
       </ul>
-    </section>
-
-    <section>
-      <h2>5. PC 확장 · Android</h2>
-      <ul>
-        <li>확장: 모든 탭 런처/에이전트 창, Chrome Debugger로 탭 조작</li>
-        <li>새 탭: 확장 <code>newtab.html</code> → Google 리다이렉트 후 주입</li>
-        <li>Android: 오버레이 질문창 + 접근성으로 홈/앱/클릭/입력</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>6. 최근 구현 (2025-06)</h2>
-      <ul>
-        <li><strong>다단계 명령</strong> — Android에서 「네이버 금융 들어가서 삼성전자 들어가서 PER 확인해」처럼 <code>해서</code>/<code>하고</code>/<code>,</code>로 이어진 단계를 순서대로 실행합니다.</li>
-        <li><strong>자동 AI 선택</strong> — 서버가 모델 헬스체크 후 가장 잘 응답하는 AI를 협업·추천에 자동 사용합니다. 설정 진단에 「자동 AI」로 표시됩니다.</li>
-        <li><strong>민감 작업 확인</strong> — 결제·은행·계좌 관련 클릭/이동은 PC 확장·Android 모두 실행 전 사용자 확인을 받습니다.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>7. 다음 보완 아이디어 (15가지 — 미구현)</h2>
-      <ol>
-        <li>음성 입력으로 에이전트 임무 말하기 (모바일·PC)</li>
-        <li>비교 결과 공유 링크 생성 (읽기 전용 URL)</li>
-        <li>팀 워크스페이스 — 협업 플랜 여러 명이 같이 편집</li>
-        <li>예약 에이전트 — 특정 시간에 임무 자동 실행</li>
-        <li>확장 설정(서버 URL·창 위치) 계정 클라우드 동기화</li>
-        <li>오프라인 캐시 — 최근 비교·협업 결과 로컬 재열람</li>
-        <li>사용자별 기본 AI 모델 프리셋 저장</li>
-        <li>에이전트 완료 시 Webhook / Telegram 알림</li>
-        <li>UI 다국어 (한/영) 전환</li>
-        <li>프라이버시 모드 — 서버 로그·히스토리 최소 저장</li>
-        <li>토론·협업 결과 Markdown/PDF 내보내기</li>
-        <li>커스텀 협업 알고리즘 플러그인 (유형 추가)</li>
-        <li>비교 시작 전 429·모델 장애 사전 경고</li>
-        <li>다크 모드 테마</li>
-        <li>외부 개발자용 REST API 키 발급</li>
-      </ol>
     </section>
   </div>
 </body>

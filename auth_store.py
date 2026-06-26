@@ -67,6 +67,17 @@ def init_db() -> None:
                     count INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY(subject, feature, day_key)
                 );
+                CREATE TABLE IF NOT EXISTS share_links (
+                    id TEXT PRIMARY KEY,
+                    kind TEXT NOT NULL,
+                    title TEXT NOT NULL DEFAULT '',
+                    payload TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS admin_sessions (
+                    token TEXT PRIMARY KEY,
+                    expires_at REAL NOT NULL
+                );
                 """
             )
             conn.commit()
@@ -254,7 +265,19 @@ def set_user_data(user_id: int, data_key: str, payload: Any) -> None:
 
 def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     current = get_user_data(user_id)
+    skip_empty_scalar_keys = {"extension_prefs", "ai_presets"}
+    replace_list_keys = {"saved_works", "ai_presets"}
     for key, value in payload.items():
+        if key in skip_empty_scalar_keys and isinstance(value, dict) and not value:
+            continue
+        if key == "ai_presets" and isinstance(value, list) and not value:
+            continue
+        if key in replace_list_keys and isinstance(value, list):
+            current[key] = value
+            continue
+        if value is None and key == "active_collab":
+            current[key] = None
+            continue
         if key not in current:
             current[key] = value
             continue
@@ -321,3 +344,176 @@ def get_quota_snapshot(subject: str) -> dict[str, Any]:
         finally:
             conn.close()
     return {"day_key": day_key, "features": out}
+
+
+def create_public_share(kind: str, title: str, payload: Any) -> str:
+    share_id = secrets.token_urlsafe(9)
+    now = time.time()
+    blob = json.dumps(payload, ensure_ascii=False)
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "INSERT INTO share_links (id, kind, title, payload, created_at) VALUES (?, ?, ?, ?, ?)",
+                (share_id, kind, title.strip()[:200], blob, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return share_id
+
+
+def get_public_share(share_id: str) -> dict[str, Any] | None:
+    clean = (share_id or "").strip()
+    if not clean or len(clean) > 64:
+        return None
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT id, kind, title, payload, created_at FROM share_links WHERE id = ?",
+                (clean,),
+            ).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return None
+    try:
+        payload = json.loads(row["payload"])
+    except json.JSONDecodeError:
+        payload = row["payload"]
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "title": row["title"],
+        "payload": payload,
+        "created_at": row["created_at"],
+    }
+
+
+ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 8
+
+
+def verify_admin_password(password: str) -> bool:
+    expected = os.getenv("ADMIN_PASSWORD", "050907")
+    if not expected:
+        return False
+    return secrets.compare_digest(str(password), str(expected))
+
+
+def create_admin_session() -> str:
+    token = "adm_" + secrets.token_urlsafe(28)
+    expires_at = time.time() + ADMIN_SESSION_TTL_SECONDS
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "INSERT INTO admin_sessions (token, expires_at) VALUES (?, ?)",
+                (token, expires_at),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return token
+
+
+def verify_admin_token(token: str | None) -> bool:
+    if not token or not token.startswith("adm_"):
+        return False
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT expires_at FROM admin_sessions WHERE token = ?",
+                (token.strip(),),
+            ).fetchone()
+            if not row:
+                return False
+            if row["expires_at"] < time.time():
+                conn.execute("DELETE FROM admin_sessions WHERE token = ?", (token.strip(),))
+                conn.commit()
+                return False
+        finally:
+            conn.close()
+    return True
+
+
+def admin_logout(token: str) -> None:
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute("DELETE FROM admin_sessions WHERE token = ?", (token.strip(),))
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def list_users_admin() -> list[dict[str, Any]]:
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT id, email, display_name, created_at FROM users ORDER BY id DESC"
+            ).fetchall()
+        finally:
+            conn.close()
+    return [_row_to_user(r) for r in rows]
+
+
+def get_user_quota_totals(user_id: int) -> dict[str, int]:
+    prefix = f"user:{user_id}"
+    day_key = _day_key()
+    totals: dict[str, int] = {}
+    with _lock:
+        conn = _connect()
+        try:
+            for feature in QUOTA_LIMITS:
+                row = conn.execute(
+                    "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
+                    (prefix, feature, day_key),
+                ).fetchone()
+                totals[feature] = int(row["count"]) if row else 0
+            all_time = conn.execute(
+                "SELECT feature, SUM(count) AS total FROM quota_usage WHERE subject = ? GROUP BY feature",
+                (prefix,),
+            ).fetchall()
+        finally:
+            conn.close()
+    totals["_all_time"] = {r["feature"]: int(r["total"]) for r in all_time}
+    return totals
+
+
+def get_admin_dashboard() -> dict[str, Any]:
+    users = list_users_admin()
+    day_key = _day_key()
+    enriched = []
+    for u in users:
+        uid = int(u["id"])
+        quotas = get_user_quota_totals(uid)
+        data = get_user_data(uid)
+        enriched.append({
+            **u,
+            "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(u["created_at"])),
+            "quota_today": {k: quotas.get(k, 0) for k in QUOTA_LIMITS},
+            "quota_all_time": quotas.get("_all_time", {}),
+            "saved_results_count": len(data.get("saved_works") or []),
+            "has_active_collab": bool(data.get("active_collab")),
+        })
+    with _lock:
+        conn = _connect()
+        try:
+            total_users = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+            today_usage = conn.execute(
+                "SELECT feature, SUM(count) AS total FROM quota_usage WHERE day_key = ? GROUP BY feature",
+                (day_key,),
+            ).fetchall()
+            share_count = conn.execute("SELECT COUNT(*) AS c FROM share_links").fetchone()["c"]
+        finally:
+            conn.close()
+    return {
+        "day_key": day_key,
+        "total_users": int(total_users),
+        "share_links": int(share_count),
+        "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
+        "users": enriched,
+    }

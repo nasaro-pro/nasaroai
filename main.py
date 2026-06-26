@@ -21,15 +21,22 @@ from pydantic import BaseModel, Field
 
 from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
 from auth_store import (
+    admin_logout,
     check_and_consume_quota,
+    create_admin_session,
+    create_public_share,
+    get_admin_dashboard,
+    get_public_share,
     get_quota_snapshot,
     get_user_by_token,
     get_user_data,
     init_db,
-    login as auth_login,
-    logout as auth_logout,
+    login as auth_login_fn,
+    logout as auth_logout_fn,
     merge_user_data,
-    signup as auth_signup,
+    signup as auth_signup_fn,
+    verify_admin_password,
+    verify_admin_token,
 )
 
 load_dotenv()
@@ -324,6 +331,7 @@ class CollabStageRequest(BaseModel):
     tools: list[str] = Field(default_factory=list)
     previous_notes: str = ""
     acceptance: list[str] = Field(default_factory=list)
+    stage_model: str = ""
     user_id: str = ""
 
 
@@ -342,6 +350,34 @@ class UserSyncRequest(BaseModel):
     compare_history: list[dict] = Field(default_factory=list)
     collab_plans: list[dict] = Field(default_factory=list)
     agent_timeline: list[dict] = Field(default_factory=list)
+    active_collab: dict | None = None
+    saved_works: list[dict] = Field(default_factory=list)
+    extension_prefs: dict = Field(default_factory=dict)
+    ai_presets: list[dict] = Field(default_factory=list)
+
+
+class ShareCreateRequest(BaseModel):
+    kind: str = "compare"
+    title: str = ""
+    payload: dict = Field(default_factory=dict)
+
+
+class AdminLoginRequest(BaseModel):
+    password: str = ""
+
+
+def _admin_bearer(request: Request) -> str | None:
+    auth = request.headers.get("Authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return None
+
+
+def _require_admin(request: Request) -> str:
+    token = _admin_bearer(request)
+    if not token or not verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="관리자 인증이 필요합니다.")
+    return token
 
 
 COLLAB_TYPE_RULES: list[dict] = [
@@ -548,6 +584,47 @@ COLLAB_TYPE_RULES: list[dict] = [
 ]
 
 
+COLLAB_STAGE_META = [
+    {
+        "short": "조사",
+        "role": "조사·트렌드",
+        "default_model": "Perplexity",
+        "options": ["Perplexity", "xAI", "OpenAI", "Google"],
+        "hint": "최신 트렌드·출처·팩트 조사 (Perplexity·Grok·GPT)",
+    },
+    {
+        "short": "구조",
+        "role": "구조·기획",
+        "default_model": "Anthropic",
+        "options": ["Anthropic", "OpenAI", "Google", "DeepSeek"],
+        "hint": "목차·논리·프롬프트 설계 (Claude)",
+    },
+    {
+        "short": "제작",
+        "role": "제작·초안",
+        "default_model": "OpenAI",
+        "options": ["OpenAI", "Anthropic", "DeepSeek", "Google"],
+        "hint": "본문·초안·실제 결과물 작성 (GPT)",
+    },
+    {
+        "short": "검증",
+        "role": "검증·교정",
+        "default_model": "DeepSeek",
+        "options": ["DeepSeek", "Anthropic", "OpenAI", "Perplexity"],
+        "hint": "오류·누락·일관성 점검",
+    },
+]
+
+COLLAB_TYPE_DEFAULT_MODELS: dict[str, list[str]] = {
+    "문서 제작": ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"],
+    "동영상 제작": ["Perplexity", "xAI", "OpenAI", "DeepSeek"],
+    "PPT·발표자료": ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"],
+    "앱·웹 개발": ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"],
+    "이미지·디자인": ["Google", "Anthropic", "OpenAI", "DeepSeek"],
+    "리서치·아이디어": ["Perplexity", "xAI", "Anthropic", "DeepSeek"],
+}
+
+
 def build_collab_plan(task: str) -> dict:
     lowered = task.lower()
     selected = COLLAB_TYPE_RULES[-2]  # 리서치·아이디어 기본값
@@ -588,6 +665,15 @@ def build_collab_plan(task: str) -> dict:
     return {
         "task": task,
         "work_type": selected["type"],
+        "summary": (
+            f"「{selected['type']}」 작업입니다. "
+            "1) 조사로 근거를 모으고 → 2) 구조를 잡고 → 3) 초안을 만들고 → 4) 검증 후 마무리합니다."
+        ),
+        "stage_models": COLLAB_TYPE_DEFAULT_MODELS.get(
+            selected["type"],
+            [m["default_model"] for m in COLLAB_STAGE_META],
+        ),
+        "stage_meta": COLLAB_STAGE_META,
         "stages": stages,
         "acceptance": selected["acceptance"],
         "handoff": "각 단계 결과를 다음 단계 입력으로 넘기고, 검증 실패 항목만 되돌려 재제작합니다.",
@@ -1886,7 +1972,9 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     action_lines = "\n".join(f"- {action}" for action in data.actions) or "- (단계 알고리즘 없음)"
     tool_lines = ", ".join(data.tools) if data.tools else "추천 도구 없음"
     acceptance_lines = "\n".join(f"- {item}" for item in data.acceptance) or "- 단계 완료 후 다음 단계로 넘깁니다."
-    stage_model = COLLAB_STAGE_MODEL_LABELS[data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)]
+    stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
+        data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
+    ]
     stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·리뷰"]
     stage_role = stage_roles[data.stage_index % len(stage_roles)]
 
@@ -2373,9 +2461,9 @@ def quota_status(request: Request, device_id: str = "") -> dict:
 
 
 @app.post("/auth/signup")
-def auth_signup(body: AuthSignupRequest) -> dict:
+def auth_signup_route(body: AuthSignupRequest) -> dict:
     try:
-        return auth_signup(body.email, body.password, body.display_name)
+        return auth_signup_fn(body.email, body.password, body.display_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -2383,7 +2471,7 @@ def auth_signup(body: AuthSignupRequest) -> dict:
 @app.post("/auth/login")
 def auth_login_route(body: AuthLoginRequest) -> dict:
     try:
-        return auth_login(body.email, body.password)
+        return auth_login_fn(body.email, body.password)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
@@ -2392,7 +2480,7 @@ def auth_login_route(body: AuthLoginRequest) -> dict:
 def auth_logout_route(request: Request) -> dict:
     token = _bearer_token(request)
     if token:
-        auth_logout(token)
+        auth_logout_fn(token)
     return {"success": True}
 
 
@@ -2423,9 +2511,30 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
             "compare_history": body.compare_history,
             "collab_plans": body.collab_plans,
             "agent_timeline": body.agent_timeline,
+            "active_collab": body.active_collab,
+            "saved_works": body.saved_works,
+            "extension_prefs": body.extension_prefs,
+            "ai_presets": body.ai_presets,
         },
     )
     return {"success": True, "data": merged}
+
+
+@app.post("/share/create")
+def share_create(body: ShareCreateRequest) -> dict:
+    if not body.payload:
+        raise HTTPException(status_code=400, detail="공유할 내용이 없습니다.")
+    kind = (body.kind or "compare").strip()[:32]
+    share_id = create_public_share(kind, body.title, body.payload)
+    return {"id": share_id, "url": f"/?share={share_id}"}
+
+
+@app.get("/share/{share_id}")
+def share_read(share_id: str) -> dict:
+    item = get_public_share(share_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="공유 링크를 찾을 수 없습니다.")
+    return item
 
 
 @app.get("/guide")
@@ -2434,6 +2543,36 @@ def serve_guide() -> FileResponse:
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="가이드 문서를 찾을 수 없습니다.")
     return FileResponse(path)
+
+
+@app.get("/admin")
+def serve_admin() -> FileResponse:
+    path = os.path.join(BASE_DIR, "admin.html")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="관리자 페이지를 찾을 수 없습니다.")
+    return FileResponse(path)
+
+
+@app.post("/admin/login")
+def admin_login(body: AdminLoginRequest) -> dict:
+    if not verify_admin_password(body.password):
+        raise HTTPException(status_code=401, detail="관리자 비밀번호가 올바르지 않습니다.")
+    token = create_admin_session()
+    return {"token": token}
+
+
+@app.get("/admin/dashboard")
+def admin_dashboard(request: Request) -> dict:
+    _require_admin(request)
+    return get_admin_dashboard()
+
+
+@app.post("/admin/logout")
+def admin_logout_route(request: Request) -> dict:
+    token = _admin_bearer(request)
+    if token:
+        admin_logout(token)
+    return {"success": True}
 
 
 @app.get("/manifest.json")

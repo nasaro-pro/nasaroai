@@ -1171,3 +1171,79 @@
     })
     .catch(() => {});
 })();
+
+// ── 계정 연동: PC 확장 설정 클라우드 동기화 (#5) ─────────────────────────
+(function extensionCloudSync() {
+  const EXT_PREF_KEYS = [
+    "serverUrl", "agentEnabled", "launcherBottom", "launcherRight",
+    "barLeft", "barTop", "barManualPos", "barWidth", "barHeight", "tasksHeight", "barOpen",
+  ];
+  let extAuthToken = "";
+  let extSyncTimer = null;
+
+  async function serverBase() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: "GET_SERVER_URL" });
+      return (r?.serverUrl || "https://nasaroai.onrender.com").replace(/\/+$/, "");
+    } catch {
+      return "https://nasaroai.onrender.com";
+    }
+  }
+
+  async function collectPrefs() {
+    const s = await chrome.storage.local.get(EXT_PREF_KEYS);
+    const out = {};
+    EXT_PREF_KEYS.forEach(k => { if (s[k] !== undefined) out[k] = s[k]; });
+    return out;
+  }
+
+  async function pushPrefs() {
+    if (!extAuthToken) return;
+    const base = await serverBase();
+    try {
+      await fetch(base + "/user/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + extAuthToken,
+        },
+        body: JSON.stringify({ extension_prefs: await collectPrefs() }),
+      });
+    } catch {}
+  }
+
+  async function pullPrefs() {
+    if (!extAuthToken) return;
+    const base = await serverBase();
+    try {
+      const res = await fetch(base + "/user/data", {
+        headers: { Authorization: "Bearer " + extAuthToken },
+      });
+      if (!res.ok) return;
+      const payload = await res.json();
+      const prefs = payload.data?.extension_prefs;
+      if (prefs && typeof prefs === "object" && Object.keys(prefs).length) {
+        await chrome.storage.local.set(prefs);
+      }
+    } catch {}
+  }
+
+  function schedulePush() {
+    if (!extAuthToken) return;
+    clearTimeout(extSyncTimer);
+    extSyncTimer = setTimeout(pushPrefs, 1500);
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    if (EXT_PREF_KEYS.some(k => changes[k])) schedulePush();
+  });
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window || event.data?.type !== "NASAROAI_AUTH") return;
+    extAuthToken = event.data.token || "";
+    if (extAuthToken) {
+      pullPrefs().then(pushPrefs);
+    }
+  });
+})();
