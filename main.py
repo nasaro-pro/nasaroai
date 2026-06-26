@@ -2454,13 +2454,17 @@ def extension_update(request: Request):
             ext_id = part[3:]
     if not ext_id:
         ext_id = "nasaroai-agent"
+    ext_ver = _read_version_file(
+        os.path.join(BASE_DIR, "extension", "manifest.json"),
+        r'"version"\s*:\s*"([^"]+)"',
+    )
     xml = (
         "<?xml version='1.0' encoding='UTF-8'?>"
         "<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>"
         f"<app appid='{ext_id}'>"
         "<updatecheck"
         " status='ok'"
-        " version='2.3.3'"
+        f" version='{ext_ver}'"
         " prodversionmin='88.0'"
         " codebase='https://nasaroai.onrender.com/static/nasaroai-extension.zip'"
         "/>"
