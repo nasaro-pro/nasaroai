@@ -2646,7 +2646,10 @@ async def agent_ask(request: AgentAskRequest, http_request: Request):
 @app.get("/")
 def serve_home() -> FileResponse:
     index_path = os.path.join(BASE_DIR, "index.html")
-    return FileResponse(index_path)
+    return FileResponse(
+        index_path,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/install")
@@ -2781,7 +2784,10 @@ def serve_guide() -> FileResponse:
     path = os.path.join(BASE_DIR, "guide.html")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="가이드 문서를 찾을 수 없습니다.")
-    return FileResponse(path)
+    return FileResponse(
+        path,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/admin")
@@ -2789,7 +2795,10 @@ def serve_admin() -> FileResponse:
     path = os.path.join(BASE_DIR, "admin.html")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="관리자 페이지를 찾을 수 없습니다.")
-    return FileResponse(path)
+    return FileResponse(
+        path,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.post("/admin/login")

@@ -984,12 +984,6 @@
         .support-reply-box { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: #ede9fe; color: #4c1d95; }
 
         .dock-mode-row { margin: 0; gap: 4px; }
-        .dock-mode-row .mode-btn,
-        .dock-mode-row .dock-btn.muted {
-            padding: 7px 12px;
-            min-height: 34px;
-            font-size: 12px;
-        }
 
         .mini-site-links {
             display: flex; flex-wrap: wrap; gap: 6px 12px;
@@ -1385,24 +1379,40 @@
         }
 
         .input-dock {
+            position: relative;
+            left: auto;
+            right: auto;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid #e5e7eb;
+            box-shadow: 0 -2px 16px rgba(15, 23, 42, 0.05);
+        }
+
+        .dock-shell {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             z-index: 200;
-            background: rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid #e5e7eb;
-            box-shadow: 0 -2px 16px rgba(15, 23, 42, 0.05);
             padding-bottom: env(safe-area-inset-bottom, 0);
             transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 사이드바가 펼쳐지면 하단 입력창 함께 밀림 (에이전트 패널은 우측 고정이라 제외) */
         @media (min-width: 768px) {
-            .app.sidebar-open .input-dock {
+            .app.sidebar-open .dock-shell {
                 left: 280px;
             }
+        }
+
+        .dock-agent-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            width: min(1160px, 100%);
+            margin: 0 auto;
+            padding: 0 10px 6px;
+            box-sizing: border-box;
         }
 
         .dock-inner {
@@ -1431,18 +1441,24 @@
             justify-content: center;
             gap: 8px;
         }
-        .dock-mode-group {
+        .dock-btn-row .dock-mode-group {
+            display: contents;
+        }
+        .dock-btn-row .dock-tools-inline {
             display: flex;
-            flex-wrap: wrap;
             align-items: center;
             gap: 8px;
         }
+        .dock-btn-row .dock-tools-inline .input-tool-row {
+            display: contents;
+            margin: 0;
+        }
         .dock-btn-row .mode-btn,
         .dock-btn-row .dock-btn.muted,
-        .dock-tools-inline .input-tool-btn {
-            min-height: 42px;
-            height: 42px;
-            padding: 0 16px;
+        .dock-btn-row .input-tool-btn {
+            min-height: 44px;
+            height: 44px;
+            padding: 0 18px;
             font-size: 14px;
             font-weight: 700;
             border-radius: 10px;
@@ -1450,20 +1466,18 @@
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
+            flex-shrink: 0;
         }
-        .dock-tools-inline .input-tool-row {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 8px;
-            margin: 0;
-        }
-        .dock-tools-inline .input-tool-btn.privacy-btn-wide {
-            min-height: 42px;
-            height: 42px;
+        .dock-btn-row .input-tool-btn.privacy-btn-wide {
+            min-height: 44px;
+            height: 44px;
             padding: 0 12px;
+            min-width: 128px;
         }
-        .dock-tools-inline .model-picker-wrap { display: flex; align-items: center; }
+        .dock-btn-row .model-picker-wrap {
+            display: flex;
+            align-items: center;
+        }
 
         .dock-compose-row #mainInput {
             min-height: 40px;
@@ -1584,23 +1598,24 @@
             }
         }
 
-        /* ===== Agent Mode (하단바 밖 플로팅) ===== */
+        /* ===== Agent Mode (하단바 밖 · 질문창 위 우측) ===== */
         .dock-agent-outside {
-            position: fixed;
-            bottom: calc(var(--input-dock-height, 88px) + 6px);
-            right: 12px;
-            z-index: 205;
-            min-height: 32px;
-            padding: 6px 14px;
-            font-size: 12px;
+            position: static;
+            min-height: 36px;
+            height: 36px;
+            padding: 0 14px;
+            font-size: 13px;
             font-weight: 700;
-            border-radius: 8px;
+            border-radius: 10px;
             border: 1px solid #c4b5fd;
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
             color: #5b21b6;
             box-shadow: 0 3px 12px rgba(91, 33, 182, 0.18);
             cursor: pointer;
             font: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .dock-agent-outside:hover:not(:disabled) {
             background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
@@ -1609,11 +1624,6 @@
             background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
             color: #fff;
             border-color: #6d28d9;
-        }
-        @media (min-width: 768px) {
-            .app.sidebar-open .dock-agent-outside {
-                right: 12px;
-            }
         }
 
         .agent-toggle-btn {
@@ -1667,7 +1677,7 @@
         body.native-agent-overlay .settings-panel,
         body.native-agent-overlay main,
         body.native-agent-overlay .input-dock,
-        body.native-agent-overlay .dock-agent-outside,
+        body.native-agent-overlay .dock-shell,
         body.native-agent-overlay #extInstallBanner,
         body.native-agent-overlay #androidInstallModal,
         body.native-agent-overlay #agentFloatLauncher {
@@ -3321,27 +3331,30 @@
             </div>
         </div>
 
-        <button id="agentToggleBtn" class="dock-agent-outside agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
-
-        <footer class="input-dock" id="inputDock">
-            <div class="dock-inner">
-                <div class="dock-compose-row">
-                    <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
-                    <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
-                </div>
-                <div class="dock-btn-row">
-                    <div class="dock-mode-group">
-                        <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
-                        <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
-                        <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
-                        <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                        <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
-                        <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
-                    </div>
-                    <div id="mainInputTools" class="dock-tools-inline"></div>
-                </div>
+        <div id="dockShell" class="dock-shell">
+            <div class="dock-agent-row">
+                <button id="agentToggleBtn" class="dock-agent-outside agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
             </div>
-        </footer>
+            <footer class="input-dock" id="inputDock">
+                <div class="dock-inner">
+                    <div class="dock-compose-row">
+                        <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
+                    </div>
+                    <div class="dock-btn-row">
+                        <div class="dock-mode-group">
+                            <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                            <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
+                            <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
+                            <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
+                            <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
+                            <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                        </div>
+                        <div id="mainInputTools" class="dock-tools-inline"></div>
+                    </div>
+                </div>
+            </footer>
+        </div>
 
         <!-- 토스트 알림 컨테이너 -->
         <div id="axToast" class="ax-toast" aria-live="polite" aria-atomic="false"></div>
@@ -3349,7 +3362,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js"></script>
+    <script src="/static/nasaro-features.js?v=20260627"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -3478,6 +3491,7 @@
         const dockNewDebateBtn = document.getElementById("dockNewDebateBtn");
         const agentToggleBtn = document.getElementById("agentToggleBtn");
         const inputDock = document.getElementById("inputDock");
+        const dockShell = document.getElementById("dockShell");
         const mainContent = document.getElementById("mainContent");
 
         const sideMenu = document.getElementById("sideMenu");
@@ -4427,7 +4441,8 @@
 
         let syncPaddingTimer = null;
         function syncMainPadding() {
-            const dockHeight = inputDock.offsetHeight;
+            const dockEl = dockShell || inputDock;
+            const dockHeight = dockEl?.offsetHeight || 0;
             const offset = dockHeight + 10;
             document.documentElement.style.setProperty("--input-dock-height", `${dockHeight}px`);
             document.documentElement.style.setProperty("--bottom-offset", `${offset}px`);
