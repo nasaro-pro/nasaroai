@@ -214,9 +214,14 @@
             return wrap;
         }
 
-        const trigger = document.createElement("div");
-        trigger.className = "input-tool-group ai-picker-trigger model-picker-wrap";
         let current = mode === "debate" ? modelsDebate : mode === "agent" ? modelsAgent : modelsCompare;
+        let pickerBtn = null;
+
+        const updateLabel = () => {
+            if (!pickerBtn) return;
+            const label = current.length >= MODELS.length ? t("ai_all") : current.join(", ");
+            pickerBtn.textContent = `🤖 ${t("ai_pick")}: ${label.length > 28 ? label.slice(0, 28) + "…" : label}`;
+        };
 
         const sync = () => {
             if (mode === "debate") modelsDebate = current.slice();
@@ -227,19 +232,8 @@
             updateLabel();
         };
 
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "input-tool-btn";
-        const updateLabel = () => {
-            const label = current.length >= MODELS.length ? t("ai_all") : current.join(", ");
-            btn.textContent = `🤖 ${t("ai_pick")}: ${label.length > 28 ? label.slice(0, 28) + "…" : label}`;
-        };
-        updateLabel();
-
-        const pop = document.createElement("div");
-        pop.className = "ai-picker-popover";
         const chips = document.createElement("div");
-        chips.className = "ai-chips-row";
+        chips.className = "ai-chips-row" + (mode === "agent" ? " agent-inline-chips" : "");
 
         const allBtn = document.createElement("button");
         allBtn.type = "button";
@@ -271,8 +265,28 @@
             allBtn.classList.toggle("active", current.length >= MODELS.length);
         };
         renderChips();
+
+        if (mode === "agent") {
+            wrap.className = "input-tool-group model-picker-wrap agent-ai-chips-wrap";
+            const label = document.createElement("span");
+            label.className = "input-tool-label";
+            label.textContent = `🤖 ${t("ai_pick")}`;
+            wrap.append(label, chips);
+            return wrap;
+        }
+
+        const trigger = document.createElement("div");
+        trigger.className = "input-tool-group ai-picker-trigger model-picker-wrap";
+
+        pickerBtn = document.createElement("button");
+        pickerBtn.type = "button";
+        pickerBtn.className = "input-tool-btn";
+        updateLabel();
+
+        const pop = document.createElement("div");
+        pop.className = "ai-picker-popover";
         pop.appendChild(chips);
-        btn.addEventListener("click", e => {
+        pickerBtn.addEventListener("click", e => {
             e.stopPropagation();
             document.querySelectorAll(".ai-picker-popover.open").forEach(p => { if (p !== pop) p.classList.remove("open"); });
             pop.classList.toggle("open");
@@ -283,7 +297,7 @@
                 document.querySelectorAll(".ai-picker-popover.open").forEach(p => p.classList.remove("open"));
             });
         }
-        trigger.append(btn, pop);
+        trigger.append(pickerBtn, pop);
         return trigger;
     }
 

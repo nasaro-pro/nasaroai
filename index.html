@@ -277,16 +277,16 @@
         }
         .side-menu-guide-btn:hover { color: #2563eb; background: #f3f4f6; }
         .side-menu-settings-btn {
-            width: 32px;
-            min-height: 32px;
+            width: 44px;
+            min-height: 44px;
             flex-shrink: 0;
             padding: 0;
-            border-radius: 6px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            color: #6b7280;
             font: inherit;
-            font-size: 16px;
+            font-size: 22px;
             font-weight: 400;
             cursor: pointer;
             display: flex;
@@ -842,7 +842,7 @@
             border-radius: 10px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            font-size: 13px;
+            font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.7;
             white-space: pre-wrap;
             color: #334155;
@@ -923,7 +923,7 @@
         .collab-stage-detail { font-size: 12px; color: #475569; margin: 6px 0 4px; line-height: 1.5; }
         .collab-stage-subdetail { font-size: 11px; color: #64748b; margin: 0 0 6px; }
         .collab-stage-live-output {
-            font-size: 12px; line-height: 1.55; max-height: 200px; overflow-y: auto;
+            font-size: var(--nasaro-answer-size, 16px); line-height: 1.55; max-height: 200px; overflow-y: auto;
             background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px;
             white-space: pre-wrap; margin: 0;
         }
@@ -933,7 +933,8 @@
         }
         .collab-final-product h3 { margin: 0 0 8px; font-size: 14px; }
         .collab-final-product pre {
-            font-size: 13px; line-height: 1.6; white-space: pre-wrap; margin: 0;
+            font-size: var(--nasaro-answer-size, 16px);
+            line-height: 1.6; white-space: pre-wrap; margin: 0;
             max-height: 320px; overflow-y: auto;
         }
         .collab-activity.compact .collab-activity-log.compact { max-height: 100px; font-size: 10px; }
@@ -1154,7 +1155,7 @@
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px 16px;
-            font-size: 0.9375rem;
+            font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.8;
         }
 
@@ -1299,13 +1300,13 @@
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px;
-            font-size: 1rem;
+            font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.75;
         }
 
         .debate-preview-body {
             padding: 14px;
-            font-size: 0.9375rem;
+            font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.6;
             color: #4b5563;
         }
@@ -1387,23 +1388,33 @@
         }
 
         .dock-input-wrap { position: relative; }
-        .dock-agent-float {
-            position: absolute;
-            top: 6px;
-            right: 112px;
-            z-index: 3;
-            min-height: 30px;
-            padding: 4px 12px;
-            font-size: 12px;
+        .dock-actions-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .dock-submit-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+            min-width: 120px;
+        }
+        .dock-admin-btn {
+            flex-shrink: 0;
+            font-size: 11px;
             font-weight: 700;
+            padding: 8px 12px;
             border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            color: #9ca3af;
+            cursor: pointer;
+            align-self: flex-end;
         }
-        .dock-input-row {
-            position: relative;
-        }
-        .dock-input-row #mainInput {
-            padding-top: 36px;
-        }
+        .dock-admin-btn:hover { color: #6b7280; background: #f3f4f6; }
 
         .dock-tools-row .input-tool-row { gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
         .dock-tools-row .input-tool-btn {
@@ -1431,18 +1442,10 @@
             border-radius: 11px;
         }
 
-        .dock-input-row {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-        }
-
-        .dock-input-row #mainInput {
-            flex: 1;
+        .dock-input-wrap #mainInput {
+            width: 100%;
             min-height: 48px;
             max-height: 120px;
-            font-size: 16px;
-            padding: 12px 14px;
         }
 
         .dock-submit-btn {
@@ -1553,14 +1556,12 @@
 
         /* ===== Agent Mode ===== */
         .agent-toggle-btn {
-            position: absolute;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            min-height: auto;
-            padding: 7px 14px;
+            width: 100%;
+            min-height: 40px;
+            padding: 8px 14px;
             font-size: 13px;
-            border-radius: 999px;
+            font-weight: 700;
+            border-radius: 10px;
             border: 1px solid #c4b5fd;
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
             color: #5b21b6;
@@ -1575,15 +1576,6 @@
             background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
             color: #fff;
             border-color: #6d28d9;
-        }
-
-        @media (max-width: 560px) {
-            .agent-toggle-btn {
-                position: static;
-                transform: none;
-                width: 100%;
-                margin-top: 4px;
-            }
         }
 
         .agent-panel {
@@ -1947,7 +1939,7 @@
 
         .agent-card-body {
             padding: 0 14px 12px;
-            font-size: 0.875rem;
+            font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.7;
             color: #374151;
             white-space: pre-wrap;
@@ -2676,12 +2668,9 @@
         .result-action-btn.primary-save { background: #7c3aed; color: #fff; border-color: #6d28d9; }
         .result-action-btn.primary-save:hover { background: #6d28d9; }
 
-        .admin-entry-btn {
-            position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
-            font-size: 10px; padding: 4px 6px; border-radius: 6px; border: 1px solid #e5e7eb;
-            background: #f9fafb; color: #9ca3af; cursor: pointer; z-index: 2;
-        }
-        .admin-entry-btn:hover { color: #6b7280; background: #f3f4f6; }
+        .agent-inline-chips { flex-wrap: wrap; gap: 5px; }
+        .agent-inline-chips .ai-chip { font-size: 11px; padding: 5px 10px; }
+        .agent-ai-chips-wrap { flex: 1 1 100%; margin-bottom: 4px; }
 
         .result-files-toggle {
             width: 100%; text-align: left; font-size: 12px; font-weight: 700; color: #6d28d9;
@@ -2888,7 +2877,7 @@
                 </div>
                 <div class="auth-field">
                     <label for="authPasswordInput" data-i18n="password">비밀번호</label>
-                    <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="8자 이상">
+                    <input id="authPasswordInput" type="password" autocomplete="off" placeholder="8자 이상">
                 </div>
                 <label class="auth-check"><input id="authRememberPwd" type="checkbox"> <span data-i18n="remember_password">비밀번호 저장 (자동 로그인)</span></label>
                 <div id="authError" class="auth-error"></div>
@@ -2933,7 +2922,7 @@
                 </ul>
                 <p>작업 설명을 입력하면 AI가 단계별로 순차 실행합니다. 완료 후 「추가 작업 ▶」로 수정 요청도 가능합니다.</p>
                 <h3>④ 에이전트</h3>
-                <p>입력창 <strong>우측 상단</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
+                <p>입력창 <strong>아래</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
                 <h3>⑤ 계정 · 저장</h3>
                 <p>로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다. 메뉴에서 「결과물 저장」으로 마음에 드는 답을 보관하세요.</p>
                 <div class="guide-bar-tip">다른 곳을 누르면 닫힙니다.</div>
@@ -3254,13 +3243,8 @@
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
                 <div class="dock-input-wrap">
-                    <div class="dock-input-row">
-                        <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
-                        <button id="agentToggleBtn" class="dock-btn agent-toggle-btn dock-agent-float" type="button" data-i18n="mode_agent">🌐 에이전트</button>
-                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
-                    </div>
+                    <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                 </div>
-                <div id="mainInputTools" class="dock-tools-row"></div>
                 <div class="dock-mode-row">
                     <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
@@ -3268,6 +3252,14 @@
                     <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                </div>
+                <div id="mainInputTools" class="dock-tools-row"></div>
+                <div class="dock-actions-row">
+                    <button id="adminEntryBtn" class="dock-admin-btn" type="button" title="관리자 페이지">관리자</button>
+                    <div class="dock-submit-stack">
+                        <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
+                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
+                    </div>
                 </div>
             </div>
         </footer>
@@ -3724,7 +3716,7 @@
                 document.getElementById("collabWorkspace").style.display = "flex";
                 document.getElementById("collabIntro").style.display = "none";
                 renderCollabRunner(document.getElementById("collabRecommendResult"));
-                setMode("collab");
+                switchMode("collab");
                 setSideMenuOpen(false);
             });
             list.appendChild(item);
@@ -3880,10 +3872,12 @@
             document.getElementById("authError").textContent = "";
             const userInput = document.getElementById("authUsernameInput");
             const rememberPwd = document.getElementById("authRememberPwd");
+            const pwdInput = document.getElementById("authPasswordInput");
             if (userInput && mode === "login") userInput.value = userInput.value || "";
             if (rememberPwd) rememberPwd.checked = localStorage.getItem(REMEMBER_PWD_KEY) === "1";
-            if (!localStorage.getItem(REMEMBER_PWD_KEY)) {
-                document.getElementById("authPasswordInput").value = "";
+            if (pwdInput) {
+                pwdInput.value = "";
+                pwdInput.setAttribute("autocomplete", mode === "signup" ? "new-password" : "off");
             }
             document.getElementById("authModalOverlay").classList.add("open");
             setTimeout(() => userInput?.focus(), 50);
@@ -4245,6 +4239,9 @@
         document.getElementById("authCloseBtn")?.addEventListener("click", closeAuthModal);
         document.getElementById("authModalOverlay")?.addEventListener("click", (e) => { if (e.target.id === "authModalOverlay") closeAuthModal(); });
         document.getElementById("permHealthBtn")?.addEventListener("click", refreshSettingsDiagnostics);
+        document.getElementById("adminEntryBtn")?.addEventListener("click", () => {
+            window.open("/admin", "_blank", "noopener");
+        });
 
         // 패널 외부 클릭 시 닫기
         document.addEventListener("click", (e) => {
@@ -4262,7 +4259,7 @@
 
         function applyFontSize(sz) {
             currentFontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, sz));
-            document.documentElement.style.fontSize = currentFontSize + "px";
+            document.documentElement.style.setProperty("--nasaro-answer-size", currentFontSize + "px");
             document.getElementById("fontSizeVal").textContent = currentFontSize + "px";
             try { localStorage.setItem(FONT_KEY, currentFontSize); } catch {}
         }
@@ -6222,14 +6219,14 @@
             if (debateInFlight) {
                 dockSecondaryBtn.disabled = true;
                 try {
-                    const response = await fetch(`${API_URL}/debate/continue`, {
+                    const response = await apiFetch("/debate/continue", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             session_id: debateSessionId,
                             topic: debateTopic,
                             user_input: userInput,
-                                user_id: getDeviceId(),
+                            user_id: getDeviceId(),
                         }),
                     });
                     if (!response.ok) throw new Error(`큐잉 실패 (${response.status})`);
