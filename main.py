@@ -2192,80 +2192,79 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                 try:
                     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                         for attempt in range(2):
-                            async with DEBATE_AI_SEMAPHORE:
-                                async with client.stream(
-                                    "POST",
-                                    OPENROUTER_CHAT_URL,
-                                    headers=build_openrouter_headers(),
-                                    json={
-                                        **build_chat_payload(
-                                            model_id=model_id,
-                                            persona=persona,
-                                            prompt=data.message,
-                                            stream=True,
-                                        )
-                                    },
-                                ) as response:
-                                    if response.status_code == 429:
-                                        body = (await response.aread()).decode("utf-8", "ignore")
-                                        if is_daily_free_limit(body):
-                                            yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
-                                            return
-                                        if attempt == 0:
-                                            await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
-                                            continue
+                            async with client.stream(
+                                "POST",
+                                OPENROUTER_CHAT_URL,
+                                headers=build_openrouter_headers(),
+                                json={
+                                    **build_chat_payload(
+                                        model_id=model_id,
+                                        persona=persona,
+                                        prompt=data.message,
+                                        stream=True,
+                                    )
+                                },
+                            ) as response:
+                                if response.status_code == 429:
+                                    body = (await response.aread()).decode("utf-8", "ignore")
+                                    if is_daily_free_limit(body):
+                                        yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
+                                        return
+                                    if attempt == 0:
+                                        await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                                        continue
+                                    excluded_by_failure.add(model_id)
+                                    failed_this_model = True
+                                    break
+
+                                if response.status_code != 200:
+                                    body = (await response.aread()).decode("utf-8", "ignore")
+                                    logger.warning(
+                                        "Stream non-200 label=%s model=%s status=%s",
+                                        label,
+                                        model_id,
+                                        response.status_code,
+                                    )
+                                    if response.status_code == 401:
+                                        yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
+                                        return
+                                    if is_daily_free_limit(body):
+                                        yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
+                                        return
+                                    if should_try_next_candidate(response.status_code):
                                         excluded_by_failure.add(model_id)
                                         failed_this_model = True
                                         break
+                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                    return
 
-                                    if response.status_code != 200:
-                                        body = (await response.aread()).decode("utf-8", "ignore")
-                                        logger.warning(
-                                            "Stream non-200 label=%s model=%s status=%s",
-                                            label,
-                                            model_id,
-                                            response.status_code,
-                                        )
-                                        if response.status_code == 401:
-                                            yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
-                                            return
-                                        if is_daily_free_limit(body):
-                                            yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
-                                            return
-                                        if should_try_next_candidate(response.status_code):
-                                            excluded_by_failure.add(model_id)
-                                            failed_this_model = True
-                                            break
+                                async for line in response.aiter_lines():
+                                    if not line or not line.startswith("data: "):
+                                        continue
+                                    if line == "data: [DONE]":
+                                        return
+                                    try:
+                                        raw = json.loads(line[6:])
+                                    except json.JSONDecodeError:
                                         yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                         return
-
-                                    async for line in response.aiter_lines():
-                                        if not line or not line.startswith("data: "):
-                                            continue
-                                        if line == "data: [DONE]":
-                                            return
-                                        try:
-                                            raw = json.loads(line[6:])
-                                        except json.JSONDecodeError:
-                                            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                            return
-                                        if raw.get("error"):
-                                            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                            return
-                                        delta = (raw.get("choices") or [{}])[0].get("delta") or {}
-                                        chunk = delta.get("content")
-                                        if chunk:
-                                            yield sse(
-                                                {
-                                                    "model": data.model_name,
-                                                    "success": True,
-                                                    "actual_label": label_for_model_id(model_id),
-                                                    "actual_model": model_id,
-                                                    "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
-                                                    "chunk": chunk,
-                                                }
-                                            )
-                                    return
+                                    if raw.get("error"):
+                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                        return
+                                    delta = (raw.get("choices") or [{}])[0].get("delta") or {}
+                                    chunk = delta.get("content")
+                                    if chunk:
+                                        yield sse(
+                                            {
+                                                "model": data.model_name,
+                                                "success": True,
+                                                "actual_label": label_for_model_id(model_id),
+                                                "actual_model": model_id,
+                                                "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
+                                                "chunk": chunk,
+                                            }
+                                        )
+                                return
 
                 except httpx.HTTPError as exc:
                     logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
