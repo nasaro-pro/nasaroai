@@ -3940,8 +3940,39 @@
                 if (typeof data.detail === "string") return data.detail;
                 if (data.detail?.message) return data.detail.message;
                 if (data.message) return data.message;
+                if (data.error) return data.error;
             } catch {}
             return `${fallback} (${response.status})`;
+        }
+
+        async function readSseJsonResponse(response, fallback = "요청 실패") {
+            if (!response.ok || !response.body) {
+                throw new Error(await parseApiError(response, fallback));
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let lastJson = null;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const blocks = buffer.split("\n\n");
+                buffer = blocks.pop() || "";
+                for (const block of blocks) {
+                    if (!block.trim() || block.trim().startsWith(":")) continue;
+                    for (const line of block.split("\n")) {
+                        if (!line.startsWith("data: ")) continue;
+                        const raw = line.slice(6).trim();
+                        if (!raw || raw === "[DONE]") continue;
+                        try { lastJson = JSON.parse(raw); } catch {}
+                    }
+                }
+            }
+            if (!lastJson) throw new Error(fallback);
+            if (lastJson.success === false && lastJson.error) throw new Error(lastJson.error);
+            if (lastJson.status === "error" && lastJson.message) throw new Error(lastJson.message);
+            return lastJson;
         }
 
         async function sendPresencePing() {
@@ -5015,6 +5046,33 @@
         }
         function hideLauncher() { agentFloatLauncher?.classList.remove("visible"); }
 
+        function positionPanelAboveButton(btn) {
+            if (!agentPanel || !btn) return;
+            if (window.innerWidth <= 520) {
+                agentPanel.style.removeProperty("left");
+                agentPanel.style.removeProperty("top");
+                agentPanel.style.right = "";
+                agentPanel.style.bottom = "";
+                return;
+            }
+            const r = btn.getBoundingClientRect();
+            const W = window.innerWidth;
+            const H = window.innerHeight;
+            const pW = Math.min(560, W - 32);
+            const pH = Math.min(Math.floor(H * 0.78), 760);
+            let left = r.left + r.width / 2 - pW / 2;
+            let top = r.top - pH - 10;
+            if (left + pW > W - 8) left = W - pW - 8;
+            if (left < 8) left = 8;
+            if (top < 8) top = 8;
+            if (top + pH > H - 8) top = H - pH - 8;
+            agentPanel.style.left = left + "px";
+            agentPanel.style.top = top + "px";
+            agentPanel.style.right = "auto";
+            agentPanel.style.bottom = "auto";
+            agentPanel.style.width = pW + "px";
+        }
+
         // ── 패널을 런처 근처에 배치 ───────────────────────────────────────────
         function positionPanelNearLauncher() {
             if (!agentPanel || !agentFloatLauncher) return;
@@ -5054,7 +5112,8 @@
         // 항상 런처 위치 기준으로 열림
         function openAgentPanel(fromLauncher = true) {
             if (!agentPanel) return;
-            positionPanelNearLauncher();
+            if (fromLauncher) positionPanelNearLauncher();
+            else positionPanelAboveButton(agentToggleBtn);
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
             hideLauncher();
@@ -5102,7 +5161,7 @@
             agentToggleBtn.classList.toggle("active", active);
             agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
             if (active) {
-                openAgentPanel();
+                openAgentPanel(false);
                 rebuildAgentToolbar();
             } else {
                 // 진행 중인 임무 중단
@@ -5382,10 +5441,8 @@
                         usedFallback = true;
                         const recentHistory = agentMissionHistory.slice(-3);
                         const res = await doFetch("/agent/ask", { query: `[Android 화면 조작 도움] ${mission}`, history: recentHistory });
-                        const data = await res.json();
-                        if (res.ok && data.status !== "error") {
-                            nativeResult = (nativeResult ? nativeResult + "\n\n" : "") + (data.result || data.response || data.message || "");
-                        }
+                        const data = await readSseJsonResponse(res, "에이전트 요청 실패");
+                        nativeResult = (nativeResult ? nativeResult + "\n\n" : "") + (data.result || data.response || data.message || "");
                     }
                     finalizeCard(cardRefs, "ok", nativeResult || "Android 접근성 작업을 실행했습니다.", mission, Date.now() - startTime);
                     agentMissionHistory.push({ mission, result: String(nativeResult || "").slice(0, 300) });
@@ -5402,17 +5459,18 @@
 
             try {
                 // 1차: 브라우저 자동화 시도
-                let res = await doFetch("/agent/task", { query: mission });
+                const res = await doFetch("/agent/task", { query: mission });
+                let data = await readSseJsonResponse(res, "에이전트 요청 실패");
 
                 // 브라우저 오류(503) → LLM 폴백
-                if (res.status === 503) {
+                if (data.status === "error" && data.http_status === 503) {
                     usedFallback = true;
                     const recentHistory = agentMissionHistory.slice(-3);
-                    res = await doFetch("/agent/ask", { query: mission, history: recentHistory });
+                    const askRes = await doFetch("/agent/ask", { query: mission, history: recentHistory });
+                    data = await readSseJsonResponse(askRes, "에이전트 요청 실패");
                 }
 
-                const data = await res.json();
-                if (!res.ok || data.status === "error") throw new Error(data.message || `서버 오류 (${res.status})`);
+                if (data.status === "error") throw new Error(data.message || "에이전트 요청 실패");
 
                 const content = data.result || data.response || data.message || "(결과 없음)";
                 const suffix  = usedFallback ? "\n\n⚠️ [브라우저 없이 LLM으로 실행됨]" : "";
@@ -5620,7 +5678,9 @@
 
         // 창 크기 변경 시 패널 재배치
         window.addEventListener("resize", () => {
-            if (agentPanel?.style.display !== "none") positionPanelNearLauncher();
+            if (agentPanel?.style.display === "none") return;
+            if (agentFloatLauncher?.classList.contains("visible")) positionPanelNearLauncher();
+            else positionPanelAboveButton(agentToggleBtn);
         });
 
         if (isAgentOverlay) {
@@ -5716,11 +5776,7 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ task, user_id: getDeviceId() }),
                 });
-                if (!response.ok) {
-                    const errMsg = await parseApiError(response, "협업 요청 실패");
-                    throw new Error(errMsg);
-                }
-                const data = await response.json();
+                const data = await readSseJsonResponse(response, "협업 요청 실패");
                 renderCollabPlan(resultEl, data, task);
                 addSessionHistory({ mode: "collab", title: task });
             } catch (err) {
@@ -5853,11 +5909,7 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),
                 });
-                if (!response.ok) {
-                    const errMsg = await parseApiError(response, "단계 실행 실패");
-                    throw new Error(errMsg);
-                }
-                const data = await response.json();
+                const data = await readSseJsonResponse(response, "단계 실행 실패");
                 const modelNote = data.model_label ? `[${data.model_label} · ${data.stage_role || ""}]\n` : "";
                 collabSession.stageOutputs[stageIndex] = modelNote + (data.guidance || "");
                 collabSession.stageStates[stageIndex] = "done";
@@ -5941,8 +5993,7 @@
                         user_id: getDeviceId(),
                     }),
                 });
-                if (!response.ok) throw new Error(`분석 실패 (${response.status})`);
-                const data = await response.json();
+                const data = await readSseJsonResponse(response, "분석 실패");
                 collabSession.task = data.merged_task || `${collabSession.task}. 추가: ${additionalTask}`;
                 appendCollabLog(`추가 작업 분석: ${data.reason || ""} → ${(data.start_stage ?? 0) + 1}단계부터`, "info");
                 for (let i = data.start_stage ?? 0; i < 4; i++) {
@@ -6491,12 +6542,7 @@
                     body: JSON.stringify(payload),
                 });
 
-                if (!response.ok) {
-                    const errMsg = await parseApiError(response, "토론 요청 실패");
-                    throw new Error(errMsg);
-                }
-
-                const data = await response.json();
+                const data = await readSseJsonResponse(response, "토론 요청 실패");
                 if (data.queued) {
                     queuedDuringFlight = true;
                     showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
@@ -6646,7 +6692,7 @@
                         }),
                     });
                     if (!response.ok) throw new Error(`큐잉 실패 (${response.status})`);
-                    const data = await response.json();
+                    const data = await readSseJsonResponse(response, "토론 요청 실패");
                     if (data.queued) {
                         queuedDuringFlight = true;
                         showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");

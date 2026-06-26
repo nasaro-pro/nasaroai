@@ -8,7 +8,7 @@ import random
 import re
 import time
 import urllib.parse
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from dataclasses import dataclass, field
 
 import httpx
@@ -1298,6 +1298,37 @@ def sse(payload: dict) -> str:
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+SSE_KEEPALIVE = ": keepalive\n\n"
+SSE_KEEPALIVE_INTERVAL = 12.0
+
+
+def streaming_json_response(coro: Awaitable[dict]) -> StreamingResponse:
+    """Run long AI work while emitting SSE keepalives (Render 30s timeout 방지)."""
+
+    async def generate() -> AsyncIterator[str]:
+        yield SSE_KEEPALIVE
+        task = asyncio.create_task(coro)
+        while not task.done():
+            await asyncio.sleep(SSE_KEEPALIVE_INTERVAL)
+            if not task.done():
+                yield SSE_KEEPALIVE
+        try:
+            payload = task.result()
+            yield sse(payload)
+        except HTTPException as exc:
+            detail = exc.detail
+            yield sse({
+                "success": False,
+                "error": detail if isinstance(detail, str) else str(detail),
+            })
+        except Exception:
+            logger.exception("streaming_json_response failed")
+            yield sse({"success": False, "error": USER_FACING_FAILURE_MSG})
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
 def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
     return [
             {"role": "system", "content": persona},
@@ -2071,6 +2102,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
 
     async def generate() -> AsyncIterator[str]:
         excluded_by_failure: set[str] = set()
+        yield SSE_KEEPALIVE
         await mark_compare_stream_started(session_id)
         current_model_id: str | None = None
 
@@ -2186,45 +2218,49 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
 
 
 @app.post("/collab/recommend")
-async def collab_recommend(data: CollabRecommendRequest, request: Request) -> dict:
+async def collab_recommend(data: CollabRecommendRequest, request: Request) -> StreamingResponse:
     """사용자 작업 설명을 작업 유형별 협업 알고리즘으로 변환한다."""
     _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
-    task = data.task.strip()
-    plan = build_collab_plan(task)
 
-    type_names = ", ".join(r["type"] for r in COLLAB_TYPE_RULES)
-    cls_prompt = (
-        f"사용자 요청:\n{task}\n\n"
-        f"가능한 작업 유형: {type_names}\n\n"
-        "요청 내용에 가장 정확히 맞는 유형 이름 하나만 출력하세요. 다른 설명 없이 유형명만."
-    )
-    cls_result = await call_ai_best(cls_prompt, max_tokens=80)
-    if cls_result.success:
-        picked = cls_result.content.strip().strip('"').strip("'")
-        for rule in COLLAB_TYPE_RULES:
-            if rule["type"] in picked or picked in rule["type"]:
-                plan = build_collab_plan(task, forced_type=rule["type"])
-                break
+    async def work() -> dict:
+        task = data.task.strip()
+        plan = build_collab_plan(task)
 
-    prompt = (
-        f"사용자 작업: {task}\n"
-        f"분류된 작업 유형: {plan['work_type']}\n\n"
-        "이 작업을 실제로 끝내기 위해 가장 중요한 주의점 3개와 "
-        "처음 실행할 구체적 액션 3개를 한국어로 짧게 제안하세요."
-    )
+        type_names = ", ".join(r["type"] for r in COLLAB_TYPE_RULES)
+        cls_prompt = (
+            f"사용자 요청:\n{task}\n\n"
+            f"가능한 작업 유형: {type_names}\n\n"
+            "요청 내용에 가장 정확히 맞는 유형 이름 하나만 출력하세요. 다른 설명 없이 유형명만."
+        )
+        cls_result = await call_ai_best(cls_prompt, max_tokens=80)
+        if cls_result.success:
+            picked = cls_result.content.strip().strip('"').strip("'")
+            for rule in COLLAB_TYPE_RULES:
+                if rule["type"] in picked or picked in rule["type"]:
+                    plan = build_collab_plan(task, forced_type=rule["type"])
+                    break
 
-    result = await call_ai_best(prompt, max_tokens=500)
-    recommendation = result.content if result.success else (
-        "AI 보완 코멘트 생성은 실패했지만, 아래 작업 유형별 협업 알고리즘은 바로 사용할 수 있습니다."
-    )
-    return {
-        "recommendation": recommendation,
-        "plan": plan,
-        "success": True,
-        "ai_comment_success": result.success,
-        "model_label": result.requested_label if result.success else None,
-    }
+        prompt = (
+            f"사용자 작업: {task}\n"
+            f"분류된 작업 유형: {plan['work_type']}\n\n"
+            "이 작업을 실제로 끝내기 위해 가장 중요한 주의점 3개와 "
+            "처음 실행할 구체적 액션 3개를 한국어로 짧게 제안하세요."
+        )
+
+        result = await call_ai_best(prompt, max_tokens=500)
+        recommendation = result.content if result.success else (
+            "AI 보완 코멘트 생성은 실패했지만, 아래 작업 유형별 협업 알고리즘은 바로 사용할 수 있습니다."
+        )
+        return {
+            "recommendation": recommendation,
+            "plan": plan,
+            "success": True,
+            "ai_comment_success": result.success,
+            "model_label": result.requested_label if result.success else None,
+        }
+
+    return streaming_json_response(work())
 
 
 def _collab_stage_prompt(data: CollabStageRequest) -> str:
@@ -2295,78 +2331,86 @@ def _collab_stage_prompt(data: CollabStageRequest) -> str:
 
 
 @app.post("/collab/run-stage")
-async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
+async def collab_run_stage(data: CollabStageRequest, request: Request) -> StreamingResponse:
     """협업 워크플로우의 특정 단계를 실행한다."""
     _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
-    stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
-        data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
-    ]
-    stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·품질"]
-    stage_role = stage_roles[data.stage_index % 4]
-    prompt = _collab_stage_prompt(data)
-    max_tokens = 1200 if data.stage_index == 2 else (1000 if data.stage_index == 3 else 900)
 
-    result = await call_ai_best(prompt, max_tokens=max_tokens, preferred_labels=[stage_model])
-    guidance = result.content if result.success else (
-        f"{data.stage_name} 단계를 진행하세요.\n\n{prompt[:500]}..."
-    )
+    async def work() -> dict:
+        stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
+            data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
+        ]
+        stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·품질"]
+        stage_role = stage_roles[data.stage_index % 4]
+        prompt = _collab_stage_prompt(data)
+        max_tokens = 1200 if data.stage_index == 2 else (1000 if data.stage_index == 3 else 900)
 
-    verify_meta = None
-    if data.stage_index == 3 and not data.is_rework and guidance:
-        import re
-        m = re.search(r'\{[^{}]*"pass"[^{}]*\}', guidance)
-        if m:
-            try:
-                verify_meta = json.loads(m.group(0))
-            except json.JSONDecodeError:
-                verify_meta = None
+        result = await call_ai_best(prompt, max_tokens=max_tokens, preferred_labels=[stage_model])
+        guidance = result.content if result.success else (
+            f"{data.stage_name} 단계를 진행하세요.\n\n{prompt[:500]}..."
+        )
 
-    return {
-        "stage_index": data.stage_index,
-        "stage_name": data.stage_name,
-        "guidance": guidance,
-        "model_label": result.requested_label if result.success else stage_model,
-        "stage_role": stage_role,
-        "success": True,
-        "ai_success": result.success,
-        "verify_meta": verify_meta,
-    }
+        verify_meta = None
+        if data.stage_index == 3 and not data.is_rework and guidance:
+            import re
+            m = re.search(r'\{[^{}]*"pass"[^{}]*\}', guidance)
+            if m:
+                try:
+                    verify_meta = json.loads(m.group(0))
+                except json.JSONDecodeError:
+                    verify_meta = None
+
+        return {
+            "stage_index": data.stage_index,
+            "stage_name": data.stage_name,
+            "guidance": guidance,
+            "model_label": result.requested_label if result.success else stage_model,
+            "stage_role": stage_role,
+            "success": True,
+            "ai_success": result.success,
+            "verify_meta": verify_meta,
+        }
+
+    return streaming_json_response(work())
 
 
 @app.post("/collab/followup-route")
-async def collab_followup_route(data: CollabFollowupRequest, request: Request) -> dict:
+async def collab_followup_route(data: CollabFollowupRequest, request: Request) -> StreamingResponse:
     """추가 작업 요청을 분석해 재시작할 단계를 결정한다."""
     _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
-    outputs_summary = "\n".join(
-        f"[{i + 1}단계] {(t or '')[:400]}" for i, t in enumerate(data.stage_outputs[:3])
-    )
-    prompt = (
-        f"원래 작업: {data.original_task}\n"
-        f"작업 유형: {data.work_type}\n"
-        f"추가 요청: {data.task}\n\n"
-        f"현재 단계별 산출물 요약:\n{outputs_summary or '없음'}\n\n"
-        "추가 요청을 반영하려면 어느 단계부터 다시 해야 하는지 판단하세요.\n"
-        "1=조사, 2=구조, 3=제작. 논리·구조 수정이면 2, 사실·근거면 1, 문장·초안만이면 3.\n"
-        'JSON만 출력: {"start_stage": 1, "reason": "한국어 설명", "merged_task": "반영된 전체 작업 설명"}'
-    )
-    result = await call_ai_best(prompt, max_tokens=300)
-    start_stage = 1
-    reason = "추가 요청 반영"
-    merged = f"{data.original_task}. 추가: {data.task}"
-    if result.success:
-        import re
-        m = re.search(r"\{[^{}]+\}", result.content)
-        if m:
-            try:
-                parsed = json.loads(m.group(0))
-                start_stage = max(0, min(2, int(parsed.get("start_stage", 1)) - 1))
-                reason = parsed.get("reason") or reason
-                merged = parsed.get("merged_task") or merged
-            except (json.JSONDecodeError, TypeError, ValueError):
-                pass
-    return {"start_stage": start_stage, "reason": reason, "merged_task": merged, "success": True}
+
+    async def work() -> dict:
+        outputs_summary = "\n".join(
+            f"[{i + 1}단계] {(t or '')[:400]}" for i, t in enumerate(data.stage_outputs[:3])
+        )
+        prompt = (
+            f"원래 작업: {data.original_task}\n"
+            f"작업 유형: {data.work_type}\n"
+            f"추가 요청: {data.task}\n\n"
+            f"현재 단계별 산출물 요약:\n{outputs_summary or '없음'}\n\n"
+            "추가 요청을 반영하려면 어느 단계부터 다시 해야 하는지 판단하세요.\n"
+            "1=조사, 2=구조, 3=제작. 논리·구조 수정이면 2, 사실·근거면 1, 문장·초안만이면 3.\n"
+            'JSON만 출력: {"start_stage": 1, "reason": "한국어 설명", "merged_task": "반영된 전체 작업 설명"}'
+        )
+        result = await call_ai_best(prompt, max_tokens=300)
+        start_stage = 1
+        reason = "추가 요청 반영"
+        merged = f"{data.original_task}. 추가: {data.task}"
+        if result.success:
+            import re
+            m = re.search(r"\{[^{}]+\}", result.content)
+            if m:
+                try:
+                    parsed = json.loads(m.group(0))
+                    start_stage = max(0, min(2, int(parsed.get("start_stage", 1)) - 1))
+                    reason = parsed.get("reason") or reason
+                    merged = parsed.get("merged_task") or merged
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+        return {"start_stage": start_stage, "reason": reason, "merged_task": merged, "success": True}
+
+    return streaming_json_response(work())
 
 
 @app.get("/collab/templates")
@@ -2375,22 +2419,25 @@ def collab_templates() -> dict:
 
 
 @app.post("/debate/start")
-async def debate_start(request: DebateRequest, http_request: Request) -> dict:
+async def debate_start(request: DebateRequest, http_request: Request) -> StreamingResponse:
     _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
     session = DebateSession(topic=request.topic)
     DEBATE_SESSIONS[request.session_id] = session
     lock = get_debate_lock(request.session_id)
 
-    async with lock:
-        if request.user_input:
-            append_pending_user_input(session, request.user_input, target_round=1)
-        turns = await run_debate_step(session)
-    return debate_response(session, turns)
+    async def work() -> dict:
+        async with lock:
+            if request.user_input:
+                append_pending_user_input(session, request.user_input, target_round=1)
+            turns = await run_debate_step(session)
+        return debate_response(session, turns)
+
+    return streaming_json_response(work())
 
 
 @app.post("/debate/continue")
-async def debate_continue(request: DebateRequest) -> dict:
+async def debate_continue(request: DebateRequest) -> StreamingResponse:
     await ensure_model_cache_fresh()
     session = DEBATE_SESSIONS.get(request.session_id)
     if session is None:
@@ -2398,21 +2445,23 @@ async def debate_continue(request: DebateRequest) -> dict:
 
     lock = get_debate_lock(request.session_id)
 
-    # Retry a single failed speaker slot in the current round without advancing.
-    if request.retry_speaker_index is not None:
+    async def work() -> dict:
+        if request.retry_speaker_index is not None:
+            async with lock:
+                turns = await retry_debate_speaker(session, request.retry_speaker_index)
+            return debate_response(session, turns)
+
+        if request.user_input and (lock.locked() or len(session.current_round_turns) < 3):
+            append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+            return debate_response(session, [], queued=True)
+
         async with lock:
-            turns = await retry_debate_speaker(session, request.retry_speaker_index)
+            if request.user_input:
+                append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+            turns = await run_debate_step(session)
         return debate_response(session, turns)
 
-    if request.user_input and (lock.locked() or len(session.current_round_turns) < 3):
-        append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
-        return debate_response(session, [], queued=True)
-
-    async with lock:
-        if request.user_input:
-            append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
-        turns = await run_debate_step(session)
-    return debate_response(session, turns)
+    return streaming_json_response(work())
 
 
 @app.get("/health")
@@ -2642,7 +2691,7 @@ async def agent_step(request: AgentStepRequest):
 
 
 @app.post("/agent/task")
-async def agent_task(request: AgentRequest, http_request: Request):
+async def agent_task(request: AgentRequest, http_request: Request) -> StreamingResponse:
     _require_quota(http_request, "agent", request.user_id)
     query = request.query.strip()
     if not query:
@@ -2657,80 +2706,80 @@ async def agent_task(request: AgentRequest, http_request: Request):
             content={"status": "error", "message": "이미 다른 에이전트 작업이 실행 중입니다. 잠시 후 다시 시도해주세요."},
         )
 
-    # 유료 호출 차단: 무료 모델만 사용한다(402 Insufficient credits 방지).
-    await ensure_model_cache_fresh()
-    model = _resolve_agent_models()[0]
-    headless = os.environ.get("AGENT_HEADLESS", "true").lower() != "false"
-    headers = build_openrouter_headers()
-    start_url = _extract_start_url(query)
+    async def work() -> dict:
+        await ensure_model_cache_fresh()
+        model = _resolve_agent_models()[0]
+        headless = os.environ.get("AGENT_HEADLESS", "true").lower() != "false"
+        headers = build_openrouter_headers()
+        start_url = _extract_start_url(query)
 
-    async with AGENT_LOCK:
-        try:
-            async with async_playwright() as p:
-                browserless_token = os.environ.get("BROWSERLESS_TOKEN", "")
-                browserless_endpoint = os.environ.get(
-                    "BROWSERLESS_ENDPOINT",
-                    f"wss://chrome.browserless.io?token={browserless_token}",
-                )
-
-                if browserless_token:
-                    try:
-                        browser = await p.chromium.connect_over_cdp(
-                            browserless_endpoint,
-                            timeout=20000,
-                        )
-                    except Exception as cdp_err:
-                        logger.error("[Agent] Browserless 연결 실패 (token 미노출)")
-                        raise RuntimeError(
-                            "브라우저 연결에 실패했습니다. BROWSERLESS_TOKEN을 확인해주세요."
-                        ) from cdp_err
-                else:
-                    try:
-                        browser = await p.chromium.launch(
-                            headless=headless,
-                            args=["--no-sandbox", "--disable-dev-shm-usage"],
-                        )
-                    except Exception as launch_err:
-                        logger.error("[Agent] 로컬 Chromium 실행 실패: %s", launch_err)
-                        raise RuntimeError(
-                            "브라우저를 실행하지 못했습니다. 서버에 BROWSERLESS_TOKEN을 설정하거나 "
-                            "로컬에서 'playwright install chromium'을 실행해주세요."
-                        ) from launch_err
-                try:
-                    context = await browser.new_context(
-                        viewport={"width": 1280, "height": 800},
-                        user_agent=(
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                            "AppleWebKit/537.36 (KHTML, like Gecko) "
-                            "Chrome/124.0.0.0 Safari/537.36"
-                        ),
+        async with AGENT_LOCK:
+            try:
+                async with async_playwright() as p:
+                    browserless_token = os.environ.get("BROWSERLESS_TOKEN", "")
+                    browserless_endpoint = os.environ.get(
+                        "BROWSERLESS_ENDPOINT",
+                        f"wss://chrome.browserless.io?token={browserless_token}",
                     )
+
+                    if browserless_token:
+                        try:
+                            browser = await p.chromium.connect_over_cdp(
+                                browserless_endpoint,
+                                timeout=20000,
+                            )
+                        except Exception as cdp_err:
+                            logger.error("[Agent] Browserless 연결 실패 (token 미노출)")
+                            raise RuntimeError(
+                                "브라우저 연결에 실패했습니다. BROWSERLESS_TOKEN을 확인해주세요."
+                            ) from cdp_err
+                    else:
+                        try:
+                            browser = await p.chromium.launch(
+                                headless=headless,
+                                args=["--no-sandbox", "--disable-dev-shm-usage"],
+                            )
+                        except Exception as launch_err:
+                            logger.error("[Agent] 로컬 Chromium 실행 실패: %s", launch_err)
+                            raise RuntimeError(
+                                "브라우저를 실행하지 못했습니다. 서버에 BROWSERLESS_TOKEN을 설정하거나 "
+                                "로컬에서 'playwright install chromium'을 실행해주세요."
+                            ) from launch_err
                     try:
-                        page = await context.new_page()
-                        await page.goto(start_url, wait_until="domcontentloaded", timeout=20000)
-                        agent = CustomWebAgent(openrouter_headers=headers, model=model)
-                        result = await agent.run(query, page)
-                        return {"status": "success", "result": result}
+                        context = await browser.new_context(
+                            viewport={"width": 1280, "height": 800},
+                            user_agent=(
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                "Chrome/124.0.0.0 Safari/537.36"
+                            ),
+                        )
+                        try:
+                            page = await context.new_page()
+                            await page.goto(start_url, wait_until="domcontentloaded", timeout=20000)
+                            agent = CustomWebAgent(openrouter_headers=headers, model=model)
+                            result = await agent.run(query, page)
+                            return {"status": "success", "result": result}
+                        finally:
+                            await context.close()
                     finally:
-                        await context.close()
-                finally:
-                    await browser.close()
-        except RuntimeError as setup_err:
-            logger.warning("CustomWebAgent setup failed: %s", setup_err)
-            return JSONResponse(
-                status_code=503,
-                content={"status": "error", "message": str(setup_err)},
-            )
-        except Exception:
-            logger.exception("CustomWebAgent failed query=%s", query[:120])
-            return JSONResponse(
-                status_code=500,
-                content={"status": "error", "message": "브라우저 에이전트 작업 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."},
-            )
+                        await browser.close()
+            except RuntimeError as setup_err:
+                logger.warning("CustomWebAgent setup failed: %s", setup_err)
+                return {"status": "error", "message": str(setup_err), "http_status": 503}
+            except Exception:
+                logger.exception("CustomWebAgent failed query=%s", query[:120])
+                return {
+                    "status": "error",
+                    "message": "브라우저 에이전트 작업 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                    "http_status": 500,
+                }
+
+    return streaming_json_response(work())
 
 
 @app.post("/agent/ask")
-async def agent_ask(request: AgentAskRequest, http_request: Request):
+async def agent_ask(request: AgentAskRequest, http_request: Request) -> StreamingResponse:
     """브라우저 없이 순수 LLM으로 임무를 수행한다.
     /agent/task(Playwright)가 실패할 때의 폴백이자, 단순 분석/답변 임무에 사용."""
     _require_quota(http_request, "agent", request.user_id)
@@ -2741,69 +2790,68 @@ async def agent_ask(request: AgentAskRequest, http_request: Request):
             content={"status": "error", "message": "임무를 입력해주세요."},
         )
 
-    await ensure_model_cache_fresh()
-    models = _resolve_agent_models()
-    headers = build_openrouter_headers()
+    async def work() -> dict:
+        await ensure_model_cache_fresh()
+        models = _resolve_agent_models()
+        headers = build_openrouter_headers()
 
-    # 이전 임무 기록을 컨텍스트로 추가
-    history_ctx = ""
-    for item in (request.history or [])[-3:]:
-        m = item.get("mission", "").strip()
-        r = item.get("result", "").strip()
-        if m and r:
-            history_ctx += f"\n[이전 임무] {m}\n[결과 요약] {r[:300]}\n"
+        history_ctx = ""
+        for item in (request.history or [])[-3:]:
+            m = item.get("mission", "").strip()
+            r = item.get("result", "").strip()
+            if m and r:
+                history_ctx += f"\n[이전 임무] {m}\n[결과 요약] {r[:300]}\n"
 
-    system_prompt = (
-        "당신은 Nasaro AI 에이전트입니다. 사용자가 지시한 임무를 분석하고 "
-        "최선의 결과를 한국어로 상세하게 제공합니다. "
-        "웹 자동화가 필요한 임무는 일반 지식과 추론으로 최대한 지원하고, "
-        "다음에 취해야 할 행동이나 확인 방법을 구체적으로 안내합니다. "
-        "응답은 충분히 자세하고 실용적이어야 합니다."
-    )
-    user_msg = (
-        f"{history_ctx}\n[현재 임무]\n{query}" if history_ctx
-        else f"[임무]\n{query}"
-    )
+        system_prompt = (
+            "당신은 Nasaro AI 에이전트입니다. 사용자가 지시한 임무를 분석하고 "
+            "최선의 결과를 한국어로 상세하게 제공합니다. "
+            "웹 자동화가 필요한 임무는 일반 지식과 추론으로 최대한 지원하고, "
+            "다음에 취해야 할 행동이나 확인 방법을 구체적으로 안내합니다. "
+            "응답은 충분히 자세하고 실용적이어야 합니다."
+        )
+        user_msg = (
+            f"{history_ctx}\n[현재 임무]\n{query}" if history_ctx
+            else f"[임무]\n{query}"
+        )
 
-    last_err = "AI 응답을 받지 못했습니다."
-    for model in models[:5]:
-        try:
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-                resp = await client.post(
-                    OPENROUTER_CHAT_URL,
-                    headers=headers,
-                    json={
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user",   "content": user_msg},
-                        ],
-                        "max_tokens": 1200,
-                    },
+        last_err = "AI 응답을 받지 못했습니다."
+        for model in models[:5]:
+            try:
+                async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                    resp = await client.post(
+                        OPENROUTER_CHAT_URL,
+                        headers=headers,
+                        json={
+                            "model": model,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user",   "content": user_msg},
+                            ],
+                            "max_tokens": 1200,
+                        },
+                    )
+                if resp.status_code == 429:
+                    last_err = "요청 한도 초과. 잠시 후 다시 시도해주세요."
+                    continue
+                if resp.status_code != 200:
+                    last_err = f"AI 서버 오류 ({resp.status_code})"
+                    continue
+                data = resp.json()
+                result = (
+                    data.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
                 )
-            if resp.status_code == 429:
-                last_err = "요청 한도 초과. 잠시 후 다시 시도해주세요."
+                if result:
+                    return {"status": "success", "result": result, "mode": "llm"}
+            except Exception as e:
+                last_err = str(e)
                 continue
-            if resp.status_code != 200:
-                last_err = f"AI 서버 오류 ({resp.status_code})"
-                continue
-            data = resp.json()
-            result = (
-                data.get("choices", [{}])[0]
-                .get("message", {})
-                .get("content", "")
-                .strip()
-            )
-            if result:
-                return {"status": "success", "result": result, "mode": "llm"}
-        except Exception as e:
-            last_err = str(e)
-            continue
 
-    return JSONResponse(
-        status_code=500,
-        content={"status": "error", "message": last_err},
-    )
+        return {"status": "error", "message": last_err}
+
+    return streaming_json_response(work())
 
 
 @app.get("/")
