@@ -481,8 +481,8 @@
             width: min(1160px, 100%);
             margin: 0 auto;
             flex: 1;
-            padding: 18px;
-            padding-bottom: calc(var(--input-dock-height, 96px) + 24px);
+            padding: 12px 18px;
+            padding-bottom: calc(var(--input-dock-height, 88px) + 10px);
             overflow-x: hidden;
             min-width: 0;
         }
@@ -1369,10 +1369,10 @@
             left: 0;
             right: 0;
             z-index: 200;
-            background: rgba(255, 255, 255, 0.88);
+            background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(12px);
             border-top: 1px solid #e5e7eb;
-            box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.06);
+            box-shadow: 0 -2px 16px rgba(15, 23, 42, 0.05);
             padding-bottom: env(safe-area-inset-bottom, 0);
             transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -1387,26 +1387,15 @@
         .dock-inner {
             width: min(1160px, 100%);
             margin: 0 auto;
-            padding: 6px 12px 10px;
+            padding: 5px 10px 6px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
-        }
-
-        .dock-agent-row {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            min-height: 0;
-        }
-        .dock-agent-row .agent-toggle-btn {
-            width: auto;
-            min-width: 108px;
+            gap: 4px;
         }
 
         .dock-compose-row {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             align-items: flex-end;
         }
         .dock-compose-row #mainInput {
@@ -1414,62 +1403,62 @@
             min-width: 0;
         }
 
-        .dock-tools-row .input-tool-row { gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
+        .dock-tools-row .input-tool-row { gap: 4px; flex-wrap: wrap; justify-content: flex-start; margin: 0; }
         .dock-tools-row .input-tool-btn {
-            min-height: 36px;
+            min-height: 32px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 7px;
+        }
+        .dock-tools-row .privacy-btn-wide { min-height: 32px; min-width: auto; }
+
+        .dock-mode-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        .dock-mode-row .mode-btn,
+        .dock-mode-row .dock-btn.muted {
+            min-height: 32px;
             padding: 6px 12px;
             font-size: 12px;
             font-weight: 700;
             border-radius: 8px;
         }
-        .dock-tools-row .privacy-btn-wide { min-height: 36px; }
-
-        .dock-mode-row {
-            position: relative;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .dock-mode-row .mode-btn,
-        .dock-mode-row .dock-btn.muted {
-            min-height: 38px;
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 700;
-            border-radius: 10px;
-        }
 
         .dock-compose-row #mainInput {
-            min-height: 38px;
-            max-height: 88px;
-            padding: 8px 12px;
-            font-size: 15px;
-            line-height: 1.45;
+            min-height: 34px;
+            max-height: 72px;
+            padding: 6px 10px;
+            font-size: 14px;
+            line-height: 1.4;
         }
 
         .dock-submit-btn {
             flex-shrink: 0;
-            min-height: 38px;
-            min-width: 96px;
-            padding: 8px 16px;
-            font-size: 13px;
+            min-height: 34px;
+            min-width: 88px;
+            padding: 6px 12px;
+            font-size: 12px;
             font-weight: 800;
             white-space: nowrap;
         }
 
         #mainInput {
             width: 100%;
-            min-height: 38px;
-            max-height: 88px;
+            min-height: 34px;
+            max-height: 72px;
             resize: none;
             overflow-y: auto;
             border: 1px solid #d1d5db;
-            border-radius: 10px;
-            padding: 8px 12px;
+            border-radius: 9px;
+            padding: 6px 10px;
             font: inherit;
-            font-size: 15px;
-            line-height: 1.45;
+            font-size: 14px;
+            line-height: 1.4;
             color: #111827;
             background: #fff;
         }
@@ -1554,7 +1543,38 @@
             }
         }
 
-        /* ===== Agent Mode ===== */
+        /* ===== Agent Mode (하단바 밖 플로팅) ===== */
+        .dock-agent-outside {
+            position: fixed;
+            bottom: calc(var(--input-dock-height, 88px) + 6px);
+            right: 12px;
+            z-index: 205;
+            min-height: 32px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 8px;
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #5b21b6;
+            box-shadow: 0 3px 12px rgba(91, 33, 182, 0.18);
+            cursor: pointer;
+            font: inherit;
+        }
+        .dock-agent-outside:hover:not(:disabled) {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+        }
+        .dock-agent-outside.active {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            color: #fff;
+            border-color: #6d28d9;
+        }
+        @media (min-width: 768px) {
+            .app.sidebar-open .dock-agent-outside {
+                right: 12px;
+            }
+        }
+
         .agent-toggle-btn {
             min-height: 34px;
             padding: 6px 14px;
@@ -1606,6 +1626,7 @@
         body.native-agent-overlay .settings-panel,
         body.native-agent-overlay main,
         body.native-agent-overlay .input-dock,
+        body.native-agent-overlay .dock-agent-outside,
         body.native-agent-overlay #extInstallBanner,
         body.native-agent-overlay #androidInstallModal,
         body.native-agent-overlay #agentFloatLauncher {
@@ -3240,16 +3261,14 @@
             </div>
         </div>
 
+        <button id="agentToggleBtn" class="dock-agent-outside agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
+
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
-                <div class="dock-agent-row">
-                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
-                </div>
                 <div class="dock-compose-row">
                     <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                     <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
-                <div id="mainInputTools" class="dock-tools-row"></div>
                 <div class="dock-mode-row">
                     <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
@@ -3258,6 +3277,7 @@
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                 </div>
+                <div id="mainInputTools" class="dock-tools-row"></div>
             </div>
         </footer>
 
@@ -4346,7 +4366,7 @@
         let syncPaddingTimer = null;
         function syncMainPadding() {
             const dockHeight = inputDock.offsetHeight;
-            const offset = dockHeight + 32;
+            const offset = dockHeight + 10;
             document.documentElement.style.setProperty("--input-dock-height", `${dockHeight}px`);
             document.documentElement.style.setProperty("--bottom-offset", `${offset}px`);
             mainContent.style.paddingBottom = "var(--bottom-offset)";
@@ -4358,8 +4378,8 @@
 
         function autoResizeInput() {
             mainInput.style.height = "auto";
-            const lineHeight = 22;
-            const maxHeight = lineHeight * 4 + 16;
+            const lineHeight = 20;
+            const maxHeight = lineHeight * 3 + 12;
             mainInput.style.height = `${Math.min(mainInput.scrollHeight, maxHeight)}px`;
             scheduleSyncMainPadding();
         }
