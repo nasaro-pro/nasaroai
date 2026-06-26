@@ -17,6 +17,22 @@
     ul, ol { padding-left: 20px; margin: 8px 0; }
     .tip { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 14px; margin: 10px 0; }
     .step { font-weight: 700; color: #7c3aed; }
+    .ideas-grid { display: grid; gap: 10px; margin-top: 10px; }
+    .idea-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 10px 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fafafa;
+      font-size: 14px;
+    }
+    .idea-num {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .idea-item.done { border-color: #bbf7d0; background: #f0fdf4; }
+    .idea-item.done .idea-num { background: #dcfce7; color: #15803d; }
+    .idea-tag { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 6px; }
+    .idea-tag.ok { background: #dcfce7; color: #15803d; }
+    .idea-tag.plan { background: #fef3c7; color: #92400e; }
   </style>
 </head>
 <body>
@@ -96,6 +112,34 @@
       <p><strong>Q. AI 답변 언어는?</strong> 질문한 언어에 맞춰 답합니다. UI 언어(설정)와 별개입니다.</p>
       <p><strong>Q. 하루 사용 한도?</strong> 비교 50 · 토론 10 · 협업 5 · 에이전트 20회 (KST 자정 리셋)</p>
       <p><strong>Q. 기록은 어디?</strong> 메뉴 「기록」= 이번 세션 요약. 영구 보관은 「결과물 저장」.</p>
+    </section>
+
+    <section>
+      <h2>앞으로 더 좋아질 기능 · 아이디어 20</h2>
+      <p style="color:#64748b;font-size:14px;margin:0 0 8px;">사용자 의견과 실제 사용 패턴을 반영해 순서대로 보완합니다. <span class="idea-tag ok">완료</span>는 이미 쓸 수 있는 기능입니다.</p>
+      <div class="ideas-grid">
+        <div class="idea-item done"><span class="idea-num">1</span><div><strong>답변 복사 버튼</strong><span class="idea-tag ok">완료</span><br>비교·토론 각 답변 옆에서 한 번에 복사</div></div>
+        <div class="idea-item done"><span class="idea-num">2</span><div><strong>내보내기 형식 선택</strong><span class="idea-tag ok">완료</span><br>md · txt · html · pdf(인쇄) 중 선택</div></div>
+        <div class="idea-item done"><span class="idea-num">3</span><div><strong>협업 4단계 순차 실행</strong><span class="idea-tag ok">완료</span><br>조사→구조→제작→검증, 단계별 실시간 확인</div></div>
+        <div class="idea-item done"><span class="idea-num">4</span><div><strong>검증 AI 피드백 루프</strong><span class="idea-tag ok">완료</span><br>검증은 지적만, 조사·구조·제작 AI가 수정</div></div>
+        <div class="idea-item done"><span class="idea-num">5</span><div><strong>작업 유형 자동 분류</strong><span class="idea-tag ok">완료</span><br>자소서·문서·영상 등 요청 내용에 맞게 협업 분류</div></div>
+        <div class="idea-item done"><span class="idea-num">6</span><div><strong>에이전트 예약 임무</strong><span class="idea-tag ok">완료</span><br>「5분 뒤 ○○해줘」→ 활동 임무에 예약 표시</div></div>
+        <div class="idea-item done"><span class="idea-num">7</span><div><strong>계정 로그인·결과물 동기화</strong><span class="idea-tag ok">완료</span><br>아이디 로그인 시 기기 간 결과물 이어하기</div></div>
+        <div class="idea-item done"><span class="idea-num">8</span><div><strong>빈 화면 질문 추천</strong><span class="idea-tag ok">완료</span><br>비교 모드에서 예시 질문 칩으로 바로 시작</div></div>
+        <div class="idea-item"><span class="idea-num">9</span><div><strong>메일·SNS·카톡 초안 변환</strong><span class="idea-tag plan">예정</span><br>비교·협업 결과를 채널별 톤·길이에 맞게 변환</div></div>
+        <div class="idea-item"><span class="idea-num">10</span><div><strong>즐겨찾는 AI 고정</strong><span class="idea-tag plan">예정</span><br>비교·토론·협업·에이전트마다 기본 AI 조합 저장</div></div>
+        <div class="idea-item"><span class="idea-num">11</span><div><strong>베스트 답변 하이라이트</strong><span class="idea-tag plan">예정</span><br>비교 후 AI가 추천한 답변을 한 줄로 표시·원탭 복사</div></div>
+        <div class="idea-item"><span class="idea-num">12</span><div><strong>답변 Diff(차이만) 보기</strong><span class="idea-tag plan">예정</span><br>여러 AI 답변에서 겹치는 부분·다른 부분만 강조</div></div>
+        <div class="idea-item"><span class="idea-num">13</span><div><strong>질문 맞춤 AI 추천</strong><span class="idea-tag plan">예정</span><br>질문 유형(코딩·글쓰기·조사)에 맞는 AI 자동 추천</div></div>
+        <div class="idea-item"><span class="idea-num">14</span><div><strong>토론 라운드 요약 카드</strong><span class="idea-tag plan">예정</span><br>토론 끝나면 합의·쟁점·다음 액션 한 장 요약</div></div>
+        <div class="idea-item"><span class="idea-num">15</span><div><strong>결과물 폴더·태그</strong><span class="idea-tag plan">예정</span><br>저장한 결과물을 주제·날짜·태그로 정리·검색</div></div>
+        <div class="idea-item"><span class="idea-num">16</span><div><strong>협업·에이전트 완료 알림</strong><span class="idea-tag plan">예정</span><br>긴 작업 끝나면 브라우저·앱 알림 (Android 우선)</div></div>
+        <div class="idea-item"><span class="idea-num">17</span><div><strong>Android 홈 위젯</strong><span class="idea-tag plan">예정</span><br>홈 화면에서 질문 입력·에이전트 바로 실행</div></div>
+        <div class="idea-item"><span class="idea-num">18</span><div><strong>초보 모드</strong><span class="idea-tag plan">예정</span><br>기능 하나씩 크게 보여 주는 단순 UI 전환</div></div>
+        <div class="idea-item"><span class="idea-num">19</span><div><strong>팀·가족 공유 보관함</strong><span class="idea-tag plan">예정</span><br>로그인 계정으로 결과물을 지정 사용자와 공유</div></div>
+        <div class="idea-item"><span class="idea-num">20</span><div><strong>오늘의 질문·템플릿 갤러리</strong><span class="idea-tag plan">예정</span><br>매일 바뀌는 추천 질문 + 자소서·기획서 등 템플릿 모음</div></div>
+      </div>
+      <div class="tip" style="margin-top:14px;">원하는 기능 번호를 알려주시면 우선순위에 반영합니다.</div>
     </section>
   </div>
 </body>
