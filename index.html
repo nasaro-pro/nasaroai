@@ -239,38 +239,51 @@
             gap: 4px;
         }
 
-        /* ── 설정 버튼 (사이드바 하단 고정) ── */
-        .side-menu-footer {
-            padding: 10px 18px 14px;
-            border-top: 1px solid #f3f4f6;
-            flex-shrink: 0;
+        /* ── 설정 버튼 (헤더 우측) ── */
+        .header-actions {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 3;
         }
-        .settings-btn {
-            width: 100%; display: flex; align-items: center; gap: 10px;
-            padding: 10px 14px; border-radius: 10px; border: 1px solid #e5e7eb;
-            background: #f9fafb; color: #374151; font: inherit; font-size: 14px;
-            font-weight: 700; cursor: pointer; text-align: left;
+        .header-icon-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            color: #374151;
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: background .15s, border-color .15s;
         }
-        .settings-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
-        .settings-btn.active { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+        .header-icon-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+        .header-icon-btn.active { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
 
         /* ── 설정 팝오버 ── */
         .settings-panel {
             position: fixed;
-            left: min(280px, 82vw);
-            bottom: 0;
+            right: 12px;
+            top: 58px;
+            left: auto;
+            bottom: auto;
             width: min(300px, 88vw);
-            max-height: min(88dvh, calc(100dvh - 56px));
+            max-height: min(78dvh, calc(100dvh - 70px));
             background: #fff;
             border: 1px solid #e5e7eb;
-            border-radius: 14px 14px 0 0;
-            box-shadow: 0 -8px 32px rgba(15,23,42,.14);
+            border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(15,23,42,.16);
             z-index: 401;
             display: none;
             flex-direction: column;
             overflow: hidden;
-            transform: translateY(12px);
+            transform: translateY(-6px);
             opacity: 0;
             transition: transform .2s cubic-bezier(.4,0,.2,1), opacity .2s;
         }
@@ -894,8 +907,22 @@
         .collab-activity.compact .collab-activity-log.compact { max-height: 100px; font-size: 10px; }
         .collab-v2-toolbar.compact { margin-top: 4px; }
 
-        .dock-agent-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
-        .dock-agent-row .agent-toggle-btn { padding: 8px 16px; min-height: 36px; font-size: 13px; }
+        .dock-agent-row { display: flex; justify-content: flex-start; margin-bottom: 0; }
+        .dock-agent-row .agent-toggle-btn { padding: 6px 12px; min-height: 32px; font-size: 12px; }
+
+        .dock-controls-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .dock-mode-row { margin: 0; gap: 4px; }
+        .dock-mode-row .mode-btn,
+        .dock-mode-row .dock-btn.muted {
+            padding: 7px 12px;
+            min-height: 34px;
+            font-size: 12px;
+        }
+        #mainInputTools { margin: 0; }
 
         .ai-picker-popover {
             display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 400;
@@ -911,40 +938,44 @@
         }
         .compare-card-header { display: flex; align-items: center; gap: 6px; }
 
-        .guide-btn {
-            width: calc(100% - 24px); margin: 0 12px 8px; padding: 10px 14px;
-            border-radius: 10px; border: 1px solid #bfdbfe; background: #eff6ff;
-            color: #1d4ed8; font-weight: 700; font-size: 13px; cursor: pointer;
+        .support-history-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 220px; overflow-y: auto; }
+        .support-history-item {
+            border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 11px; background: #f9fafb;
         }
+        .support-history-item.answered { border-color: #bbf7d0; background: #f0fdf4; }
+        .support-history-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
+        .support-history-delete { border: none; background: transparent; color: #dc2626; cursor: pointer; font-size: 11px; }
+        .support-reply-box { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: #ede9fe; color: #4c1d95; }
 
         .guide-bar-backdrop {
             position: fixed; inset: 0; z-index: 850; background: transparent;
         }
         .guide-bar {
-            position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
-            z-index: 900; width: min(640px, calc(100vw - 24px));
-            max-height: min(52vh, 420px); overflow: hidden;
-            background: #fff; border: 1px solid #c7d2fe; border-radius: 14px;
-            box-shadow: 0 12px 40px rgba(49, 46, 129, 0.18);
+            position: fixed; top: 54px; right: 12px; left: auto;
+            transform: none; z-index: 900;
+            width: min(320px, calc(100vw - 24px));
+            max-height: min(36vh, 260px); overflow: hidden;
+            background: #fff; border: 1px solid #c7d2fe; border-radius: 12px;
+            box-shadow: 0 8px 28px rgba(49, 46, 129, 0.15);
             display: flex; flex-direction: column;
         }
         .guide-bar-head {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #eef2ff;
-            font-size: 14px; font-weight: 800; color: #4338ca;
+            padding: 7px 10px; border-bottom: 1px solid #e2e8f0; background: #eef2ff;
+            font-size: 12px; font-weight: 800; color: #4338ca;
         }
         .guide-bar-close {
-            border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748b;
+            border: none; background: transparent; font-size: 16px; cursor: pointer; color: #64748b;
         }
         .guide-bar-body {
-            padding: 12px 14px 14px; overflow-y: auto; font-size: 13px; line-height: 1.65; color: #334155;
+            padding: 8px 10px 10px; overflow-y: auto; font-size: 11px; line-height: 1.55; color: #334155;
         }
-        .guide-bar-body h3 { margin: 10px 0 4px; font-size: 13px; color: #4338ca; }
-        .guide-bar-body p { margin: 0 0 8px; }
-        .guide-bar-body ul { margin: 0 0 8px; padding-left: 18px; }
+        .guide-bar-body h3 { margin: 6px 0 2px; font-size: 11px; color: #4338ca; }
+        .guide-bar-body p { margin: 0 0 5px; }
+        .guide-bar-body ul { margin: 0 0 5px; padding-left: 16px; }
         .guide-bar-tip {
-            background: #eff6ff; border-left: 3px solid #3b82f6; padding: 8px 10px;
-            border-radius: 0 8px 8px 0; font-size: 12px; margin-top: 6px;
+            background: #eff6ff; border-left: 3px solid #3b82f6; padding: 6px 8px;
+            border-radius: 0 6px 6px 0; font-size: 10px; margin-top: 4px;
         }
         html[data-theme="dark"] .guide-bar { background: #1e293b; border-color: #475569; }
         html[data-theme="dark"] .guide-bar-head { background: #312e81; color: #e9d5ff; border-color: #475569; }
@@ -969,6 +1000,8 @@
         html[data-theme="dark"] .side-menu-brand,
         html[data-theme="dark"] h1, html[data-theme="dark"] h2,
         html[data-theme="dark"] .header-brand p { color: #f1f5f9; }
+        html[data-theme="dark"] .header-icon-btn { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+        html[data-theme="dark"] .header-icon-btn.active { background: #312e81; border-color: #7c3aed; color: #e9d5ff; }
         html[data-theme="dark"] .works-section-title,
         html[data-theme="dark"] .settings-row-label { color: #cbd5e1; }
         html[data-theme="dark"] .settings-meta,
@@ -1298,10 +1331,10 @@
         .dock-inner {
             width: min(1160px, 100%);
             margin: 0 auto;
-            padding: 8px 14px 12px;
+            padding: 6px 12px 10px;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
         }
 
         .dock-mode-row {
@@ -2663,18 +2696,6 @@
                 <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
-
-            <!-- 가이드 · 설정 (하단) -->
-            <div class="side-menu-footer">
-                <button id="guideBtn" class="guide-btn" type="button">📘 사용 가이드</button>
-                <button id="settingsBtn" class="settings-btn" type="button">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                    </svg>
-                    설정
-                </button>
-            </div>
         </aside>
 
         <!-- 설정 팝오버 패널 -->
@@ -2739,12 +2760,16 @@
                 <div id="settingsVersionMeta" class="settings-meta">불러오는 중…</div>
             </div>
 
-            <div class="settings-row">
+            <div class="settings-row" id="supportSection">
                 <div class="settings-row-label">관리자 문의</div>
-                <div class="settings-meta" style="margin-bottom:6px;">버그·기능 요청·사용 중 궁금한 점을 남기면 관리자가 답변합니다.</div>
-                <textarea id="supportInquiryInput" rows="3" placeholder="문의 내용을 입력하세요…" style="width:100%;border-radius:8px;border:1px solid #d1d5db;padding:8px 10px;font:inherit;resize:vertical;"></textarea>
-                <button id="supportInquiryBtn" class="settings-action-btn primary-action" type="button" style="margin-top:8px;">📨 문의 보내기</button>
-                <div id="supportInquiryStatus" class="settings-meta" style="margin-top:6px;"></div>
+                <div id="supportLoginHint" class="settings-meta" style="margin-bottom:6px;">로그인 후 문의할 수 있습니다.</div>
+                <div id="supportFormWrap" style="display:none;">
+                    <textarea id="supportInquiryInput" rows="2" placeholder="문의 내용을 입력하세요…" style="width:100%;border-radius:8px;border:1px solid #d1d5db;padding:8px 10px;font:inherit;resize:vertical;"></textarea>
+                    <button id="supportInquiryBtn" class="settings-action-btn primary-action" type="button" style="margin-top:8px;">📨 문의 보내기</button>
+                    <div id="supportInquiryStatus" class="settings-meta" style="margin-top:6px;"></div>
+                </div>
+                <div class="settings-row-label" style="margin-top:10px;">문의 기록</div>
+                <div id="supportHistoryList" class="support-history-list"><div class="settings-meta">로그인 후 확인할 수 있습니다.</div></div>
             </div>
 
             <!-- 결과물 삭제 -->
@@ -2764,14 +2789,13 @@
                     <input id="authNameInput" type="text" autocomplete="name" placeholder="선택 입력">
                 </div>
                 <div class="auth-field">
-                    <label for="authUsernameInput" data-i18n="username">아이디</label>
-                    <input id="authUsernameInput" type="text" autocomplete="username" placeholder="my_id">
+                    <label for="authUsernameInput">이메일</label>
+                    <input id="authUsernameInput" type="email" autocomplete="email" placeholder="you@example.com">
                 </div>
                 <div class="auth-field">
                     <label for="authPasswordInput" data-i18n="password">비밀번호</label>
                     <input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="8자 이상">
                 </div>
-                <label class="auth-check"><input id="authRememberUser" type="checkbox"> <span data-i18n="remember_username">아이디 기억</span></label>
                 <label class="auth-check"><input id="authRememberPwd" type="checkbox"> <span data-i18n="remember_password">비밀번호 저장 (자동 로그인)</span></label>
                 <div id="authError" class="auth-error"></div>
                 <div class="auth-actions">
@@ -2791,6 +2815,10 @@
                 <div class="header-brand">
                     <h1>Nasaro AI</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
+                </div>
+                <div class="header-actions">
+                    <button id="guideBtn" class="header-icon-btn" type="button" title="사용 가이드" aria-label="사용 가이드">📘</button>
+                    <button id="settingsBtn" class="header-icon-btn" type="button" title="설정" aria-label="설정">⚙️</button>
                 </div>
             </div>
         </header>
@@ -3102,16 +3130,16 @@
                     <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                     <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
-                <div class="dock-mode-row">
-                    <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
-                    <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
-                    <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
-                    <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                </div>
-                <div id="mainInputTools"></div>
-                <div class="dock-actions">
-                    <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
-                    <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                <div class="dock-controls-wrap">
+                    <div class="dock-mode-row">
+                        <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                        <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
+                        <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
+                        <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
+                        <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
+                        <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                    </div>
+                    <div id="mainInputTools"></div>
                 </div>
             </div>
         </footer>
@@ -3372,7 +3400,6 @@
         }
 
         const AUTH_TOKEN_KEY = "nasaroai_auth_token";
-        const REMEMBER_USER_KEY = "nasaroai_remember_user";
         const REMEMBER_PWD_KEY = "nasaroai_auto_login";
         let authToken = localStorage.getItem(REMEMBER_PWD_KEY) === "1"
             ? (localStorage.getItem(AUTH_TOKEN_KEY) || "")
@@ -3628,6 +3655,74 @@
             }
             renderResultFilesList();
             notifyExtensionAuth();
+            updateSupportUI();
+        }
+
+        async function loadSupportHistory() {
+            const listEl = document.getElementById("supportHistoryList");
+            if (!listEl || !authToken || !currentUser) return;
+            listEl.innerHTML = "<div class=\"settings-meta\">불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/support/inquiries");
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "불러오기 실패");
+                renderSupportHistory(data.inquiries || []);
+            } catch (err) {
+                listEl.innerHTML = `<div class="settings-meta">${err.message || "불러오기 실패"}</div>`;
+            }
+        }
+
+        function renderSupportHistory(items) {
+            const listEl = document.getElementById("supportHistoryList");
+            if (!listEl) return;
+            if (!items.length) {
+                listEl.innerHTML = "<div class=\"settings-meta\">문의 기록이 없습니다.</div>";
+                return;
+            }
+            listEl.innerHTML = "";
+            items.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "support-history-item" + (item.status === "answered" ? " answered" : "");
+                const adminReplies = (item.replies || []).filter(r => r.from_admin);
+                div.innerHTML = `
+                    <div class="support-history-head">
+                        <span>${item.created_at_iso} · ${item.status === "answered" ? "답변완료" : "대기중"}</span>
+                        <button type="button" class="support-history-delete" data-id="${item.id}">삭제</button>
+                    </div>
+                    <div>${item.message.replace(/</g, "&lt;")}</div>
+                    ${adminReplies.map(r => `<div class="support-reply-box"><strong>관리자</strong> · ${r.created_at_iso}<br>${r.message.replace(/</g, "&lt;")}</div>`).join("")}
+                `;
+                div.querySelector(".support-history-delete")?.addEventListener("click", async () => {
+                    if (!confirm("이 문의를 삭제할까요?")) return;
+                    try {
+                        const res = await apiFetch("/support/inquiry/" + item.id, { method: "DELETE" });
+                        if (!res.ok) {
+                            const data = await res.json().catch(() => ({}));
+                            throw new Error(typeof data.detail === "string" ? data.detail : "삭제 실패");
+                        }
+                        await loadSupportHistory();
+                        showToast("문의가 삭제되었습니다.", "success");
+                    } catch (err) {
+                        showToast(err.message || "삭제 실패", "error");
+                    }
+                });
+                listEl.appendChild(div);
+            });
+        }
+
+        function updateSupportUI() {
+            const hint = document.getElementById("supportLoginHint");
+            const form = document.getElementById("supportFormWrap");
+            const hist = document.getElementById("supportHistoryList");
+            if (currentUser && authToken) {
+                if (hint) hint.style.display = "none";
+                if (form) form.style.display = "";
+                loadSupportHistory();
+            } else {
+                if (hint) hint.style.display = "";
+                if (form) form.style.display = "none";
+                if (hist) hist.innerHTML = "<div class=\"settings-meta\">로그인 후 확인할 수 있습니다.</div>";
+            }
         }
 
         function openAuthModal(mode = "login") {
@@ -3637,8 +3732,8 @@
                 ? (NF?.t?.("signup") || "회원가입")
                 : (NF?.t?.("login") || "로그인");
             document.getElementById("authModalDesc").textContent = mode === "signup"
-                ? (NF?.lang === "en" ? "Sign up to sync saved results across devices. (Password 8+ chars)" : "가입하면 결과물·협업이 서버에 저장됩니다. (비밀번호 8자 이상)")
-                : (NF?.lang === "en" ? "Sign in to continue saved results on other devices." : "로그인하면 다른 기기에서도 결과물을 이어갈 수 있습니다.");
+                ? (NF?.lang === "en" ? "Sign up with a real email address. Password 8+ chars." : "실제 이메일로 가입합니다. (비밀번호 8자 이상)")
+                : (NF?.lang === "en" ? "Sign in with your email." : "가입한 이메일로 로그인하세요.");
             document.getElementById("authNameField").style.display = mode === "signup" ? "" : "none";
             document.getElementById("authSubmitBtn").textContent = mode === "signup"
                 ? (NF?.t?.("signup") || "가입하기")
@@ -3648,16 +3743,14 @@
                 : (NF?.t?.("signup") || "회원가입");
             document.getElementById("authError").textContent = "";
             const userInput = document.getElementById("authUsernameInput");
-            const rememberUser = document.getElementById("authRememberUser");
             const rememberPwd = document.getElementById("authRememberPwd");
-            const savedUser = localStorage.getItem(REMEMBER_USER_KEY) || "";
-            if (userInput) userInput.value = savedUser;
-            if (rememberUser) rememberUser.checked = !!savedUser;
+            if (userInput && mode === "login") userInput.value = userInput.value || "";
             if (rememberPwd) rememberPwd.checked = localStorage.getItem(REMEMBER_PWD_KEY) === "1";
             if (!localStorage.getItem(REMEMBER_PWD_KEY)) {
                 document.getElementById("authPasswordInput").value = "";
             }
             document.getElementById("authModalOverlay").classList.add("open");
+            setTimeout(() => userInput?.focus(), 50);
         }
 
         function closeAuthModal() {
@@ -3668,10 +3761,15 @@
             const username = document.getElementById("authUsernameInput").value.trim();
             const password = document.getElementById("authPasswordInput").value;
             const displayName = document.getElementById("authNameInput").value.trim();
-            const rememberUser = document.getElementById("authRememberUser")?.checked;
             const rememberPwd = document.getElementById("authRememberPwd")?.checked;
             const errEl = document.getElementById("authError");
             errEl.textContent = "";
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+                errEl.textContent = window.NasaroFeatures?.lang === "en"
+                    ? "Enter a valid email address."
+                    : "실제 이메일 주소를 입력해주세요.";
+                return;
+            }
             if (authModalMode === "signup" && password.length < 8) {
                 errEl.textContent = window.NasaroFeatures?.lang === "en"
                     ? "Password must be at least 8 characters."
@@ -3695,8 +3793,6 @@
                 }
                 authToken = data.token;
                 currentUser = data.user;
-                if (rememberUser) localStorage.setItem(REMEMBER_USER_KEY, username);
-                else localStorage.removeItem(REMEMBER_USER_KEY);
                 if (rememberPwd) {
                     localStorage.setItem(REMEMBER_PWD_KEY, "1");
                     localStorage.setItem(AUTH_TOKEN_KEY, authToken);
@@ -3907,6 +4003,7 @@
             requestAnimationFrame(() => settingsPanel.classList.add("open"));
             settingsBtn.classList.add("active");
             refreshSettingsDiagnostics();
+            updateSupportUI();
         }
         function closeSettings() {
             settingsPanel.classList.remove("open");
@@ -3946,6 +4043,10 @@
         });
 
         document.getElementById("supportInquiryBtn")?.addEventListener("click", async () => {
+            if (!authToken || !currentUser) {
+                openAuthModal("login");
+                return;
+            }
             const ta = document.getElementById("supportInquiryInput");
             const status = document.getElementById("supportInquiryStatus");
             const msg = (ta?.value || "").trim();
@@ -3961,13 +4062,24 @@
                     body: JSON.stringify({ message: msg, device_id: getDeviceId() }),
                 });
                 const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail || "전송 실패");
+                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "전송 실패");
                 if (ta) ta.value = "";
-                if (status) status.textContent = "문의가 접수되었습니다. 관리자 답변을 기다려주세요.";
+                if (status) status.textContent = "문의가 접수되었습니다.";
                 showToast("관리자 문의가 접수되었습니다.", "success");
+                await loadSupportHistory();
             } catch (err) {
                 if (status) status.textContent = err.message || "전송 실패";
             }
+        });
+
+        document.getElementById("authUsernameInput")?.addEventListener("keydown", e => {
+            if (e.key === "Enter") { e.preventDefault(); document.getElementById("authPasswordInput")?.focus(); }
+        });
+        document.getElementById("authPasswordInput")?.addEventListener("keydown", e => {
+            if (e.key === "Enter") { e.preventDefault(); submitAuth(); }
+        });
+        document.getElementById("authNameInput")?.addEventListener("keydown", e => {
+            if (e.key === "Enter") { e.preventDefault(); document.getElementById("authPasswordInput")?.focus(); }
         });
         settingsPanelClose?.addEventListener("click", closeSettings);
 

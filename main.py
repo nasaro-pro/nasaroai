@@ -27,6 +27,7 @@ from auth_store import (
     create_admin_session,
     create_public_share,
     create_support_inquiry,
+    delete_support_inquiry,
     get_activity_log,
     get_admin_dashboard,
     get_public_share,
@@ -38,6 +39,7 @@ from auth_store import (
     init_db,
     list_guest_devices,
     list_support_inquiries,
+    list_user_support_inquiries,
     log_activity,
     login as auth_login_fn,
     logout as auth_logout_fn,
@@ -2839,12 +2841,11 @@ def admin_support_reply(inquiry_id: int, body: SupportReplyRequest, request: Req
 @app.post("/support/inquiry")
 def user_support_inquiry(body: SupportInquiryRequest, request: Request) -> dict:
     user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="문의는 로그인 후 이용할 수 있습니다.")
     dev = (body.device_id or request.headers.get("X-Device-Id") or "").strip()
-    username = ""
-    user_id = None
-    if user:
-        user_id = user["id"]
-        username = user.get("username") or user.get("email") or ""
+    username = user.get("username") or user.get("email") or ""
+    user_id = user["id"]
     try:
         row = create_support_inquiry(
             body.message,
@@ -2866,6 +2867,26 @@ def user_support_inquiry(body: SupportInquiryRequest, request: Request) -> dict:
         detail=body.message[:120],
     )
     return row
+
+
+@app.get("/support/inquiries")
+def user_support_list(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {"inquiries": list_user_support_inquiries(int(user["id"]))}
+
+
+@app.delete("/support/inquiry/{inquiry_id}")
+def user_support_delete(inquiry_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        delete_support_inquiry(inquiry_id, int(user["id"]))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"success": True}
 
 
 @app.post("/admin/logout")

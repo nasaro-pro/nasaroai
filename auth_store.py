@@ -155,10 +155,17 @@ def _normalize_username(username: str) -> str:
     return value
 
 
+def _require_email(email: str) -> str:
+    value = email.strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+        raise ValueError("실제 사용 가능한 이메일 주소를 입력해주세요.")
+    return value
+
+
 def signup(username: str, password: str, display_name: str = "") -> dict[str, Any]:
     if len(password) < 8:
         raise ValueError("비밀번호는 8자 이상이어야 합니다.")
-    email_norm = _normalize_username(username)
+    email_norm = _require_email(username)
     now = time.time()
     with _lock:
         conn = _connect()
@@ -170,7 +177,7 @@ def signup(username: str, password: str, display_name: str = "") -> dict[str, An
             user_id = cur.lastrowid
             conn.commit()
         except sqlite3.IntegrityError as exc:
-            raise ValueError("이미 사용 중인 아이디입니다.") from exc
+            raise ValueError("이미 가입된 이메일입니다.") from exc
         finally:
             conn.close()
     token = create_session(int(user_id))
@@ -179,7 +186,10 @@ def signup(username: str, password: str, display_name: str = "") -> dict[str, An
 
 
 def login(username: str, password: str) -> dict[str, Any]:
-    email_norm = _normalize_username(username)
+    try:
+        email_norm = _require_email(username)
+    except ValueError:
+        email_norm = _normalize_username(username)
     with _lock:
         conn = _connect()
         try:
@@ -190,7 +200,7 @@ def login(username: str, password: str) -> dict[str, Any]:
         finally:
             conn.close()
     if not row or not _verify_password(password, row["password_hash"]):
-        raise ValueError("아이디 또는 비밀번호가 올바르지 않습니다.")
+        raise ValueError("이메일 또는 비밀번호가 올바르지 않습니다.")
     token = create_session(int(row["id"]))
     log_login_event(int(row["id"]), "login")
     return {"token": token, "user": _row_to_user(row)}
@@ -968,6 +978,60 @@ def add_support_reply(inquiry_id: int, message: str, from_admin: bool = True) ->
                 "UPDATE support_inquiries SET status = ?, updated_at = ? WHERE id = ?",
                 (status, now, inquiry_id),
             )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def list_user_support_inquiries(user_id: int, limit: int = 30) -> list[dict[str, Any]]:
+    limit = max(1, min(100, limit))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT * FROM support_inquiries WHERE user_id = ?
+                ORDER BY updated_at DESC LIMIT ?
+                """,
+                (user_id, limit),
+            ).fetchall()
+            out = []
+            for row in rows:
+                item = _support_row(row)
+                replies = conn.execute(
+                    "SELECT * FROM support_replies WHERE inquiry_id = ? ORDER BY created_at",
+                    (row["id"],),
+                ).fetchall()
+                item["replies"] = [
+                    {
+                        "id": r["id"],
+                        "from_admin": bool(r["from_admin"]),
+                        "message": r["message"],
+                        "created_at_iso": time.strftime(
+                            "%Y-%m-%d %H:%M", time.localtime(r["created_at"])
+                        ),
+                    }
+                    for r in replies
+                ]
+                out.append(item)
+        finally:
+            conn.close()
+    return out
+
+
+def delete_support_inquiry(inquiry_id: int, user_id: int) -> None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT user_id FROM support_inquiries WHERE id = ?", (inquiry_id,)
+            ).fetchone()
+            if not row:
+                raise ValueError("문의를 찾을 수 없습니다.")
+            if int(row["user_id"] or 0) != int(user_id):
+                raise ValueError("삭제 권한이 없습니다.")
+            conn.execute("DELETE FROM support_replies WHERE inquiry_id = ?", (inquiry_id,))
+            conn.execute("DELETE FROM support_inquiries WHERE id = ?", (inquiry_id,))
             conn.commit()
         finally:
             conn.close()
