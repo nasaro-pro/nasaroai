@@ -804,7 +804,12 @@
     if (!task) return;
     input.value = ""; input.style.height = "auto"; input.focus();
     try {
-      chrome.runtime.sendMessage({ type: "RUN_TASK", task }, () => void chrome.runtime.lastError);
+      chrome.runtime.sendMessage({ type: "RUN_TASK", task }, (res) => {
+        void chrome.runtime.lastError;
+        if (res && !res.ok && res.finalText) {
+          showBubble(res.finalText, res.kind || "error");
+        }
+      });
     } catch (e) {
       // Extension context invalidated (확장 리로드 시) → 무시
     }

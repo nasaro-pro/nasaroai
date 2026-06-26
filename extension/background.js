@@ -66,6 +66,12 @@ function parseHost(url) {
   try { return new URL(String(url || "")).host || ""; } catch { return ""; }
 }
 
+function safeAgentId(id) {
+  const s = String(id || "");
+  if (!/^a\d+$/.test(s)) return "";
+  return s;
+}
+
 function tsCreate(taskId, text, tabId, pageUrl) {
   return _withTasks(async (ts) => {
     // 활성(실행중/중단됨) 임무는 최대 5개 — 이미 5개이면 오류 표시 후 생성 안 함
@@ -214,8 +220,10 @@ async function scanCurrentTab(tabId) {
 
 // ---- 액션 실행 ----
 function buildResolveExpression(agentId) {
+  const safe = safeAgentId(agentId);
+  if (!safe) return "({ found: false })";
   return `(() => {
-    const el = document.querySelector('[data-agent-id="${agentId}"]');
+    const el = document.querySelector('[data-agent-id="${safe}"]');
     if (!el) return { found: false };
     el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
@@ -224,8 +232,10 @@ function buildResolveExpression(agentId) {
 }
 
 async function resolveElementCenter(tabId, agentId) {
+  const safe = safeAgentId(agentId);
+  if (!safe) return { found: false };
   const res = await sendCommand(tabId, "Runtime.evaluate", {
-    expression: buildResolveExpression(agentId), returnByValue: true,
+    expression: buildResolveExpression(safe), returnByValue: true,
   });
   return res?.result?.value ?? { found: false };
 }
@@ -260,21 +270,27 @@ async function executeAction(tabId, action) {
   const type = action?.action;
   try {
     if (type === "click") {
-      const c = await resolveElementCenter(tabId, action.target_id);
-      if (!c.found) return { success: false, error: "요소 없음(클릭): " + action.target_id };
+      const safe = safeAgentId(action.target_id);
+      if (!safe) return { success: false, error: "잘못된 요소 ID: " + action.target_id };
+      const c = await resolveElementCenter(tabId, safe);
+      if (!c.found) return { success: false, error: "요소 없음(클릭): " + safe };
       await dispatchClickAt(tabId, c.x, c.y);
     } else if (type === "type") {
-      const c = await resolveElementCenter(tabId, action.target_id);
-      if (!c.found) return { success: false, error: "요소 없음(입력): " + action.target_id };
+      const safe = safeAgentId(action.target_id);
+      if (!safe) return { success: false, error: "잘못된 요소 ID: " + action.target_id };
+      const c = await resolveElementCenter(tabId, safe);
+      if (!c.found) return { success: false, error: "요소 없음(입력): " + safe };
       await dispatchClickAt(tabId, c.x, c.y);
       await sendCommand(tabId, "Runtime.evaluate", {
-        expression: `(() => { const el = document.querySelector('[data-agent-id="${action.target_id}"]'); if (el) { el.focus(); if (el.select) el.select(); } })()`,
+        expression: `(() => { const el = document.querySelector('[data-agent-id="${safe}"]'); if (el) { el.focus(); if (el.select) el.select(); } })()`,
       });
       await sendCommand(tabId, "Input.insertText", { text: String(action.value ?? "") });
     } else if (type === "select") {
+      const safe = safeAgentId(action.target_id);
+      if (!safe) return { success: false, error: "잘못된 요소 ID: " + action.target_id };
       const val = JSON.stringify(String(action.value ?? ""));
       const expr = `(() => {
-        const el = document.querySelector('[data-agent-id="${action.target_id}"]');
+        const el = document.querySelector('[data-agent-id="${safe}"]');
         if (!el) return false;
         const want = ${val};
         let ok = false;
@@ -333,7 +349,9 @@ async function postStep(serverUrl, task, scan, actionHistory) {
   try { data = await resp.json(); }
   catch { throw new Error("서버 응답을 해석하지 못했습니다."); }
   if (!resp.ok || data.status === "error") {
-    throw new Error(data.message || data.detail?.message || "서버 오류 (" + resp.status + ")");
+    const detail = data.detail;
+    const detailMsg = typeof detail === "string" ? detail : detail?.message;
+    throw new Error(data.message || detailMsg || "서버 오류 (" + resp.status + ")");
   }
   return data;
 }
@@ -357,12 +375,13 @@ async function runTask(tabId, text, taskId, pageUrl) {
   const serverUrl = await getServerUrl();
   cancelFlags.delete(taskId);
   pauseFlags.delete(taskId);
+  let taskText = text;
 
   // 외부 try/finally: 어떤 경로(early return 포함)로 나가도 cleanup 보장
   try {
     // 1) 태스크 생성 — MAX_ACTIVE이면 에러 throw (이제 _withTasks가 에러를 전파함)
     try {
-      await tsCreate(taskId, text, tabId, pageUrl);
+      await tsCreate(taskId, taskText, tabId, pageUrl);
     } catch (e) {
       const msg = String(e?.message ?? e);
       if (msg === "MAX_ACTIVE") {
@@ -383,7 +402,7 @@ async function runTask(tabId, text, taskId, pageUrl) {
 
     await tsStep(taskId, "⚙️ 탭 제어 시작 (상단에 디버깅 배너 표시됨)", "info");
 
-    const actionHistory = [];
+    let actionHistory = [];
     let finalText = "최대 단계(" + MAX_ROUNDS + "단계)에 도달했습니다. 목표를 완전히 달성하지 못했을 수 있습니다.";
     let kind = "error";
 
@@ -409,7 +428,7 @@ async function runTask(tabId, text, taskId, pageUrl) {
         if (amendMap.has(taskId)) {
           const newGoal = amendMap.get(taskId);
           amendMap.delete(taskId);
-          text = newGoal;
+          taskText = newGoal;
           actionHistory = [];
           await tsStep(taskId, `✏️ 지시 수정됨: ${newGoal}`, "info");
           await _withTasks(async ts => {
@@ -419,13 +438,13 @@ async function runTask(tabId, text, taskId, pageUrl) {
         }
 
         const scan = await scanCurrentTab(tabId);
-        const data  = await postStep(serverUrl, text, scan, actionHistory);
+        const data  = await postStep(serverUrl, taskText, scan, actionHistory);
         const reasoning = data.reasoning || "(이유 없음)";
         await tsStep(taskId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
 
         if (data.handoff_required) {
           finalText = data.reasoning || "보안상 사용자가 직접 처리해야 합니다.";
-          kind = "paused";
+          kind = "handoff";
           await tsStep(taskId, "⏸ " + finalText, "info");
           break;
         }
