@@ -451,7 +451,7 @@ class SupportReplyRequest(BaseModel):
 
 
 class PresenceRequest(BaseModel):
-    device_id: str | None = None = ""
+    device_id: str | None = None
 
 
 def _admin_bearer(request: Request) -> str | None:
