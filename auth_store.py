@@ -78,6 +78,19 @@ def init_db() -> None:
                     token TEXT PRIMARY KEY,
                     expires_at REAL NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS usage_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subject TEXT NOT NULL,
+                    feature TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS login_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    event_type TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
                 """
             )
             conn.commit()
@@ -129,6 +142,7 @@ def signup(username: str, password: str, display_name: str = "") -> dict[str, An
         finally:
             conn.close()
     token = create_session(int(user_id))
+    log_login_event(int(user_id), "signup")
     return {"token": token, "user": get_user_by_id(int(user_id))}
 
 
@@ -146,6 +160,7 @@ def login(username: str, password: str) -> dict[str, Any]:
     if not row or not _verify_password(password, row["password_hash"]):
         raise ValueError("아이디 또는 비밀번호가 올바르지 않습니다.")
     token = create_session(int(row["id"]))
+    log_login_event(int(row["id"]), "login")
     return {"token": token, "user": _row_to_user(row)}
 
 
@@ -303,6 +318,98 @@ def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     return current
 
 
+def log_usage_event(subject: str, feature: str) -> None:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "INSERT INTO usage_events (subject, feature, created_at) VALUES (?, ?, ?)",
+                (subject, feature, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def log_login_event(user_id: int, event_type: str = "login") -> None:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "INSERT INTO login_events (user_id, event_type, created_at) VALUES (?, ?, ?)",
+                (user_id, event_type, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_active_session_count() -> int:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM sessions WHERE expires_at > ?",
+                (now,),
+            ).fetchone()
+        finally:
+            conn.close()
+    return int(row["c"]) if row else 0
+
+
+def get_usage_by_hour(day_key: str | None = None) -> dict[str, int]:
+    day_key = day_key or _day_key()
+    # KST day window
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, CAST(strftime('%H', datetime(created_at, 'unixepoch', '+9 hours')) AS INTEGER) AS hr,
+                       COUNT(*) AS cnt
+                FROM usage_events
+                WHERE strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY feature, hr
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    out: dict[str, int] = {}
+    for r in rows:
+        key = f"{r['feature']}:{r['hr']:02d}"
+        out[key] = int(r["cnt"])
+    return out
+
+
+def get_user_login_stats(user_id: int) -> dict[str, Any]:
+    with _lock:
+        conn = _connect()
+        try:
+            total = conn.execute(
+                "SELECT COUNT(*) AS c FROM login_events WHERE user_id = ? AND event_type = 'login'",
+                (user_id,),
+            ).fetchone()["c"]
+            last = conn.execute(
+                "SELECT created_at FROM login_events WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+            active = conn.execute(
+                "SELECT COUNT(*) AS c FROM sessions s WHERE s.user_id = ? AND s.expires_at > ?",
+                (user_id, time.time()),
+            ).fetchone()["c"]
+        finally:
+            conn.close()
+    return {
+        "login_count": int(total),
+        "last_login_at": last["created_at"] if last else None,
+        "active_sessions": int(active),
+    }
+
+
 def _day_key() -> str:
     # KST midnight reset approximation via UTC+9
     kst = time.gmtime(time.time() + 9 * 3600)
@@ -331,6 +438,7 @@ def check_and_consume_quota(subject: str, feature: str) -> tuple[bool, dict[str,
                 (subject, feature, day_key),
             )
             conn.commit()
+            log_usage_event(subject, feature)
             return True, {"feature": feature, "used": used + 1, "limit": limit, "day_key": day_key}
         finally:
             conn.close()
@@ -499,13 +607,26 @@ def get_admin_dashboard() -> dict[str, Any]:
         uid = int(u["id"])
         quotas = get_user_quota_totals(uid)
         data = get_user_data(uid)
+        login_stats = get_user_login_stats(uid)
+        collab_info = data.get("active_collab") or {}
         enriched.append({
             **u,
             "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(u["created_at"])),
             "quota_today": {k: quotas.get(k, 0) for k in QUOTA_LIMITS},
             "quota_all_time": quotas.get("_all_time", {}),
             "saved_results_count": len(data.get("saved_works") or []),
-            "has_active_collab": bool(data.get("active_collab")),
+            "has_active_collab": bool(collab_info),
+            "collab_task": (collab_info.get("task") or "")[:80] if collab_info else "",
+            "collab_work_type": collab_info.get("plan", {}).get("work_type", "") if collab_info else "",
+            "collab_stage_done": sum(
+                1 for s in (collab_info.get("stageStates") or []) if s == "done"
+            ) if collab_info else 0,
+            "login_count": login_stats["login_count"],
+            "last_login_iso": time.strftime(
+                "%Y-%m-%d %H:%M", time.localtime(login_stats["last_login_at"])
+            ) if login_stats.get("last_login_at") else "-",
+            "active_sessions": login_stats["active_sessions"],
+            "is_online": login_stats["active_sessions"] > 0,
         })
     with _lock:
         conn = _connect()
@@ -521,7 +642,9 @@ def get_admin_dashboard() -> dict[str, Any]:
     return {
         "day_key": day_key,
         "total_users": int(total_users),
+        "active_sessions": get_active_session_count(),
         "share_links": int(share_count),
         "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
+        "usage_by_hour": get_usage_by_hour(day_key),
         "users": enriched,
     }

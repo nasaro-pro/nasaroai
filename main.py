@@ -333,6 +333,17 @@ class CollabStageRequest(BaseModel):
     acceptance: list[str] = Field(default_factory=list)
     stage_model: str = ""
     user_id: str = ""
+    verification_feedback: str = ""
+    is_rework: bool = False
+    artifact_under_review: str = ""
+
+
+class CollabFollowupRequest(BaseModel):
+    task: str
+    original_task: str = ""
+    work_type: str = ""
+    stage_outputs: list[str] = Field(default_factory=list)
+    user_id: str = ""
 
 
 class AuthSignupRequest(BaseModel):
@@ -382,6 +393,29 @@ def _require_admin(request: Request) -> str:
 
 COLLAB_TYPE_RULES: list[dict] = [
     {
+        "type": "자기소개서·취업",
+        "keywords": [
+            "자기소개서", "자소서", "자기소개", "입사", "취업", "지원서", "cover letter",
+            "resume", "cv", "면접", "경력기술서", "포트폴리오", "jd", "채용",
+        ],
+        "tools": {
+            "research": ["Perplexity", "LinkedIn", "잡코리아/원티드 JD"],
+            "structure": ["Claude", "ChatGPT"],
+            "production": ["Claude", "ChatGPT", "Notion AI"],
+            "review": ["DeepSeek", "Claude"],
+        },
+        "algorithm": [
+            "지원 직무·회사/학교, 강조할 경력·역량, 분량·형식(글자수/항목)을 확정한다.",
+            "JD(직무기술서)와 본인 경력의 매칭 포인트, 성과 수치, 차별화 근거를 조사한다.",
+            "도입→경력→역량→지원동기→마무리 흐름과 문단별 핵심 메시지·키워드를 설계한다.",
+            "직무 맞춤형 자기소개서·지원서 초안을 작성한다(항목별 분리).",
+            "과장·누락·직무 불일치·맞춤법·톤·분량·중복을 검증한다. 직접 재작성하지 않고 오류·보완점과 수정 지시만 작성한다.",
+            "조사·구조 AI에게 피드백 기반 재조사·재설계 지시를 전달하고, 제작 AI는 수정된 구조로 초안을 갱신한다.",
+            "통과 기준(직무 적합·구체적 성과·일관된 톤·분량 준수)을 만족하면 최종본을 확정한다.",
+        ],
+        "acceptance": ["직무와 내용 일치", "성과·수치 구체적", "항목별 분량 준수", "과장·누락 없음"],
+    },
+    {
         "type": "동영상 제작",
         "keywords": ["동영상", "영상", "숏츠", "유튜브", "릴스", "틱톡", "편집", "자막", "나레이션"],
         "tools": {
@@ -403,7 +437,7 @@ COLLAB_TYPE_RULES: list[dict] = [
     },
     {
         "type": "문서 제작",
-        "keywords": ["문서", "보고서", "제안서", "기획서", "논문", "정리", "요약", "계약서"],
+        "keywords": ["문서", "보고서", "제안서", "기획서", "논문", "정리", "요약", "계약서", "레포트", "원고"],
         "tools": {
             "research": ["Perplexity", "NotebookLM", "ChatPDF"],
             "structure": ["Claude", "ChatGPT", "Notion AI"],
@@ -587,35 +621,40 @@ COLLAB_TYPE_RULES: list[dict] = [
 COLLAB_STAGE_META = [
     {
         "short": "조사",
-        "role": "조사·트렌드",
+        "role": "조사·리서치",
         "default_model": "Perplexity",
         "options": ["Perplexity", "xAI", "OpenAI", "Google"],
-        "hint": "최신 트렌드·출처·팩트 조사 (Perplexity·Grok·GPT)",
+        "hint": "요청의 핵심 목표·제약·독자를 파악하고, 최신 출처·팩트·레퍼런스·경쟁/유사 사례를 수집합니다. 다음 단계(구조)가 바로 쓸 수 있는 근거 목록을 만듭니다.",
+        "detail": "① 작업 범위·성공 기준 정의 ② 1차 출처·최신 자료 수집 ③ 핵심 인사이트·리스크·반례 정리 ④ 구조 단계용 근거 패키지 작성",
     },
     {
         "short": "구조",
         "role": "구조·기획",
         "default_model": "Anthropic",
         "options": ["Anthropic", "OpenAI", "Google", "DeepSeek"],
-        "hint": "목차·논리·프롬프트 설계 (Claude)",
+        "hint": "조사 결과를 바탕으로 목차·논리 흐름·섹션별 핵심 메시지·작성 지시문(프롬프트)을 설계합니다. 제작 AI가 그대로 실행할 수 있는 청사진을 만듭니다.",
+        "detail": "① 목차/와이어프레임 ② 섹션별 목적·필수 포함 요소 ③ 논리 순서·전환 ④ 제작 단계용 상세 지시문",
     },
     {
         "short": "제작",
         "role": "제작·초안",
         "default_model": "OpenAI",
         "options": ["OpenAI", "Anthropic", "DeepSeek", "Google"],
-        "hint": "본문·초안·실제 결과물 작성 (GPT)",
+        "hint": "구조·지시문에 따라 실제 작업물 초안을 작성합니다. 조사·구조 단계 산출물을 반영하고, 검증 단계에서 점검할 완성형 초안을 만듭니다.",
+        "detail": "① 구조대로 본문/초안 작성 ② 형식·분량·톤 준수 ③ 근거·출처 반영 ④ 검증용 최종 초안 제출",
     },
     {
         "short": "검증",
-        "role": "검증·교정",
+        "role": "검증·품질",
         "default_model": "DeepSeek",
         "options": ["DeepSeek", "Anthropic", "OpenAI", "Perplexity"],
-        "hint": "오류·누락·일관성 점검",
+        "hint": "작업물을 직접 재작성하지 않습니다. 오류·누락·논리 비약·형식 문제를 지적하고, 조사/구조/제작 AI에게 줄 구체적 수정 지시를 작성합니다.",
+        "detail": "① 통과 기준 대비 체크 ② 오류·보완점 목록(심각도) ③ 단계별 수정 지시 ④ 통과/재작업 필요 여부(JSON)",
     },
 ]
 
 COLLAB_TYPE_DEFAULT_MODELS: dict[str, list[str]] = {
+    "자기소개서·취업": ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"],
     "문서 제작": ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"],
     "동영상 제작": ["Perplexity", "xAI", "OpenAI", "DeepSeek"],
     "PPT·발표자료": ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"],
@@ -625,49 +664,71 @@ COLLAB_TYPE_DEFAULT_MODELS: dict[str, list[str]] = {
 }
 
 
-def build_collab_plan(task: str) -> dict:
+def _score_collab_rule(task_lower: str, rule: dict) -> int:
+    score = 0
+    for keyword in rule["keywords"]:
+        kw = keyword.lower()
+        if kw in task_lower:
+            score += max(3, len(kw))
+    return score
+
+
+def _select_collab_rule(task: str, forced_type: str | None = None) -> dict:
+    if forced_type:
+        for rule in COLLAB_TYPE_RULES:
+            if rule["type"] == forced_type:
+                return rule
     lowered = task.lower()
-    selected = COLLAB_TYPE_RULES[-2]  # 리서치·아이디어 기본값
+    selected = COLLAB_TYPE_RULES[-2]
     best_score = -1
     for rule in COLLAB_TYPE_RULES:
-        score = sum(1 for keyword in rule["keywords"] if keyword.lower() in lowered)
+        score = _score_collab_rule(lowered, rule)
         if score > best_score:
             best_score = score
             selected = rule
+    return selected
 
+
+def build_collab_plan(task: str, forced_type: str | None = None) -> dict:
+    selected = _select_collab_rule(task, forced_type)
     tools = selected["tools"]
     stages = [
         {
             "name": "1단계 · 조사/아이디어",
-            "goal": "작업 방향을 정할 근거와 후보를 모읍니다.",
+            "goal": COLLAB_STAGE_META[0]["hint"],
+            "detail": COLLAB_STAGE_META[0]["detail"],
             "tools": tools["research"],
             "actions": selected["algorithm"][:2],
         },
         {
             "name": "2단계 · 논리구조/지시문",
-            "goal": "작업물을 만들 수 있는 구조와 프롬프트를 확정합니다.",
+            "goal": COLLAB_STAGE_META[1]["hint"],
+            "detail": COLLAB_STAGE_META[1]["detail"],
             "tools": tools["structure"],
             "actions": selected["algorithm"][2:3],
         },
         {
             "name": "3단계 · 제작/초안",
-            "goal": "실제 결과물 초안을 만듭니다.",
+            "goal": COLLAB_STAGE_META[2]["hint"],
+            "detail": COLLAB_STAGE_META[2]["detail"],
             "tools": tools["production"],
             "actions": selected["algorithm"][3:4],
         },
         {
-            "name": "4단계 · 검증/재제작/통과",
-            "goal": "오류를 찾고 고쳐 최종 통과 기준을 만족시킵니다.",
+            "name": "4단계 · 검증/피드백",
+            "goal": COLLAB_STAGE_META[3]["hint"],
+            "detail": COLLAB_STAGE_META[3]["detail"],
             "tools": tools["review"],
-            "actions": selected["algorithm"][4:],
+            "actions": selected["algorithm"][4:6],
         },
     ]
     return {
         "task": task,
         "work_type": selected["type"],
         "summary": (
-            f"「{selected['type']}」 작업입니다. "
-            "1) 조사로 근거를 모으고 → 2) 구조를 잡고 → 3) 초안을 만들고 → 4) 검증 후 마무리합니다."
+            f"「{selected['type']}」 작업으로 분류했습니다. "
+            "1) 조사 → 2) 구조·지시문 → 3) 제작 → 4) 검증(피드백·지시) 순으로 단계별 실행합니다. "
+            "검증 AI는 재작성하지 않고, 문제 지적 후 해당 단계 AI가 수정합니다."
         ),
         "stage_models": COLLAB_TYPE_DEFAULT_MODELS.get(
             selected["type"],
@@ -676,7 +737,7 @@ def build_collab_plan(task: str) -> dict:
         "stage_meta": COLLAB_STAGE_META,
         "stages": stages,
         "acceptance": selected["acceptance"],
-        "handoff": "각 단계 결과를 다음 단계 입력으로 넘기고, 검증 실패 항목만 되돌려 재제작합니다.",
+        "handoff": "각 단계 산출물을 다음 단계 입력으로 넘깁니다. 검증 실패 시 지적·지시만 전달하고 조사/구조/제작 단계가 순서대로 수정합니다.",
     }
 
 
@@ -1942,10 +2003,25 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
     """사용자 작업 설명을 작업 유형별 협업 알고리즘으로 변환한다."""
     _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
-    plan = build_collab_plan(data.task.strip())
+    task = data.task.strip()
+    plan = build_collab_plan(task)
+
+    type_names = ", ".join(r["type"] for r in COLLAB_TYPE_RULES)
+    cls_prompt = (
+        f"사용자 요청:\n{task}\n\n"
+        f"가능한 작업 유형: {type_names}\n\n"
+        "요청 내용에 가장 정확히 맞는 유형 이름 하나만 출력하세요. 다른 설명 없이 유형명만."
+    )
+    cls_result = await call_ai_best(cls_prompt, max_tokens=80)
+    if cls_result.success:
+        picked = cls_result.content.strip().strip('"').strip("'")
+        for rule in COLLAB_TYPE_RULES:
+            if rule["type"] in picked or picked in rule["type"]:
+                plan = build_collab_plan(task, forced_type=rule["type"])
+                break
 
     prompt = (
-        f"사용자 작업: {data.task}\n"
+        f"사용자 작업: {task}\n"
         f"분류된 작업 유형: {plan['work_type']}\n\n"
         "이 작업을 실제로 끝내기 위해 가장 중요한 주의점 3개와 "
         "처음 실행할 구체적 액션 3개를 한국어로 짧게 제안하세요."
@@ -1964,43 +2040,101 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
     }
 
 
-@app.post("/collab/run-stage")
-async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
-    """협업 워크플로우의 특정 단계를 실제 실행 가능한 지시문으로 변환한다."""
-    _require_quota(request, "collab", data.user_id)
-    await ensure_model_cache_fresh()
+def _collab_stage_prompt(data: CollabStageRequest) -> str:
     action_lines = "\n".join(f"- {action}" for action in data.actions) or "- (단계 알고리즘 없음)"
     tool_lines = ", ".join(data.tools) if data.tools else "추천 도구 없음"
     acceptance_lines = "\n".join(f"- {item}" for item in data.acceptance) or "- 단계 완료 후 다음 단계로 넘깁니다."
-    stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
-        data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
-    ]
-    stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·리뷰"]
-    stage_role = stage_roles[data.stage_index % len(stage_roles)]
+    stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·품질"]
+    stage_role = stage_roles[data.stage_index % 4]
+    rework_note = ""
+    if data.is_rework and data.verification_feedback:
+        rework_note = (
+            f"\n\n[검증 AI 피드백 — 반드시 반영하여 이 단계 산출물을 수정]\n{data.verification_feedback}\n"
+        )
 
-    prompt = (
+    if data.stage_index == 3 and not data.is_rework:
+        artifact = data.artifact_under_review or data.previous_notes or "(검토할 산출물 없음)"
+        return (
+            f"작업: {data.task}\n작업 유형: {data.work_type}\n"
+            f"현재 단계: {data.stage_name} (4/4) — 역할: {stage_role}\n\n"
+            f"검토 대상 작업물(제작 단계 산출물):\n{artifact}\n\n"
+            f"이전 단계 요약:\n{data.previous_notes or '없음'}\n\n"
+            f"통과 기준:\n{acceptance_lines}\n\n"
+            "당신은 검증 AI입니다. **절대 작업물 전체를 재작성하지 마세요.**\n"
+            "다음 형식으로 한국어 작성:\n"
+            "1) 통과 기준별 평가 (통과/부분통과/미통과)\n"
+            "2) 발견된 오류·누락·보완점 (심각도: 높음/중간/낮음)\n"
+            "3) 단계별 수정 지시 — 조사 AI(1단계), 구조 AI(2단계), 제작 AI(3단계)에게 줄 구체적 지시\n"
+            "4) 재작업이 필요한 단계 번호 (1=조사, 2=구조, 3=제작). 없으면 빈 배열\n\n"
+            "마지막 줄에 반드시 JSON 한 줄:\n"
+            '{"pass": true|false, "rework_stages": [1,2], "instructions": {"1":"...", "2":"...", "3":"..."}, "summary":"한줄요약"}'
+        )
+
+    stage_outputs = {
+        0: (
+            "조사·리서치 AI로서 다음을 수행하고 **실제 조사 결과**를 작성하세요:\n"
+            "1) 작업 목표·제약·독자·성공 기준\n"
+            "2) 수집한 근거·출처·팩트·유사사례 (가능하면 출처 표기)\n"
+            "3) 핵심 인사이트·리스크·반례\n"
+            "4) 구조 단계에 넘길 근거 패키지 (목록 형태)\n"
+        ),
+        1: (
+            "구조·기획 AI로서 조사 결과를 바탕으로 **실행 가능한 구조**를 작성하세요:\n"
+            "1) 목차/와이어프레임\n"
+            "2) 섹션별 핵심 메시지·필수 포함 요소\n"
+            "3) 논리 흐름·전환\n"
+            "4) 제작 AI가 그대로 실행할 상세 지시문(프롬프트)\n"
+        ),
+        2: (
+            "제작·초안 AI로서 구조·지시문에 따라 **실제 작업물 초안**을 작성하세요:\n"
+            "1) 완성형 초안 본문 (형식·분량·톤 준수)\n"
+            "2) 조사·구조 단계 반영 여부\n"
+            "3) 검증 단계에서 점검할 최종 산출물\n"
+        ),
+    }
+    role_instruction = stage_outputs.get(data.stage_index, "단계 결과를 작성하세요.")
+
+    return (
         f"작업: {data.task}\n"
         f"작업 유형: {data.work_type}\n"
         f"현재 단계: {data.stage_name} ({data.stage_index + 1}/4) — 역할: {stage_role}\n"
         f"이 단계 알고리즘:\n{action_lines}\n"
         f"추천 도구: {tool_lines}\n"
-        f"이전 단계 메모:\n{data.previous_notes or '없음'}\n\n"
-        f"당신은 {stage_role} 전문 AI입니다. 다른 단계 AI와 역할이 겹치지 않게 작성하세요.\n"
-        "위 단계를 지금 실행하기 위한 결과를 아래 형식으로 한국어로 작성하세요.\n"
-        "1) 지금 할 일 5개 (체크리스트)\n"
-        "2) 추천 도구별 사용법 3개\n"
-        "3) 이 단계 완료 기준\n"
-        "4) 다음 단계로 넘길 산출물 1~2개\n"
+        f"이전 단계 산출물:\n{data.previous_notes or '없음'}\n"
+        f"{rework_note}\n"
+        f"당신은 {stage_role} 전문 AI입니다.\n{role_instruction}\n"
         f"전체 통과 기준 참고:\n{acceptance_lines}"
     )
 
-    result = await call_ai_best(prompt, max_tokens=900, preferred_labels=[stage_model])
+
+@app.post("/collab/run-stage")
+async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
+    """협업 워크플로우의 특정 단계를 실행한다."""
+    _require_quota(request, "collab", data.user_id)
+    await ensure_model_cache_fresh()
+    stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
+        data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
+    ]
+    stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·품질"]
+    stage_role = stage_roles[data.stage_index % 4]
+    prompt = _collab_stage_prompt(data)
+    max_tokens = 1200 if data.stage_index == 2 else (1000 if data.stage_index == 3 else 900)
+
+    result = await call_ai_best(prompt, max_tokens=max_tokens, preferred_labels=[stage_model])
     guidance = result.content if result.success else (
-        f"{data.stage_name} 단계를 진행하세요.\n\n"
-        f"알고리즘:\n{action_lines}\n\n"
-        f"추천 도구: {tool_lines}\n\n"
-        "각 항목을 완료한 뒤 '단계 완료'를 눌러 다음 단계로 넘기세요."
+        f"{data.stage_name} 단계를 진행하세요.\n\n{prompt[:500]}..."
     )
+
+    verify_meta = None
+    if data.stage_index == 3 and not data.is_rework and guidance:
+        import re
+        m = re.search(r'\{[^{}]*"pass"[^{}]*\}', guidance)
+        if m:
+            try:
+                verify_meta = json.loads(m.group(0))
+            except json.JSONDecodeError:
+                verify_meta = None
+
     return {
         "stage_index": data.stage_index,
         "stage_name": data.stage_name,
@@ -2009,7 +2143,43 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
         "stage_role": stage_role,
         "success": True,
         "ai_success": result.success,
+        "verify_meta": verify_meta,
     }
+
+
+@app.post("/collab/followup-route")
+async def collab_followup_route(data: CollabFollowupRequest, request: Request) -> dict:
+    """추가 작업 요청을 분석해 재시작할 단계를 결정한다."""
+    _require_quota(request, "collab", data.user_id)
+    await ensure_model_cache_fresh()
+    outputs_summary = "\n".join(
+        f"[{i + 1}단계] {(t or '')[:400]}" for i, t in enumerate(data.stage_outputs[:3])
+    )
+    prompt = (
+        f"원래 작업: {data.original_task}\n"
+        f"작업 유형: {data.work_type}\n"
+        f"추가 요청: {data.task}\n\n"
+        f"현재 단계별 산출물 요약:\n{outputs_summary or '없음'}\n\n"
+        "추가 요청을 반영하려면 어느 단계부터 다시 해야 하는지 판단하세요.\n"
+        "1=조사, 2=구조, 3=제작. 논리·구조 수정이면 2, 사실·근거면 1, 문장·초안만이면 3.\n"
+        'JSON만 출력: {"start_stage": 1, "reason": "한국어 설명", "merged_task": "반영된 전체 작업 설명"}'
+    )
+    result = await call_ai_best(prompt, max_tokens=300)
+    start_stage = 1
+    reason = "추가 요청 반영"
+    merged = f"{data.original_task}. 추가: {data.task}"
+    if result.success:
+        import re
+        m = re.search(r"\{[^{}]+\}", result.content)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+                start_stage = max(0, min(2, int(parsed.get("start_stage", 1)) - 1))
+                reason = parsed.get("reason") or reason
+                merged = parsed.get("merged_task") or merged
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+    return {"start_stage": start_stage, "reason": reason, "merged_task": merged, "success": True}
 
 
 @app.get("/collab/templates")

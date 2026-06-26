@@ -3,101 +3,99 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nasaro AI 구조·아이디어 가이드</title>
+  <title>Nasaro AI 사용 가이드</title>
   <style>
-    :root { color-scheme: light; }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.75; }
-    .wrap { max-width: 920px; margin: 0 auto; padding: 28px 18px 64px; }
-    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-    a.back { text-decoration: none; color: #6d28d9; font-weight: 700; font-size: 14px; }
-    h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.03em; }
-    .lead { color: #475569; margin: 0 0 24px; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif; background: #f0f4ff; color: #0f172a; line-height: 1.75; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 28px 18px 64px; }
+    a.back { display: inline-block; margin-bottom: 16px; color: #6d28d9; font-weight: 700; text-decoration: none; }
+    h1 { font-size: 26px; margin: 0 0 8px; }
+    .lead { color: #475569; margin-bottom: 24px; }
     section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
-    h2 { font-size: 18px; margin: 0 0 10px; color: #1d4ed8; }
+    h2 { font-size: 17px; margin: 0 0 10px; color: #4338ca; }
+    h3 { font-size: 14px; margin: 14px 0 6px; color: #334155; }
     ul, ol { padding-left: 20px; margin: 8px 0; }
-    code { background: #f1f5f9; padding: 2px 6px; border-radius: 6px; font-size: 0.92em; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #fafafa; }
-    .card strong { display: block; margin-bottom: 4px; }
-    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    .tip { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 14px; margin: 10px 0; }
+    .step { font-weight: 700; color: #7c3aed; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="top">
-      <div>
-        <h1>Nasaro AI 구조·아이디어 가이드</h1>
-        <p class="lead">설정 패널에도 요약이 있습니다. (<code>docs/GUIDE_SYNC.md</code> 참고)</p>
-      </div>
-      <a class="back" href="/">← Nasaro AI로 돌아가기</a>
-    </div>
+    <a class="back" href="/">← Nasaro AI로 돌아가기</a>
+    <h1>📘 Nasaro AI 사용 가이드</h1>
+    <p class="lead">처음이셔도 괜찮아요. 아래 순서대로 따라 하시면 됩니다.</p>
 
     <section>
-      <h2>1. Nasaro AI가 하는 일</h2>
-      <div class="grid">
-        <div class="card"><strong>비교</strong>여러 AI 답변을 한 화면에서 비교합니다.</div>
-        <div class="card"><strong>토론</strong>주제별 AI 라운드 토론입니다.</div>
-        <div class="card"><strong>협업</strong>작업 유형별 4단계 알고리즘 + 단계별 AI 실행입니다.</div>
-        <div class="card"><strong>에이전트</strong>PC 확장 / Android 오버레이로 화면 위 임무 실행입니다.</div>
-      </div>
-    </section>
-
-    <section>
-      <h2>2. 저장 · 프라이버시</h2>
-      <ul>
-        <li><strong>자동 기록 없음</strong> — 비교·토론·에이전트 결과는 그 채팅 화면에만 표시됩니다.</li>
-        <li><strong>결과물 저장</strong> — 답변 옆 「💾 결과물 저장」 버튼을 눌렀을 때만 메뉴 「결과물 파일」에 추가됩니다.</li>
-        <li><strong>비로그인</strong> — sessionStorage에만 보관 (탭/브라우저 데이터 삭제 시 사라짐).</li>
-        <li><strong>로그인</strong> — 서버 동기화 + Android 앱 IndexedDB 오프라인 보관.</li>
-        <li><strong>🔒 프라이버시</strong> — 서버 동기화·공유 링크는 막지만, 수동 「결과물 저장」은 가능합니다.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>3. 회원 · 관리자</h2>
-      <ul>
-        <li>회원가입: <code>/auth/signup</code> (이메일, 비밀번호 8자+)</li>
-        <li>관리자: 왼쪽 상단 「관리」→ 비밀번호 → <code>/admin</code> 대시보드 (회원·사용량)</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>4. 대중이 이 사이트를 쓰는 이유</h2>
-      <ul>
-        <li>ChatGPT만 쓰면 “이 답 맞나?” — <strong>여러 AI를 한 번에</strong> 보고 고를 수 있음</li>
-        <li>조사·기획·글쓰기를 <strong>토론·협업 4단계</strong>로 체계화</li>
-        <li>PC/폰에서 <strong>에이전트</strong>로 반복 작업 대신</li>
-        <li>원하는 것만 <strong>결과물 저장</strong> — 프라이버시 부담 적음</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>5. 보완 우선순위 (대중용)</h2>
+      <h2>시작하기</h2>
       <ol>
-        <li>베스트 답변 원탭 복사</li>
-        <li>메일·SNS·카톡 초안 템플릿</li>
-        <li>「오늘 뭐 물어볼까」 질문 추천</li>
-        <li>즐겨찾는 AI 고정</li>
-        <li>최근 질문 재실행</li>
-        <li>QR로 폰↔PC 공유</li>
-        <li>PDF/인쇄 한 장 내보내기</li>
-        <li>초보 모드 (기능 하나씩 크게)</li>
-        <li>Android 홈 위젯</li>
-        <li>협업·에이전트 완료 알림 강화</li>
+        <li>화면 <strong>아래 입력창</strong>에 하고 싶은 일을 적습니다.</li>
+        <li><span class="step">비교 · 토론 · 협업</span> 중 모드를 고릅니다.</li>
+        <li><strong>🤖 AI</strong> 버튼을 눌러 사용할 AI를 선택합니다 (여러 개 가능).</li>
+        <li>오른쪽 <strong>▶ 버튼</strong>으로 실행합니다.</li>
       </ol>
-      <p><strong>하지 않음:</strong> REST API 키 (개발자용, 대중 불필요). 커스텀 협업 플러그인은 보류.</p>
+      <div class="tip">에이전트(자동 실행)는 입력창 <strong>위</strong> 「🌐 에이전트」 버튼을 누르세요. PC는 확장 프로그램, 폰은 앱이 필요합니다.</div>
     </section>
 
     <section>
-      <h2>6. ✅ 구현됨</h2>
+      <h2>비교 모드</h2>
+      <p>같은 질문을 여러 AI에게 동시에 보냅니다. 답이 나란히 표시되어 어느 답이 나은지 바로 비교할 수 있습니다.</p>
       <ul>
-        <li>음성·공유·다크모드·다국어·AI 프리셋·예약 에이전트</li>
-        <li>결과물 저장 버튼 + 결과물 파일 메뉴</li>
-        <li>회원가입/로그인 + 서버 동기화</li>
-        <li>관리자 대시보드</li>
-        <li>Android 다단계 명령·민감 작업 확인·자동 AI</li>
+        <li>AI 칩에서 비교할 모델을 고르세요 (전체 = 6개 모두).</li>
+        <li>각 답변 오른쪽 <strong>「복사」</strong> 버튼으로 텍스트를 복사할 수 있습니다.</li>
+        <li>마음에 드는 결과는 <strong>💾 결과물 저장</strong>으로 보관하세요.</li>
       </ul>
+    </section>
+
+    <section>
+      <h2>토론 모드</h2>
+      <p>주제 하나를 놓고 AI들이 라운드별로 의견을 주고받습니다. 기획안·논점 정리에 유용합니다.</p>
+    </section>
+
+    <section>
+      <h2>협업 모드 (4단계)</h2>
+      <p>작업을 <strong>조사 → 구조 → 제작 → 검증</strong> 순으로 AI가 나눠 수행합니다.</p>
+      <h3>단계별 역할</h3>
+      <ul>
+        <li><strong>1 조사</strong> — 근거·출처·팩트 수집</li>
+        <li><strong>2 구조</strong> — 목차·논리·작성 지시문 설계</li>
+        <li><strong>3 제작</strong> — 실제 초안·작업물 작성</li>
+        <li><strong>4 검증</strong> — 오류·누락 지적 (재작성 X) → 필요 시 1~3단계가 수정</li>
+      </ul>
+      <h3>사용 방법</h3>
+      <ol>
+        <li>작업 내용 입력 → <strong>AI 추천 ▶</strong></li>
+        <li>각 단계 카드에서 AI 변경 가능</li>
+        <li><strong>▶ 작업 시작</strong> → 1단계부터 자동 순차 실행</li>
+        <li>완료 후 추가 수정은 입력창에 적고 <strong>추가 작업 ▶</strong></li>
+      </ol>
+      <div class="tip">「자기소개서」「보고서」「영상 기획」 등 요청 내용에 맞게 작업 유형이 자동 분류됩니다.</div>
+    </section>
+
+    <section>
+      <h2>에이전트</h2>
+      <ul>
+        <li>PC: Chrome 확장 설치 후 「에이전트」 클릭</li>
+        <li>Android: APK 설치 → 오버레이·접근성 권한 허용</li>
+        <li>「5분 뒤 ○○해줘」처럼 입력하면 <strong>예약 임무</strong>로 등록됩니다</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>저장 · 공유 · 계정</h2>
+      <ul>
+        <li>자동 기록 없음 — <strong>💾 결과물 저장</strong>을 눌러야 메뉴 「결과물 파일」에 쌓입니다.</li>
+        <li>로그인하면 다른 기기에서도 결과물을 이어갈 수 있습니다.</li>
+        <li>공유 링크는 <strong>로그인 후</strong> 계정으로 생성됩니다.</li>
+        <li>내보내기 시 md / txt / html / pdf(인쇄) 형식을 선택할 수 있습니다.</li>
+        <li>🔒 프라이버시 모드: 자동 동기화·공유 차단 (수동 저장은 가능)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>자주 묻는 질문</h2>
+      <p><strong>Q. AI 답변 언어는?</strong> 질문한 언어에 맞춰 답합니다. UI 언어(설정)와 별개입니다.</p>
+      <p><strong>Q. 하루 사용 한도?</strong> 비교 50 · 토론 10 · 협업 5 · 에이전트 20회 (KST 자정 리셋)</p>
+      <p><strong>Q. 기록은 어디?</strong> 메뉴 「기록」= 이번 세션 요약. 영구 보관은 「결과물 저장」.</p>
     </section>
   </div>
 </body>

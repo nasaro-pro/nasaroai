@@ -214,11 +214,8 @@
             return wrap;
         }
 
-        const label = document.createElement("span");
-        label.className = "input-tool-label";
-        label.textContent = t("ai_pick");
-        const chips = document.createElement("div");
-        chips.className = "ai-chips-row";
+        const trigger = document.createElement("div");
+        trigger.className = "input-tool-group ai-picker-trigger model-picker-wrap";
         let current = mode === "debate" ? modelsDebate : mode === "agent" ? modelsAgent : modelsCompare;
 
         const sync = () => {
@@ -227,14 +224,29 @@
             else modelsCompare = current.slice();
             saveModels(mode);
             opts.onModelsChange?.(getModelsForMode(mode));
+            updateLabel();
         };
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "input-tool-btn";
+        const updateLabel = () => {
+            const label = current.length >= MODELS.length ? t("ai_all") : current.join(", ");
+            btn.textContent = `🤖 ${t("ai_pick")}: ${label.length > 28 ? label.slice(0, 28) + "…" : label}`;
+        };
+        updateLabel();
+
+        const pop = document.createElement("div");
+        pop.className = "ai-picker-popover";
+        const chips = document.createElement("div");
+        chips.className = "ai-chips-row";
 
         const allBtn = document.createElement("button");
         allBtn.type = "button";
         allBtn.className = "ai-chip" + (current.length >= MODELS.length ? " active" : "");
         allBtn.textContent = t("ai_all");
         allBtn.addEventListener("click", () => {
-            current = current.length >= MODELS.length ? [] : MODELS.slice();
+            current = current.length >= MODELS.length ? [MODELS[0]] : MODELS.slice();
             renderChips();
             sync();
         });
@@ -251,8 +263,6 @@
                     if (current.includes(m)) current = current.filter(x => x !== m);
                     else current.push(m);
                     if (!current.length) current = MODELS.slice();
-                    allBtn.classList.toggle("active", current.length >= MODELS.length);
-                    b.classList.toggle("active");
                     renderChips();
                     sync();
                 });
@@ -261,8 +271,20 @@
             allBtn.classList.toggle("active", current.length >= MODELS.length);
         };
         renderChips();
-        wrap.append(label, chips);
-        return wrap;
+        pop.appendChild(chips);
+        btn.addEventListener("click", e => {
+            e.stopPropagation();
+            document.querySelectorAll(".ai-picker-popover.open").forEach(p => { if (p !== pop) p.classList.remove("open"); });
+            pop.classList.toggle("open");
+        });
+        if (!window._nasaroAiPickerClose) {
+            window._nasaroAiPickerClose = true;
+            document.addEventListener("click", () => {
+                document.querySelectorAll(".ai-picker-popover.open").forEach(p => p.classList.remove("open"));
+            });
+        }
+        trigger.append(btn, pop);
+        return trigger;
     }
 
     function buildInputToolbar(textarea, opts = {}) {
@@ -372,9 +394,13 @@
             <p><strong>프라이버시 🔒</strong> — 자동 기록 없음. 저장 버튼을 눌러야 보관됩니다.</p>`;
     }
 
-    async function createShareLink(kind, title, payload, apiFetch, showToast) {
+    async function createShareLink(kind, title, payload, apiFetch, showToast, opts = {}) {
         if (isPrivacyMode()) {
             showToast?.(lang === "en" ? "Disabled in privacy mode" : "프라이버시 모드에서는 공유할 수 없습니다.", "warn");
+            return null;
+        }
+        if (opts.requireLogin && !opts.loggedIn) {
+            showToast?.(lang === "en" ? "Sign in to share via account." : "계정 로그인 후 공유할 수 있습니다.", "warn");
             return null;
         }
         try {
@@ -397,18 +423,44 @@
         }
     }
 
-    function exportMarkdown(title, sections) {
+    function exportMarkdown(title, sections, format = "md") {
         const lines = [`# ${title}`, "", `> ${new Date().toLocaleString()}`, ""];
         sections.forEach(({ heading, body }) => {
             if (heading) lines.push(`## ${heading}`, "");
             lines.push(String(body || "").trim(), "");
         });
         const safe = title.replace(/[^\w\uAC00-\uD7A3\-]+/g, "_").slice(0, 40) || "nasaroai";
-        downloadTextFile(`${safe}.md`, lines.join("\n"));
+        const content = lines.join("\n");
+        if (format === "html" || format === "pdf") {
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+            <style>body{font-family:sans-serif;max-width:800px;margin:40px auto;line-height:1.6;padding:0 20px}
+            h1{border-bottom:2px solid #333}h2{color:#444;margin-top:24px}pre{white-space:pre-wrap}</style></head>
+            <body><h1>${title}</h1>${sections.map(s => `<h2>${s.heading || ""}</h2><pre>${String(s.body || "").replace(/</g,"&lt;")}</pre>`).join("")}</body></html>`;
+            if (format === "pdf") {
+                const w = window.open("", "_blank");
+                if (w) { w.document.write(html); w.document.close(); w.print(); }
+                return;
+            }
+            downloadTextFile(`${safe}.html`, html, "text/html;charset=utf-8");
+            return;
+        }
+        const ext = format === "txt" ? "txt" : "md";
+        downloadTextFile(`${safe}.${ext}`, content, format === "txt" ? "text/plain;charset=utf-8" : "text/markdown;charset=utf-8");
     }
 
-    function downloadTextFile(filename, content) {
-        const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    function promptExportFormat(title, sections) {
+        const fmt = prompt(
+            lang === "en"
+                ? "Export format: md / txt / html / pdf\n(md=Markdown, txt=Plain, html=HTML, pdf=Print PDF)"
+                : "내보내기 형식: md / txt / html / pdf\n(md=마크다운, txt=텍스트, html=HTML, pdf=인쇄→PDF)",
+            "md"
+        );
+        if (!fmt) return;
+        exportMarkdown(title, sections, fmt.trim().toLowerCase());
+    }
+
+    function downloadTextFile(filename, content, mime) {
+        const blob = new Blob([content], { type: mime || "text/markdown;charset=utf-8" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = filename;
@@ -429,12 +481,12 @@
         exp.type = "button";
         exp.className = "result-action-btn";
         exp.textContent = "📄 " + t("export_result");
-        exp.addEventListener("click", () => exportMarkdown(title, sections));
+        exp.addEventListener("click", () => promptExportFormat(title, sections));
         const share = document.createElement("button");
         share.type = "button";
         share.className = "result-action-btn";
         share.textContent = "🔗 " + t("share_link");
-        share.addEventListener("click", () => createShareLink(kind, title, payload, apiFetch, showToast));
+        share.addEventListener("click", () => createShareLink(kind, title, payload, apiFetch, showToast, { requireLogin: true, loggedIn: !!opts.loggedIn }));
         row.append(save, exp, share);
         container.appendChild(row);
     }

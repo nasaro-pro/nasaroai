@@ -7,23 +7,30 @@
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.5; }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
     h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 16px; margin: 0 0 10px; color: #c4b5fd; }
     .sub { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
     a { color: #a78bfa; }
     .login-box, .panel { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
     input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f8fafc; margin: 8px 0 12px; }
     button { padding: 9px 14px; border-radius: 8px; border: none; background: #7c3aed; color: #fff; font-weight: 600; cursor: pointer; }
     button.secondary { background: #334155; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
     .stat { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
-    .stat b { display: block; font-size: 22px; color: #c4b5fd; }
-    .stat span { font-size: 12px; color: #94a3b8; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { border-bottom: 1px solid #334155; padding: 8px 6px; text-align: left; vertical-align: top; }
-    th { color: #94a3b8; font-weight: 600; }
+    .stat b { display: block; font-size: 20px; color: #c4b5fd; }
+    .stat span { font-size: 11px; color: #94a3b8; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { border-bottom: 1px solid #334155; padding: 7px 5px; text-align: left; vertical-align: top; }
+    th { color: #94a3b8; font-weight: 600; white-space: nowrap; }
     .err { color: #fca5a5; font-size: 13px; min-height: 18px; }
     .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .online { color: #86efac; font-weight: 700; }
+    .offline { color: #64748b; }
+    .guide-box { font-size: 13px; color: #cbd5e1; line-height: 1.65; }
+    .guide-box ol { padding-left: 20px; }
+    .hour-chart { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .hour-bar { font-size: 10px; background: #312e81; padding: 3px 6px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -31,7 +38,7 @@
     <div class="top">
       <div>
         <h1>Nasaro AI 관리자</h1>
-        <p class="sub">회원 · 사용량 · 결과물 현황</p>
+        <p class="sub">회원 · 로그인 · 사용량 · 협업 · 로드맵</p>
       </div>
       <div>
         <a href="/">← 메인으로</a>
@@ -49,24 +56,45 @@
     <div id="dashView" style="display:none;">
       <div class="stats" id="statsRow"></div>
       <div class="panel">
+        <h2>시간대별 사용 (오늘 KST)</h2>
+        <div id="hourChart" class="hour-chart"></div>
+      </div>
+      <div class="panel">
         <strong>회원 목록</strong>
         <div style="overflow-x:auto;margin-top:10px;">
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>이메일</th>
+                <th>아이디</th>
                 <th>이름</th>
                 <th>가입일</th>
-                <th>오늘 사용량</th>
+                <th>로그인</th>
+                <th>마지막</th>
+                <th>접속</th>
+                <th>오늘</th>
                 <th>누적</th>
                 <th>결과물</th>
-                <th>협업중</th>
+                <th>협업</th>
               </tr>
             </thead>
             <tbody id="usersBody"></tbody>
           </table>
         </div>
+      </div>
+      <div class="panel guide-box">
+        <h2>기능 로드맵 · 보완 아이디어</h2>
+        <ol>
+          <li><strong>답변 복사</strong> — 각 AI 답변마다 작은 복사 버튼 (구현됨)</li>
+          <li><strong>메일·SNS·카톡 초안</strong> — 협업/비교 결과를 채널별 템플릿으로 변환</li>
+          <li><strong>빈 화면 추천</strong> — 협업처럼 중앙에 질문 추천 칩 표시</li>
+          <li><strong>즐겨찾는 AI</strong> — 모드별 기본 AI 고정 저장</li>
+          <li><strong>계정 공유</strong> — 로그인 계정으로 결과물·공유 링크 동기화 (부분 구현)</li>
+          <li><strong>내보내기 형식</strong> — md/txt/html/pdf 선택 (구현됨)</li>
+          <li><strong>상세 가이드</strong> — 사이드바 「사용 가이드」→ /guide</li>
+          <li><strong>Android 위젯</strong> — 홈 화면에서 빠른 질문·에이전트 (앱 전용, 알림 필요)</li>
+        </ol>
+        <p style="margin-top:12px;color:#94a3b8;">사용자용 가이드는 <a href="/guide" target="_blank">/guide</a> · 메인 사이드바 「📘 사용 가이드」</p>
       </div>
     </div>
   </div>
@@ -101,8 +129,8 @@
     }
 
     function fmtQuota(q) {
-      if (!q) return "-";
-      return Object.entries(q).map(([k, v]) => `${k}:${v}`).join(" ");
+      if (!q || typeof q !== "object") return "-";
+      return Object.entries(q).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k}:${v}`).join(" ");
     }
 
     async function loadDashboard() {
@@ -113,22 +141,37 @@
         document.getElementById("logoutBtn").style.display = "";
         document.getElementById("statsRow").innerHTML = `
           <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
+          <div class="stat"><b>${data.active_sessions ?? 0}</b><span>활성 세션</span></div>
           <div class="stat"><b>${data.share_links}</b><span>공유 링크</span></div>
           <div class="stat"><b>${data.day_key}</b><span>오늘 (KST)</span></div>
-          <div class="stat"><b>${fmtQuota(data.usage_today)}</b><span>전체 오늘 사용</span></div>`;
+          <div class="stat"><b>${fmtQuota(data.usage_today)}</b><span>전체 오늘</span></div>`;
+
+        const hourEl = document.getElementById("hourChart");
+        const byHour = data.usage_by_hour || {};
+        const keys = Object.keys(byHour).sort();
+        hourEl.innerHTML = keys.length
+          ? keys.map(k => `<span class="hour-bar">${k}=${byHour[k]}</span>`).join("")
+          : "<span style='color:#64748b'>아직 기록 없음</span>";
+
         const tbody = document.getElementById("usersBody");
         tbody.innerHTML = "";
         (data.users || []).forEach(u => {
           const tr = document.createElement("tr");
+          const collab = u.has_active_collab
+            ? `예 ${u.collab_work_type || ""} ${u.collab_stage_done || 0}/4`
+            : "-";
           tr.innerHTML = `
             <td>${u.id}</td>
-            <td>${u.email}</td>
+            <td>${u.username || u.email}</td>
             <td>${u.display_name || "-"}</td>
             <td>${u.created_at_iso || "-"}</td>
+            <td>${u.login_count ?? 0}회</td>
+            <td>${u.last_login_iso || "-"}</td>
+            <td class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속중" : "오프"}</td>
             <td>${fmtQuota(u.quota_today)}</td>
             <td>${fmtQuota(u.quota_all_time)}</td>
             <td>${u.saved_results_count ?? 0}</td>
-            <td>${u.has_active_collab ? "예" : "-"}</td>`;
+            <td>${collab}</td>`;
           tbody.appendChild(tr);
         });
       } catch {
@@ -148,7 +191,6 @@
       sessionStorage.removeItem(TOKEN_KEY);
       location.reload();
     });
-
     if (adminToken) loadDashboard();
   </script>
 </body>
