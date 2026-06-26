@@ -82,13 +82,41 @@
     #overviewPanels { display: none; }
     #detailPanels { display: none; }
     #detailPanels.visible { display: grid; }
+    .sidebar-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-top: 1px solid #334155;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .sidebar-foot-links {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      line-height: 1;
+    }
+    .sidebar-foot-links a {
+      color: #a78bfa;
+      text-decoration: none;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .sidebar-foot-links a:hover { color: #c4b5fd; }
+    .sidebar-foot .secondary { flex-shrink: 0; }
+    .login-form { margin: 0; }
+    .login-form input { margin-bottom: 0; }
   </style>
 </head>
 <body>
   <div id="loginView" class="login-wrap">
     <h1>Nasaro AI 관리자</h1>
     <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">회원 · 활동 · 문의 · 플랫폼 통계</p>
-    <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="off" name="nasaro-admin-pwd">
+    <form id="adminLoginForm" class="login-form" autocomplete="off" onsubmit="return false;">
+      <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="new-password" name="nasaro-admin-secret" readonly>
+    </form>
     <div id="loginErr" class="err"></div>
     <button id="loginBtn" type="button" style="width:100%;margin-top:4px;">접속</button>
     <p style="margin-top:12px;font-size:12px;"><a href="/">← 메인으로</a></p>
@@ -110,10 +138,12 @@
         <input id="sidebarSearch" type="search" placeholder="아이디·이메일 검색…">
       </div>
       <div id="sidebarList" class="sidebar-list"></div>
-      <div style="padding:10px;border-top:1px solid #334155;font-size:11px;">
-        <a href="/">메인</a>
-        <a href="/guide" target="_blank" rel="noopener" style="margin-left:10px;opacity:.7;font-size:10px;">가이드</a>
-        <button id="logoutBtn" class="secondary" type="button" style="float:right;">로그아웃</button>
+      <div class="sidebar-foot">
+        <div class="sidebar-foot-links">
+          <a href="/">메인</a>
+          <a href="/guide" target="_blank" rel="noopener">가이드</a>
+        </div>
+        <button id="logoutBtn" class="secondary" type="button">로그아웃</button>
       </div>
     </aside>
 
@@ -188,12 +218,19 @@
 
     const PLATFORM_LABEL = { web: "웹", app: "앱", mobile_web: "모바일웹" };
 
+    function clearAdminPasswordField() {
+      const ap = document.getElementById("adminPassword");
+      if (!ap) return;
+      ap.value = "";
+      ap.setAttribute("readonly", "readonly");
+    }
+
     function showLoginView() {
       adminToken = "";
       sessionStorage.removeItem(TOKEN_KEY);
       document.getElementById("loginView").style.display = "";
       document.getElementById("appShell").classList.remove("open");
-      document.getElementById("adminPassword").value = "";
+      clearAdminPasswordField();
       document.getElementById("loginErr").textContent = "";
     }
 
@@ -475,7 +512,11 @@
     }
 
     document.getElementById("loginBtn").addEventListener("click", tryLogin);
-    document.getElementById("adminPassword").addEventListener("keydown", e => { if (e.key === "Enter") tryLogin(); });
+    const adminPwdInput = document.getElementById("adminPassword");
+    adminPwdInput?.addEventListener("focus", () => adminPwdInput.removeAttribute("readonly"));
+    adminPwdInput?.addEventListener("keydown", e => { if (e.key === "Enter") tryLogin(); });
+    document.addEventListener("DOMContentLoaded", clearAdminPasswordField);
+    window.addEventListener("pageshow", clearAdminPasswordField);
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       const token = adminToken;
       adminToken = "";
@@ -538,10 +579,7 @@
     });
 
     if (adminToken) loadDashboard().catch(showLoginView);
-    else {
-      const ap = document.getElementById("adminPassword");
-      if (ap) ap.value = "";
-    }
+    else clearAdminPasswordField();
   </script>
 </body>
 </html>

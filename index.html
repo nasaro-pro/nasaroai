@@ -76,12 +76,19 @@
             color: #6b7280;
         }
 
-        /* 좌측 메뉴 토글(햄버거) 버튼 */
-        .menu-toggle-btn {
+        /* 좌측 메뉴 · 관리자 */
+        .header-left-actions {
             position: absolute;
             left: 12px;
             top: 50%;
             transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .menu-toggle-btn {
+            position: static;
+            transform: none;
             width: 40px;
             height: 40px;
             border: 1px solid #e5e7eb;
@@ -93,7 +100,22 @@
             justify-content: center;
             gap: 4px;
             cursor: pointer;
+            flex-shrink: 0;
         }
+        .header-admin-btn {
+            height: 40px;
+            padding: 0 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #f9fafb;
+            color: #6b7280;
+            font: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .header-admin-btn:hover { background: #f3f4f6; color: #374151; }
 
         .menu-toggle-btn span {
             display: block;
@@ -158,18 +180,6 @@
             padding: 18px 18px 14px;
             border-bottom: 1px solid #f3f4f6;
         }
-        .side-menu-admin-btn {
-            flex-shrink: 0;
-            font-size: 11px;
-            padding: 6px 10px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-            color: #6b7280;
-            cursor: pointer;
-            font-weight: 700;
-        }
-        .side-menu-admin-btn:hover { background: #f3f4f6; color: #374151; }
 
         .side-menu-brand {
             font-size: 20px;
@@ -265,23 +275,24 @@
             justify-content: flex-end;
         }
         .side-menu-guide-btn {
-            flex: 1 1 auto;
-            min-height: 40px;
-            padding: 0 12px;
-            border-radius: 10px;
+            width: 34px;
+            min-height: 34px;
+            flex: 0 0 auto;
+            padding: 0;
+            border-radius: 8px;
             border: 1px solid #c7d2fe;
             background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
             color: #4338ca;
             font: inherit;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
             cursor: pointer;
             line-height: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
         }
+        .side-menu-guide-btn span:last-child { display: none; }
         .side-menu-guide-btn:hover { background: #e0e7ff; color: #3730a3; }
         .side-menu-settings-btn {
             width: 44px;
@@ -996,35 +1007,45 @@
         }
         .guide-bar {
             position: fixed; z-index: 900;
-            width: min(320px, calc(100vw - 24px));
-            max-height: min(42vh, 300px); overflow: hidden;
+            width: min(360px, calc(100vw - 24px));
+            max-height: min(52vh, 380px); overflow: hidden;
             background: #fff; border: 1px solid #c7d2fe; border-radius: 12px;
             box-shadow: 0 8px 28px rgba(49, 46, 129, 0.15);
             display: flex; flex-direction: column;
         }
         .guide-bar-head {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 7px 10px; border-bottom: 1px solid #e2e8f0; background: #eef2ff;
-            font-size: 12px; font-weight: 800; color: #4338ca;
-        }
-        .guide-bar-close {
-            border: none; background: transparent; font-size: 16px; cursor: pointer; color: #64748b;
+            padding: 10px 12px; border-bottom: 1px solid #e2e8f0; background: #eef2ff;
+            font-size: 13px; font-weight: 800; color: #4338ca;
         }
         .guide-bar-body {
-            padding: 8px 10px 10px; overflow-y: auto; font-size: 11px; line-height: 1.55; color: #334155;
+            padding: 10px 12px 12px; overflow-y: auto; font-size: 12px; line-height: 1.55; color: #334155;
         }
-        .guide-bar-body h3 { margin: 6px 0 2px; font-size: 11px; color: #4338ca; }
-        .guide-bar-body p { margin: 0 0 5px; }
-        .guide-bar-body ul { margin: 0 0 5px; padding-left: 16px; }
+        .guide-bar-section {
+            margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9;
+        }
+        .guide-bar-section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+        .guide-bar-section h3 {
+            margin: 0 0 4px; font-size: 12px; font-weight: 800; color: #4338ca;
+        }
+        .guide-bar-section p { margin: 0 0 4px; }
+        .guide-bar-section ul, .guide-bar-section ol {
+            margin: 4px 0 0; padding-left: 18px;
+        }
+        .guide-bar-section li { margin-bottom: 2px; }
         .guide-bar-tip {
-            background: #eff6ff; border-left: 3px solid #3b82f6; padding: 6px 8px;
-            border-radius: 0 6px 6px 0; font-size: 10px; margin-top: 4px;
+            background: #eff6ff; border-left: 3px solid #3b82f6; padding: 8px 10px;
+            border-radius: 0 8px 8px 0; font-size: 11px; margin-top: 8px; line-height: 1.5;
         }
         html[data-theme="dark"] .guide-bar { background: #1e293b; border-color: #475569; }
         html[data-theme="dark"] .guide-bar-head { background: #312e81; color: #e9d5ff; border-color: #475569; }
         html[data-theme="dark"] .guide-bar-body { color: #cbd5e1; }
         html[data-theme="dark"] .guide-bar-body h3 { color: #c4b5fd; }
+        html[data-theme="dark"] .guide-bar-section { border-color: #334155; }
         html[data-theme="dark"] .guide-bar-tip { background: #1e3a5f; color: #bfdbfe; }
+        .guide-bar-close {
+            border: none; background: transparent; font-size: 16px; cursor: pointer; color: #64748b;
+        }
 
         html[data-theme="dark"] {
             color-scheme: dark;
@@ -1403,48 +1424,68 @@
             min-width: 0;
         }
 
-        .dock-tools-row .input-tool-row { gap: 4px; flex-wrap: wrap; justify-content: flex-start; margin: 0; }
-        .dock-tools-row .input-tool-btn {
-            min-height: 32px;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 7px;
-        }
-        .dock-tools-row .privacy-btn-wide { min-height: 32px; min-width: auto; }
-
-        .dock-mode-row {
+        .dock-btn-row {
             display: flex;
-            gap: 6px;
             flex-wrap: wrap;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        .dock-mode-row .mode-btn,
-        .dock-mode-row .dock-btn.muted {
-            min-height: 32px;
-            padding: 6px 12px;
-            font-size: 12px;
+        .dock-mode-group {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .dock-btn-row .mode-btn,
+        .dock-btn-row .dock-btn.muted,
+        .dock-tools-inline .input-tool-btn {
+            min-height: 42px;
+            height: 42px;
+            padding: 0 16px;
+            font-size: 14px;
             font-weight: 700;
-            border-radius: 8px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
         }
+        .dock-tools-inline .input-tool-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+        }
+        .dock-tools-inline .input-tool-btn.privacy-btn-wide {
+            min-height: 42px;
+            height: 42px;
+            padding: 0 12px;
+        }
+        .dock-tools-inline .model-picker-wrap { display: flex; align-items: center; }
 
         .dock-compose-row #mainInput {
-            min-height: 34px;
-            max-height: 72px;
-            padding: 6px 10px;
-            font-size: 14px;
-            line-height: 1.4;
+            min-height: 40px;
+            max-height: 80px;
+            padding: 8px 12px;
+            font-size: 15px;
+            line-height: 1.45;
         }
 
         .dock-submit-btn {
             flex-shrink: 0;
-            min-height: 34px;
-            min-width: 88px;
-            padding: 6px 12px;
-            font-size: 12px;
+            min-height: 40px;
+            height: 40px;
+            min-width: 100px;
+            padding: 0 16px;
+            font-size: 14px;
             font-weight: 800;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
         }
 
         #mainInput {
@@ -2771,7 +2812,6 @@
         <div id="sideMenuOverlay" class="side-menu-overlay"></div>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
-                <button id="adminEntryBtn" class="side-menu-admin-btn" type="button" title="관리자 페이지">관리자</button>
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
             </div>
             <div id="sideAccountBox" class="side-account-box" style="display:none;">
@@ -2912,9 +2952,12 @@
 
         <header class="site-header">
             <div class="header-inner">
-                <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴 열기">
-                    <span></span><span></span><span></span>
-                </button>
+                <div class="header-left-actions">
+                    <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴 열기">
+                        <span></span><span></span><span></span>
+                    </button>
+                    <button id="adminEntryBtn" class="header-admin-btn" type="button" title="관리자 페이지">관리자</button>
+                </div>
                 <div class="header-brand">
                     <h1>Nasaro AI</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
@@ -2929,24 +2972,41 @@
                 <button id="guideBarClose" class="guide-bar-close" type="button" aria-label="닫기">✕</button>
             </div>
             <div class="guide-bar-body">
-                <p><strong>처음이셔도 괜찮아요.</strong> 아래 입력창에 질문을 적고, 모드를 고른 뒤 ▶ 버튼으로 실행하세요.</p>
-                <h3>① 비교</h3>
-                <p>같은 질문을 여러 AI에게 동시에 보냅니다. 🤖 AI 버튼으로 모델을 고르고, 답변마다 「복사」로 텍스트를 가져올 수 있습니다.</p>
-                <h3>② 토론</h3>
-                <p>주제 하나를 놓고 AI들이 라운드별로 의견을 주고받습니다. 기획·논점 정리에 적합합니다.</p>
-                <h3>③ 협업 (4단계)</h3>
-                <ul>
-                    <li><strong>조사</strong> — 근거·팩트 수집</li>
-                    <li><strong>구조</strong> — 목차·논리 설계</li>
-                    <li><strong>제작</strong> — 초안·작업물 작성</li>
-                    <li><strong>검증</strong> — 오류 지적 후 필요 시 앞 단계가 수정</li>
-                </ul>
-                <p>작업 설명을 입력하면 AI가 단계별로 순차 실행합니다. 완료 후 「추가 작업 ▶」로 수정 요청도 가능합니다.</p>
-                <h3>④ 에이전트</h3>
-                <p>입력창 <strong>아래</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
-                <h3>⑤ 계정 · 저장</h3>
-                <p>로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다. 메뉴에서 「결과물 저장」으로 마음에 드는 답을 보관하세요.</p>
-                <div class="guide-bar-tip">다른 곳을 누르면 닫힙니다.</div>
+                <div class="guide-bar-section">
+                    <h3>시작하기</h3>
+                    <ol>
+                        <li>아래 <strong>질문창</strong>에 하고 싶은 일을 적습니다.</li>
+                        <li><strong>비교 · 토론 · 협업</strong> 중 모드를 고릅니다.</li>
+                        <li><strong>🤖 AI</strong> 버튼으로 사용할 AI를 선택합니다.</li>
+                        <li>오른쪽 <strong>▶</strong> 버튼 또는 <strong>Enter</strong>로 실행합니다.</li>
+                    </ol>
+                </div>
+                <div class="guide-bar-section">
+                    <h3>비교</h3>
+                    <p>같은 질문을 여러 AI에게 동시에 보냅니다. 답변마다 <strong>복사</strong> 버튼이 있습니다.</p>
+                </div>
+                <div class="guide-bar-section">
+                    <h3>토론</h3>
+                    <p>주제 하나로 AI들이 라운드별 의견을 주고받습니다. 기획·논점 정리에 적합합니다.</p>
+                </div>
+                <div class="guide-bar-section">
+                    <h3>협업 (4단계)</h3>
+                    <ul>
+                        <li><strong>조사</strong> — 근거·팩트 수집</li>
+                        <li><strong>구조</strong> — 목차·논리 설계</li>
+                        <li><strong>제작</strong> — 초안·작업물 작성</li>
+                        <li><strong>검증</strong> — 오류 점검 후 필요 시 수정</li>
+                    </ul>
+                </div>
+                <div class="guide-bar-section">
+                    <h3>에이전트</h3>
+                    <p>하단바 <strong>위</strong> 「🌐 에이전트」로 웹 자동 실행. PC는 Chrome 확장, 폰은 앱 필요.</p>
+                </div>
+                <div class="guide-bar-section">
+                    <h3>계정 · 저장</h3>
+                    <p>로그인 시 기록이 서버에 저장됩니다. <strong>결과물 저장</strong>으로 마음에 드는 답을 보관하세요.</p>
+                </div>
+                <div class="guide-bar-tip">자세한 설명은 <a href="/guide" target="_blank" rel="noopener" style="color:#2563eb;font-weight:700;">전체 가이드</a>에서 볼 수 있습니다.</div>
             </div>
         </div>
 
@@ -3269,15 +3329,17 @@
                     <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                     <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
-                <div class="dock-mode-row">
-                    <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
-                    <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
-                    <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
-                    <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                    <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
-                    <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                <div class="dock-btn-row">
+                    <div class="dock-mode-group">
+                        <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                        <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
+                        <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
+                        <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
+                        <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
+                        <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                    </div>
+                    <div id="mainInputTools" class="dock-tools-inline"></div>
                 </div>
-                <div id="mainInputTools" class="dock-tools-row"></div>
             </div>
         </footer>
 
