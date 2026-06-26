@@ -903,7 +903,7 @@ AGENT_STEP_SEMAPHORE = asyncio.Semaphore(AGENT_STEP_CONCURRENCY)
 
 
 def build_openrouter_headers() -> dict[str, str]:
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     return {
         "Authorization": f"Bearer {api_key}",
         "HTTP-Referer": "https://nasaroai.onrender.com",
@@ -913,7 +913,7 @@ def build_openrouter_headers() -> dict[str, str]:
 
 
 def log_openrouter_key_status() -> None:
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     prefix = api_key[:8] if api_key else "N/A"
     if not api_key:
         logger.warning("OPENROUTER_API_KEY is empty. length=0 prefix=%s", prefix)
@@ -1186,15 +1186,6 @@ async def ensure_model_cache_fresh() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     log_openrouter_key_status()
-    asyncio.create_task(_bootstrap_model_cache())
-
-
-async def _bootstrap_model_cache() -> None:
-    try:
-        await refresh_model_cache()
-        asyncio.create_task(refresh_label_health(force=True))
-    except Exception:
-        logger.exception("Model cache bootstrap failed")
 
 
 def sse(payload: dict) -> str:
@@ -2313,6 +2304,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "openrouter_configured": bool(api_key),
+        "openrouter_key_length": len(api_key),
     }
 
 

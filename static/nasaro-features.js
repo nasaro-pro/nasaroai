@@ -219,8 +219,12 @@
 
         const updateLabel = () => {
             if (!pickerBtn) return;
-            const label = current.length >= MODELS.length ? t("ai_all") : current.join(", ");
-            pickerBtn.textContent = `🤖 ${t("ai_pick")}: ${label.length > 28 ? label.slice(0, 28) + "…" : label}`;
+            const label = current.length >= MODELS.length
+                ? t("ai_all")
+                : (current.length === 1 ? current[0] : current.join(" · "));
+            const short = label.length > 24 ? label.slice(0, 24) + "…" : label;
+            pickerBtn.textContent = `🤖 ${short}`;
+            pickerBtn.title = current.length >= MODELS.length ? t("ai_all") : current.join(", ");
         };
 
         const sync = () => {
@@ -274,12 +278,15 @@
 
         pickerBtn = document.createElement("button");
         pickerBtn.type = "button";
-        pickerBtn.className = "input-tool-btn";
+        pickerBtn.className = "input-tool-btn ai-pick-trigger-btn";
         updateLabel();
 
         const pop = document.createElement("div");
         pop.className = "ai-picker-popover";
-        pop.appendChild(chips);
+        const popHead = document.createElement("div");
+        popHead.className = "ai-picker-popover-head";
+        popHead.textContent = t("ai_pick") + " · " + (lang === "en" ? "multi-select" : "다중 선택");
+        pop.append(popHead, chips);
         pickerBtn.addEventListener("click", e => {
             e.stopPropagation();
             document.querySelectorAll(".ai-picker-popover.open").forEach(p => { if (p !== pop) p.classList.remove("open"); });
@@ -299,14 +306,16 @@
     function buildPrivacyButton(textarea, opts = {}) {
         const privBtn = document.createElement("button");
         privBtn.type = "button";
-        privBtn.className = "input-tool-btn privacy-btn privacy-btn-wide" + (privacyMode ? " active" : "");
-        privBtn.innerHTML = `<span class="priv-text">${privacyMode ? t("privacy_on") : t("privacy_off")}</span><span class="priv-q" title="${t("privacy_tip")}">?</span>`;
+        privBtn.className = "input-tool-btn privacy-btn privacy-btn-compact" + (privacyMode ? " active" : "");
+        privBtn.title = t("privacy_tip");
+        privBtn.innerHTML = `<span class="priv-text">${privacyMode ? "🔒" : "🔓"}</span><span class="priv-q" title="${t("privacy_tip")}">?</span>`;
         privBtn.addEventListener("click", e => {
             if (e.target.classList.contains("priv-q")) return;
             privacyMode = !privacyMode;
             localStorage.setItem("nasaroai_privacy", privacyMode ? "1" : "0");
             privBtn.classList.toggle("active", privacyMode);
-            privBtn.querySelector(".priv-text").textContent = privacyMode ? t("privacy_on") : t("privacy_off");
+            const pt = privBtn.querySelector(".priv-text");
+            if (pt) pt.textContent = privacyMode ? "🔒" : "🔓";
             opts.onPrivacyChange?.(privacyMode);
         });
         privBtn.querySelector(".priv-q")?.addEventListener("click", e => {
@@ -319,7 +328,7 @@
     function buildVoiceButton(textarea, opts = {}) {
         const voiceBtn = document.createElement("button");
         voiceBtn.type = "button";
-        voiceBtn.className = "input-tool-btn";
+        voiceBtn.className = "input-tool-btn icon-tool-btn";
         voiceBtn.textContent = "🎤";
         voiceBtn.title = t("voice_start");
         voiceBtn.addEventListener("click", () => startVoiceInput(textarea, voiceBtn, opts.showToast));

@@ -962,10 +962,22 @@
 
         .ai-picker-popover {
             display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 400;
-            background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 260px; max-width: 90vw;
+            background: #fff; border: 1px solid #ddd6fe; border-radius: 12px; padding: 10px 12px;
+            box-shadow: 0 10px 28px rgba(91, 33, 182, 0.15); min-width: 240px; max-width: 92vw;
         }
         .ai-picker-popover.open { display: block; }
+        .ai-picker-popover-head {
+            font-size: 11px; font-weight: 800; color: #6d28d9; margin-bottom: 8px;
+        }
+        .ai-chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .ai-chips-row .ai-chip {
+            border: 1px solid #e5e7eb; background: #fff; color: #374151;
+            border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 700; cursor: pointer;
+        }
+        .ai-chips-row .ai-chip:hover { border-color: #c4b5fd; background: #f5f3ff; }
+        .ai-chips-row .ai-chip.active {
+            background: #7c3aed; color: #fff; border-color: #6d28d9;
+        }
         .ai-picker-trigger { position: relative; }
 
         .compare-copy-btn {
@@ -1464,10 +1476,10 @@
         .dock-btn-row .mode-btn,
         .dock-btn-row .dock-btn.muted,
         .dock-btn-row .input-tool-btn {
-            min-height: 44px;
-            height: 44px;
-            padding: 0 18px;
-            font-size: 14px;
+            min-height: 40px;
+            height: 40px;
+            padding: 0 14px;
+            font-size: 13px;
             font-weight: 700;
             border-radius: 10px;
             display: inline-flex;
@@ -1476,11 +1488,34 @@
             box-sizing: border-box;
             flex-shrink: 0;
         }
-        .dock-btn-row .input-tool-btn.privacy-btn-wide {
-            min-height: 44px;
-            height: 44px;
+        .dock-btn-row .input-tool-btn.privacy-btn-compact,
+        .dock-btn-row .input-tool-btn.icon-tool-btn {
+            min-height: 36px;
+            height: 36px;
+            min-width: 36px;
+            padding: 0 8px;
+            font-size: 13px;
+        }
+        .dock-btn-row .input-tool-btn.privacy-btn-compact {
+            min-width: 44px;
+        }
+        .dock-btn-row .input-tool-btn.ai-pick-trigger-btn {
+            min-height: 40px;
+            height: 40px;
             padding: 0 12px;
-            min-width: 128px;
+            max-width: 148px;
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #6d28d9;
+            font-weight: 800;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dock-btn-row .input-tool-btn.ai-pick-trigger-btn:hover {
+            background: #ede9fe;
+            border-color: #a78bfa;
         }
         .dock-btn-left .model-picker-wrap,
         .agent-ai-toolbar .model-picker-wrap {
@@ -1774,13 +1809,14 @@
         .agent-header-ai-slot .agent-ai-picker-trigger {
             width: auto;
         }
-        .agent-header-ai-slot .agent-ai-picker-trigger .input-tool-btn {
-            min-height: 36px;
-            padding: 8px 12px;
-            font-size: 13px;
+        .agent-header-ai-slot .agent-ai-picker-trigger .input-tool-btn,
+        .agent-header-ai-slot .ai-pick-trigger-btn {
+            min-height: 34px;
+            padding: 6px 10px;
+            font-size: 12px;
             width: auto;
-            min-width: 110px;
-            max-width: 160px;
+            min-width: 100px;
+            max-width: 140px;
         }
 
         .agent-panel-title {
@@ -2896,19 +2932,77 @@
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
             <div class="side-menu-footer">
+                <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
                 <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
             </div>
         </aside>
 
-        <div id="hiddenAppPrefs" aria-hidden="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">
-            <select id="settingsLangSelect">
-                <option value="ko">한국어</option>
-                <option value="en">English</option>
-            </select>
-            <select id="settingsThemeSelect">
-                <option value="light">라이트</option>
-                <option value="dark">다크</option>
-            </select>
+        <!-- 설정 팝오버 패널 -->
+        <div id="settingsPanel" class="settings-panel" role="dialog" aria-label="설정">
+            <div class="settings-panel-head">
+                ⚙️ 설정
+                <button class="settings-panel-close" id="settingsPanelClose" aria-label="닫기">✕</button>
+            </div>
+            <div class="settings-panel-body">
+            <div class="settings-row">
+                <div class="settings-row-label">글씨 크기</div>
+                <div class="font-size-control">
+                    <button id="fontDecBtn" title="작게">−</button>
+                    <span class="font-size-val" id="fontSizeVal">16px</span>
+                    <button id="fontIncBtn" title="크게">+</button>
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">계정</div>
+                <div id="settingsAccountMeta" class="settings-meta">로그인하지 않음 — 이 탭에서만 저장됩니다.</div>
+                <div class="settings-perm-grid" style="margin-top:8px;">
+                    <button id="settingsLoginBtn" class="settings-action-btn primary-action" type="button">로그인 / 회원가입</button>
+                    <button id="settingsLogoutBtn" class="settings-action-btn" type="button" style="display:none;">로그아웃</button>
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">진단</div>
+                <button id="permHealthBtn" class="settings-action-btn" type="button">🌐 서버 상태 확인</button>
+                <div id="settingsDiagMeta" class="settings-meta" style="margin-top:8px;">설정을 열면 진단 정보를 불러옵니다.</div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">오늘 사용량</div>
+                <div id="settingsQuotaMeta" class="settings-meta">불러오는 중…</div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label" data-i18n="lang">언어</div>
+                <select id="settingsLangSelect" class="input-tool-select" style="width:100%;">
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label" data-i18n="theme">테마</div>
+                <select id="settingsThemeSelect" class="input-tool-select" style="width:100%;">
+                    <option value="light" data-i18n="theme_light">라이트</option>
+                    <option value="dark" data-i18n="theme_dark">다크</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">배포 · 버전</div>
+                <div id="settingsVersionMeta" class="settings-meta">불러오는 중…</div>
+            </div>
+            <div class="settings-row" id="supportSection">
+                <div class="settings-row-label">관리자 문의</div>
+                <div id="supportLoginHint" class="settings-meta" style="margin-bottom:6px;">로그인 후 문의할 수 있습니다.</div>
+                <div id="supportFormWrap" style="display:none;">
+                    <textarea id="supportInquiryInput" rows="2" placeholder="문의 내용을 입력하세요…" style="width:100%;border-radius:8px;border:1px solid #d1d5db;padding:8px 10px;font:inherit;resize:vertical;"></textarea>
+                    <button id="supportInquiryBtn" class="settings-action-btn primary-action" type="button" style="margin-top:8px;">📨 문의 보내기</button>
+                    <div id="supportInquiryStatus" class="settings-meta" style="margin-top:6px;"></div>
+                </div>
+                <div class="settings-row-label" style="margin-top:10px;">문의 기록</div>
+                <div id="supportHistoryList" class="support-history-list"><div class="settings-meta">로그인 후 확인할 수 있습니다.</div></div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-row-label">결과물 파일</div>
+                <button id="clearResultsBtn" class="settings-action-btn" type="button">🗑 결과물 전부 삭제</button>
+            </div>
+            </div>
         </div>
 
         <div id="authModalOverlay" class="auth-modal-overlay" aria-hidden="true">
@@ -3342,7 +3436,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627c"></script>
+    <script src="/static/nasaro-features.js?v=20260627d"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -3530,6 +3624,14 @@
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
             appShell.classList.toggle("sidebar-open", open);
+            if (!open) {
+                const sp = document.getElementById("settingsPanel");
+                if (sp?.classList.contains("open")) {
+                    sp.classList.remove("open");
+                    document.getElementById("settingsBtn")?.classList.remove("active");
+                    sp.style.display = "none";
+                }
+            }
         }
 
         menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
@@ -3925,6 +4027,10 @@
         }
 
         function updateAuthUI() {
+            const NF = window.NasaroFeatures;
+            const meta = document.getElementById("settingsAccountMeta");
+            const loginBtn = document.getElementById("settingsLoginBtn");
+            const logoutBtn = document.getElementById("settingsLogoutBtn");
             const sideAuth = document.getElementById("sideAuthBtns");
             const sideAccount = document.getElementById("sideAccountBox");
             const sideMenuBrand = document.getElementById("sideMenuBrand");
@@ -3932,10 +4038,18 @@
             loadSessionHistoryFromStore();
             if (currentUser) {
                 const id = currentUser.username || currentUser.email || "";
+                if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${id}`;
+                if (loginBtn) loginBtn.style.display = "none";
+                if (logoutBtn) logoutBtn.style.display = "";
                 if (sideAuth) sideAuth.style.display = "none";
                 if (sideAccount) sideAccount.style.display = "flex";
                 if (sideMenuBrand) sideMenuBrand.textContent = id;
             } else {
+                if (meta) meta.textContent = NF?.lang === "en"
+                    ? "Not signed in — results stay in this tab only."
+                    : "로그인하지 않음 — 이 탭에서만 저장됩니다.";
+                if (loginBtn) loginBtn.style.display = "";
+                if (logoutBtn) logoutBtn.style.display = "none";
                 if (sideAuth) sideAuth.style.display = "flex";
                 if (sideAccount) sideAccount.style.display = "none";
                 if (sideMenuBrand) sideMenuBrand.textContent = "Nasaro AI";
@@ -3943,6 +4057,74 @@
             renderSessionHistory();
             renderResultFilesList();
             notifyExtensionAuth();
+            updateSupportUI();
+        }
+
+        async function loadSupportHistory() {
+            const listEl = document.getElementById("supportHistoryList");
+            if (!listEl || !authToken || !currentUser) return;
+            listEl.innerHTML = "<div class=\"settings-meta\">불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/support/inquiries");
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "불러오기 실패");
+                renderSupportHistory(data.inquiries || []);
+            } catch (err) {
+                listEl.innerHTML = `<div class="settings-meta">${err.message || "불러오기 실패"}</div>`;
+            }
+        }
+
+        function renderSupportHistory(items) {
+            const listEl = document.getElementById("supportHistoryList");
+            if (!listEl) return;
+            if (!items.length) {
+                listEl.innerHTML = "<div class=\"settings-meta\">문의 기록이 없습니다.</div>";
+                return;
+            }
+            listEl.innerHTML = "";
+            items.forEach(item => {
+                const div = document.createElement("div");
+                div.className = "support-history-item" + (item.status === "answered" ? " answered" : "");
+                const adminReplies = (item.replies || []).filter(r => r.from_admin);
+                div.innerHTML = `
+                    <div class="support-history-head">
+                        <span>${item.created_at_iso} · ${item.status === "answered" ? "답변완료" : "대기중"}</span>
+                        <button type="button" class="support-history-delete" data-id="${item.id}">삭제</button>
+                    </div>
+                    <div>${item.message.replace(/</g, "&lt;")}</div>
+                    ${adminReplies.map(r => `<div class="support-reply-box"><strong>관리자</strong> · ${r.created_at_iso}<br>${r.message.replace(/</g, "&lt;")}</div>`).join("")}
+                `;
+                div.querySelector(".support-history-delete")?.addEventListener("click", async () => {
+                    if (!confirm("이 문의를 삭제할까요?")) return;
+                    try {
+                        const res = await apiFetch("/support/inquiry/" + item.id, { method: "DELETE" });
+                        if (!res.ok) {
+                            const data = await res.json().catch(() => ({}));
+                            throw new Error(typeof data.detail === "string" ? data.detail : "삭제 실패");
+                        }
+                        await loadSupportHistory();
+                        showToast("문의가 삭제되었습니다.", "success");
+                    } catch (err) {
+                        showToast(err.message || "삭제 실패", "error");
+                    }
+                });
+                listEl.appendChild(div);
+            });
+        }
+
+        function updateSupportUI() {
+            const hint = document.getElementById("supportLoginHint");
+            const form = document.getElementById("supportFormWrap");
+            const hist = document.getElementById("supportHistoryList");
+            if (currentUser && authToken) {
+                if (hint) hint.style.display = "none";
+                if (form) form.style.display = "";
+                loadSupportHistory();
+            } else {
+                if (hint) hint.style.display = "";
+                if (form) form.style.display = "none";
+                if (hist) hist.innerHTML = "<div class=\"settings-meta\">로그인 후 확인할 수 있습니다.</div>";
+            }
         }
 
         function openAuthModal(mode = "login") {
@@ -4102,6 +4284,46 @@
             });
         }
 
+        async function refreshSettingsDiagnostics() {
+            const quotaEl = document.getElementById("settingsQuotaMeta");
+            const versionEl = document.getElementById("settingsVersionMeta");
+            const diagEl = document.getElementById("settingsDiagMeta");
+            try {
+                const [quotaRes, infoRes, healthRes] = await Promise.all([
+                    apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId())),
+                    apiFetch("/system/info"),
+                    apiFetch("/health"),
+                ]);
+                if (quotaRes.ok) {
+                    const q = await quotaRes.json();
+                    const lines = Object.entries(q.features || {}).map(([k, v]) => `${k}: ${v.used}/${v.limit}`);
+                    if (quotaEl) quotaEl.textContent = lines.join("\n") || "사용량 정보 없음";
+                }
+                if (infoRes.ok) {
+                    const info = await infoRes.json();
+                    if (versionEl) {
+                        versionEl.textContent =
+                            `서버: ${info.deploy_ref}\n확장: v${info.extension_version}\nAPK: v${info.apk_version}` +
+                            (info.auto_ai_label ? `\n자동 AI: ${info.auto_ai_label}` : "");
+                    }
+                }
+                const diag = [];
+                if (healthRes.ok) {
+                    const h = await healthRes.json();
+                    diag.push("서버: 정상");
+                    diag.push(h.openrouter_configured
+                        ? `OpenRouter 키: 설정됨 (${h.openrouter_key_length || "?"}자)`
+                        : "OpenRouter 키: 미설정 — Render 환경변수 확인");
+                } else diag.push("서버: 응답 오류");
+                if (isExtensionContext()) diag.push("PC 확장: 설치됨");
+                else if (hasNativeAndroidAgent) diag.push("Android 앱: 연결됨");
+                else diag.push("에이전트: 확장/APK 미연결");
+                if (diagEl) diagEl.textContent = diag.join("\n");
+            } catch {
+                if (quotaEl) quotaEl.textContent = "진단 정보를 불러오지 못했습니다.";
+            }
+        }
+
         function isExtensionContext() {
             return !!(window.chrome && chrome.runtime && chrome.runtime.id);
         }
@@ -4169,6 +4391,77 @@
             if (list) list.style.display = open ? "none" : "";
             if (viewer && open) viewer.style.display = "none";
             btn?.classList.toggle("open", !open);
+        });
+
+        const settingsBtn   = document.getElementById("settingsBtn");
+        const settingsPanel = document.getElementById("settingsPanel");
+        const settingsPanelClose = document.getElementById("settingsPanelClose");
+
+        function openSettings() {
+            if (!settingsPanel) return;
+            settingsPanel.style.display = "flex";
+            requestAnimationFrame(() => settingsPanel.classList.add("open"));
+            settingsBtn?.classList.add("active");
+            refreshSettingsDiagnostics();
+            updateSupportUI();
+        }
+        function closeSettings() {
+            if (!settingsPanel) return;
+            settingsPanel.classList.remove("open");
+            settingsBtn?.classList.remove("active");
+            settingsPanel.addEventListener("transitionend", () => {
+                if (!settingsPanel.classList.contains("open"))
+                    settingsPanel.style.display = "none";
+            }, { once: true });
+        }
+        settingsBtn?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            settingsPanel?.classList.contains("open") ? closeSettings() : openSettings();
+        });
+        settingsPanelClose?.addEventListener("click", closeSettings);
+        document.getElementById("settingsLoginBtn")?.addEventListener("click", () => openAuthModal("login"));
+        document.getElementById("settingsLogoutBtn")?.addEventListener("click", logoutAccount);
+        document.getElementById("permHealthBtn")?.addEventListener("click", refreshSettingsDiagnostics);
+        document.getElementById("clearResultsBtn")?.addEventListener("click", () => {
+            if (!confirm("저장된 결과물을 모두 삭제할까요?")) return;
+            savedResults = [];
+            persistSavedResults();
+            renderResultFilesList();
+        });
+        document.getElementById("supportInquiryBtn")?.addEventListener("click", async () => {
+            if (!authToken || !currentUser) {
+                openAuthModal("login");
+                return;
+            }
+            const ta = document.getElementById("supportInquiryInput");
+            const status = document.getElementById("supportInquiryStatus");
+            const msg = (ta?.value || "").trim();
+            if (!msg) {
+                if (status) status.textContent = "문의 내용을 입력해주세요.";
+                return;
+            }
+            if (status) status.textContent = "전송 중…";
+            try {
+                const res = await apiFetch("/support/inquiry", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg, device_id: getDeviceId() }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "전송 실패");
+                if (ta) ta.value = "";
+                if (status) status.textContent = "문의가 접수되었습니다.";
+                showToast("관리자 문의가 접수되었습니다.", "success");
+                await loadSupportHistory();
+            } catch (err) {
+                if (status) status.textContent = err.message || "전송 실패";
+            }
+        });
+        document.addEventListener("click", (e) => {
+            if (!settingsPanel?.classList.contains("open")) return;
+            if (settingsPanel.contains(e.target) ||
+                e.target === settingsBtn || settingsBtn?.contains(e.target)) return;
+            closeSettings();
         });
 
         const guideBar = document.getElementById("guideBar");
@@ -5316,9 +5609,11 @@
                 addSessionHistory({ mode: "collab", title: task });
             } catch (err) {
                 resultEl.textContent = `오류: ${err.message}`;
+                showToast(err.message || "협업 요청 실패", "error", 5000);
             } finally {
                 collabRecommendInFlight = false;
-                collabTaskAsked = true;
+                dockPrimaryBtn.disabled = false;
+                if (collabSession?.plan) collabTaskAsked = true;
                 updateDockUI();
             }
         }
@@ -5442,7 +5737,10 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),
                 });
-                if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
+                if (!response.ok) {
+                    const errMsg = await parseApiError(response, "단계 실행 실패");
+                    throw new Error(errMsg);
+                }
                 const data = await response.json();
                 const modelNote = data.model_label ? `[${data.model_label} · ${data.stage_role || ""}]\n` : "";
                 collabSession.stageOutputs[stageIndex] = modelNote + (data.guidance || "");
@@ -5645,6 +5943,10 @@
             appendCollabLog(plan.summary || "4단계 협업을 시작할 수 있습니다.", "info");
             persistActiveCollab();
             renderCollabRunner(container);
+            if (!collabPipelineRunning) {
+                showToast("협업 계획이 준비되었습니다. 단계별 작업을 시작합니다.", "info", 3500);
+                setTimeout(() => startCollabWork(), 500);
+            }
         }
 
         dockSecondaryBtn.addEventListener("click", handleAddUserInput);
