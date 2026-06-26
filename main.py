@@ -21,19 +21,28 @@ from pydantic import BaseModel, Field
 
 from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
 from auth_store import (
+    add_support_reply,
     admin_logout,
     check_and_consume_quota,
     create_admin_session,
     create_public_share,
+    create_support_inquiry,
+    get_activity_log,
     get_admin_dashboard,
     get_public_share,
     get_quota_snapshot,
+    get_support_thread,
+    get_user_admin_detail,
     get_user_by_token,
     get_user_data,
     init_db,
+    list_guest_devices,
+    list_support_inquiries,
+    log_activity,
     login as auth_login_fn,
     logout as auth_logout_fn,
     merge_user_data,
+    search_users_admin,
     signup as auth_signup_fn,
     verify_admin_password,
     verify_admin_token,
@@ -139,10 +148,34 @@ def _resolve_subject(request: Request, device_id: str | None = None) -> tuple[st
     return f"device:{dev}", None
 
 
-def _require_quota(request: Request, feature: str, device_id: str | None = None) -> dict | None:
+def _platform(request: Request) -> str:
+    p = (request.headers.get("X-Platform") or "web").strip().lower()
+    if p in ("app", "mobile_web", "web"):
+        return p
+    return "web"
+
+
+def _require_quota(
+    request: Request,
+    feature: str,
+    device_id: str | None = None,
+    *,
+    action: str = "",
+    detail: str = "",
+) -> dict | None:
     subject, user = _resolve_subject(request, device_id)
     ok, info = check_and_consume_quota(subject, feature)
     if ok:
+        dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
+        log_activity(
+            subject,
+            feature,
+            user_id=user["id"] if user else None,
+            device_id=dev,
+            platform=_platform(request),
+            action=action or feature,
+            detail=(detail or "")[:500],
+        )
         return user
     raise HTTPException(
         status_code=429,
@@ -374,7 +407,16 @@ class ShareCreateRequest(BaseModel):
 
 
 class AdminLoginRequest(BaseModel):
-    password: str = ""
+    password: str
+
+
+class SupportInquiryRequest(BaseModel):
+    message: str
+    device_id: str = ""
+
+
+class SupportReplyRequest(BaseModel):
+    message: str = ""
 
 
 def _admin_bearer(request: Request) -> str | None:
@@ -2735,6 +2777,95 @@ def admin_login(body: AdminLoginRequest) -> dict:
 def admin_dashboard(request: Request) -> dict:
     _require_admin(request)
     return get_admin_dashboard()
+
+
+@app.get("/admin/users/search")
+def admin_search_users(request: Request, q: str = "", limit: int = 40) -> dict:
+    _require_admin(request)
+    return {"users": search_users_admin(q, limit=limit)}
+
+
+@app.get("/admin/users/{user_id}")
+def admin_user_detail(user_id: int, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return get_user_admin_detail(user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.get("/admin/guests")
+def admin_guests(request: Request, limit: int = 50) -> dict:
+    _require_admin(request)
+    return {"guests": list_guest_devices(limit=limit)}
+
+
+@app.get("/admin/activity")
+def admin_activity(
+    request: Request,
+    user_id: int | None = None,
+    device_id: str | None = None,
+    limit: int = 100,
+) -> dict:
+    _require_admin(request)
+    return {"activity": get_activity_log(user_id=user_id, device_id=device_id, limit=limit)}
+
+
+@app.get("/admin/support")
+def admin_support_list(request: Request, status: str | None = None) -> dict:
+    _require_admin(request)
+    return {"inquiries": list_support_inquiries(status=status)}
+
+
+@app.get("/admin/support/{inquiry_id}")
+def admin_support_thread(inquiry_id: int, request: Request) -> dict:
+    _require_admin(request)
+    thread = get_support_thread(inquiry_id)
+    if not thread:
+        raise HTTPException(status_code=404, detail="문의를 찾을 수 없습니다.")
+    return thread
+
+
+@app.post("/admin/support/{inquiry_id}/reply")
+def admin_support_reply(inquiry_id: int, body: SupportReplyRequest, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        add_support_reply(inquiry_id, body.message, from_admin=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"success": True}
+
+
+@app.post("/support/inquiry")
+def user_support_inquiry(body: SupportInquiryRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    dev = (body.device_id or request.headers.get("X-Device-Id") or "").strip()
+    username = ""
+    user_id = None
+    if user:
+        user_id = user["id"]
+        username = user.get("username") or user.get("email") or ""
+    try:
+        row = create_support_inquiry(
+            body.message,
+            user_id=user_id,
+            device_id=dev,
+            platform=_platform(request),
+            username=username,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    subject, _ = _resolve_subject(request, dev)
+    log_activity(
+        subject,
+        "support",
+        user_id=user_id,
+        device_id=dev,
+        platform=_platform(request),
+        action="inquiry",
+        detail=body.message[:120],
+    )
+    return row
 
 
 @app.post("/admin/logout")

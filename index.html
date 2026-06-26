@@ -917,6 +917,41 @@
             color: #1d4ed8; font-weight: 700; font-size: 13px; cursor: pointer;
         }
 
+        .guide-bar-backdrop {
+            position: fixed; inset: 0; z-index: 850; background: transparent;
+        }
+        .guide-bar {
+            position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+            z-index: 900; width: min(640px, calc(100vw - 24px));
+            max-height: min(52vh, 420px); overflow: hidden;
+            background: #fff; border: 1px solid #c7d2fe; border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(49, 46, 129, 0.18);
+            display: flex; flex-direction: column;
+        }
+        .guide-bar-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; border-bottom: 1px solid #e2e8f0; background: #eef2ff;
+            font-size: 14px; font-weight: 800; color: #4338ca;
+        }
+        .guide-bar-close {
+            border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748b;
+        }
+        .guide-bar-body {
+            padding: 12px 14px 14px; overflow-y: auto; font-size: 13px; line-height: 1.65; color: #334155;
+        }
+        .guide-bar-body h3 { margin: 10px 0 4px; font-size: 13px; color: #4338ca; }
+        .guide-bar-body p { margin: 0 0 8px; }
+        .guide-bar-body ul { margin: 0 0 8px; padding-left: 18px; }
+        .guide-bar-tip {
+            background: #eff6ff; border-left: 3px solid #3b82f6; padding: 8px 10px;
+            border-radius: 0 8px 8px 0; font-size: 12px; margin-top: 6px;
+        }
+        html[data-theme="dark"] .guide-bar { background: #1e293b; border-color: #475569; }
+        html[data-theme="dark"] .guide-bar-head { background: #312e81; color: #e9d5ff; border-color: #475569; }
+        html[data-theme="dark"] .guide-bar-body { color: #cbd5e1; }
+        html[data-theme="dark"] .guide-bar-body h3 { color: #c4b5fd; }
+        html[data-theme="dark"] .guide-bar-tip { background: #1e3a5f; color: #bfdbfe; }
+
         html[data-theme="dark"] {
             color-scheme: dark;
         }
@@ -1263,10 +1298,10 @@
         .dock-inner {
             width: min(1160px, 100%);
             margin: 0 auto;
-            padding: 12px 18px 16px;
+            padding: 8px 14px 12px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .dock-mode-row {
@@ -2704,6 +2739,14 @@
                 <div id="settingsVersionMeta" class="settings-meta">불러오는 중…</div>
             </div>
 
+            <div class="settings-row">
+                <div class="settings-row-label">관리자 문의</div>
+                <div class="settings-meta" style="margin-bottom:6px;">버그·기능 요청·사용 중 궁금한 점을 남기면 관리자가 답변합니다.</div>
+                <textarea id="supportInquiryInput" rows="3" placeholder="문의 내용을 입력하세요…" style="width:100%;border-radius:8px;border:1px solid #d1d5db;padding:8px 10px;font:inherit;resize:vertical;"></textarea>
+                <button id="supportInquiryBtn" class="settings-action-btn primary-action" type="button" style="margin-top:8px;">📨 문의 보내기</button>
+                <div id="supportInquiryStatus" class="settings-meta" style="margin-top:6px;"></div>
+            </div>
+
             <!-- 결과물 삭제 -->
             <div class="settings-row">
                 <div class="settings-row-label">결과물 파일</div>
@@ -2751,6 +2794,34 @@
                 </div>
             </div>
         </header>
+
+        <div id="guideBarBackdrop" class="guide-bar-backdrop" style="display:none;" aria-hidden="true"></div>
+        <div id="guideBar" class="guide-bar" style="display:none;" role="dialog" aria-label="사용 가이드">
+            <div class="guide-bar-head">
+                <span>📘 Nasaro AI 사용 가이드</span>
+                <button id="guideBarClose" class="guide-bar-close" type="button" aria-label="닫기">✕</button>
+            </div>
+            <div class="guide-bar-body">
+                <p><strong>처음이셔도 괜찮아요.</strong> 아래 입력창에 질문을 적고, 모드를 고른 뒤 ▶ 버튼으로 실행하세요.</p>
+                <h3>① 비교</h3>
+                <p>같은 질문을 여러 AI에게 동시에 보냅니다. 🤖 AI 버튼으로 모델을 고르고, 답변마다 「복사」로 텍스트를 가져올 수 있습니다.</p>
+                <h3>② 토론</h3>
+                <p>주제 하나를 놓고 AI들이 라운드별로 의견을 주고받습니다. 기획·논점 정리에 적합합니다.</p>
+                <h3>③ 협업 (4단계)</h3>
+                <ul>
+                    <li><strong>조사</strong> — 근거·팩트 수집</li>
+                    <li><strong>구조</strong> — 목차·논리 설계</li>
+                    <li><strong>제작</strong> — 초안·작업물 작성</li>
+                    <li><strong>검증</strong> — 오류 지적 후 필요 시 앞 단계가 수정</li>
+                </ul>
+                <p>작업 설명을 입력하면 AI가 단계별로 순차 실행합니다. 완료 후 「추가 작업 ▶」로 수정 요청도 가능합니다.</p>
+                <h3>④ 에이전트</h3>
+                <p>입력창 <strong>위</strong> 「🌐 에이전트」 버튼으로 웹 자동 실행 패널을 엽니다. PC는 Chrome 확장, Android는 앱이 필요합니다. 「5분 뒤 …」처럼 자연어로 예약도 됩니다.</p>
+                <h3>⑤ 계정 · 저장</h3>
+                <p>로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다. 메뉴에서 「결과물 저장」으로 마음에 드는 답을 보관하세요.</p>
+                <div class="guide-bar-tip">다른 곳을 누르면 이 안내가 닫힙니다. 문의는 설정 → 「관리자 문의」를 이용하세요.</div>
+            </div>
+        </div>
 
         <main id="mainContent">
             <div id="shareViewBanner"></div>
@@ -3031,13 +3102,13 @@
                     <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                     <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
-                <div id="mainInputTools"></div>
                 <div class="dock-mode-row">
                     <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
                     <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
                     <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
                 </div>
+                <div id="mainInputTools"></div>
                 <div class="dock-actions">
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
@@ -3370,8 +3441,14 @@
             applyAiPreset(preset);
         });
 
+        function getPlatform() {
+            if (navigator.userAgent.includes("NasaroAIApp") || new URLSearchParams(location.search).get("source") === "app") return "app";
+            if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) return "mobile_web";
+            return "web";
+        }
+
         function authHeaders(extra = {}) {
-            const h = { ...extra, "X-Device-Id": getDeviceId() };
+            const h = { ...extra, "X-Device-Id": getDeviceId(), "X-Platform": getPlatform() };
             if (authToken) h.Authorization = "Bearer " + authToken;
             return h;
         }
@@ -3842,7 +3919,56 @@
         settingsBtn.addEventListener("click", () => {
             settingsPanel.classList.contains("open") ? closeSettings() : openSettings();
         });
-        document.getElementById("guideBtn")?.addEventListener("click", () => { window.open("/guide", "_blank"); });
+        const guideBar = document.getElementById("guideBar");
+        const guideBarBackdrop = document.getElementById("guideBarBackdrop");
+
+        function openGuideBar() {
+            if (!guideBar) return;
+            guideBar.style.display = "flex";
+            guideBarBackdrop.style.display = "block";
+        }
+        function closeGuideBar() {
+            if (!guideBar) return;
+            guideBar.style.display = "none";
+            guideBarBackdrop.style.display = "none";
+        }
+
+        document.getElementById("guideBtn")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            guideBar?.style.display === "flex" ? closeGuideBar() : openGuideBar();
+        });
+        document.getElementById("guideBarClose")?.addEventListener("click", closeGuideBar);
+        guideBarBackdrop?.addEventListener("click", closeGuideBar);
+        document.addEventListener("click", (e) => {
+            if (!guideBar || guideBar.style.display !== "flex") return;
+            if (guideBar.contains(e.target) || e.target?.id === "guideBtn") return;
+            closeGuideBar();
+        });
+
+        document.getElementById("supportInquiryBtn")?.addEventListener("click", async () => {
+            const ta = document.getElementById("supportInquiryInput");
+            const status = document.getElementById("supportInquiryStatus");
+            const msg = (ta?.value || "").trim();
+            if (!msg) {
+                if (status) status.textContent = "문의 내용을 입력해주세요.";
+                return;
+            }
+            if (status) status.textContent = "전송 중…";
+            try {
+                const res = await apiFetch("/support/inquiry", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg, device_id: getDeviceId() }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.detail || "전송 실패");
+                if (ta) ta.value = "";
+                if (status) status.textContent = "문의가 접수되었습니다. 관리자 답변을 기다려주세요.";
+                showToast("관리자 문의가 접수되었습니다.", "success");
+            } catch (err) {
+                if (status) status.textContent = err.message || "전송 실패";
+            }
+        });
         settingsPanelClose?.addEventListener("click", closeSettings);
 
         document.getElementById("settingsLoginBtn")?.addEventListener("click", () => openAuthModal("login"));
@@ -3958,6 +4084,7 @@
             return clean.length > 64 ? `${clean.slice(0, 64)}...` : clean || "답변 작성 중...";
         }
 
+        let syncPaddingTimer = null;
         function syncMainPadding() {
             const dockHeight = inputDock.offsetHeight;
             const offset = dockHeight + 32;
@@ -3965,13 +4092,17 @@
             document.documentElement.style.setProperty("--bottom-offset", `${offset}px`);
             mainContent.style.paddingBottom = "var(--bottom-offset)";
         }
+        function scheduleSyncMainPadding() {
+            if (syncPaddingTimer) cancelAnimationFrame(syncPaddingTimer);
+            syncPaddingTimer = requestAnimationFrame(syncMainPadding);
+        }
 
         function autoResizeInput() {
             mainInput.style.height = "auto";
             const lineHeight = 24;
             const maxHeight = lineHeight * 6 + 24;
             mainInput.style.height = `${Math.min(mainInput.scrollHeight, maxHeight)}px`;
-            syncMainPadding();
+            scheduleSyncMainPadding();
         }
 
         function autoResizeTA(ta) {
@@ -4058,9 +4189,9 @@
                 dockPrimaryBtn.click();
             }
         });
-        const bottomResizeObserver = new ResizeObserver(syncMainPadding);
+        const bottomResizeObserver = new ResizeObserver(scheduleSyncMainPadding);
         bottomResizeObserver.observe(inputDock);
-        window.addEventListener("resize", syncMainPadding);
+        window.addEventListener("resize", scheduleSyncMainPadding);
         autoResizeInput();
 
         // ── 모바일 키보드 팝업 시 입력창 함께 올라오기 (visualViewport) ────────
@@ -4079,7 +4210,7 @@
                         agentPanel.style.bottom = "";
                     }
                 }
-                syncMainPadding();
+                scheduleSyncMainPadding();
                 // 포커스된 입력창을 화면에 보이도록 스크롤
                 if (keyboardHeight > 60) {
                     const focused = document.activeElement;

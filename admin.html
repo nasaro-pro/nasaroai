@@ -7,137 +7,187 @@
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.5; }
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
-    h1 { font-size: 22px; margin: 0 0 4px; }
-    h2 { font-size: 16px; margin: 0 0 10px; color: #c4b5fd; }
-    .sub { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
     a { color: #a78bfa; }
-    .login-box, .panel { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-    input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f8fafc; margin: 8px 0 12px; }
-    button { padding: 9px 14px; border-radius: 8px; border: none; background: #7c3aed; color: #fff; font-weight: 600; cursor: pointer; }
+    button { padding: 8px 12px; border-radius: 8px; border: none; background: #7c3aed; color: #fff; font-weight: 600; cursor: pointer; font-size: 12px; }
     button.secondary { background: #334155; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
-    .stat { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
-    .stat b { display: block; font-size: 20px; color: #c4b5fd; }
-    .stat span { font-size: 11px; color: #94a3b8; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    input, textarea, select {
+      width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #475569;
+      background: #0f172a; color: #f8fafc; font: inherit; font-size: 12px;
+    }
+    textarea { resize: vertical; min-height: 72px; }
+    .login-wrap { max-width: 400px; margin: 80px auto; padding: 24px; background: #1e293b; border-radius: 14px; border: 1px solid #334155; }
+    .login-wrap h1 { margin: 0 0 8px; font-size: 20px; }
+    .err { color: #fca5a5; font-size: 13px; min-height: 18px; margin: 6px 0; }
+    .app-shell { display: none; min-height: 100vh; }
+    .app-shell.open { display: grid; grid-template-columns: 260px 1fr; }
+    @media (max-width: 900px) { .app-shell.open { grid-template-columns: 1fr; } .sidebar { max-height: 220px; overflow: hidden; } }
+    .sidebar { background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; min-height: 100vh; }
+    .sidebar-head { padding: 14px 14px 10px; border-bottom: 1px solid #334155; }
+    .sidebar-head h1 { margin: 0; font-size: 16px; }
+    .sidebar-head p { margin: 4px 0 0; font-size: 11px; color: #94a3b8; }
+    .sidebar-tabs { display: flex; gap: 4px; padding: 8px 10px; }
+    .sidebar-tabs button { flex: 1; background: #0f172a; }
+    .sidebar-tabs button.active { background: #7c3aed; }
+    .sidebar-search { padding: 0 10px 8px; }
+    .sidebar-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+    .side-item {
+      display: block; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 4px;
+      border-radius: 8px; border: 1px solid transparent; background: #0f172a; color: #e2e8f0;
+      cursor: pointer; font-size: 11px;
+    }
+    .side-item:hover { border-color: #475569; }
+    .side-item.active { border-color: #7c3aed; background: #312e81; }
+    .side-item b { display: block; font-size: 12px; }
+    .side-item span { color: #94a3b8; font-size: 10px; }
+    .badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 999px; margin-left: 4px; }
+    .badge.web { background: #1e3a8a; color: #bfdbfe; }
+    .badge.app { background: #14532d; color: #bbf7d0; }
+    .badge.mobile_web { background: #713f12; color: #fde68a; }
+    .badge.open { background: #7f1d1d; color: #fecaca; }
+    .badge.answered { background: #14532d; color: #bbf7d0; }
+    .main { padding: 16px 18px 40px; overflow-x: hidden; }
+    .main-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .stat { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; }
+    .stat b { display: block; font-size: 18px; color: #c4b5fd; }
+    .stat span { font-size: 10px; color: #94a3b8; }
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 1100px) { .panels { grid-template-columns: 1fr; } }
+    .panel { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px; }
+    .panel h2 { margin: 0 0 10px; font-size: 14px; color: #c4b5fd; }
+    .panel.full { grid-column: 1 / -1; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { border-bottom: 1px solid #334155; padding: 7px 5px; text-align: left; vertical-align: top; }
-    th { color: #94a3b8; font-weight: 600; white-space: nowrap; }
-    .err { color: #fca5a5; font-size: 13px; min-height: 18px; }
-    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    th, td { border-bottom: 1px solid #334155; padding: 6px 4px; text-align: left; vertical-align: top; }
+    th { color: #94a3b8; white-space: nowrap; }
     .online { color: #86efac; font-weight: 700; }
     .offline { color: #64748b; }
-    .guide-box { font-size: 13px; color: #cbd5e1; line-height: 1.65; }
-    .guide-box ol { padding-left: 20px; }
-    .hour-chart { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .activity-list, .support-list { max-height: 280px; overflow-y: auto; }
+    .activity-row, .support-row {
+      padding: 8px 0; border-bottom: 1px solid #334155; font-size: 11px;
+    }
+    .activity-row:last-child, .support-row:last-child { border-bottom: none; }
+    .activity-meta { color: #94a3b8; font-size: 10px; margin-top: 2px; }
+    .detail-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-top: 10px; font-size: 12px; }
+    .detail-box h3 { margin: 0 0 8px; font-size: 14px; color: #c4b5fd; }
+    .reply-thread { margin: 10px 0; max-height: 200px; overflow-y: auto; }
+    .reply-bubble { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; }
+    .reply-bubble.admin { background: #312e81; }
+    .reply-bubble.user { background: #0f172a; border: 1px solid #334155; }
+    .hour-chart { display: flex; flex-wrap: wrap; gap: 4px; }
     .hour-bar { font-size: 10px; background: #312e81; padding: 3px 6px; border-radius: 4px; }
+    .empty { color: #64748b; font-size: 12px; padding: 12px 0; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top">
-      <div>
-        <h1>Nasaro AI 관리자</h1>
-        <p class="sub">회원 · 로그인 · 사용량 · 협업 · 로드맵</p>
-      </div>
-      <div>
-        <a href="/">← 메인으로</a>
-        <button id="logoutBtn" class="secondary" type="button" style="display:none;margin-left:8px;">로그아웃</button>
-      </div>
-    </div>
-
-    <div id="loginView" class="login-box">
-      <strong>관리자 로그인</strong>
-      <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
-      <div id="loginErr" class="err"></div>
-      <button id="loginBtn" type="button">접속</button>
-    </div>
-
-    <div id="dashView" style="display:none;">
-      <div class="stats" id="statsRow"></div>
-      <div class="panel">
-        <h2>시간대별 사용 (오늘 KST)</h2>
-        <div id="hourChart" class="hour-chart"></div>
-      </div>
-      <div class="panel">
-        <strong>회원 목록</strong>
-        <div style="overflow-x:auto;margin-top:10px;">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>아이디</th>
-                <th>이름</th>
-                <th>가입일</th>
-                <th>로그인</th>
-                <th>마지막</th>
-                <th>접속</th>
-                <th>오늘</th>
-                <th>누적</th>
-                <th>결과물</th>
-                <th>협업</th>
-              </tr>
-            </thead>
-            <tbody id="usersBody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="panel guide-box">
-        <h2>기능 로드맵 · 보완 아이디어 (20)</h2>
-        <ol>
-          <li><strong>답변 복사</strong> — 각 AI 답변마다 작은 복사 버튼 ✅</li>
-          <li><strong>내보내기 형식</strong> — md/txt/html/pdf 선택 ✅</li>
-          <li><strong>협업 4단계 순차 실행</strong> — 단계별 실시간 표시 ✅</li>
-          <li><strong>검증 피드백 루프</strong> — 지적 후 해당 단계 AI 재작업 ✅</li>
-          <li><strong>작업 유형 자동 분류</strong> — 자소서·문서·영상 등 ✅</li>
-          <li><strong>에이전트 예약 임무</strong> — 「N분 뒤 …」 자연어 예약 ✅</li>
-          <li><strong>계정·결과물 동기화</strong> — 아이디 로그인 ✅</li>
-          <li><strong>빈 화면 질문 추천</strong> — 비교 모드 예시 칩 ✅</li>
-          <li><strong>메일·SNS·카톡 초안</strong> — 채널별 템플릿 변환</li>
-          <li><strong>즐겨찾는 AI 고정</strong> — 모드별 기본 AI 저장</li>
-          <li><strong>베스트 답변 하이라이트</strong> — 추천 답 원탭 복사</li>
-          <li><strong>답변 Diff 보기</strong> — AI 간 차이만 강조</li>
-          <li><strong>질문 맞춤 AI 추천</strong> — 유형별 최적 AI 제안</li>
-          <li><strong>토론 라운드 요약</strong> — 합의·쟁점 한 장 정리</li>
-          <li><strong>결과물 폴더·태그</strong> — 저장물 검색·분류</li>
-          <li><strong>협업·에이전트 완료 알림</strong> — 브라우저·앱 푸시</li>
-          <li><strong>Android 홈 위젯</strong> — 빠른 질문·에이전트</li>
-          <li><strong>초보 모드</strong> — 기능 하나씩 크게</li>
-          <li><strong>팀·가족 공유 보관함</strong> — 계정 간 결과물 공유</li>
-          <li><strong>오늘의 질문·템플릿 갤러리</strong> — 추천 질문 + 자소서 등 템플릿</li>
-        </ol>
-        <p style="margin-top:12px;color:#94a3b8;">사용자용 가이드는 <a href="/guide" target="_blank">/guide</a> · 메인 사이드바 「📘 사용 가이드」</p>
-      </div>
-    </div>
+  <div id="loginView" class="login-wrap">
+    <h1>Nasaro AI 관리자</h1>
+    <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">회원 · 활동 · 문의 · 플랫폼 통계</p>
+    <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+    <div id="loginErr" class="err"></div>
+    <button id="loginBtn" type="button" style="width:100%;margin-top:4px;">접속</button>
+    <p style="margin-top:12px;font-size:12px;"><a href="/">← 메인으로</a></p>
   </div>
+
+  <div id="appShell" class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h1>관리자 콘솔</h1>
+        <p id="sidebarSub">회원 · 비회원 · 문의</p>
+      </div>
+      <div class="sidebar-tabs">
+        <button type="button" id="tabMembers" class="active">회원</button>
+        <button type="button" id="tabGuests">비회원</button>
+        <button type="button" id="tabSupport">문의</button>
+      </div>
+      <div class="sidebar-search">
+        <input id="sidebarSearch" type="search" placeholder="이름·아이디 검색…">
+      </div>
+      <div id="sidebarList" class="sidebar-list"></div>
+      <div style="padding:10px;border-top:1px solid #334155;">
+        <a href="/">메인</a>
+        <button id="logoutBtn" class="secondary" type="button" style="float:right;">로그아웃</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-top">
+        <div>
+          <strong id="mainTitle">대시보드</strong>
+          <div id="mainSub" style="font-size:12px;color:#94a3b8;">전체 현황</div>
+        </div>
+        <button id="refreshBtn" class="secondary" type="button">새로고침</button>
+      </div>
+
+      <div class="stats" id="statsRow"></div>
+
+      <div class="panels">
+        <section class="panel">
+          <h2>플랫폼별 사용 (오늘)</h2>
+          <div id="platformStats" class="empty">불러오는 중…</div>
+        </section>
+        <section class="panel">
+          <h2>시간대별 사용 (KST)</h2>
+          <div id="hourChart" class="hour-chart"></div>
+        </section>
+        <section class="panel full">
+          <h2>최근 활동 (전체)</h2>
+          <div id="activityFeed" class="activity-list"></div>
+        </section>
+        <section class="panel" id="userDetailPanel" style="display:none;">
+          <h2>회원 상세</h2>
+          <div id="userDetail"></div>
+        </section>
+        <section class="panel" id="supportPanel">
+          <h2>관리자 문의</h2>
+          <div id="supportList" class="support-list"></div>
+          <div id="supportDetail" class="detail-box" style="display:none;">
+            <h3 id="supportDetailTitle">문의</h3>
+            <div id="supportThread" class="reply-thread"></div>
+            <textarea id="supportReplyInput" placeholder="답변 입력…"></textarea>
+            <button id="supportReplyBtn" type="button" style="margin-top:8px;">답변 보내기</button>
+          </div>
+        </section>
+        <section class="panel full">
+          <h2>회원 목록 (요약)</h2>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th><th>아이디</th><th>이름</th><th>가입</th><th>로그인</th><th>접속</th><th>오늘</th><th>협업</th>
+                </tr>
+              </thead>
+              <tbody id="usersBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
   <script>
     const TOKEN_KEY = "nasaroai_admin_token";
     let adminToken = sessionStorage.getItem(TOKEN_KEY) || "";
+    let dashData = null;
+    let guests = [];
+    let supportItems = [];
+    let sidebarMode = "members";
+    let selectedUserId = null;
+    let selectedSupportId = null;
+    let searchTimer = null;
+
+    const PLATFORM_LABEL = { web: "웹", app: "앱", mobile_web: "모바일웹" };
 
     async function api(path, opts = {}) {
       const headers = { ...(opts.headers || {}) };
       if (adminToken) headers.Authorization = "Bearer " + adminToken;
       const res = await fetch(path, { ...opts, headers });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "요청 실패");
-      return data;
-    }
-
-    async function tryLogin() {
-      const pw = document.getElementById("adminPassword").value;
-      document.getElementById("loginErr").textContent = "";
-      try {
-        const data = await api("/admin/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password: pw }),
-        });
-        adminToken = data.token;
-        sessionStorage.setItem(TOKEN_KEY, adminToken);
-        await loadDashboard();
-      } catch (e) {
-        document.getElementById("loginErr").textContent = e.message || "로그인 실패";
+      if (!res.ok) {
+        const msg = typeof data.detail === "string" ? data.detail : (data.detail?.message || "요청 실패");
+        throw new Error(msg);
       }
+      return data;
     }
 
     function fmtQuota(q) {
@@ -145,53 +195,225 @@
       return Object.entries(q).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k}:${v}`).join(" ");
     }
 
-    async function loadDashboard() {
-      try {
-        const data = await api("/admin/dashboard");
-        document.getElementById("loginView").style.display = "none";
-        document.getElementById("dashView").style.display = "";
-        document.getElementById("logoutBtn").style.display = "";
-        document.getElementById("statsRow").innerHTML = `
-          <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
-          <div class="stat"><b>${data.active_sessions ?? 0}</b><span>활성 세션</span></div>
-          <div class="stat"><b>${data.share_links}</b><span>공유 링크</span></div>
-          <div class="stat"><b>${data.day_key}</b><span>오늘 (KST)</span></div>
-          <div class="stat"><b>${fmtQuota(data.usage_today)}</b><span>전체 오늘</span></div>`;
+    function platformBadge(p) {
+      const cls = PLATFORM_LABEL[p] ? p : "web";
+      return `<span class="badge ${cls}">${PLATFORM_LABEL[p] || p || "web"}</span>`;
+    }
 
-        const hourEl = document.getElementById("hourChart");
-        const byHour = data.usage_by_hour || {};
-        const keys = Object.keys(byHour).sort();
-        hourEl.innerHTML = keys.length
-          ? keys.map(k => `<span class="hour-bar">${k}=${byHour[k]}</span>`).join("")
-          : "<span style='color:#64748b'>아직 기록 없음</span>";
+    function renderStats(data) {
+      const ps = data.platform_stats || {};
+      const plat = Object.entries(ps).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
+      document.getElementById("statsRow").innerHTML = `
+        <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
+        <div class="stat"><b>${data.active_sessions ?? 0}</b><span>활성 세션</span></div>
+        <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
+        <div class="stat"><b>${guests.length}</b><span>비회원 기기</span></div>
+        <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용</span></div>`;
+      document.getElementById("platformStats").innerHTML = Object.keys(ps).length
+        ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
+        : "<span class='empty'>오늘 활동 기록 없음</span>";
+      const byHour = data.usage_by_hour || {};
+      const keys = Object.keys(byHour).sort();
+      document.getElementById("hourChart").innerHTML = keys.length
+        ? keys.map(k => `<span class="hour-bar">${k}=${byHour[k]}</span>`).join("")
+        : "<span class='empty'>아직 기록 없음</span>";
+    }
 
-        const tbody = document.getElementById("usersBody");
-        tbody.innerHTML = "";
-        (data.users || []).forEach(u => {
-          const tr = document.createElement("tr");
-          const collab = u.has_active_collab
-            ? `예 ${u.collab_work_type || ""} ${u.collab_stage_done || 0}/4`
-            : "-";
-          tr.innerHTML = `
-            <td>${u.id}</td>
-            <td>${u.username || u.email}</td>
-            <td>${u.display_name || "-"}</td>
-            <td>${u.created_at_iso || "-"}</td>
-            <td>${u.login_count ?? 0}회</td>
-            <td>${u.last_login_iso || "-"}</td>
-            <td class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속중" : "오프"}</td>
-            <td>${fmtQuota(u.quota_today)}</td>
-            <td>${fmtQuota(u.quota_all_time)}</td>
-            <td>${u.saved_results_count ?? 0}</td>
-            <td>${collab}</td>`;
-          tbody.appendChild(tr);
+    function renderActivityFeed(items) {
+      const el = document.getElementById("activityFeed");
+      if (!items?.length) { el.innerHTML = "<div class='empty'>활동 기록 없음</div>"; return; }
+      el.innerHTML = items.map(a => `
+        <div class="activity-row">
+          <div><strong>${a.feature}</strong> · ${a.action || ""} ${platformBadge(a.platform)}
+            ${a.user_id ? `<span style="color:#a78bfa;">#${a.user_id}</span>` : `<span style="color:#94a3b8;">비회원</span>`}
+          </div>
+          <div>${(a.detail || "").slice(0, 120)}</div>
+          <div class="activity-meta">${a.created_at_iso} · ${a.device_id ? a.device_id.slice(0, 16) : "-"}</div>
+        </div>`).join("");
+    }
+
+    function renderUsersTable(users) {
+      const tbody = document.getElementById("usersBody");
+      tbody.innerHTML = "";
+      (users || []).forEach(u => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = "pointer";
+        tr.innerHTML = `
+          <td>${u.id}</td>
+          <td>${u.username || u.email}</td>
+          <td>${u.display_name || "-"}</td>
+          <td>${u.created_at_iso || "-"}</td>
+          <td>${u.login_count ?? 0}</td>
+          <td class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속" : "오프"}</td>
+          <td>${fmtQuota(u.quota_today)}</td>
+          <td>${u.has_active_collab ? "진행중" : "-"}</td>`;
+        tr.addEventListener("click", () => selectUser(u.id));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderSidebar() {
+      const q = document.getElementById("sidebarSearch").value.trim().toLowerCase();
+      const list = document.getElementById("sidebarList");
+      list.innerHTML = "";
+      if (sidebarMode === "members") {
+        let users = dashData?.users || [];
+        if (q) users = users.filter(u => `${u.username} ${u.display_name} ${u.email}`.toLowerCase().includes(q));
+        if (!users.length) { list.innerHTML = "<div class='empty'>회원 없음</div>"; return; }
+        users.forEach(u => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "side-item" + (selectedUserId === u.id ? " active" : "");
+          btn.innerHTML = `<b>${u.username || u.email}</b><span>${u.display_name || "-"} · 로그인 ${u.login_count ?? 0} · ${u.is_online ? "접속중" : "오프"}</span>`;
+          btn.addEventListener("click", () => selectUser(u.id));
+          list.appendChild(btn);
         });
-      } catch {
-        adminToken = "";
-        sessionStorage.removeItem(TOKEN_KEY);
-        document.getElementById("loginView").style.display = "";
-        document.getElementById("dashView").style.display = "none";
-        document.getElementById("logoutBtn").style.display = "none";
+        return;
+      }
+      if (sidebarMode === "guests") {
+        let items = guests;
+        if (q) items = items.filter(g => (g.device_id || "").toLowerCase().includes(q));
+        if (!items.length) { list.innerHTML = "<div class='empty'>비회원 기록 없음</div>"; return; }
+        items.forEach(g => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "side-item";
+          btn.innerHTML = `<b>${(g.device_id || "").slice(0, 20)}…</b><span>${platformBadge(g.platform)} ${g.activity_count}회 · ${g.last_at_iso}</span>`;
+          btn.addEventListener("click", () => loadGuestActivity(g.device_id));
+          list.appendChild(btn);
+        });
+        return;
+      }
+      let items = supportItems;
+      if (q) items = items.filter(s => `${s.username} ${s.message}`.toLowerCase().includes(q));
+      if (!items.length) { list.innerHTML = "<div class='empty'>문의 없음</div>"; return; }
+      items.forEach(s => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "side-item" + (selectedSupportId === s.id ? " active" : "");
+        btn.innerHTML = `<b>${s.username || "비회원"} <span class="badge ${s.status}">${s.status}</span></b><span>${s.message.slice(0, 40)}… · ${s.created_at_iso}</span>`;
+        btn.addEventListener("click", () => openSupport(s.id));
+        list.appendChild(btn);
+      });
+    }
+
+    async function selectUser(userId) {
+      selectedUserId = userId;
+      selectedSupportId = null;
+      document.getElementById("userDetailPanel").style.display = "";
+      document.getElementById("mainTitle").textContent = "회원 #" + userId;
+      document.getElementById("userDetail").innerHTML = "불러오는 중…";
+      renderSidebar();
+      try {
+        const u = await api("/admin/users/" + userId);
+        const pc = Object.entries(u.platform_counts || {}).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
+        document.getElementById("userDetail").innerHTML = `
+          <p><strong>${u.username || u.email}</strong> (${u.display_name || "-"}) · 가입 ${u.created_at_iso || "-"}</p>
+          <p>로그인 ${u.login_stats?.login_count ?? 0}회 · 마지막 ${u.last_login_iso || "-"} · 결과물 ${u.saved_results_count ?? 0}개</p>
+          <p>오늘 사용: ${fmtQuota(u.quota_today)} · 플랫폼: ${pc}</p>
+          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
+          <div class="activity-list">${(u.activity || []).map(a => `
+            <div class="activity-row">
+              <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
+              <div>${(a.detail || a.action || "").slice(0, 100)}</div>
+            </div>`).join("") || "<div class='empty'>없음</div>"}</div>
+          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 내역</h3>
+          ${(u.support_inquiries || []).map(s => `<div class="activity-row">${s.status} · ${s.created_at_iso} · ${s.message}</div>`).join("") || "<div class='empty'>없음</div>"}`;
+        renderActivityFeed(u.activity || []);
+      } catch (e) {
+        document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
+      }
+    }
+
+    async function loadGuestActivity(deviceId) {
+      selectedUserId = null;
+      document.getElementById("userDetailPanel").style.display = "";
+      document.getElementById("mainTitle").textContent = "비회원 기기";
+      document.getElementById("userDetail").innerHTML = `<p>기기 ID: <code>${deviceId}</code></p><p>활동 불러오는 중…</p>`;
+      try {
+        const data = await api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=80");
+        document.getElementById("userDetail").innerHTML = `
+          <p>기기 ID: <code>${deviceId}</code></p>
+          <div class="activity-list">${(data.activity || []).map(a => `
+            <div class="activity-row">
+              <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
+              <div>${(a.detail || "").slice(0, 120)}</div>
+            </div>`).join("") || "<div class='empty'>없음</div>"}</div>`;
+        renderActivityFeed(data.activity || []);
+      } catch (e) {
+        document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
+      }
+    }
+
+    function renderSupportList() {
+      const el = document.getElementById("supportList");
+      if (!supportItems.length) { el.innerHTML = "<div class='empty'>문의 없음</div>"; return; }
+      el.innerHTML = supportItems.slice(0, 15).map(s => `
+        <div class="support-row" style="cursor:pointer;" data-id="${s.id}">
+          <div><strong>${s.username || "비회원"}</strong> ${platformBadge(s.platform)}
+            <span class="badge ${s.status}">${s.status}</span></div>
+          <div>${s.message.slice(0, 80)}</div>
+          <div class="activity-meta">${s.created_at_iso}</div>
+        </div>`).join("");
+      el.querySelectorAll(".support-row").forEach(row => {
+        row.addEventListener("click", () => openSupport(Number(row.dataset.id)));
+      });
+    }
+
+    async function openSupport(id) {
+      selectedSupportId = id;
+      sidebarMode = "support";
+      document.getElementById("tabSupport").classList.add("active");
+      document.getElementById("tabMembers").classList.remove("active");
+      document.getElementById("tabGuests").classList.remove("active");
+      renderSidebar();
+      const box = document.getElementById("supportDetail");
+      box.style.display = "";
+      document.getElementById("supportThread").innerHTML = "불러오는 중…";
+      try {
+        const t = await api("/admin/support/" + id);
+        document.getElementById("supportDetailTitle").textContent =
+          `${t.username || "비회원"} · ${t.status} ${platformBadge(t.platform)}`;
+        const msgs = [`<div class="reply-bubble user"><strong>문의</strong><br>${t.message}</div>`];
+        (t.replies || []).forEach(r => {
+          msgs.push(`<div class="reply-bubble ${r.from_admin ? "admin" : "user"}"><strong>${r.from_admin ? "관리자" : "사용자"}</strong> · ${r.created_at_iso}<br>${r.message}</div>`);
+        });
+        document.getElementById("supportThread").innerHTML = msgs.join("");
+        document.getElementById("supportReplyInput").value = "";
+      } catch (e) {
+        document.getElementById("supportThread").innerHTML = `<span class="err">${e.message}</span>`;
+      }
+    }
+
+    async function loadDashboard() {
+      dashData = await api("/admin/dashboard");
+      const g = await api("/admin/guests?limit=80");
+      guests = g.guests || [];
+      const s = await api("/admin/support");
+      supportItems = s.inquiries || [];
+      document.getElementById("loginView").style.display = "none";
+      document.getElementById("appShell").classList.add("open");
+      renderStats(dashData);
+      renderActivityFeed(dashData.recent_activity || []);
+      renderUsersTable(dashData.users || []);
+      renderSupportList();
+      renderSidebar();
+    }
+
+    async function tryLogin() {
+      document.getElementById("loginErr").textContent = "";
+      try {
+        const data = await api("/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: document.getElementById("adminPassword").value }),
+        });
+        adminToken = data.token;
+        sessionStorage.setItem(TOKEN_KEY, adminToken);
+        await loadDashboard();
+      } catch (e) {
+        document.getElementById("loginErr").textContent = e.message || "로그인 실패";
       }
     }
 
@@ -203,7 +425,58 @@
       sessionStorage.removeItem(TOKEN_KEY);
       location.reload();
     });
-    if (adminToken) loadDashboard();
+    document.getElementById("refreshBtn").addEventListener("click", () => loadDashboard().catch(() => location.reload()));
+    document.getElementById("tabMembers").addEventListener("click", () => {
+      sidebarMode = "members";
+      document.getElementById("tabMembers").classList.add("active");
+      document.getElementById("tabGuests").classList.remove("active");
+      document.getElementById("tabSupport").classList.remove("active");
+      renderSidebar();
+    });
+    document.getElementById("tabGuests").addEventListener("click", () => {
+      sidebarMode = "guests";
+      document.getElementById("tabGuests").classList.add("active");
+      document.getElementById("tabMembers").classList.remove("active");
+      document.getElementById("tabSupport").classList.remove("active");
+      renderSidebar();
+    });
+    document.getElementById("tabSupport").addEventListener("click", () => {
+      sidebarMode = "support";
+      document.getElementById("tabSupport").classList.add("active");
+      document.getElementById("tabMembers").classList.remove("active");
+      document.getElementById("tabGuests").classList.remove("active");
+      renderSidebar();
+    });
+    document.getElementById("sidebarSearch").addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(renderSidebar, 200);
+    });
+    document.getElementById("supportReplyBtn").addEventListener("click", async () => {
+      if (!selectedSupportId) return;
+      const msg = document.getElementById("supportReplyInput").value.trim();
+      if (!msg) return;
+      try {
+        await api("/admin/support/" + selectedSupportId + "/reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg }),
+        });
+        await openSupport(selectedSupportId);
+        const s = await api("/admin/support");
+        supportItems = s.inquiries || [];
+        renderSupportList();
+        renderSidebar();
+        dashData.open_support_count = supportItems.filter(x => x.status === "open").length;
+        renderStats(dashData);
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
+    if (adminToken) loadDashboard().catch(() => {
+      adminToken = "";
+      sessionStorage.removeItem(TOKEN_KEY);
+    });
   </script>
 </body>
 </html>

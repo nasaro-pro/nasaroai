@@ -91,6 +91,38 @@ def init_db() -> None:
                     created_at REAL NOT NULL,
                     FOREIGN KEY(user_id) REFERENCES users(id)
                 );
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subject TEXT NOT NULL,
+                    user_id INTEGER,
+                    device_id TEXT NOT NULL DEFAULT '',
+                    platform TEXT NOT NULL DEFAULT 'web',
+                    feature TEXT NOT NULL,
+                    action TEXT NOT NULL DEFAULT '',
+                    detail TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_activity_device ON activity_log(device_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS support_inquiries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    device_id TEXT NOT NULL DEFAULT '',
+                    platform TEXT NOT NULL DEFAULT 'web',
+                    username TEXT NOT NULL DEFAULT '',
+                    message TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'open',
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS support_replies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    inquiry_id INTEGER NOT NULL,
+                    from_admin INTEGER NOT NULL DEFAULT 0,
+                    message TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(inquiry_id) REFERENCES support_inquiries(id)
+                );
                 """
             )
             conn.commit()
@@ -650,4 +682,333 @@ def get_admin_dashboard() -> dict[str, Any]:
         "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
         "usage_by_hour": get_usage_by_hour(day_key),
         "users": enriched,
+        "recent_activity": get_activity_log(limit=30),
+        "open_support_count": count_open_support(),
+        "platform_stats": get_platform_stats(day_key),
+    }
+
+
+def log_activity(
+    subject: str,
+    feature: str,
+    *,
+    user_id: int | None = None,
+    device_id: str = "",
+    platform: str = "web",
+    action: str = "",
+    detail: str = "",
+) -> None:
+    now = time.time()
+    try:
+        with _lock:
+            conn = _connect()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO activity_log
+                    (subject, user_id, device_id, platform, feature, action, detail, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        subject[:128],
+                        user_id,
+                        (device_id or "")[:128],
+                        (platform or "web")[:32],
+                        feature[:32],
+                        (action or feature)[:64],
+                        (detail or "")[:500],
+                        now,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception:
+        pass
+
+
+def get_activity_log(
+    user_id: int | None = None,
+    device_id: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    limit = max(1, min(500, limit))
+    with _lock:
+        conn = _connect()
+        try:
+            if user_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM activity_log WHERE user_id = ?
+                    ORDER BY created_at DESC LIMIT ?
+                    """,
+                    (user_id, limit),
+                ).fetchall()
+            elif device_id:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM activity_log WHERE device_id = ?
+                    ORDER BY created_at DESC LIMIT ?
+                    """,
+                    (device_id.strip(), limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        finally:
+            conn.close()
+    return [_activity_row(r) for r in rows]
+
+
+def _activity_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "subject": row["subject"],
+        "user_id": row["user_id"],
+        "device_id": row["device_id"],
+        "platform": row["platform"],
+        "feature": row["feature"],
+        "action": row["action"],
+        "detail": row["detail"],
+        "created_at": row["created_at"],
+        "created_at_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row["created_at"])),
+    }
+
+
+def get_platform_stats(day_key: str | None = None) -> dict[str, int]:
+    day_key = day_key or _day_key()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT platform, COUNT(*) AS cnt FROM activity_log
+                WHERE strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY platform
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {r["platform"]: int(r["cnt"]) for r in rows}
+
+
+def list_guest_devices(limit: int = 50) -> list[dict[str, Any]]:
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT device_id, platform, MAX(created_at) AS last_at, COUNT(*) AS cnt
+                FROM activity_log
+                WHERE user_id IS NULL AND device_id != ''
+                GROUP BY device_id
+                ORDER BY last_at DESC LIMIT ?
+                """,
+                (max(1, min(200, limit)),),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [
+        {
+            "device_id": r["device_id"],
+            "platform": r["platform"],
+            "last_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["last_at"])),
+            "activity_count": int(r["cnt"]),
+        }
+        for r in rows
+    ]
+
+
+def search_users_admin(query: str, limit: int = 30) -> list[dict[str, Any]]:
+    q = (query or "").strip().lower()
+    users = list_users_admin()
+    if not q:
+        return users[:limit]
+    out = []
+    for u in users:
+        hay = f"{u.get('username','')} {u.get('display_name','')} {u.get('email','')}".lower()
+        if q in hay:
+            out.append(u)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def create_support_inquiry(
+    message: str,
+    *,
+    user_id: int | None = None,
+    device_id: str = "",
+    platform: str = "web",
+    username: str = "",
+) -> dict[str, Any]:
+    msg = message.strip()
+    if not msg:
+        raise ValueError("문의 내용을 입력해주세요.")
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO support_inquiries
+                (user_id, device_id, platform, username, message, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 'open', ?, ?)
+                """,
+                (user_id, device_id[:128], platform[:32], username[:64], msg[:2000], now, now),
+            )
+            iid = cur.lastrowid
+            conn.commit()
+        finally:
+            conn.close()
+    return {"id": int(iid), "status": "open"}
+
+
+def count_open_support() -> int:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM support_inquiries WHERE status = 'open'"
+            ).fetchone()
+        finally:
+            conn.close()
+    return int(row["c"]) if row else 0
+
+
+def list_support_inquiries(status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    limit = max(1, min(200, limit))
+    with _lock:
+        conn = _connect()
+        try:
+            if status:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM support_inquiries WHERE status = ?
+                    ORDER BY updated_at DESC LIMIT ?
+                    """,
+                    (status, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM support_inquiries ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        finally:
+            conn.close()
+    return [_support_row(r) for r in rows]
+
+
+def _support_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "device_id": row["device_id"],
+        "platform": row["platform"],
+        "username": row["username"],
+        "message": row["message"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(row["created_at"])),
+    }
+
+
+def get_support_thread(inquiry_id: int) -> dict[str, Any] | None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM support_inquiries WHERE id = ?", (inquiry_id,)
+            ).fetchone()
+            if not row:
+                return None
+            replies = conn.execute(
+                "SELECT * FROM support_replies WHERE inquiry_id = ? ORDER BY created_at",
+                (inquiry_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {
+        **_support_row(row),
+        "replies": [
+            {
+                "id": r["id"],
+                "from_admin": bool(r["from_admin"]),
+                "message": r["message"],
+                "created_at_iso": time.strftime(
+                    "%Y-%m-%d %H:%M", time.localtime(r["created_at"])
+                ),
+            }
+            for r in replies
+        ],
+    }
+
+
+def add_support_reply(inquiry_id: int, message: str, from_admin: bool = True) -> None:
+    msg = message.strip()
+    if not msg:
+        raise ValueError("답변 내용이 비어 있습니다.")
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                """
+                INSERT INTO support_replies (inquiry_id, from_admin, message, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (inquiry_id, 1 if from_admin else 0, msg[:2000], now),
+            )
+            status = "answered" if from_admin else "open"
+            conn.execute(
+                "UPDATE support_inquiries SET status = ?, updated_at = ? WHERE id = ?",
+                (status, now, inquiry_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_user_admin_detail(user_id: int) -> dict[str, Any]:
+    user = get_user_by_id(user_id)
+    data = get_user_data(user_id)
+    login_stats = get_user_login_stats(user_id)
+    quotas = get_user_quota_totals(user_id)
+    activity = get_activity_log(user_id=user_id, limit=80)
+    platform_counts: dict[str, int] = {}
+    for a in activity:
+        platform_counts[a["platform"]] = platform_counts.get(a["platform"], 0) + 1
+    inquiries = []
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT id, message, status, created_at FROM support_inquiries WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
+                (user_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    for r in rows:
+        inquiries.append({
+            "id": r["id"],
+            "message": r["message"][:120],
+            "status": r["status"],
+            "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
+        })
+    return {
+        **user,
+        "login_stats": login_stats,
+        "last_login_iso": time.strftime(
+            "%Y-%m-%d %H:%M", time.localtime(login_stats["last_login_at"])
+        ) if login_stats.get("last_login_at") else "-",
+        "quota_today": {k: quotas.get(k, 0) for k in QUOTA_LIMITS},
+        "quota_all_time": quotas.get("_all_time", {}),
+        "saved_results_count": len(data.get("saved_works") or []),
+        "activity": activity,
+        "platform_counts": platform_counts,
+        "support_inquiries": inquiries,
     }
