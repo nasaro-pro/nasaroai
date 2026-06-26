@@ -902,8 +902,17 @@ AGENT_STEP_CONCURRENCY = int(os.environ.get("AGENT_STEP_CONCURRENCY", "8"))
 AGENT_STEP_SEMAPHORE = asyncio.Semaphore(AGENT_STEP_CONCURRENCY)
 
 
+def get_openrouter_api_key() -> str:
+    """Nasaro AI calls OpenRouter. Accept common env names (Render often has OPENAI_API_KEY)."""
+    for name in ("OPENROUTER_API_KEY", "OPENROUTER_KEY", "OPENAI_API_KEY"):
+        val = os.environ.get(name, "").strip()
+        if val:
+            return val
+    return ""
+
+
 def build_openrouter_headers() -> dict[str, str]:
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    api_key = get_openrouter_api_key()
     return {
         "Authorization": f"Bearer {api_key}",
         "HTTP-Referer": "https://nasaroai.onrender.com",
@@ -913,12 +922,22 @@ def build_openrouter_headers() -> dict[str, str]:
 
 
 def log_openrouter_key_status() -> None:
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    api_key = get_openrouter_api_key()
     prefix = api_key[:8] if api_key else "N/A"
     if not api_key:
-        logger.warning("OPENROUTER_API_KEY is empty. length=0 prefix=%s", prefix)
+        openai_only = os.environ.get("OPENAI_API_KEY", "").strip()
+        if openai_only:
+            logger.warning(
+                "OPENROUTER_API_KEY empty but OPENAI_API_KEY is set — "
+                "if this is an OpenRouter key, rename env to OPENROUTER_API_KEY on Render"
+            )
+        else:
+            logger.warning("OPENROUTER_API_KEY is empty. length=0 prefix=%s", prefix)
         return
-    logger.info("OPENROUTER_API_KEY loaded. length=%d prefix=%s", len(api_key), prefix)
+    source = "OPENROUTER_API_KEY"
+    if not os.environ.get("OPENROUTER_API_KEY", "").strip():
+        source = "OPENAI_API_KEY (fallback)"
+    logger.info("OpenRouter auth loaded from %s. length=%d prefix=%s", source, len(api_key), prefix)
 
 
 def is_free_model(model: dict) -> bool:
@@ -2300,11 +2319,21 @@ async def debate_continue(request: DebateRequest) -> dict:
 
 @app.get("/health")
 async def health() -> dict:
-    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    api_key = get_openrouter_api_key()
+    has_openrouter_name = bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
+    has_openai_name = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+    hint = None
+    if not api_key:
+        hint = "Render에 OPENROUTER_API_KEY를 추가하세요 (openrouter.ai/keys). OPENAI_API_KEY만으로는 동작하지 않습니다."
+    elif has_openai_name and not has_openrouter_name:
+        hint = "OPENAI_API_KEY로 연결 중입니다. OpenRouter 키면 변수명을 OPENROUTER_API_KEY로 바꾸는 것을 권장합니다."
     return {
         "status": "ok",
         "openrouter_configured": bool(api_key),
         "openrouter_key_length": len(api_key),
+        "env_openrouter_api_key": has_openrouter_name,
+        "env_openai_api_key": has_openai_name,
+        "hint": hint,
     }
 
 

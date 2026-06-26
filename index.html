@@ -4311,9 +4311,13 @@
                 if (healthRes.ok) {
                     const h = await healthRes.json();
                     diag.push("서버: 정상");
-                    diag.push(h.openrouter_configured
-                        ? `OpenRouter 키: 설정됨 (${h.openrouter_key_length || "?"}자)`
-                        : "OpenRouter 키: 미설정 — Render 환경변수 확인");
+                    if (h.openrouter_configured) {
+                        const src = h.env_openrouter_api_key ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY";
+                        diag.push(`AI 키: 설정됨 (${src}, ${h.openrouter_key_length || "?"}자)`);
+                    } else {
+                        diag.push("AI 키: 미설정");
+                    }
+                    if (h.hint) diag.push(h.hint);
                 } else diag.push("서버: 응답 오류");
                 if (isExtensionContext()) diag.push("PC 확장: 설치됨");
                 else if (hasNativeAndroidAgent) diag.push("Android 앱: 연결됨");
