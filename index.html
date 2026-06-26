@@ -3912,6 +3912,8 @@
             sync();
             new MutationObserver(sync).observe(grid, { childList: true });
         }
+
+        function createUUID() {
             if (crypto.randomUUID) return crypto.randomUUID();
             return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
                 const random = Math.random() * 16 | 0;

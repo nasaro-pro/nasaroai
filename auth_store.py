@@ -320,16 +320,19 @@ def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
 
 def log_usage_event(subject: str, feature: str) -> None:
     now = time.time()
-    with _lock:
-        conn = _connect()
-        try:
-            conn.execute(
-                "INSERT INTO usage_events (subject, feature, created_at) VALUES (?, ?, ?)",
-                (subject, feature, now),
-            )
-            conn.commit()
-        finally:
-            conn.close()
+    try:
+        with _lock:
+            conn = _connect()
+            try:
+                conn.execute(
+                    "INSERT INTO usage_events (subject, feature, created_at) VALUES (?, ?, ?)",
+                    (subject, feature, now),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception:
+        pass
 
 
 def log_login_event(user_id: int, event_type: str = "login") -> None:
