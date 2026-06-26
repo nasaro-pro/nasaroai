@@ -49,6 +49,10 @@ MAX_MODEL_CANDIDATES_PER_LABEL = 10
 MIN_MODEL_CANDIDATES_PER_LABEL = 5
 HEALTHCHECK_CONCURRENCY = 2
 HEALTHCHECK_DELAY_SECONDS = 1.0
+LABEL_HEALTH_TTL_SECONDS = 600
+
+LABEL_HEALTH: dict[str, dict] = {}
+LABEL_HEALTH_REFRESHED_AT = 0.0
 # Wait this long before retrying the exact same model once after a 429.
 RATE_LIMIT_RETRY_DELAY_SECONDS = 1.0
 # Simple prompt used for the very last fallback so even a tiny model can answer.
@@ -964,6 +968,7 @@ async def ensure_model_cache_fresh() -> None:
 async def startup() -> None:
     log_openrouter_key_status()
     await refresh_model_cache()
+    asyncio.create_task(refresh_label_health(force=True))
 
 
 def sse(payload: dict) -> str:
@@ -1860,7 +1865,7 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
         "처음 실행할 구체적 액션 3개를 한국어로 짧게 제안하세요."
     )
 
-    result = await call_ai_model("OpenAI", prompt, max_tokens=500)
+    result = await call_ai_best(prompt, max_tokens=500)
     recommendation = result.content if result.success else (
         "AI 보완 코멘트 생성은 실패했지만, 아래 작업 유형별 협업 알고리즘은 바로 사용할 수 있습니다."
     )
@@ -1869,6 +1874,7 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
         "plan": plan,
         "success": True,
         "ai_comment_success": result.success,
+        "model_label": result.requested_label if result.success else None,
     }
 
 
@@ -1900,7 +1906,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
         f"전체 통과 기준 참고:\n{acceptance_lines}"
     )
 
-    result = await call_ai_model(stage_model, prompt, max_tokens=900)
+    result = await call_ai_best(prompt, max_tokens=900, preferred_labels=[stage_model])
     guidance = result.content if result.success else (
         f"{data.stage_name} 단계를 진행하세요.\n\n"
         f"알고리즘:\n{action_lines}\n\n"
@@ -1911,7 +1917,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
         "stage_index": data.stage_index,
         "stage_name": data.stage_name,
         "guidance": guidance,
-        "model_label": stage_model,
+        "model_label": result.requested_label if result.success else stage_model,
         "stage_role": stage_role,
         "success": True,
         "ai_success": result.success,
@@ -2024,6 +2030,81 @@ async def models_health() -> dict[str, str]:
     model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
     results = await asyncio.gather(*(check_model_health(semaphore, model_id) for model_id in model_ids))
     return dict(results)
+
+
+async def refresh_label_health(force: bool = False) -> None:
+    global LABEL_HEALTH_REFRESHED_AT
+    if (
+        not force
+        and LABEL_HEALTH
+        and time.time() - LABEL_HEALTH_REFRESHED_AT < LABEL_HEALTH_TTL_SECONDS
+    ):
+        return
+
+    await ensure_model_cache_fresh()
+    semaphore = asyncio.Semaphore(HEALTHCHECK_CONCURRENCY)
+
+    async def check_label(label: str) -> tuple[str, dict]:
+        primary = MODEL_MAPPING.get(label)
+        if not primary:
+            return label, {"model": "", "status": "미설정", "ok": False}
+        model_id, status = await check_model_health(semaphore, primary)
+        return label, {"model": model_id, "status": status, "ok": status == "정상"}
+
+    pairs = await asyncio.gather(*(check_label(label) for label in COMPANY_LABELS))
+    LABEL_HEALTH.clear()
+    for label, info in pairs:
+        LABEL_HEALTH[label] = info
+    LABEL_HEALTH_REFRESHED_AT = time.time()
+
+
+def ranked_labels(preferred: list[str] | None = None) -> list[str]:
+    preferred = preferred or []
+
+    def sort_key(label: str) -> tuple:
+        health = LABEL_HEALTH.get(label, {})
+        ok_rank = 0 if health.get("ok") else 1
+        pref_rank = preferred.index(label) if label in preferred else len(preferred) + 1
+        return (ok_rank, pref_rank, label)
+
+    ordered = list(dict.fromkeys([*preferred, *COMPANY_LABELS]))
+    return sorted(ordered, key=sort_key)
+
+
+async def call_ai_best(
+    prompt: str,
+    max_tokens: int | None = None,
+    preferred_labels: list[str] | None = None,
+) -> ModelCallResult:
+    await refresh_label_health()
+    last_result: ModelCallResult | None = None
+    for label in ranked_labels(preferred_labels):
+        result = await call_ai_model(label, prompt, max_tokens=max_tokens)
+        last_result = result
+        if result.success:
+            return result
+    if last_result is not None:
+        return last_result
+    fallback_label = preferred_labels[0] if preferred_labels else COMPANY_LABELS[0]
+    return make_failed_result(
+        requested_label=fallback_label,
+        requested_model=MODEL_MAPPING.get(fallback_label, LAST_RESORT_MODEL),
+        actual_model="",
+        failed_candidates=[],
+        error=USER_FACING_FAILURE_MSG,
+    )
+
+
+@app.get("/models/auto")
+async def models_auto() -> dict:
+    await refresh_label_health()
+    ranked = ranked_labels()
+    return {
+        "ranked_labels": ranked,
+        "best_label": ranked[0] if ranked else None,
+        "health": LABEL_HEALTH,
+        "refreshed_at": LABEL_HEALTH_REFRESHED_AT,
+    }
 
 
 AGENT_STEP_MAX_CANDIDATES = 4
@@ -2280,6 +2361,7 @@ def system_info() -> dict:
         "extension_version": ext_ver,
         "apk_version": apk_ver,
         "guide_path": "/guide",
+        "auto_ai_label": ranked_labels()[0] if LABEL_HEALTH else None,
     }
 
 

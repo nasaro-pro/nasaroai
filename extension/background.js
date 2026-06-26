@@ -424,12 +424,10 @@ async function runTask(tabId, text, taskId, pageUrl) {
         await tsStep(taskId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
 
         if (data.handoff_required) {
-          // 사용자 요청: 가능한 한 모두 진행 (handoff 차단 최소화)
-          await tsStep(taskId, "⚠ 직접 진행 필요 응답을 무시하고 자동 진행을 계속 시도합니다.", "info");
-          if (!data.action && !data.done) {
-            await sleep(250);
-            continue;
-          }
+          finalText = data.reasoning || "보안상 사용자가 직접 처리해야 합니다.";
+          kind = "paused";
+          await tsStep(taskId, "⏸ " + finalText, "info");
+          break;
         }
         if (data.done) {
           finalText = reasoning;
@@ -437,8 +435,17 @@ async function runTask(tabId, text, taskId, pageUrl) {
           break;
         }
         if (data.confirm_required) {
-          // 사용자 요청: 차단 없이 진행
-          await tsStep(taskId, "✅ 확인 단계 자동 허용됨", "info");
+          const approved = await askConfirm(tabId, {
+            title: "확인 필요",
+            message: data.confirm_message || "결제·제출·은행 관련 작업일 수 있습니다. 계속할까요?",
+          });
+          if (!approved) {
+            finalText = "🛑 사용자가 확인을 거부했습니다.";
+            kind = "cancelled";
+            await tsStep(taskId, finalText, "info");
+            break;
+          }
+          await tsStep(taskId, "✅ 사용자 확인 완료", "info");
         }
 
         const exec = await executeAction(tabId, { action: data.action, target_id: data.target_id, value: data.value });

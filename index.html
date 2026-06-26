@@ -2881,10 +2881,11 @@
             const versionEl = document.getElementById("settingsVersionMeta");
             const diagEl = document.getElementById("settingsDiagMeta");
             try {
-                const [quotaRes, infoRes, healthRes] = await Promise.all([
+                const [quotaRes, infoRes, healthRes, autoRes] = await Promise.all([
                     apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId())),
                     apiFetch("/system/info"),
                     apiFetch("/health"),
+                    apiFetch("/models/auto"),
                 ]);
                 if (quotaRes.ok) {
                     const q = await quotaRes.json();
@@ -2895,12 +2896,17 @@
                     const info = await infoRes.json();
                     if (versionEl) {
                         versionEl.textContent =
-                            `서버: ${info.deploy_ref}\n확장: v${info.extension_version}\nAPK: v${info.apk_version}\n가이드: ${info.guide_path}`;
+                            `서버: ${info.deploy_ref}\n확장: v${info.extension_version}\nAPK: v${info.apk_version}\n가이드: ${info.guide_path}` +
+                            (info.auto_ai_label ? `\n자동 AI: ${info.auto_ai_label}` : "");
                     }
                 }
                 let diag = [];
                 if (healthRes.ok) diag.push("서버: 정상");
                 else diag.push("서버: 오류");
+                if (autoRes?.ok) {
+                    const auto = await autoRes.json();
+                    if (auto.best_label) diag.push("자동 AI: " + auto.best_label);
+                }
                 if (hasNativeAndroidAgent) {
                     diag.push("Android 앱: 연결됨");
                     if (window.NasaroAndroidAgent.canDrawOverlay) {
@@ -3723,8 +3729,13 @@
                         );
                         return;
                     }
+                    const sensitiveMission = /결제|송금|이체|계좌|은행|카카오페이|토스|kb|신한|비밀번호|password|구매|checkout|pay/i.test(mission || "");
+                    if (sensitiveMission && !window.confirm(`민감한 작업입니다:\n\n${mission}\n\n계속 진행할까요?`)) {
+                        finalizeCard(cardRefs, "ok", "사용자가 작업을 취소했습니다.", mission, Date.now() - startTime);
+                        return;
+                    }
                     let nativeResult = window.NasaroAndroidAgent.runNativeTask(mission);
-                    const needsAiFallback = !nativeResult || nativeResult.includes("이해한 기본 명령이 없습니다") || nativeResult.includes("연결되지 않았습니다");
+                    const needsAiFallback = !nativeResult || nativeResult.includes("단계를 이해하지 못했습니다") || nativeResult.includes("연결되지 않았습니다");
                     if (needsAiFallback) {
                         usedFallback = true;
                         const recentHistory = agentMissionHistory.slice(-3);

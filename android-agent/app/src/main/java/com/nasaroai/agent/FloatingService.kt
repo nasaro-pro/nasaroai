@@ -1,5 +1,6 @@
 package com.nasaroai.agent
 
+import android.app.AlertDialog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -44,6 +45,24 @@ class FloatingService : Service() {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         createChannel()
         startForeground(NOTIF_ID, buildNotification())
+        AccessibilityAgentService.confirmHandler = { message ->
+            var approved = false
+            val latch = java.util.concurrent.CountDownLatch(1)
+            android.os.Handler(mainLooper).post {
+                AlertDialog.Builder(this@FloatingService)
+                    .setTitle("확인 필요")
+                    .setMessage(message)
+                    .setCancelable(false)
+                    .setPositiveButton("허용") { _, _ ->
+                        approved = true
+                        latch.countDown()
+                    }
+                    .setNegativeButton("취소") { _, _ -> latch.countDown() }
+                    .show()
+            }
+            latch.await(60, java.util.concurrent.TimeUnit.SECONDS)
+            approved
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -75,6 +94,7 @@ class FloatingService : Service() {
     }
 
     override fun onDestroy() {
+        AccessibilityAgentService.confirmHandler = null
         super.onDestroy()
         floatView?.let { wm.removeView(it) }
         panelView?.let { wm.removeView(it) }
@@ -283,7 +303,12 @@ class FloatingService : Service() {
                     latch.countDown()
                 }, if (needsForeground) 380L else 0L)
             }
-            latch.await(6, java.util.concurrent.TimeUnit.SECONDS)
+            val stepCount = task.split(Regex("(?:\\s*해서\\s*|\\s*하고\\s*|\\s*후에\\s*|\\s*다음\\s*|\\s*그리고\\s*|\\s*,\\s*)"))
+                .map { it.trim() }
+                .count { it.isNotEmpty() }
+                .coerceAtLeast(1)
+            val timeoutSec = (stepCount * 8L).coerceIn(12L, 45L)
+            latch.await(timeoutSec, java.util.concurrent.TimeUnit.SECONDS)
             return result.ifBlank { "Android 접근성 작업 시간이 초과되었습니다. 다시 시도해주세요." }
         }
     }

@@ -518,6 +518,22 @@ PAYMENT_KEYWORDS = (
     "결제 진행",
 )
 
+BANKING_URL_HINTS = (
+    "bank",
+    "toss.im",
+    "kakaobank",
+    "kbstar",
+    "shinhan",
+    "kebhana",
+    "wooribank",
+    "nhbank",
+    "hanabank",
+    "payco",
+    "wallet",
+    "account",
+    "transfer",
+)
+
 
 # 되돌리기 어려운 "최종 제출/결제성" 동작. 이런 클릭은 실행 전에 사용자 확인을 받는다.
 CONFIRM_KEYWORDS = (
@@ -530,6 +546,12 @@ CONFIRM_KEYWORDS = (
     "신청 완료",
     "확정",
     "동의하고",
+    "이체",
+    "송금",
+    "계좌이체",
+    "출금",
+    "입금",
+    "은행",
     "submit",
     "buy",
     "purchase",
@@ -537,6 +559,7 @@ CONFIRM_KEYWORDS = (
     "checkout",
     "confirm",
     "pay now",
+    "transfer",
 )
 
 
@@ -570,6 +593,20 @@ def needs_confirmation(action: "AgentAction", elements: list) -> tuple[bool, str
     return False, ""
 
 
+def is_sensitive_url(url: str) -> bool:
+    lower = (url or "").lower()
+    return any(hint in lower for hint in BANKING_URL_HINTS)
+
+
+def needs_sensitive_navigation(action: "AgentAction", current_url: str) -> tuple[bool, str]:
+    if action.action != "navigate":
+        return False, ""
+    target = str(action.value or "").strip()
+    if not target or not is_sensitive_url(target):
+        return False, ""
+    return True, f"은행·결제 관련 페이지({target})로 이동합니다. 계속할까요?"
+
+
 def detect_handoff(elements: list) -> tuple[bool, str]:
     """로그인/캡차/결제처럼 사용자가 직접 처리해야 하는 화면을 감지한다.
 
@@ -583,7 +620,6 @@ def detect_handoff(elements: list) -> tuple[bool, str]:
 
     has_password = False
     has_captcha = False
-    has_payment = False
 
     for el in elements:
         if not isinstance(el, dict):
@@ -597,15 +633,11 @@ def detect_handoff(elements: list) -> tuple[bool, str]:
         ).lower()
         if any(keyword in blob for keyword in CAPTCHA_KEYWORDS):
             has_captcha = True
-        if any(keyword in blob for keyword in PAYMENT_KEYWORDS):
-            has_payment = True
 
     if has_captcha:
         return True, "캡차(로봇 확인)가 감지되었습니다. 보안을 위해 이 단계는 사용자가 직접 처리해주세요."
     if has_password:
         return True, "로그인(비밀번호 입력) 화면이 감지되었습니다. 보안을 위해 로그인은 사용자가 직접 진행해주세요."
-    if has_payment:
-        return True, "결제 정보 입력 화면이 감지되었습니다. 안전을 위해 결제는 사용자가 직접 확인/진행해주세요."
     return False, ""
 
 
@@ -649,6 +681,13 @@ async def decide_next_step(
 
         action = agent._safe_parse_action(raw)
         confirm_required, confirm_message = needs_confirmation(action, elements)
+        if not confirm_required:
+            nav_confirm, nav_message = needs_sensitive_navigation(action, current_url)
+            if nav_confirm:
+                confirm_required, confirm_message = nav_confirm, nav_message
+        if not confirm_required and is_sensitive_url(current_url) and action.action == "click":
+            confirm_required = True
+            confirm_message = "은행·결제 관련 페이지에서 클릭합니다. 계속할까요?"
         return {
             "action": action.action,
             "target_id": action.target_id,
