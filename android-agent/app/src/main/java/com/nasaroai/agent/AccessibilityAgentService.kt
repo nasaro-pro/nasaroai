@@ -205,7 +205,7 @@ class AccessibilityAgentService : AccessibilityService() {
         if (lower.contains("per")) found.add("PER")
         val tokens = step.split(Regex("\\s+"))
         for (t in tokens) {
-            val clean = t.trim('?', '.', '!', '을', '를', '확인', '조회')
+            val clean = cleanTokenSuffix(t.trim('?', '.', '!'))
             if (clean.length >= 2 && !listOf("확인", "조회", "알려", "해줘").contains(clean)) {
                 found.add(clean)
             }
@@ -282,12 +282,22 @@ class AccessibilityAgentService : AccessibilityService() {
     private fun matchesAny(text: String, words: List<String>): Boolean =
         words.any { text.contains(it) }
 
+    private fun cleanTokenSuffix(text: String): String {
+        var s = text.trim()
+        for (suffix in listOf("주세요", "해줘", "확인", "조회", "을", "를", "에", "로")) {
+            if (s.endsWith(suffix)) s = s.removeSuffix(suffix).trim()
+        }
+        return s
+    }
+
     private fun extractAfterAny(text: String, markers: List<String>): String {
         for (marker in markers) {
             val idx = text.indexOf(marker, ignoreCase = true)
             if (idx >= 0) {
-                return text.substring(idx + marker.length)
-                    .trim(' ', ':', '"', '\'', '을', '를', '에', '로', '해', '줘', '주세요')
+                return cleanTokenSuffix(
+                    text.substring(idx + marker.length)
+                        .trim(' ', ':', '"', '\'', '을', '를', '에', '로', '해', '줘'),
+                )
             }
         }
         return ""
