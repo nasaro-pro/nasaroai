@@ -135,7 +135,10 @@
     let privacyMode = localStorage.getItem("nasaroai_privacy") === "1";
     let modelsCompare = JSON.parse(localStorage.getItem("nasaroai_models_compare") || "null") || MODELS.slice();
     let modelsDebate = JSON.parse(localStorage.getItem("nasaroai_models_debate") || "null") || MODELS.slice();
-    let modelsAgent = JSON.parse(localStorage.getItem("nasaroai_models_agent") || "null") || MODELS.slice();
+    let modelsAgent = (() => {
+        const raw = JSON.parse(localStorage.getItem("nasaroai_models_agent") || "null") || MODELS.slice();
+        return raw.length ? [raw[0]] : [FASTEST_MODEL];
+    })();
     let collabModel = localStorage.getItem("nasaroai_model_collab") || "Perplexity";
     let agentScheduledTasks = JSON.parse(localStorage.getItem("nasaroai_agent_scheduled") || "[]");
     let agentScheduleTimer = null;
@@ -189,49 +192,45 @@
     }
 
     function buildModelPicker(mode, opts) {
-        const wrap = document.createElement("div");
-        wrap.className = "input-tool-group model-picker-wrap";
-
-        if (mode === "collab") {
-            const label = document.createElement("span");
-            label.className = "input-tool-label";
-            label.textContent = t("ai_collab_pick");
-            const sel = document.createElement("select");
-            sel.className = "input-tool-select";
-            MODELS.forEach(m => {
-                const o = document.createElement("option");
-                o.value = m;
-                o.textContent = m;
-                if (m === collabModel) o.selected = true;
-                sel.appendChild(o);
-            });
-            sel.addEventListener("change", () => {
-                collabModel = sel.value;
-                saveModels("collab");
-                opts.onModelsChange?.(getModelsForMode("collab"));
-            });
-            wrap.append(label, sel);
-            return wrap;
-        }
-
-        let current = mode === "debate" ? modelsDebate : mode === "agent" ? modelsAgent : modelsCompare;
+        const singleSelect = mode === "agent" || mode === "collab";
         let pickerBtn = null;
+
+        const getCurrentList = () => {
+            if (mode === "collab") return [collabModel || FASTEST_MODEL];
+            if (mode === "debate") return modelsDebate;
+            if (mode === "agent") return modelsAgent;
+            return modelsCompare;
+        };
+
+        let current = getCurrentList().slice();
+        if (singleSelect) current = [current[0] || FASTEST_MODEL];
 
         const updateLabel = () => {
             if (!pickerBtn) return;
-            const label = current.length >= MODELS.length
-                ? t("ai_all")
-                : (current.length === 1 ? current[0] : current.join(" · "));
+            const label = singleSelect
+                ? current[0]
+                : (current.length >= MODELS.length
+                    ? t("ai_all")
+                    : (current.length === 1 ? current[0] : current.join(" · ")));
             const short = label.length > 24 ? label.slice(0, 24) + "…" : label;
             pickerBtn.textContent = `🤖 ${short}`;
-            pickerBtn.title = current.length >= MODELS.length ? t("ai_all") : current.join(", ");
+            pickerBtn.title = singleSelect ? current[0] : (current.length >= MODELS.length ? t("ai_all") : current.join(", "));
         };
 
         const sync = () => {
-            if (mode === "debate") modelsDebate = current.slice();
-            else if (mode === "agent") modelsAgent = current.slice();
-            else modelsCompare = current.slice();
-            saveModels(mode);
+            if (mode === "collab") {
+                collabModel = current[0] || FASTEST_MODEL;
+                saveModels("collab");
+            } else if (mode === "debate") {
+                modelsDebate = current.slice();
+                saveModels("debate");
+            } else if (mode === "agent") {
+                modelsAgent = [current[0] || FASTEST_MODEL];
+                saveModels("agent");
+            } else {
+                modelsCompare = current.slice();
+                saveModels("compare");
+            }
             opts.onModelsChange?.(getModelsForMode(mode));
             updateLabel();
         };
@@ -239,20 +238,21 @@
         const chips = document.createElement("div");
         chips.className = "ai-chips-row" + (mode === "agent" ? " agent-inline-chips" : "");
 
-        const allBtn = document.createElement("button");
-        allBtn.type = "button";
-        allBtn.className = "ai-chip" + (current.length >= MODELS.length ? " active" : "");
-        allBtn.textContent = t("ai_all");
-        allBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            current = current.length >= MODELS.length ? [MODELS[0]] : MODELS.slice();
-            renderChips();
-            sync();
-        });
-        chips.appendChild(allBtn);
-
         const renderChips = () => {
-            chips.querySelectorAll(".ai-chip:not(:first-child)").forEach(el => el.remove());
+            chips.innerHTML = "";
+            if (!singleSelect) {
+                const allBtn = document.createElement("button");
+                allBtn.type = "button";
+                allBtn.className = "ai-chip" + (current.length >= MODELS.length ? " active" : "");
+                allBtn.textContent = t("ai_all");
+                allBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    current = current.length >= MODELS.length ? [MODELS[0]] : MODELS.slice();
+                    renderChips();
+                    sync();
+                });
+                chips.appendChild(allBtn);
+            }
             MODELS.forEach(m => {
                 const b = document.createElement("button");
                 b.type = "button";
@@ -260,15 +260,22 @@
                 b.textContent = m;
                 b.addEventListener("click", (e) => {
                     e.stopPropagation();
-                    if (current.includes(m)) current = current.filter(x => x !== m);
-                    else current.push(m);
-                    if (!current.length) current = MODELS.slice();
+                    if (singleSelect) {
+                        current = [m];
+                    } else if (current.includes(m)) {
+                        current = current.filter(x => x !== m);
+                        if (!current.length) current = MODELS.slice();
+                    } else {
+                        current.push(m);
+                    }
                     renderChips();
                     sync();
+                    if (singleSelect) {
+                        document.querySelectorAll(".ai-picker-popover.open").forEach(p => p.classList.remove("open"));
+                    }
                 });
                 chips.appendChild(b);
             });
-            allBtn.classList.toggle("active", current.length >= MODELS.length);
         };
         renderChips();
 
@@ -285,7 +292,10 @@
         pop.className = "ai-picker-popover";
         const popHead = document.createElement("div");
         popHead.className = "ai-picker-popover-head";
-        popHead.textContent = t("ai_pick") + " · " + (lang === "en" ? "multi-select" : "다중 선택");
+        const pickTitle = mode === "collab" ? t("ai_collab_pick") : t("ai_pick");
+        popHead.textContent = singleSelect
+            ? pickTitle + " · " + (lang === "en" ? "single" : "1개 선택")
+            : pickTitle + " · " + (lang === "en" ? "multi-select" : "다중 선택");
         pop.append(popHead, chips);
         pickerBtn.addEventListener("click", e => {
             e.stopPropagation();

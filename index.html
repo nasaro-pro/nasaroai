@@ -469,10 +469,10 @@
             border-radius: 999px;
             background: transparent;
             color: #374151;
-            padding: 8px 16px;
-            min-height: 36px;
+            padding: 10px 22px;
+            min-height: 44px;
             font: inherit;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
             transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -1473,7 +1473,18 @@
             align-items: center;
             gap: 8px;
         }
-        .dock-btn-row .mode-btn,
+        .dock-btn-row .mode-btn {
+            min-height: 44px;
+            height: 44px;
+            padding: 0 20px;
+            font-size: 15px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
         .dock-btn-row .dock-btn.muted,
         .dock-btn-row .input-tool-btn {
             min-height: 40px;
@@ -2932,8 +2943,8 @@
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
             <div class="side-menu-footer">
-                <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
                 <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
+                <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
             </div>
         </aside>
 
@@ -3436,7 +3447,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627d"></script>
+    <script src="/static/nasaro-features.js?v=20260627e"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -4969,6 +4980,24 @@
 
         // ── 에이전트 ON/OFF ────────────────────────────────────────────────────
         function setAgentActive(active) {
+            if (useExtensionAgent()) {
+                if (active) {
+                    const r = agentToggleBtn.getBoundingClientRect();
+                    window.postMessage({
+                        __nasaroai: "agent",
+                        type: "OPEN",
+                        anchor: { left: r.left, top: r.top, width: r.width, height: r.height }
+                    }, "*");
+                } else {
+                    window.postMessage({ __nasaroai: "agent", type: "CLOSE" }, "*");
+                }
+                agentActive = active;
+                agentToggleBtn.classList.toggle("active", active);
+                agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
+                if (agentPanel) agentPanel.style.display = "none";
+                hideLauncher();
+                return;
+            }
             agentActive = active;
             agentToggleBtn.classList.toggle("active", active);
             agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
@@ -5525,24 +5554,7 @@
             }
             // PC + 확장 준비됨: 사이트 에이전트 대신 확장 에이전트 사용(통일)
             if (useExtensionAgent()) {
-                if (agentActive) {
-                    window.postMessage({ __nasaroai: "agent", type: "CLOSE" }, "*");
-                    agentActive = false;
-                    agentToggleBtn.classList.remove("active");
-                    agentToggleBtn.textContent = "🌐 에이전트";
-                } else {
-                    const r = agentToggleBtn.getBoundingClientRect();
-                    window.postMessage({
-                        __nasaroai: "agent",
-                        type: "OPEN",
-                        anchor: { left: r.left, top: r.top, width: r.width, height: r.height }
-                    }, "*");
-                    agentActive = true;
-                    agentToggleBtn.classList.add("active");
-                    agentToggleBtn.textContent = "● 에이전트 ON";
-                }
-                if (agentPanel) agentPanel.style.display = "none";
-                hideLauncher();
+                setAgentActive(!agentActive);
                 return;
             }
             if (agentActive) {

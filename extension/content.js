@@ -408,12 +408,11 @@
   const sendBtnEl  = $("ax-send");
 
   const AI_MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
-  let agentModelLabels = AI_MODELS.slice();
+  let agentModelLabels = [AI_MODELS[0]];
 
   function agentModelsLabel() {
-    if (agentModelLabels.length >= AI_MODELS.length) return "전체";
-    const t = agentModelLabels.join(", ");
-    return t.length > 22 ? t.slice(0, 22) + "…" : t;
+    const m = agentModelLabels[0] || AI_MODELS[0];
+    return m.length > 22 ? m.slice(0, 22) + "…" : m;
   }
 
   function updateAiPickBtn() {
@@ -432,36 +431,22 @@
     aiPop.innerHTML = "";
     const label = document.createElement("span");
     label.className = "ai-popover-label";
-    label.textContent = "임무 수행 AI";
+    label.textContent = "임무 수행 AI · 1개 선택";
     const chips = document.createElement("div");
     chips.className = "ai-chips";
-
-    const allBtn = document.createElement("button");
-    allBtn.type = "button";
-    allBtn.className = "ai-chip ai-chip-all" + (agentModelLabels.length >= AI_MODELS.length ? " active" : "");
-    allBtn.textContent = "전체";
-    allBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      agentModelLabels = agentModelLabels.length >= AI_MODELS.length ? [AI_MODELS[0]] : AI_MODELS.slice();
-      saveAgentModels();
-      buildAiPopover();
-      updateAiPickBtn();
-    });
-    chips.appendChild(allBtn);
 
     AI_MODELS.forEach(m => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "ai-chip" + (agentModelLabels.includes(m) ? " active" : "");
+      b.className = "ai-chip" + (agentModelLabels[0] === m ? " active" : "");
       b.textContent = m;
       b.addEventListener("click", e => {
         e.stopPropagation();
-        if (agentModelLabels.includes(m)) agentModelLabels = agentModelLabels.filter(x => x !== m);
-        else agentModelLabels.push(m);
-        if (!agentModelLabels.length) agentModelLabels = AI_MODELS.slice();
+        agentModelLabels = [m];
         saveAgentModels();
         buildAiPopover();
         updateAiPickBtn();
+        closeAiPopover();
       });
       chips.appendChild(b);
     });
@@ -544,7 +529,15 @@
   // storage 초기화 완료 전까지 런처를 표시하지 않도록 guard
   function render() {
     if (!initialized) { launcher.classList.remove("show"); return; }
-    launcher.classList.toggle("show", enabled && bar.hidden);
+    if (!enabled) {
+      launcher.classList.remove("show");
+      bar.hidden = true;
+      bubble.classList.remove("show");
+      host.style.display = "none";
+      return;
+    }
+    host.style.display = "";
+    launcher.classList.toggle("show", bar.hidden);
   }
   function applyBarSize() {
     if (window.innerWidth <= 640) {
@@ -595,7 +588,12 @@
   }
   function applyEnabled(v) {
     enabled = v;
-    if (!v) bar.hidden = true;
+    if (!v) {
+      bar.hidden = true;
+      closeAiPopover();
+      bubble.classList.remove("show");
+      try { chrome.storage.local.set({ barOpen: false }); } catch {}
+    }
     render();
     broadcastAgentState(v);
   }
@@ -1216,15 +1214,15 @@
     .get(["agentEnabled", "serverUrl", "agentTasks", "agentModelLabels", "launcherBottom", "launcherRight", "barLeft", "barTop", "barManualPos", "barWidth", "barHeight", "tasksHeight", "barOpen"])
     .then(s => {
       if (Array.isArray(s.agentModelLabels) && s.agentModelLabels.length) {
-        agentModelLabels = s.agentModelLabels.filter(m => AI_MODELS.includes(m));
+        agentModelLabels = [s.agentModelLabels.filter(m => AI_MODELS.includes(m))[0] || AI_MODELS[0]];
       }
       try {
         const site = JSON.parse(localStorage.getItem("nasaroai_models_agent") || "null");
         if (Array.isArray(site) && site.length) {
-          agentModelLabels = site.filter(m => AI_MODELS.includes(m));
+          agentModelLabels = [site.filter(m => AI_MODELS.includes(m))[0] || AI_MODELS[0]];
         }
       } catch {}
-      if (!agentModelLabels.length) agentModelLabels = AI_MODELS.slice();
+      if (!agentModelLabels.length) agentModelLabels = [AI_MODELS[0]];
       updateAiPickBtn();
       if (typeof s.launcherBottom === "number") launcherBottom = s.launcherBottom;
       if (typeof s.launcherRight  === "number") launcherRight  = s.launcherRight;
