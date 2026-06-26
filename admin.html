@@ -62,7 +62,7 @@
     th { color: #94a3b8; white-space: nowrap; }
     .online { color: #86efac; font-weight: 700; }
     .offline { color: #64748b; }
-    .activity-list, .support-list { max-height: 280px; overflow-y: auto; }
+    .activity-list, .support-list { max-height: min(70vh, 640px); overflow-y: auto; }
     .activity-row, .support-row {
       padding: 8px 0; border-bottom: 1px solid #334155; font-size: 11px;
     }
@@ -376,7 +376,6 @@
             </div>`).join("") || "<div class='empty'>없음</div>"}</div>
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 내역</h3>
           ${(u.support_inquiries || []).map(s => `<div class="activity-row">${s.status} · ${s.created_at_iso} · ${s.message}</div>`).join("") || "<div class='empty'>없음</div>"}`;
-        renderActivityFeed(u.activity || []);
       } catch (e) {
         document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
       }
@@ -390,7 +389,7 @@
       document.getElementById("mainSub").textContent = "기기별 활동 기록";
       document.getElementById("userDetail").innerHTML = `<p>기기 ID: <code>${deviceId}</code></p><p>활동 불러오는 중…</p>`;
       try {
-        const data = await api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=80");
+        const data = await api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=500");
         document.getElementById("userDetail").innerHTML = `
           <p>기기 ID: <code>${deviceId}</code></p>
           <div class="activity-list">${(data.activity || []).map(a => `
@@ -398,7 +397,6 @@
               <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
               <div>${(a.detail || "").slice(0, 120)}</div>
             </div>`).join("") || "<div class='empty'>없음</div>"}</div>`;
-        renderActivityFeed(data.activity || []);
       } catch (e) {
         document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
       }

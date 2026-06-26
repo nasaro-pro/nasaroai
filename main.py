@@ -2807,7 +2807,7 @@ def admin_activity(
     request: Request,
     user_id: int | None = None,
     device_id: str | None = None,
-    limit: int = 100,
+    limit: int = 500,
 ) -> dict:
     _require_admin(request)
     return {"activity": get_activity_log(user_id=user_id, device_id=device_id, limit=limit)}

@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "data", "nasaroai.db")
+DB_PATH = os.environ.get("NASAROAI_DB_PATH", os.path.join(BASE_DIR, "data", "nasaroai.db"))
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 30 days
 
 _lock = threading.Lock()
@@ -165,24 +165,24 @@ def _require_email(email: str) -> str:
 def signup(username: str, password: str, display_name: str = "") -> dict[str, Any]:
     if len(password) < 8:
         raise ValueError("비밀번호는 8자 이상이어야 합니다.")
-    email_norm = _require_email(username)
+    ident_norm = _normalize_username(username)
     with _lock:
         conn = _connect()
         try:
             exists = conn.execute(
-                "SELECT id FROM users WHERE email = ?", (email_norm,)
+                "SELECT id FROM users WHERE email = ?", (ident_norm,)
             ).fetchone()
         finally:
             conn.close()
     if exists:
-        raise ValueError("이미 가입된 이메일입니다. 로그인하거나 다른 이메일을 사용해주세요.")
+        raise ValueError("이미 사용 중인 아이디입니다. 다른 아이디를 사용하거나 로그인하세요.")
     now = time.time()
     with _lock:
         conn = _connect()
         try:
             cur = conn.execute(
                 "INSERT INTO users (email, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)",
-                (email_norm, _hash_password(password), display_name.strip(), now),
+                (ident_norm, _hash_password(password), display_name.strip(), now),
             )
             user_id = cur.lastrowid
             conn.commit()
@@ -196,21 +196,18 @@ def signup(username: str, password: str, display_name: str = "") -> dict[str, An
 
 
 def login(username: str, password: str) -> dict[str, Any]:
-    try:
-        email_norm = _require_email(username)
-    except ValueError:
-        email_norm = _normalize_username(username)
+    ident_norm = _normalize_username(username)
     with _lock:
         conn = _connect()
         try:
             row = conn.execute(
                 "SELECT id, email, password_hash, display_name, created_at FROM users WHERE email = ?",
-                (email_norm,),
+                (ident_norm,),
             ).fetchone()
         finally:
             conn.close()
     if not row or not _verify_password(password, row["password_hash"]):
-        raise ValueError("이메일 또는 비밀번호가 올바르지 않습니다.")
+        raise ValueError("아이디 또는 비밀번호가 올바르지 않습니다.")
     token = create_session(int(row["id"]))
     log_login_event(int(row["id"]), "login")
     return {"token": token, "user": _row_to_user(row)}
@@ -702,7 +699,7 @@ def get_admin_dashboard() -> dict[str, Any]:
         "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
         "usage_by_hour": get_usage_by_hour(day_key),
         "users": enriched,
-        "recent_activity": get_activity_log(limit=30),
+        "recent_activity": get_activity_log(limit=500),
         "open_support_count": count_open_support(),
         "platform_stats": get_platform_stats(day_key),
     }
@@ -1052,7 +1049,7 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
     data = get_user_data(user_id)
     login_stats = get_user_login_stats(user_id)
     quotas = get_user_quota_totals(user_id)
-    activity = get_activity_log(user_id=user_id, limit=80)
+    activity = get_activity_log(user_id=user_id, limit=500)
     platform_counts: dict[str, int] = {}
     for a in activity:
         platform_counts[a["platform"]] = platform_counts.get(a["platform"], 0) + 1
