@@ -242,7 +242,7 @@ class FloatingService : Service() {
 
         @JavascriptInterface
         fun isAccessibilityReady(): Boolean {
-            return AccessibilityAgentService.isRunning()
+            return AccessibilityAgentService.isEnabled(this@FloatingService)
         }
 
         @JavascriptInterface
@@ -256,8 +256,29 @@ class FloatingService : Service() {
 
         @JavascriptInterface
         fun runNativeTask(task: String): String {
-            return AccessibilityAgentService.performTask(task)
+            val needsForeground = needsForegroundTask(task)
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var result = ""
+            android.os.Handler(mainLooper).post {
+                val panelWasOpen = panelView != null
+                if (needsForeground && panelWasOpen) hidePanel()
+                android.os.Handler(mainLooper).postDelayed({
+                    result = AccessibilityAgentService.performTask(task)
+                    if (needsForeground && panelWasOpen) showPanel()
+                    latch.countDown()
+                }, if (needsForeground) 380L else 0L)
+            }
+            latch.await(6, java.util.concurrent.TimeUnit.SECONDS)
+            return result.ifBlank { "Android 접근성 작업 시간이 초과되었습니다. 다시 시도해주세요." }
         }
+    }
+
+    private fun needsForegroundTask(task: String): Boolean {
+        val lower = task.lowercase()
+        if (lower.contains("홈") || lower.contains("home")) return false
+        if (lower.contains("뒤로") || lower.contains("back")) return false
+        if (lower.contains("최근") || lower.contains("recent")) return false
+        return true
     }
 
     private fun createChannel() {

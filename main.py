@@ -251,6 +251,17 @@ class CollabRecommendRequest(BaseModel):
     task: str
 
 
+class CollabStageRequest(BaseModel):
+    task: str
+    work_type: str
+    stage_index: int
+    stage_name: str
+    actions: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    previous_notes: str = ""
+    acceptance: list[str] = Field(default_factory=list)
+
+
 COLLAB_TYPE_RULES: list[dict] = [
     {
         "type": "동영상 제작",
@@ -1778,6 +1789,45 @@ async def collab_recommend(data: CollabRecommendRequest) -> dict:
     }
 
 
+@app.post("/collab/run-stage")
+async def collab_run_stage(data: CollabStageRequest) -> dict:
+    """협업 워크플로우의 특정 단계를 실제 실행 가능한 지시문으로 변환한다."""
+    await ensure_model_cache_fresh()
+    action_lines = "\n".join(f"- {action}" for action in data.actions) or "- (단계 알고리즘 없음)"
+    tool_lines = ", ".join(data.tools) if data.tools else "추천 도구 없음"
+    acceptance_lines = "\n".join(f"- {item}" for item in data.acceptance) or "- 단계 완료 후 다음 단계로 넘깁니다."
+
+    prompt = (
+        f"작업: {data.task}\n"
+        f"작업 유형: {data.work_type}\n"
+        f"현재 단계: {data.stage_name} ({data.stage_index + 1}/4)\n"
+        f"이 단계 알고리즘:\n{action_lines}\n"
+        f"추천 도구: {tool_lines}\n"
+        f"이전 단계 메모:\n{data.previous_notes or '없음'}\n\n"
+        "위 단계를 지금 실행하기 위한 결과를 아래 형식으로 한국어로 작성하세요.\n"
+        "1) 지금 할 일 5개 (체크리스트)\n"
+        "2) 추천 도구별 사용법 3개\n"
+        "3) 이 단계 완료 기준\n"
+        "4) 다음 단계로 넘길 산출물 1~2개\n"
+        f"전체 통과 기준 참고:\n{acceptance_lines}"
+    )
+
+    result = await call_ai_model("OpenAI", prompt, max_tokens=900)
+    guidance = result.content if result.success else (
+        f"{data.stage_name} 단계를 진행하세요.\n\n"
+        f"알고리즘:\n{action_lines}\n\n"
+        f"추천 도구: {tool_lines}\n\n"
+        "각 항목을 완료한 뒤 '단계 완료'를 눌러 다음 단계로 넘기세요."
+    )
+    return {
+        "stage_index": data.stage_index,
+        "stage_name": data.stage_name,
+        "guidance": guidance,
+        "success": True,
+        "ai_success": result.success,
+    }
+
+
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest) -> dict:
     await ensure_model_cache_fresh()
@@ -2106,6 +2156,14 @@ def serve_install() -> FileResponse:
     return FileResponse(os.path.join(BASE_DIR, "install.html"))
 
 
+@app.get("/guide")
+def serve_guide() -> FileResponse:
+    path = os.path.join(BASE_DIR, "guide.html")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="가이드 문서를 찾을 수 없습니다.")
+    return FileResponse(path)
+
+
 @app.get("/manifest.json")
 def serve_manifest() -> FileResponse:
     path = os.path.join(BASE_DIR, "manifest.json")
@@ -2131,7 +2189,7 @@ def extension_update(request: Request):
         f"<app appid='{ext_id}'>"
         "<updatecheck"
         " status='ok'"
-        " version='2.3.2'"
+        " version='2.3.3'"
         " prodversionmin='88.0'"
         " codebase='https://nasaroai.onrender.com/static/nasaroai-extension.zip'"
         "/>"

@@ -8,7 +8,7 @@
 const DEFAULT_SERVER    = "https://nasaroai.onrender.com";
 const DEBUGGER_VERSION  = "1.3";
 const MAX_ROUNDS        = 20;
-const INTERNAL_URL_RE   = /^(chrome|edge|brave|about|chrome-extension|devtools|view-source):/i;
+const INTERNAL_URL_RE   = /^(chrome|edge|brave|about|chrome-extension|devtools|view-source|chrome-search):/i;
 
 const attachedTabs = new Set();
 const runningTabs  = new Set();   // Set<tabId>  — 현재 제어 중인 탭

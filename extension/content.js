@@ -399,14 +399,29 @@
 
   function ensureHostAttached() {
     const parent = document.documentElement || document.body;
-    if (parent && host.parentNode !== parent) parent.appendChild(host);
+    if (!parent) return;
+    if (host.parentNode !== parent) parent.appendChild(host);
+    host.style.setProperty("position", "fixed", "important");
+    host.style.setProperty("z-index", "2147483647", "important");
+    host.style.setProperty("pointer-events", "none", "important");
   }
-  ensureHostAttached();
+  function bootHost() {
+    ensureHostAttached();
+    if (!document.documentElement && !document.body) {
+      requestAnimationFrame(bootHost);
+    }
+  }
+  bootHost();
   const hostObserver = new MutationObserver(() => {
     ensureHostAttached();
     if (initialized) render();
   });
-  try { hostObserver.observe(document, { childList: true, subtree: true }); } catch {}
+  try { hostObserver.observe(document.documentElement || document, { childList: true, subtree: true }); } catch {}
+  setInterval(() => {
+    if (!initialized || !enabled) return;
+    ensureHostAttached();
+    render();
+  }, 2000);
 
   const MAX_ACTIVE  = 5;
   let initialized   = false; // storage 확인 전까지 런처를 절대 표시하지 않음
@@ -950,6 +965,7 @@
       return true;
     }
     if (msg.type === "AX_SYNC_STATE") {
+      initialized = true;
       const enabledNow = !!msg.enabled;
       const openNow = !!msg.barOpen;
       if (typeof msg.launcherBottom === "number") launcherBottom = msg.launcherBottom;

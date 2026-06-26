@@ -576,6 +576,114 @@
             margin-bottom: 8px;
         }
 
+        .collab-progress-wrap {
+            margin: 10px 0 14px;
+        }
+
+        .collab-progress-bar {
+            height: 8px;
+            border-radius: 999px;
+            background: #dbeafe;
+            overflow: hidden;
+        }
+
+        .collab-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2563eb, #7c3aed);
+            width: 0%;
+            transition: width .25s ease;
+        }
+
+        .collab-progress-label {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #475569;
+            font-weight: 700;
+        }
+
+        .collab-stage-runner {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .collab-stage-item {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .collab-stage-item.active {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, .12);
+        }
+
+        .collab-stage-item.done {
+            border-color: #86efac;
+            background: #f0fdf4;
+        }
+
+        .collab-stage-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .collab-stage-status {
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .collab-stage-status.running { background: #ede9fe; color: #6d28d9; }
+        .collab-stage-status.done { background: #dcfce7; color: #15803d; }
+
+        .collab-stage-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .collab-stage-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .collab-stage-btn.run { background: #7c3aed; color: #fff; }
+        .collab-stage-btn.done { background: #059669; color: #fff; }
+        .collab-stage-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+        .collab-stage-output {
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            color: #334155;
+        }
+
+        .collab-ai-btn.recommended {
+            border-color: #7c3aed;
+            background: #f5f3ff;
+            color: #6d28d9;
+        }
+
         @media (max-width: 700px) {
             .collab-plan-grid {
                 grid-template-columns: 1fr;
@@ -2055,6 +2163,7 @@
 
             <!-- 설정 버튼 (하단 고정) -->
             <div class="side-menu-footer">
+                <a href="/guide" class="side-menu-btn outline" style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:8px;">📘 구조·아이디어 가이드</a>
                 <button id="settingsBtn" class="settings-btn" type="button">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="3"/>
@@ -2131,7 +2240,8 @@
                     <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
                     <p class="collab-intro-desc">
                         아래 입력창에 작업 내용을 입력하면<br>
-                        각 단계에 맞는 AI를 추천해드립니다.
+                        작업 유형별 4단계 협업 알고리즘이 실행됩니다.<br>
+                        각 단계에서 <strong>단계 실행</strong> 버튼으로 AI가 구체적 체크리스트를 생성합니다.
                     </p>
                 </div>
 
@@ -2420,6 +2530,7 @@
 
         let collabTaskAsked = false;
         let collabRecommendInFlight = false;
+        let collabSession = null;
 
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
@@ -3207,6 +3318,15 @@
             const startTime = Date.now();
             let usedFallback = false;
 
+            const doFetch = async (endpoint, body) => {
+                return fetch(`${API_URL}${endpoint}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                    signal: agentAbortCtrl?.signal,
+                });
+            };
+
             if (isAgentOverlay && window.NasaroAndroidAgent?.runNativeTask) {
                 try {
                     if (window.NasaroAndroidAgent.isAccessibilityReady && !window.NasaroAndroidAgent.isAccessibilityReady()) {
@@ -3220,7 +3340,17 @@
                         );
                         return;
                     }
-                    const nativeResult = window.NasaroAndroidAgent.runNativeTask(mission);
+                    let nativeResult = window.NasaroAndroidAgent.runNativeTask(mission);
+                    const needsAiFallback = !nativeResult || nativeResult.includes("이해한 기본 명령이 없습니다") || nativeResult.includes("연결되지 않았습니다");
+                    if (needsAiFallback) {
+                        usedFallback = true;
+                        const recentHistory = agentMissionHistory.slice(-3);
+                        const res = await doFetch("/agent/ask", { query: `[Android 화면 조작 도움] ${mission}`, history: recentHistory });
+                        const data = await res.json();
+                        if (res.ok && data.status !== "error") {
+                            nativeResult = (nativeResult ? nativeResult + "\n\n" : "") + (data.result || data.response || data.message || "");
+                        }
+                    }
                     finalizeCard(cardRefs, "ok", nativeResult || "Android 접근성 작업을 실행했습니다.", mission, Date.now() - startTime);
                     agentMissionHistory.push({ mission, result: String(nativeResult || "").slice(0, 300) });
                     return;
@@ -3233,15 +3363,6 @@
                     if (agentSendBtn) { agentSendBtn.disabled = false; agentSendBtn.textContent = "실행 ▶"; agentSendBtn._nextIsModify = false; }
                 }
             }
-
-            const doFetch = async (endpoint, body) => {
-                return fetch(`${API_URL}${endpoint}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body),
-                    signal: agentAbortCtrl?.signal,
-                });
-            };
 
             try {
                 // 1차: 브라우저 자동화 시도
@@ -3551,7 +3672,7 @@
                 });
                 if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
                 const data = await response.json();
-                renderCollabPlan(resultEl, data);
+                renderCollabPlan(resultEl, data, task);
             } catch (err) {
                 resultEl.textContent = `오류: ${err.message}`;
             } finally {
@@ -3561,33 +3682,142 @@
             }
         }
 
-        function renderCollabPlan(container, data) {
-            const plan = data.plan;
-            if (!plan) {
-                container.textContent = data.recommendation || "추천 결과가 없습니다.";
-                return;
+        function highlightCollabTools(tools) {
+            const set = new Set((tools || []).map(t => String(t).toLowerCase()));
+            document.querySelectorAll(".collab-ai-btn").forEach(btn => {
+                const ai = (btn.dataset.ai || "").toLowerCase();
+                const hit = [...set].some(tool => ai.includes(tool) || tool.includes(ai));
+                btn.classList.toggle("recommended", hit);
+            });
+        }
+
+        function updateCollabProgress() {
+            if (!collabSession?.plan?.stages) return;
+            const total = collabSession.plan.stages.length;
+            const done = collabSession.stageStates.filter(s => s === "done").length;
+            const fill = document.getElementById("collabProgressFill");
+            const label = document.getElementById("collabProgressLabel");
+            if (fill) fill.style.width = `${Math.round((done / total) * 100)}%`;
+            if (label) label.textContent = `진행 ${done}/${total}단계 · ${collabSession.plan.work_type}`;
+        }
+
+        async function runCollabStage(stageIndex) {
+            if (!collabSession?.plan) return;
+            const stage = collabSession.plan.stages[stageIndex];
+            if (!stage) return;
+            const outputEl = document.getElementById(`collabStageOutput-${stageIndex}`);
+            const runBtn = document.querySelector(`.collab-stage-btn.run[data-stage="${stageIndex}"]`);
+            if (runBtn) { runBtn.disabled = true; runBtn.textContent = "실행 중…"; }
+            collabSession.stageStates[stageIndex] = "running";
+            renderCollabRunner(document.getElementById("collabRecommendResult"));
+
+            const previousNotes = collabSession.stageOutputs
+                .slice(0, stageIndex)
+                .filter(Boolean)
+                .map((text, i) => `[${i + 1}단계] ${text}`)
+                .join("\n\n");
+
+            try {
+                const response = await fetch(`${API_URL}/collab/run-stage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        task: collabSession.task,
+                        work_type: collabSession.plan.work_type,
+                        stage_index: stageIndex,
+                        stage_name: stage.name,
+                        actions: stage.actions || [],
+                        tools: stage.tools || [],
+                        previous_notes: previousNotes,
+                        acceptance: collabSession.plan.acceptance || [],
+                    }),
+                });
+                if (!response.ok) throw new Error(`서버 오류 (${response.status})`);
+                const data = await response.json();
+                collabSession.stageOutputs[stageIndex] = data.guidance || "";
+            } catch (err) {
+                collabSession.stageOutputs[stageIndex] = `오류: ${err.message}`;
+            } finally {
+                if (runBtn) { runBtn.disabled = false; runBtn.textContent = "단계 실행"; }
+                renderCollabRunner(document.getElementById("collabRecommendResult"));
             }
+        }
+
+        function markCollabStageDone(stageIndex) {
+            if (!collabSession) return;
+            collabSession.stageStates[stageIndex] = "done";
+            if (stageIndex + 1 < collabSession.stageStates.length && collabSession.stageStates[stageIndex + 1] === "idle") {
+                collabSession.stageStates[stageIndex + 1] = "active";
+            }
+            renderCollabRunner(document.getElementById("collabRecommendResult"));
+        }
+
+        function renderCollabRunner(container) {
+            if (!collabSession?.plan) return;
+            const plan = collabSession.plan;
             const escList = value => escapeHtml(value || "");
-            const stageHtml = (plan.stages || []).map(stage => `
-                <article class="collab-plan-card">
-                    <h3>${escList(stage.name)}</h3>
+            const stageHtml = (plan.stages || []).map((stage, idx) => {
+                const state = collabSession.stageStates[idx] || "idle";
+                const statusLabel = state === "done" ? "완료" : state === "running" ? "실행중" : state === "active" ? "진행중" : "대기";
+                const output = collabSession.stageOutputs[idx] || "";
+                return `
+                <article class="collab-stage-item ${state === "active" || state === "running" ? "active" : ""} ${state === "done" ? "done" : ""}">
+                    <div class="collab-stage-head">
+                        <h3>${escList(stage.name)}</h3>
+                        <span class="collab-stage-status ${state === "running" ? "running" : state === "done" ? "done" : ""}">${statusLabel}</span>
+                    </div>
                     <p><strong>목표:</strong> ${escList(stage.goal)}</p>
                     <p><strong>추천 도구:</strong> ${(stage.tools || []).map(escList).join(" · ")}</p>
-                    <ol>
-                        ${(stage.actions || []).map(action => `<li>${escList(action)}</li>`).join("")}
-                    </ol>
-                </article>
-            `).join("");
+                    <ol>${(stage.actions || []).map(action => `<li>${escList(action)}</li>`).join("")}</ol>
+                    <div class="collab-stage-actions">
+                        <button class="collab-stage-btn run" type="button" data-stage="${idx}">단계 실행</button>
+                        <button class="collab-stage-btn done" type="button" data-done-stage="${idx}" ${output ? "" : "disabled"}>단계 완료</button>
+                    </div>
+                    ${output ? `<div class="collab-stage-output" id="collabStageOutput-${idx}">${escList(output)}</div>` : `<div class="collab-stage-output" id="collabStageOutput-${idx}" style="display:none;"></div>`}
+                </article>`;
+            }).join("");
+
             container.innerHTML = `
                 <span class="collab-type-badge">${escList(plan.work_type)}</span>
-                <div><strong>AI 보완 코멘트</strong><br>${escList(data.recommendation || "")}</div>
-                <div class="collab-plan-grid">${stageHtml}</div>
+                <div><strong>AI 보완 코멘트</strong><br>${escList(collabSession.recommendation || "")}</div>
+                <div class="collab-progress-wrap">
+                    <div class="collab-progress-bar"><div class="collab-progress-fill" id="collabProgressFill"></div></div>
+                    <div class="collab-progress-label" id="collabProgressLabel"></div>
+                </div>
+                <div class="collab-stage-runner">${stageHtml}</div>
                 <div class="collab-plan-card" style="margin-top:12px;">
                     <h3>통과 기준</h3>
                     <ul>${(plan.acceptance || []).map(item => `<li>${escList(item)}</li>`).join("")}</ul>
                     <p style="margin-top:8px;"><strong>협업 흐름:</strong> ${escList(plan.handoff)}</p>
                 </div>
             `;
+
+            container.querySelectorAll(".collab-stage-btn.run").forEach(btn => {
+                btn.addEventListener("click", () => runCollabStage(Number(btn.dataset.stage)));
+            });
+            container.querySelectorAll(".collab-stage-btn.done").forEach(btn => {
+                btn.addEventListener("click", () => markCollabStageDone(Number(btn.dataset.doneStage)));
+            });
+
+            const activeStage = collabSession.plan.stages[collabSession.stageStates.findIndex(s => s === "active" || s === "running")];
+            highlightCollabTools(activeStage?.tools || []);
+            updateCollabProgress();
+        }
+
+        function renderCollabPlan(container, data, taskText) {
+            const plan = data.plan;
+            if (!plan) {
+                container.textContent = data.recommendation || "추천 결과가 없습니다.";
+                return;
+            }
+            collabSession = {
+                task: taskText || plan.task || "",
+                recommendation: data.recommendation || "",
+                plan,
+                stageStates: plan.stages.map((_, i) => (i === 0 ? "active" : "idle")),
+                stageOutputs: plan.stages.map(() => ""),
+            };
+            renderCollabRunner(container);
         }
 
         dockSecondaryBtn.addEventListener("click", handleAddUserInput);
