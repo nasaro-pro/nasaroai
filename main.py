@@ -150,6 +150,25 @@ async def _start_db_backup_loop() -> None:
         asyncio.create_task(_periodic_db_cloud_backup())
 
 
+@app.on_event("startup")
+async def _start_self_ping_loop() -> None:
+    asyncio.create_task(_self_ping_loop())
+
+
+async def _self_ping_loop() -> None:
+    await asyncio.sleep(60)
+    self_url = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if not self_url:
+        return
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.get(f"{self_url}/health")
+        except Exception:
+            pass
+        await asyncio.sleep(840)
+
+
 # 협업 단계별 역할 AI — 조사/구조/제작/검증을 서로 다른 모델이 담당
 COLLAB_STAGE_MODEL_LABELS = ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"]
 
