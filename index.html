@@ -4399,14 +4399,11 @@
                     const h = await healthRes.json();
                     diag.push("서버: 정상");
                     if (h.openrouter_configured) {
-                        const src = h.env_openrouter_api_key ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY";
-                        const valid = h.openrouter_key_valid === true ? "검증 OK" : (h.openrouter_key_valid === false ? "검증 실패" : "미검증");
-                        diag.push(`AI 키: 설정됨 (${src}, ${h.openrouter_key_length || "?"}자, ${valid})`);
-                        if (h.openrouter_key_type === "openai" && !h.env_openrouter_api_key) {
-                            diag.push("→ OpenAI 전용 키로 보입니다. OpenRouter 키(sk-or-v1-…)가 필요합니다.");
-                        }
+                        const src = h.openrouter_key_source || (h.env_openrouter_api_key ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY");
+                        const valid = h.openrouter_key_valid === true ? "OpenRouter 검증 OK" : (h.openrouter_key_valid === false ? "검증 실패" : "미검증");
+                        diag.push(`AI: OpenRouter (${src}, ${valid})`);
                     } else {
-                        diag.push("AI 키: 미설정");
+                        diag.push("AI: OPENROUTER_API_KEY 미설정");
                     }
                     if (h.hint) diag.push(h.hint);
                 } else diag.push("서버: 응답 오류");

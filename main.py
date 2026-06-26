@@ -903,12 +903,36 @@ AGENT_STEP_SEMAPHORE = asyncio.Semaphore(AGENT_STEP_CONCURRENCY)
 
 
 def get_openrouter_api_key() -> str:
-    """Nasaro AI calls OpenRouter. Accept common env names (Render often has OPENAI_API_KEY)."""
-    for name in ("OPENROUTER_API_KEY", "OPENROUTER_KEY", "OPENAI_API_KEY"):
+    """Return OpenRouter API key from env. Only OpenRouter-format keys are accepted."""
+    for name in ("OPENROUTER_API_KEY", "OPENROUTER_KEY"):
         val = os.environ.get(name, "").strip()
         if val:
             return val
+    # Legacy: OPENAI_API_KEY only if it is actually an OpenRouter key (sk-or-v1-…)
+    openai_env = os.environ.get("OPENAI_API_KEY", "").strip()
+    if openai_env and classify_api_key(openai_env) == "openrouter":
+        return openai_env
     return ""
+
+
+def get_openrouter_key_source() -> str:
+    for name in ("OPENROUTER_API_KEY", "OPENROUTER_KEY"):
+        if os.environ.get(name, "").strip():
+            return name
+    openai_env = os.environ.get("OPENAI_API_KEY", "").strip()
+    if openai_env and classify_api_key(openai_env) == "openrouter":
+        return "OPENAI_API_KEY (openrouter-format)"
+    return ""
+
+
+def require_openrouter_key() -> str:
+    key = get_openrouter_api_key()
+    if not key:
+        raise HTTPException(
+            status_code=503,
+            detail="OPENROUTER_API_KEY가 설정되지 않았습니다. Render에 OpenRouter 키(sk-or-v1-…)를 등록하세요.",
+        )
+    return key
 
 
 def classify_api_key(key: str) -> str:
@@ -959,32 +983,38 @@ async def verify_openrouter_auth() -> tuple[bool | None, str | None]:
 
 
 def build_openrouter_headers() -> dict[str, str]:
-    api_key = get_openrouter_api_key()
+    api_key = require_openrouter_key()
     return {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://nasaroai.onrender.com",
-        "X-Title": "Nasaro AI",
+        "HTTP-Referer": os.environ.get("OPENROUTER_HTTP_REFERER", "https://nasaroai.onrender.com"),
+        "X-Title": os.environ.get("OPENROUTER_APP_TITLE", "Nasaro AI"),
         "Content-Type": "application/json",
     }
 
 
 def log_openrouter_key_status() -> None:
     api_key = get_openrouter_api_key()
-    prefix = api_key[:8] if api_key else "N/A"
+    prefix = api_key[:12] if api_key else "N/A"
     if not api_key:
         openai_only = os.environ.get("OPENAI_API_KEY", "").strip()
-        if openai_only:
+        if openai_only and classify_api_key(openai_only) != "openrouter":
             logger.warning(
-                "OPENROUTER_API_KEY empty but OPENAI_API_KEY is set — "
-                "if this is an OpenRouter key, rename env to OPENROUTER_API_KEY on Render"
+                "OPENROUTER_API_KEY missing; OPENAI_API_KEY is OpenAI-only (sk-…) — "
+                "Nasaro AI requires an OpenRouter key in OPENROUTER_API_KEY"
             )
+        elif openai_only:
+            logger.warning("OPENROUTER_API_KEY empty; using OpenRouter-format key from OPENAI_API_KEY")
         else:
-            logger.warning("OPENROUTER_API_KEY is empty. length=0 prefix=%s", prefix)
+            logger.warning("OPENROUTER_API_KEY is empty")
         return
-    source = "OPENROUTER_API_KEY"
-    if not os.environ.get("OPENROUTER_API_KEY", "").strip():
-        source = "OPENAI_API_KEY (fallback)"
-    logger.info("OpenRouter auth loaded from %s. length=%d prefix=%s", source, len(api_key), prefix)
+    source = get_openrouter_key_source() or "OPENROUTER_API_KEY"
+    logger.info(
+        "OpenRouter API ready via %s. length=%d prefix=%s type=%s",
+        source,
+        len(api_key),
+        prefix,
+        classify_api_key(api_key),
+    )
 
 
 def is_free_model(model: dict) -> bool:
@@ -1196,8 +1226,13 @@ def rebuild_model_mappings(source: str) -> None:
 
 async def refresh_model_cache() -> None:
     try:
+        headers: dict[str, str] = {}
+        try:
+            headers = build_openrouter_headers()
+        except HTTPException:
+            headers = {}
         async with httpx.AsyncClient(timeout=MODEL_REFRESH_TIMEOUT) as client:
-            response = await client.get(OPENROUTER_MODELS_URL)
+            response = await client.get(OPENROUTER_MODELS_URL, headers=headers)
             response.raise_for_status()
             payload = response.json()
     except Exception as exc:
@@ -1488,6 +1523,14 @@ async def call_ai_model(
                     response.status_code,
                     response.text[:300],
                 )
+                if response.status_code == 401:
+                    return make_failed_result(
+                        requested_label=label,
+                        requested_model=requested_model,
+                        actual_model=model_id,
+                        failed_candidates=failed_candidates,
+                        error=OPENROUTER_AUTH_ERROR_MSG,
+                    )
                 if is_daily_free_limit(response.text):
                     return make_failed_result(
                         requested_label=label,
@@ -2371,30 +2414,39 @@ async def debate_continue(request: DebateRequest) -> dict:
 async def health() -> dict:
     api_key = get_openrouter_api_key()
     has_openrouter_name = bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
+    has_openrouter_key_env = bool(os.environ.get("OPENROUTER_KEY", "").strip())
     has_openai_name = bool(os.environ.get("OPENAI_API_KEY", "").strip())
     key_type = classify_api_key(api_key)
+    key_source = get_openrouter_key_source()
     hint = None
     if not api_key:
-        hint = "Render에 OPENROUTER_API_KEY를 추가하세요 (openrouter.ai/keys)."
-    elif key_type == "openai" and not has_openrouter_name:
-        hint = (
-            "OPENAI_API_KEY가 OpenAI 전용 키 형식입니다. "
-            "변수명 문제가 아니라 키 종류 문제 — OpenRouter 키(sk-or-v1-…)를 OPENROUTER_API_KEY로 등록하세요."
-        )
-    elif has_openai_name and not has_openrouter_name and key_type == "openrouter":
-        hint = "OpenRouter 키를 OPENROUTER_API_KEY 변수명으로 옮기는 것을 권장합니다."
+        if has_openai_name and classify_api_key(os.environ.get("OPENAI_API_KEY", "").strip()) != "openrouter":
+            hint = (
+                "OPENAI_API_KEY는 OpenAI 전용 키입니다. "
+                "OpenRouter 키(sk-or-v1-…)를 OPENROUTER_API_KEY로 등록하세요."
+            )
+        else:
+            hint = "Render에 OPENROUTER_API_KEY를 추가하세요 (openrouter.ai/keys)."
+    elif key_source.startswith("OPENROUTER"):
+        hint = None
+    elif key_type == "openrouter":
+        hint = "OpenRouter 키가 동작 중입니다. OPENROUTER_API_KEY 변수명 사용을 권장합니다."
 
     openrouter_key_valid, auth_error = await verify_openrouter_auth()
     if openrouter_key_valid is False and auth_error:
         hint = auth_error
+    elif openrouter_key_valid is True and not hint:
+        hint = "OpenRouter API 연결 정상 — 모든 AI 호출은 OpenRouter로 전송됩니다."
 
     return {
         "status": "ok",
         "openrouter_configured": bool(api_key),
         "openrouter_key_valid": openrouter_key_valid,
         "openrouter_key_type": key_type,
+        "openrouter_key_source": key_source,
         "openrouter_key_length": len(api_key),
         "env_openrouter_api_key": has_openrouter_name,
+        "env_openrouter_key": has_openrouter_key_env,
         "env_openai_api_key": has_openai_name,
         "hint": hint,
     }
