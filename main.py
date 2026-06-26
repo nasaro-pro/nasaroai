@@ -20,6 +20,7 @@ from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field
 
 from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
+from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db_if_changed
 from auth_store import (
     add_support_reply,
     admin_logout,
@@ -120,8 +121,22 @@ app = FastAPI(title="Nasaro AI Backend")
 
 @app.on_event("startup")
 async def _startup_db() -> None:
+    if cloud_backup_enabled():
+        restore_db_from_cloud(DB_PATH)
     init_db()
-    logger.info("Nasaro DB path: %s", DB_PATH)
+    logger.info("Nasaro DB path: %s (cloud_backup=%s)", DB_PATH, cloud_backup_enabled())
+
+
+async def _periodic_db_cloud_backup() -> None:
+    while True:
+        await asyncio.sleep(90)
+        upload_db_if_changed(DB_PATH)
+
+
+@app.on_event("startup")
+async def _start_db_backup_loop() -> None:
+    if cloud_backup_enabled():
+        asyncio.create_task(_periodic_db_cloud_backup())
 
 
 # 협업 단계별 역할 AI — 조사/구조/제작/검증을 서로 다른 모델이 담당
