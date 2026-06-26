@@ -2639,6 +2639,14 @@ def serve_install() -> FileResponse:
     return FileResponse(os.path.join(BASE_DIR, "install.html"))
 
 
+@app.get("/google3cf35a4abfa671e1.html")
+def serve_google_site_verification() -> FileResponse:
+    path = os.path.join(BASE_DIR, "google3cf35a4abfa671e1.html")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="text/html")
+
+
 def _read_version_file(path: str, pattern: str) -> str:
     try:
         with open(path, encoding="utf-8") as f:
