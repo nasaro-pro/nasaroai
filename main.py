@@ -2192,79 +2192,80 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                 try:
                     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                         for attempt in range(2):
-                            async with client.stream(
-                                "POST",
-                                OPENROUTER_CHAT_URL,
-                                headers=build_openrouter_headers(),
-                                json={
-                                    **build_chat_payload(
-                                        model_id=model_id,
-                                        persona=persona,
-                                        prompt=data.message,
-                                        stream=True,
-                                    )
-                                },
-                            ) as response:
-                                if response.status_code == 429:
-                                    body = (await response.aread()).decode("utf-8", "ignore")
-                                    if is_daily_free_limit(body):
-                                        yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
-                                        return
-                                    if attempt == 0:
-                                        await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
-                                        continue
-                                    excluded_by_failure.add(model_id)
-                                    failed_this_model = True
-                                    break
-
-                                if response.status_code != 200:
-                                    body = (await response.aread()).decode("utf-8", "ignore")
-                                    logger.warning(
-                                        "Stream non-200 label=%s model=%s status=%s",
-                                        label,
-                                        model_id,
-                                        response.status_code,
-                                    )
-                                    if response.status_code == 401:
-                                        yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
-                                        return
-                                    if is_daily_free_limit(body):
-                                        yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
-                                        return
-                                    if should_try_next_candidate(response.status_code):
+                            async with DEBATE_AI_SEMAPHORE:
+                                async with client.stream(
+                                    "POST",
+                                    OPENROUTER_CHAT_URL,
+                                    headers=build_openrouter_headers(),
+                                    json={
+                                        **build_chat_payload(
+                                            model_id=model_id,
+                                            persona=persona,
+                                            prompt=data.message,
+                                            stream=True,
+                                        )
+                                    },
+                                ) as response:
+                                    if response.status_code == 429:
+                                        body = (await response.aread()).decode("utf-8", "ignore")
+                                        if is_daily_free_limit(body):
+                                            yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
+                                            return
+                                        if attempt == 0:
+                                            await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                                            continue
                                         excluded_by_failure.add(model_id)
                                         failed_this_model = True
                                         break
-                                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                    return
 
-                                async for line in response.aiter_lines():
-                                    if not line or not line.startswith("data: "):
-                                        continue
-                                    if line == "data: [DONE]":
-                                        return
-                                    try:
-                                        raw = json.loads(line[6:])
-                                    except json.JSONDecodeError:
-                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                        return
-                                    if raw.get("error"):
-                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                        return
-                                    delta = (raw.get("choices") or [{}])[0].get("delta") or {}
-                                    chunk = delta.get("content")
-                                    if chunk:
-                                        yield sse(
-                                            {
-                                                "model": data.model_name,
-                                                "success": True,
-                                                "actual_label": label_for_model_id(model_id),
-                                                "actual_model": model_id,
-                                                "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
-                                                "chunk": chunk,
-                                            }
+                                    if response.status_code != 200:
+                                        body = (await response.aread()).decode("utf-8", "ignore")
+                                        logger.warning(
+                                            "Stream non-200 label=%s model=%s status=%s",
+                                            label,
+                                            model_id,
+                                            response.status_code,
                                         )
-                                return
+                                        if response.status_code == 401:
+                                            yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
+                                            return
+                                        if is_daily_free_limit(body):
+                                            yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
+                                            return
+                                        if should_try_next_candidate(response.status_code):
+                                            excluded_by_failure.add(model_id)
+                                            failed_this_model = True
+                                            break
+                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                        return
+
+                                    async for line in response.aiter_lines():
+                                        if not line or not line.startswith("data: "):
+                                            continue
+                                        if line == "data: [DONE]":
+                                            return
+                                        try:
+                                            raw = json.loads(line[6:])
+                                        except json.JSONDecodeError:
+                                            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                            return
+                                        if raw.get("error"):
+                                            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                            return
+                                        delta = (raw.get("choices") or [{}])[0].get("delta") or {}
+                                        chunk = delta.get("content")
+                                        if chunk:
+                                            yield sse(
+                                                {
+                                                    "model": data.model_name,
+                                                    "success": True,
+                                                    "actual_label": label_for_model_id(model_id),
+                                                    "actual_model": model_id,
+                                                    "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
+                                                    "chunk": chunk,
+                                                }
+                                            )
+                                    return
 
                 except httpx.HTTPError as exc:
                     logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
@@ -2522,44 +2523,7 @@ async def debate_continue(request: DebateRequest, http_request: Request) -> dict
 
 @app.get("/health")
 async def health() -> dict:
-    api_key = get_openrouter_api_key()
-    has_openrouter_name = bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
-    has_openrouter_key_env = bool(os.environ.get("OPENROUTER_KEY", "").strip())
-    has_openai_name = bool(os.environ.get("OPENAI_API_KEY", "").strip())
-    key_type = classify_api_key(api_key)
-    key_source = get_openrouter_key_source()
-    hint = None
-    if not api_key:
-        if has_openai_name and classify_api_key(os.environ.get("OPENAI_API_KEY", "").strip()) != "openrouter":
-            hint = (
-                "OPENAI_API_KEY는 OpenAI 전용 키입니다. "
-                "OpenRouter 키(sk-or-v1-…)를 OPENROUTER_API_KEY로 등록하세요."
-            )
-        else:
-            hint = "Render에 OPENROUTER_API_KEY를 추가하세요 (openrouter.ai/keys)."
-    elif key_source.startswith("OPENROUTER"):
-        hint = None
-    elif key_type == "openrouter":
-        hint = "OpenRouter 키가 동작 중입니다. OPENROUTER_API_KEY 변수명 사용을 권장합니다."
-
-    openrouter_key_valid, auth_error = await verify_openrouter_auth()
-    if openrouter_key_valid is False and auth_error:
-        hint = auth_error
-    elif openrouter_key_valid is True and not hint:
-        hint = "OpenRouter API 연결 정상 — 모든 AI 호출은 OpenRouter로 전송됩니다."
-
-    return {
-        "status": "ok",
-        "openrouter_configured": bool(api_key),
-        "openrouter_key_valid": openrouter_key_valid,
-        "openrouter_key_type": key_type,
-        "openrouter_key_source": key_source,
-        "openrouter_key_length": len(api_key),
-        "env_openrouter_api_key": has_openrouter_name,
-        "env_openrouter_key": has_openrouter_key_env,
-        "env_openai_api_key": has_openai_name,
-        "hint": hint,
-    }
+    return {"status": "ok"}
 
 
 @app.get("/models/info")
