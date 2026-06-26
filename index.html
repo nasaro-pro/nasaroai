@@ -6244,32 +6244,45 @@
             if (!response.ok || !response.body) {
                 const errMsg = await parseApiError(response, COMPARE_FAILURE_MSG);
                 applyStreamChunk(responses, { model, success: false, error: errMsg });
-                showToast(errMsg, "error", 5000);
-                return;
+                throw new Error(errMsg);
             }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (value) {
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split("\n\n");
+                        buffer = events.pop() || "";
 
-                buffer += decoder.decode(value, { stream: true });
-                const events = buffer.split("\n\n");
-                buffer = events.pop() || "";
+                        for (const event of events) {
+                            const line = event.split("\n").find(item => item.startsWith("data: "));
+                            if (!line) continue;
 
-                for (const event of events) {
-                    const line = event.split("\n").find(item => item.startsWith("data: "));
-                    if (!line) continue;
+                            try {
+                                applyStreamChunk(responses, JSON.parse(line.slice(6)));
+                            } catch (error) {
+                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                            }
+                        }
+                    }
+                    if (done) break;
+                }
 
-                    try {
-                        applyStreamChunk(responses, JSON.parse(line.slice(6)));
-                    } catch (error) {
-                        applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                if (buffer.trim()) {
+                    const line = buffer.split("\n").find(item => item.startsWith("data: "));
+                    if (line) {
+                        try {
+                            applyStreamChunk(responses, JSON.parse(line.slice(6)));
+                        } catch {}
                     }
                 }
+            } finally {
+                try { reader.releaseLock(); } catch {}
             }
         }
 
@@ -6294,16 +6307,18 @@
                 renderCompareCard(model);
             });
 
-            const STAGGER_MS = 500;
             const failures = [];
-            await Promise.all(activeModels.map((model, index) =>
-                new Promise(resolve => setTimeout(resolve, index * STAGGER_MS))
-                    .then(() => streamCompareModel(model, message, responses, lastCompareSessionId))
-                    .catch(error => {
-                        failures.push(`${model}: ${error.message}`);
-                        applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
-                    })
-            ));
+            await Promise.all(
+                activeModels.map(model =>
+                    streamCompareModel(model, message, responses, lastCompareSessionId)
+                        .catch(error => {
+                            failures.push(`${model}: ${error.message}`);
+                            if (!responses[model] || responses[model] === "") {
+                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                            }
+                        })
+                )
+            );
 
             if (failures.length > 0) {
                 showNotice("compareError", `일부 모델 오류: ${failures.join(", ")}`);
