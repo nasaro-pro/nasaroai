@@ -36,6 +36,7 @@ def _resolve_db_path() -> str:
 
 DB_PATH = _resolve_db_path()
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 30 days
+PRESENCE_TTL_SECONDS = 120  # 온라인 = 최근 2분 내 활동
 
 _lock = threading.Lock()
 
@@ -149,6 +150,18 @@ def init_db() -> None:
             cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
             if "user_email" not in cols:
                 conn.execute("ALTER TABLE users ADD COLUMN user_email TEXT")
+            session_cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+            if "last_seen_at" not in session_cols:
+                conn.execute("ALTER TABLE sessions ADD COLUMN last_seen_at REAL NOT NULL DEFAULT 0")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_presence (
+                    device_id TEXT PRIMARY KEY,
+                    platform TEXT NOT NULL DEFAULT 'web',
+                    last_seen_at REAL NOT NULL
+                )
+                """
+            )
             conn.execute(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_user_email
@@ -272,13 +285,14 @@ def login(username: str, password: str) -> dict[str, Any]:
 
 def create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
-    expires_at = time.time() + SESSION_TTL_SECONDS
+    now = time.time()
+    expires_at = now + SESSION_TTL_SECONDS
     with _lock:
         conn = _connect()
         try:
             conn.execute(
-                "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
-                (token, user_id, expires_at),
+                "INSERT INTO sessions (token, user_id, expires_at, last_seen_at) VALUES (?, ?, ?, ?)",
+                (token, user_id, expires_at, now),
             )
             conn.commit()
         finally:
@@ -317,6 +331,12 @@ def get_user_by_token(token: str | None) -> dict[str, Any] | None:
                 conn.execute("DELETE FROM sessions WHERE token = ?", (token.strip(),))
                 conn.commit()
                 return None
+            now = time.time()
+            conn.execute(
+                "UPDATE sessions SET last_seen_at = ? WHERE token = ?",
+                (now, token.strip()),
+            )
+            conn.commit()
         finally:
             conn.close()
     return _row_to_user(row)
@@ -470,14 +490,42 @@ def log_login_event(user_id: int, event_type: str = "login") -> None:
             conn.close()
 
 
+def touch_device_presence(device_id: str, platform: str = "web") -> None:
+    dev = (device_id or "").strip()[:128]
+    if not dev:
+        return
+    now = time.time()
+    plat = (platform or "web")[:32]
+    try:
+        with _lock:
+            conn = _connect()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO device_presence (device_id, platform, last_seen_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        platform = excluded.platform,
+                        last_seen_at = excluded.last_seen_at
+                    """,
+                    (dev, plat, now),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception:
+        pass
+
+
 def get_active_session_count() -> int:
     now = time.time()
+    cutoff = now - PRESENCE_TTL_SECONDS
     with _lock:
         conn = _connect()
         try:
             row = conn.execute(
-                "SELECT COUNT(*) AS c FROM sessions WHERE expires_at > ?",
-                (now,),
+                "SELECT COUNT(*) AS c FROM sessions WHERE expires_at > ? AND last_seen_at > ?",
+                (now, cutoff),
             ).fetchone()
         finally:
             conn.close()
@@ -510,6 +558,8 @@ def get_usage_by_hour(day_key: str | None = None) -> dict[str, int]:
 
 
 def get_user_login_stats(user_id: int) -> dict[str, Any]:
+    now = time.time()
+    cutoff = now - PRESENCE_TTL_SECONDS
     with _lock:
         conn = _connect()
         try:
@@ -522,15 +572,25 @@ def get_user_login_stats(user_id: int) -> dict[str, Any]:
                 (user_id,),
             ).fetchone()
             active = conn.execute(
-                "SELECT COUNT(*) AS c FROM sessions s WHERE s.user_id = ? AND s.expires_at > ?",
-                (user_id, time.time()),
+                """
+                SELECT COUNT(*) AS c FROM sessions s
+                WHERE s.user_id = ? AND s.expires_at > ? AND s.last_seen_at > ?
+                """,
+                (user_id, now, cutoff),
             ).fetchone()["c"]
+            seen = conn.execute(
+                "SELECT MAX(last_seen_at) AS t FROM sessions WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
         finally:
             conn.close()
+    last_seen = float(seen["t"] or 0) if seen and seen["t"] else None
     return {
         "login_count": int(total),
         "last_login_at": last["created_at"] if last else None,
         "active_sessions": int(active),
+        "last_seen_at": last_seen,
+        "is_online": int(active) > 0,
     }
 
 
@@ -749,8 +809,11 @@ def get_admin_dashboard() -> dict[str, Any]:
             "last_login_iso": time.strftime(
                 "%Y-%m-%d %H:%M", time.localtime(login_stats["last_login_at"])
             ) if login_stats.get("last_login_at") else "-",
+            "last_seen_iso": time.strftime(
+                "%Y-%m-%d %H:%M", time.localtime(login_stats["last_seen_at"])
+            ) if login_stats.get("last_seen_at") else "-",
             "active_sessions": login_stats["active_sessions"],
-            "is_online": login_stats["active_sessions"] > 0,
+            "is_online": login_stats.get("is_online", login_stats["active_sessions"] > 0),
         })
     with _lock:
         conn = _connect()
@@ -885,6 +948,8 @@ def get_platform_stats(day_key: str | None = None) -> dict[str, int]:
 
 
 def list_guest_devices(limit: int = 50) -> list[dict[str, Any]]:
+    now = time.time()
+    cutoff = now - PRESENCE_TTL_SECONDS
     with _lock:
         conn = _connect()
         try:
@@ -898,17 +963,28 @@ def list_guest_devices(limit: int = 50) -> list[dict[str, Any]]:
                 """,
                 (max(1, min(200, limit)),),
             ).fetchall()
+            presence_rows = conn.execute(
+                "SELECT device_id, platform, last_seen_at FROM device_presence"
+            ).fetchall()
         finally:
             conn.close()
-    return [
-        {
+    presence_map = {r["device_id"]: r for r in presence_rows}
+    out = []
+    for r in rows:
+        pres = presence_map.get(r["device_id"])
+        last_seen = float(pres["last_seen_at"]) if pres else float(r["last_at"])
+        plat = pres["platform"] if pres else r["platform"]
+        out.append({
             "device_id": r["device_id"],
-            "platform": r["platform"],
+            "platform": plat,
+            "last_at": float(r["last_at"]),
             "last_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["last_at"])),
             "activity_count": int(r["cnt"]),
-        }
-        for r in rows
-    ]
+            "last_seen_at": last_seen,
+            "last_seen_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(last_seen)),
+            "is_online": last_seen > cutoff,
+        })
+    return out
 
 
 def search_users_admin(query: str, limit: int = 30) -> list[dict[str, Any]]:
@@ -1145,6 +1221,10 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
     return {
         **user,
         "login_stats": login_stats,
+        "is_online": login_stats.get("is_online", False),
+        "last_seen_iso": time.strftime(
+            "%Y-%m-%d %H:%M", time.localtime(login_stats["last_seen_at"])
+        ) if login_stats.get("last_seen_at") else "-",
         "last_login_iso": time.strftime(
             "%Y-%m-%d %H:%M", time.localtime(login_stats["last_login_at"])
         ) if login_stats.get("last_login_at") else "-",

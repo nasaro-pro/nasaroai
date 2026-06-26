@@ -3944,6 +3944,21 @@
             return `${fallback} (${response.status})`;
         }
 
+        async function sendPresencePing() {
+            try {
+                await apiFetch("/presence", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ device_id: getDeviceId() }),
+                });
+            } catch {}
+        }
+
+        function startPresencePing() {
+            sendPresencePing();
+            setInterval(sendPresencePing, 45000);
+        }
+
         async function bootstrapApiCheck() {
             try {
                 const res = await apiFetch("/models/info");
@@ -6677,6 +6692,7 @@
             initDebateSuggestions();
             syncDebateEmptyHint();
             bootstrapApiCheck();
+            startPresencePing();
         })();
 
         updateDockUI();

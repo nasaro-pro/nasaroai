@@ -228,6 +228,7 @@
     function showLoginView() {
       adminToken = "";
       sessionStorage.removeItem(TOKEN_KEY);
+      clearInterval(dashRefreshTimer);
       document.getElementById("loginView").style.display = "";
       document.getElementById("appShell").classList.remove("open");
       clearAdminPasswordField();
@@ -293,7 +294,7 @@
       const plat = Object.entries(ps).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
       document.getElementById("statsRow").innerHTML = `
         <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
-        <div class="stat"><b>${data.active_sessions ?? 0}</b><span>활성 세션</span></div>
+        <div class="stat"><b>${data.active_sessions ?? 0}</b><span>실시간 접속 (2분)</span></div>
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
@@ -333,7 +334,7 @@
           <td>${u.email || "-"}</td>
           <td>${u.created_at_iso || "-"}</td>
           <td>${u.login_count ?? 0}</td>
-          <td class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속" : "오프"}</td>
+          <td class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속중" : "오프"}</td>
           <td>${fmtQuota(u.quota_today)}</td>
           <td>${u.has_active_collab ? "진행중" : "-"}</td>`;
         tr.addEventListener("click", () => selectUser(u.id));
@@ -371,7 +372,7 @@
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "side-item";
-          btn.innerHTML = `<b>${(g.device_id || "").slice(0, 20)}…</b><span>${platformBadge(g.platform)} ${g.activity_count}회 · ${g.last_at_iso}</span>`;
+          btn.innerHTML = `<b>${(g.device_id || "").slice(0, 20)}…</b><span>${platformBadge(g.platform)} ${g.is_online ? "접속중" : "오프"} · ${g.activity_count}회 · ${g.last_seen_iso || g.last_at_iso}</span>`;
           btn.addEventListener("click", () => loadGuestActivity(g.device_id));
           list.appendChild(btn);
         });
@@ -404,8 +405,10 @@
         const pc = Object.entries(u.platform_counts || {}).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
         document.getElementById("userDetail").innerHTML = `
           <p><strong>${u.username || "-"}</strong> · ${u.email || "-"} · 가입 ${u.created_at_iso || "-"}</p>
-          <p>로그인 ${u.login_stats?.login_count ?? 0}회 · 마지막 ${u.last_login_iso || "-"} · 결과물 ${u.saved_results_count ?? 0}개</p>
-          <p>오늘 사용: ${fmtQuota(u.quota_today)} · 플랫폼: ${pc}</p>
+          <p>접속: <span class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속 중" : "오프라인"}</span>
+            · 마지막 활동 ${u.last_seen_iso || "-"}
+            · 로그인 ${u.login_stats?.login_count ?? 0}회 · 마지막 로그인 ${u.last_login_iso || "-"}</p>
+          <p>오늘 사용: ${fmtQuota(u.quota_today)} · 플랫폼: ${pc} · 결과물 ${u.saved_results_count ?? 0}개</p>
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
           <div class="activity-list">${(u.activity || []).map(a => `
             <div class="activity-row">
@@ -480,6 +483,16 @@
       }
     }
 
+    let dashRefreshTimer = null;
+
+    function startDashAutoRefresh() {
+      clearInterval(dashRefreshTimer);
+      dashRefreshTimer = setInterval(() => {
+        if (!adminToken || sidebarMode !== "stats") return;
+        loadDashboard().catch(() => {});
+      }, 30000);
+    }
+
     async function loadDashboard() {
       dashData = await api("/admin/dashboard");
       const g = await api("/admin/guests?limit=80");
@@ -493,6 +506,7 @@
       renderUsersTable(dashData.users || []);
       renderSupportList();
       showOverview();
+      startDashAutoRefresh();
     }
 
     async function tryLogin() {

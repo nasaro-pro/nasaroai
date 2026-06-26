@@ -47,6 +47,7 @@ from auth_store import (
     logout as auth_logout_fn,
     merge_user_data,
     search_users_admin,
+    touch_device_presence,
     signup as auth_signup_fn,
     verify_admin_password,
     verify_admin_token,
@@ -446,7 +447,11 @@ class SupportInquiryRequest(BaseModel):
 
 
 class SupportReplyRequest(BaseModel):
-    message: str = ""
+    message: str
+
+
+class PresenceRequest(BaseModel):
+    device_id: str | None = None = ""
 
 
 def _admin_bearer(request: Request) -> str | None:
@@ -2858,6 +2863,16 @@ def quota_status(request: Request, device_id: str = "") -> dict:
     subject, user = _resolve_subject(request, device_id)
     snap = get_quota_snapshot(subject)
     return {"subject": subject, "logged_in": user is not None, **snap}
+
+
+@app.post("/presence")
+def touch_presence(body: PresenceRequest, request: Request) -> dict:
+    """클라이언트 하트비트 — 관리자 콘솔 실시간 접속 표시용."""
+    user = get_user_by_token(_bearer_token(request))
+    dev = (body.device_id or request.headers.get("X-Device-Id") or "").strip()
+    if dev:
+        touch_device_presence(dev, _platform(request))
+    return {"ok": True, "logged_in": user is not None}
 
 
 @app.post("/auth/signup")

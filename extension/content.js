@@ -599,11 +599,17 @@
     bar.style.bottom = "auto";
   }
 
-  function showBar(show) {
+  function showBar(show, opts = {}) {
     bar.hidden = !show;
     if (show) {
       applyBarSize();
-      positionBarNearLauncher();
+      if (opts.fromLauncher || !barManualPos) {
+        barManualPos = false;
+        positionBarNearLauncher();
+        syncUiSoon({ barManualPos: false, barLeft, barTop }, true);
+      } else {
+        applyManualBarPos();
+      }
     }
     render();
     if (show) {
@@ -679,8 +685,9 @@
     const H = window.innerHeight;
     const bW = Math.min(560, W - 32);
     const bH = Math.min(Math.floor(H * 0.78), 760);
-    let left = lRect.left;
-    if (left + bW > W - 8) left = W - bW - 8;
+    const gap = 12;
+    let left = lRect.left - bW - gap;
+    if (left < 8) left = Math.max(8, lRect.right - bW);
     if (left < 8) left = 8;
     let top = lRect.bottom - bH;
     if (top < 8) top = 8;
@@ -985,7 +992,7 @@
     if (moved) syncUiSoon({ launcherBottom, launcherRight }, true);
     else {
       barManualPos = false;
-      showBar(true);
+      showBar(true, { fromLauncher: true });
     }
   }
   launcher.addEventListener("pointerup",     endLauncherDrag);
