@@ -2291,7 +2291,11 @@ async def debate_continue(request: DebateRequest) -> dict:
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    return {
+        "status": "ok",
+        "openrouter_configured": bool(api_key),
+    }
 
 
 @app.get("/models/info")

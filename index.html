@@ -103,14 +103,14 @@
             flex-shrink: 0;
         }
         .header-admin-btn {
-            height: 40px;
-            padding: 0 10px;
+            height: 32px;
+            padding: 0 8px;
             border: 1px solid #e5e7eb;
-            border-radius: 10px;
+            border-radius: 8px;
             background: #f9fafb;
             color: #6b7280;
             font: inherit;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             cursor: pointer;
             flex-shrink: 0;
@@ -1411,7 +1411,7 @@
             align-items: center;
             width: min(1160px, 100%);
             margin: 0 auto;
-            padding: 0 10px 6px;
+            padding: 0 10px 12px;
             box-sizing: border-box;
         }
 
@@ -1438,20 +1438,28 @@
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
             gap: 8px;
         }
-        .dock-btn-row .dock-mode-group {
-            display: contents;
+        .dock-btn-left {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
         }
-        .dock-btn-row .dock-tools-inline {
+        .dock-btn-center {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .dock-btn-right {
+            flex: 0 0 auto;
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-        .dock-btn-row .dock-tools-inline .input-tool-row {
-            display: contents;
-            margin: 0;
         }
         .dock-btn-row .mode-btn,
         .dock-btn-row .dock-btn.muted,
@@ -1474,9 +1482,18 @@
             padding: 0 12px;
             min-width: 128px;
         }
-        .dock-btn-row .model-picker-wrap {
+        .dock-btn-left .model-picker-wrap,
+        .agent-ai-toolbar .model-picker-wrap {
             display: flex;
             align-items: center;
+        }
+        .agent-ai-toolbar {
+            width: 100%;
+            margin-bottom: 6px;
+        }
+        .agent-ai-toolbar .agent-inline-chips {
+            flex-wrap: wrap;
+            gap: 6px;
         }
 
         .dock-compose-row #mainInput {
@@ -1601,10 +1618,10 @@
         /* ===== Agent Mode (하단바 밖 · 질문창 위 우측) ===== */
         .dock-agent-outside {
             position: static;
-            min-height: 36px;
-            height: 36px;
-            padding: 0 14px;
-            font-size: 13px;
+            min-height: 40px;
+            height: 40px;
+            padding: 0 16px;
+            font-size: 14px;
             font-weight: 700;
             border-radius: 10px;
             border: 1px solid #c4b5fd;
@@ -2848,7 +2865,6 @@
             </div>
             <div class="side-menu-footer">
                 <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
-                <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span>설정</span></button>
             </div>
         </aside>
 
@@ -2963,10 +2979,10 @@
         <header class="site-header">
             <div class="header-inner">
                 <div class="header-left-actions">
+                    <button id="adminEntryBtn" class="header-admin-btn" type="button" title="관리자 페이지">관리</button>
                     <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴 열기">
                         <span></span><span></span><span></span>
                     </button>
-                    <button id="adminEntryBtn" class="header-admin-btn" type="button" title="관리자 페이지">관리자</button>
                 </div>
                 <div class="header-brand">
                     <h1>Nasaro AI</h1>
@@ -3342,7 +3358,8 @@
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
                     <div class="dock-btn-row">
-                        <div class="dock-mode-group">
+                        <div class="dock-btn-left" id="mainInputToolsLeft"></div>
+                        <div class="dock-btn-center dock-mode-group">
                             <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                             <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
                             <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
@@ -3350,7 +3367,7 @@
                             <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                             <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                         </div>
-                        <div id="mainInputTools" class="dock-tools-inline"></div>
+                        <div class="dock-btn-right" id="mainInputToolsRight"></div>
                     </div>
                 </div>
             </footer>
@@ -3362,7 +3379,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627"></script>
+    <script src="/static/nasaro-features.js?v=20260627b"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -3428,18 +3445,23 @@
 
         function rebuildMainToolbar() {
             const NF = window.NasaroFeatures;
-            const mainTools = document.getElementById("mainInputTools");
-            if (!NF || !mainTools || !mainInput) return;
-            mainTools.innerHTML = "";
-            mainTools.appendChild(NF.buildInputToolbar(mainInput, { mode: currentMode, showToast }));
+            const left = document.getElementById("mainInputToolsLeft");
+            const right = document.getElementById("mainInputToolsRight");
+            if (!NF || !left || !right || !mainInput) return;
+            left.innerHTML = "";
+            right.innerHTML = "";
+            const parts = NF.buildDockToolbarParts?.(mainInput, { mode: currentMode, showToast });
+            if (!parts) return;
+            left.appendChild(parts.ai);
+            right.append(parts.privacy, parts.voice);
         }
 
         function rebuildAgentToolbar() {
             const NF = window.NasaroFeatures;
             const agentTools = document.getElementById("agentInputTools");
-            if (!NF || !agentTools || !agentInputEl) return;
+            if (!NF || !agentTools) return;
             agentTools.innerHTML = "";
-            agentTools.appendChild(NF.buildInputToolbar(agentInputEl, { mode: "agent", showToast }));
+            agentTools.appendChild(NF.buildAgentModelToolbar?.({ showToast }) || NF.buildModelPicker("agent", { showToast }));
         }
 
         function refreshAppLang() {
@@ -3706,6 +3728,32 @@
                 headers: authHeaders(options.headers || {}),
             });
             return res;
+        }
+
+        async function parseApiError(response, fallback = "요청 실패") {
+            try {
+                const data = await response.json();
+                if (typeof data.detail === "string") return data.detail;
+                if (data.detail?.message) return data.detail.message;
+                if (data.message) return data.message;
+            } catch {}
+            return `${fallback} (${response.status})`;
+        }
+
+        async function bootstrapApiCheck() {
+            try {
+                const res = await apiFetch("/models/info");
+                if (!res.ok) {
+                    showToast("서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.", "error", 5000);
+                    return;
+                }
+                const data = await res.json();
+                if (data.error) {
+                    showToast("AI API 오류: " + data.error, "warn", 6000);
+                }
+            } catch {
+                showToast("서버에 연결할 수 없습니다.", "error", 5000);
+            }
         }
 
         function scheduleUserSync() {
@@ -4236,23 +4284,25 @@
 
         // 팝오버 토글 (CSS transition이 display:none이면 안 돌아가므로 두 단계로 처리)
         function openSettings() {
+            if (!settingsPanel) return;
             settingsPanel.style.display = "flex";
             requestAnimationFrame(() => settingsPanel.classList.add("open"));
-            settingsBtn.classList.add("active");
+            settingsBtn?.classList.add("active");
             refreshSettingsDiagnostics();
             updateSupportUI();
         }
         function closeSettings() {
+            if (!settingsPanel) return;
             settingsPanel.classList.remove("open");
-            settingsBtn.classList.remove("active");
+            settingsBtn?.classList.remove("active");
             settingsPanel.addEventListener("transitionend", () => {
                 if (!settingsPanel.classList.contains("open"))
                     settingsPanel.style.display = "none";
             }, { once: true });
         }
-        settingsBtn.addEventListener("click", (e) => {
+        settingsBtn?.addEventListener("click", (e) => {
             e.stopPropagation();
-            settingsPanel.classList.contains("open") ? closeSettings() : openSettings();
+            settingsPanel?.classList.contains("open") ? closeSettings() : openSettings();
         });
         const guideBar = document.getElementById("guideBar");
         const guideBarBackdrop = document.getElementById("guideBarBackdrop");
@@ -4348,11 +4398,10 @@
 
         // 패널 외부 클릭 시 닫기
         document.addEventListener("click", (e) => {
-            if (settingsPanel.classList.contains("open") &&
-                !settingsPanel.contains(e.target) &&
-                e.target !== settingsBtn && !settingsBtn.contains(e.target)) {
-                closeSettings();
-            }
+            if (!settingsPanel?.classList.contains("open")) return;
+            if (settingsPanel.contains(e.target) ||
+                e.target === settingsBtn || settingsBtn?.contains(e.target)) return;
+            closeSettings();
         });
 
         // ── 글씨 크기 조절 ───────────────────────────────────────────────────
@@ -4542,11 +4591,20 @@
         mainInput.addEventListener("keydown", event => {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
+                const text = mainInput.value.trim();
+                if (agentActive && text) {
+                    mainInput.value = "";
+                    autoResizeInput();
+                    if (!agentPanel?.classList.contains("open")) setAgentActive(true);
+                    runAgentMission(text, false);
+                    return;
+                }
                 dockPrimaryBtn.click();
             }
         });
         const bottomResizeObserver = new ResizeObserver(scheduleSyncMainPadding);
-        bottomResizeObserver.observe(inputDock);
+        const dockShellEl = document.getElementById("dockShell");
+        bottomResizeObserver.observe(dockShellEl || inputDock);
         window.addEventListener("resize", scheduleSyncMainPadding);
         autoResizeInput();
 
@@ -4556,8 +4614,12 @@
             function onViewportResize() {
                 const vv = window.visualViewport;
                 const keyboardHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
-                // 키보드가 올라왔으면 inputDock을 위로 밀어줌
-                inputDock.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                const shell = document.getElementById("dockShell");
+                if (shell) {
+                    shell.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                } else {
+                    inputDock.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                }
                 // 모바일 에이전트 패널은 키보드 바로 위에 자연스럽게 붙임
                 if (agentPanel && window.innerWidth <= 520 && !document.body.classList.contains("native-agent-overlay")) {
                     if (keyboardHeight > 60) {
@@ -5419,8 +5481,8 @@
                     body: JSON.stringify({ task, user_id: getDeviceId() }),
                 });
                 if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.detail?.message || errData.detail || `서버 오류 (${response.status})`);
+                    const errMsg = await parseApiError(response, "협업 요청 실패");
+                    throw new Error(errMsg);
                 }
                 const data = await response.json();
                 renderCollabPlan(resultEl, data, task);
@@ -5896,7 +5958,9 @@
             });
 
             if (!response.ok || !response.body) {
-                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                const errMsg = await parseApiError(response, COMPARE_FAILURE_MSG);
+                applyStreamChunk(responses, { model, success: false, error: errMsg });
+                showToast(errMsg, "error", 5000);
                 return;
             }
 
@@ -6182,7 +6246,10 @@
                     body: JSON.stringify(payload),
                 });
 
-                if (!response.ok) throw new Error(`요청 실패 (${response.status})`);
+                if (!response.ok) {
+                    const errMsg = await parseApiError(response, "토론 요청 실패");
+                    throw new Error(errMsg);
+                }
 
                 const data = await response.json();
                 if (data.queued) {
@@ -6379,6 +6446,7 @@
             initCompareSuggestions();
             initDebateSuggestions();
             syncDebateEmptyHint();
+            bootstrapApiCheck();
         })();
 
         updateDockUI();

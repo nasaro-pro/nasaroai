@@ -239,7 +239,8 @@
         allBtn.type = "button";
         allBtn.className = "ai-chip" + (current.length >= MODELS.length ? " active" : "");
         allBtn.textContent = t("ai_all");
-        allBtn.addEventListener("click", () => {
+        allBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
             current = current.length >= MODELS.length ? [MODELS[0]] : MODELS.slice();
             renderChips();
             sync();
@@ -253,7 +254,8 @@
                 b.type = "button";
                 b.className = "ai-chip" + (current.includes(m) ? " active" : "");
                 b.textContent = m;
-                b.addEventListener("click", () => {
+                b.addEventListener("click", (e) => {
+                    e.stopPropagation();
                     if (current.includes(m)) current = current.filter(x => x !== m);
                     else current.push(m);
                     if (!current.length) current = MODELS.slice();
@@ -293,7 +295,8 @@
         });
         if (!window._nasaroAiPickerClose) {
             window._nasaroAiPickerClose = true;
-            document.addEventListener("click", () => {
+            document.addEventListener("click", (e) => {
+                if (e.target.closest(".ai-picker-popover") || e.target.closest(".ai-picker-trigger")) return;
                 document.querySelectorAll(".ai-picker-popover.open").forEach(p => p.classList.remove("open"));
             });
         }
@@ -301,12 +304,7 @@
         return trigger;
     }
 
-    function buildInputToolbar(textarea, opts = {}) {
-        const mode = opts.mode || "compare";
-        const row = document.createElement("div");
-        row.className = "input-tool-row";
-        row.appendChild(buildModelPicker(mode, opts));
-
+    function buildPrivacyButton(textarea, opts = {}) {
         const privBtn = document.createElement("button");
         privBtn.type = "button";
         privBtn.className = "input-tool-btn privacy-btn privacy-btn-wide" + (privacyMode ? " active" : "");
@@ -323,15 +321,41 @@
             e.stopPropagation();
             opts.showToast?.(t("privacy_tip"), "info", 5000);
         });
+        return privBtn;
+    }
 
+    function buildVoiceButton(textarea, opts = {}) {
         const voiceBtn = document.createElement("button");
         voiceBtn.type = "button";
         voiceBtn.className = "input-tool-btn";
         voiceBtn.textContent = "🎤";
         voiceBtn.title = t("voice_start");
         voiceBtn.addEventListener("click", () => startVoiceInput(textarea, voiceBtn, opts.showToast));
+        return voiceBtn;
+    }
 
-        row.append(privBtn, voiceBtn);
+    function buildDockToolbarParts(textarea, opts = {}) {
+        const mode = opts.mode || "compare";
+        return {
+            ai: buildModelPicker(mode, opts),
+            privacy: buildPrivacyButton(textarea, opts),
+            voice: buildVoiceButton(textarea, opts),
+        };
+    }
+
+    function buildAgentModelToolbar(opts = {}) {
+        const wrap = document.createElement("div");
+        wrap.className = "agent-ai-toolbar";
+        wrap.appendChild(buildModelPicker("agent", opts));
+        return wrap;
+    }
+
+    function buildInputToolbar(textarea, opts = {}) {
+        const mode = opts.mode || "compare";
+        const row = document.createElement("div");
+        row.className = "input-tool-row";
+        row.appendChild(buildModelPicker(mode, opts));
+        row.append(buildPrivacyButton(textarea, opts), buildVoiceButton(textarea, opts));
         return row;
     }
 
@@ -556,7 +580,7 @@
         get theme() { return theme; },
         set theme(v) { theme = v; applyTheme(); },
         isPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
-        applyTheme, applyLang, buildInputToolbar,
+        applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
         createShareLink, exportMarkdown, addResultActions, loadShareFromUrl,
         parseScheduleFromText, addAgentSchedule, startAgentScheduleChecker,
         getUserGuideHtml, isNativeApp, saveOfflineSnapshot,
