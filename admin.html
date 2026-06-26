@@ -390,7 +390,7 @@
       document.getElementById("mainSub").textContent = "기기별 활동 기록";
       document.getElementById("userDetail").innerHTML = `<p>기기 ID: <code>${deviceId}</code></p><p>활동 불러오는 중…</p>`;
       try {
-        const data = await api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=500");
+        const data = await api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=100000");
         document.getElementById("userDetail").innerHTML = `
           <p>기기 ID: <code>${deviceId}</code></p>
           <div class="activity-list">${(data.activity || []).map(a => `
