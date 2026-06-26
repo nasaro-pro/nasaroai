@@ -179,6 +179,7 @@
     function applyTheme() {
         document.documentElement.dataset.theme = theme;
         localStorage.setItem("nasaroai_theme", theme);
+        window.dispatchEvent(new CustomEvent("nasaroai:theme", { detail: { theme } }));
     }
 
     function applyLang() {

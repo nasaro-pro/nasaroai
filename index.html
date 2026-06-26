@@ -1105,6 +1105,82 @@
         html[data-theme="dark"] .result-files-toggle { background: #111; border-color: #333; color: #c4b5fd; }
         html[data-theme="dark"] .works-item,
         html[data-theme="dark"] .active-collab-item { background: #111; border-color: #262626; }
+        html[data-theme="dark"] .input-tool-btn {
+            background: #141414; border-color: #333; color: #f5f5f5;
+        }
+        html[data-theme="dark"] .input-tool-btn.active {
+            background: #1e1b4b; border-color: #6366f1; color: #e0e7ff;
+        }
+        html[data-theme="dark"] .input-tool-btn.ai-pick-trigger-btn {
+            background: #1a1530; border-color: #4338ca; color: #c4b5fd;
+        }
+        html[data-theme="dark"] .input-tool-btn.ai-pick-trigger-btn:hover {
+            background: #251f45; border-color: #6366f1;
+        }
+        html[data-theme="dark"] .dock-btn.primary { background: #2563eb; color: #fff; border: 0; }
+        html[data-theme="dark"] .dock-btn.secondary { background: #ea580c; color: #fff; border: 0; }
+        html[data-theme="dark"] .dock-agent-outside,
+        html[data-theme="dark"] .agent-toggle-btn {
+            background: #141414; border: 1px solid #333; color: #c4b5fd;
+        }
+        html[data-theme="dark"] .agent-toggle-btn.active,
+        html[data-theme="dark"] .dock-agent-outside.active {
+            background: linear-gradient(135deg, #5b21b6 0%, #4c1d95 100%);
+            color: #fff; border-color: #6d28d9;
+        }
+        html[data-theme="dark"] .compare-card-header {
+            background: #111; border-color: #262626; color: #f5f5f5;
+        }
+        html[data-theme="dark"] .compare-card-body,
+        html[data-theme="dark"] .compare-card-content {
+            background: #0a0a0a; color: #e5e5e5;
+        }
+        html[data-theme="dark"] .compare-model-meta { color: #737373; }
+        html[data-theme="dark"] .agent-panel-header {
+            background: #1a1530; border-color: #333; color: #e9d5ff;
+        }
+        html[data-theme="dark"] .agent-panel-title { color: #e9d5ff; }
+        html[data-theme="dark"] .agent-panel-end {
+            background: #2a1215; border-color: #7f1d1d; color: #fecaca;
+        }
+        html[data-theme="dark"] .agent-status-bar {
+            background: #111; color: #d4d4d4; border-color: #262626;
+        }
+        html[data-theme="dark"] .agent-card {
+            background: #111; border-color: #262626; color: #f5f5f5;
+        }
+        html[data-theme="dark"] .agent-card-header { border-color: #262626; }
+        html[data-theme="dark"] .agent-card-body { color: #e5e5e5; }
+        html[data-theme="dark"] .agent-input-row { background: #0a0a0a; border-color: #262626; }
+        html[data-theme="dark"] .agent-send-btn { background: #5b21b6; color: #fff; }
+        html[data-theme="dark"] .agent-card-action-btn {
+            background: #141414; border-color: #333; color: #d4d4d4;
+        }
+        html[data-theme="dark"] .agent-card-action-btn:hover { background: #1f1f1f; }
+        html[data-theme="dark"] .collab-template-btn {
+            background: #141414; border-color: #333; color: #d4d4d4;
+        }
+        html[data-theme="dark"] .collab-template-btn:hover {
+            background: #1e1b4b; border-color: #4338ca; color: #e0e7ff;
+        }
+        html[data-theme="dark"] .settings-action-btn {
+            background: #141414; border-color: #333; color: #d4d4d4;
+        }
+        html[data-theme="dark"] .settings-action-btn:hover {
+            background: #1f1f1f; border-color: #404040; color: #fafafa;
+        }
+        html[data-theme="dark"] .side-account-box { background: #111; }
+        html[data-theme="dark"] .side-account-name { color: #f5f5f5; }
+        html[data-theme="dark"] .side-logout-btn {
+            background: #141414; border-color: #333; color: #a3a3a3;
+        }
+        html[data-theme="dark"] .collab-ai-btn.recommended {
+            background: #1a1530; border-color: #7c3aed; color: #c4b5fd;
+        }
+        html[data-theme="dark"] .debate-card,
+        html[data-theme="dark"] .debate-turn { background: #111; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .notice.error { background: #2a1215; color: #fecaca; }
+        html[data-theme="dark"] .notice.info { background: #172554; color: #bfdbfe; }
 
         .collab-ai-btn.recommended {
             border-color: #7c3aed;
@@ -3447,7 +3523,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627e"></script>
+    <script src="/static/nasaro-features.js?v=20260627f"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -4324,15 +4400,27 @@
                     diag.push("서버: 정상");
                     if (h.openrouter_configured) {
                         const src = h.env_openrouter_api_key ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY";
-                        diag.push(`AI 키: 설정됨 (${src}, ${h.openrouter_key_length || "?"}자)`);
+                        const valid = h.openrouter_key_valid === true ? "검증 OK" : (h.openrouter_key_valid === false ? "검증 실패" : "미검증");
+                        diag.push(`AI 키: 설정됨 (${src}, ${h.openrouter_key_length || "?"}자, ${valid})`);
+                        if (h.openrouter_key_type === "openai" && !h.env_openrouter_api_key) {
+                            diag.push("→ OpenAI 전용 키로 보입니다. OpenRouter 키(sk-or-v1-…)가 필요합니다.");
+                        }
                     } else {
                         diag.push("AI 키: 미설정");
                     }
                     if (h.hint) diag.push(h.hint);
                 } else diag.push("서버: 응답 오류");
-                if (isExtensionContext()) diag.push("PC 확장: 설치됨");
-                else if (hasNativeAndroidAgent) diag.push("Android 앱: 연결됨");
-                else diag.push("에이전트: 확장/APK 미연결");
+                if (hasNativeAndroidAgent) {
+                    diag.push("Android 앱: 연결됨");
+                } else if (isAppSource) {
+                    diag.push("Android WebView: 앱 모드");
+                } else if (typeof nasaroaiExtReady !== "undefined" && nasaroaiExtReady && !isMobileDevice) {
+                    diag.push("PC 확장: 연결됨");
+                } else if (!isMobileDevice && !isAppSource) {
+                    diag.push("PC 확장: 미연결 (install.html에서 설치)");
+                } else if (isMobileDevice && !isAppSource) {
+                    diag.push("에이전트: Android APK 설치 필요");
+                }
                 if (diagEl) diagEl.textContent = diag.join("\n");
             } catch {
                 if (quotaEl) quotaEl.textContent = "진단 정보를 불러오지 못했습니다.";

@@ -307,7 +307,41 @@
   .send-btn { align-self: stretch; min-width: 64px; border: 0; border-radius: 10px; background: #7c3aed; color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; }
   .send-btn:hover:not(:disabled) { background: #6d28d9; }
   .send-btn:disabled { background: #c4b5fd; cursor: not-allowed; }
+
+  :host([data-theme="dark"]) .bar { background: #0c0c0c; color: #f5f5f5; border-color: #262626; box-shadow: 0 8px 40px rgba(0,0,0,.55); }
+  :host([data-theme="dark"]) .head { background: #1a1530; border-color: #333; }
+  :host([data-theme="dark"]) .title { color: #c4b5fd; }
+  :host([data-theme="dark"]) .task-counter { background: #1e1b4b; color: #c4b5fd; }
+  :host([data-theme="dark"]) .icon-btn { background: #141414; border-color: #333; color: #d4d4d4; }
+  :host([data-theme="dark"]) .icon-btn:hover { background: #1f1f1f; }
+  :host([data-theme="dark"]) .min-btn { background: #1e1b4b; border-color: #4338ca; color: #e0e7ff; }
+  :host([data-theme="dark"]) .end-btn { background: #2a1215; border-color: #7f1d1d; color: #fecaca; }
+  :host([data-theme="dark"]) .ai-pick-btn { background: #1a1530; border-color: #4338ca; color: #c4b5fd; }
+  :host([data-theme="dark"]) .ai-popover { background: #0c0c0c; border-color: #333; }
+  :host([data-theme="dark"]) .ai-chip { background: #141414; border-color: #333; color: #e5e5e5; }
+  :host([data-theme="dark"]) .ai-chip.active { background: #1e1b4b; border-color: #6366f1; color: #e0e7ff; }
+  :host([data-theme="dark"]) .task-sidebar { background: #0a0a0a; border-color: #262626; }
+  :host([data-theme="dark"]) .task-sidebar-title { color: #a3a3a3; }
+  :host([data-theme="dark"]) .task-mini-section { border-color: #262626; background: #111; }
+  :host([data-theme="dark"]) .task-card { background: #111; border-color: #262626; color: #f5f5f5; }
+  :host([data-theme="dark"]) .task-input { background: #0a0a0a; border-color: #333; color: #fafafa; }
+  :host([data-theme="dark"]) .input-row { border-color: #262626; }
+  :host([data-theme="dark"]) .resize-handle { background: #141414; border-color: #262626; }
+  :host([data-theme="dark"]) .confirm { background: #2a2410; border-color: #333; }
+  :host([data-theme="dark"]) .confirm-msg { color: #fde68a; }
+  :host([data-theme="dark"]) .reject-btn { background: #262626; color: #d4d4d4; }
   `;
+
+  function applyExtensionTheme() {
+    let theme = "light";
+    try { theme = localStorage.getItem("nasaroai_theme") || "light"; } catch {}
+    host.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+  }
+  applyExtensionTheme();
+  window.addEventListener("storage", e => {
+    if (e.key === "nasaroai_theme") applyExtensionTheme();
+  });
+  window.addEventListener("nasaroai:theme", applyExtensionTheme);
 
   try {
     const sheet = new CSSStyleSheet();
@@ -567,20 +601,17 @@
 
   function showBar(show) {
     bar.hidden = !show;
-    render();
     if (show) {
       applyBarSize();
-      if (window.innerWidth > 640 && barManualPos) {
-        applyManualBarPos();
-      } else {
-        applyBarPos();
-      }
+      positionBarNearLauncher();
+    }
+    render();
+    if (show) {
       setTimeout(() => {
         input.focus();
         tasksWrap.scrollTop = tasksWrap.scrollHeight;
       }, 50);
     }
-    // 모든 탭에 동기화 — 한 탭에서 접으면 다른 탭도 같이 접힘
     try { chrome.storage.local.set({ barOpen: show }); } catch {}
   }
   function broadcastAgentState(v) {
@@ -612,38 +643,61 @@
     }
   }
   // 패널을 런처 옆에 배치 (desktop 전용; 모바일은 CSS @media가 처리)
-  function applyBarPos() {
+  function getLauncherRect() {
+    if (launcher.classList.contains("show")) {
+      return launcher.getBoundingClientRect();
+    }
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const w = launcher.offsetWidth || 52;
+    const h = launcher.offsetHeight || 52;
+    const right = launcherRight;
+    const bottom = launcherBottom + kbOffset;
+    const left = W - right - w;
+    const top = H - bottom - h;
+    return {
+      left,
+      top,
+      right: left + w,
+      bottom: top + h,
+      width: w,
+      height: h,
+    };
+  }
+  function positionBarNearLauncher() {
     if (bar.hidden) return;
     if (window.innerWidth <= 640) {
-      // 모바일: CSS @media에서 이미 처리하므로 JS 재정의 제거
-      ["left","top","right","bottom","width"].forEach(p => bar.style.removeProperty(p));
+      ["left", "top", "right", "bottom", "width"].forEach(p => bar.style.removeProperty(p));
       return;
     }
-    const lRect = launcher.getBoundingClientRect();
+    if (barManualPos) {
+      applyManualBarPos();
+      return;
+    }
+    const lRect = getLauncherRect();
     const W = window.innerWidth;
     const H = window.innerHeight;
     const bW = Math.min(560, W - 32);
     const bH = Math.min(Math.floor(H * 0.78), 760);
-
-    // 런처 위치를 그대로 따라가되 화면 안으로만 보정
     let left = lRect.left;
     if (left + bW > W - 8) left = W - bW - 8;
     if (left < 8) left = 8;
-
-    // 수직: 런처 하단 기준 패널 하단 맞춤
     let top = lRect.bottom - bH;
     if (top < 8) top = 8;
     if (top + bH > H - 8) top = H - bH - 8;
-
-    bar.style.left   = left + "px";
-    bar.style.top    = top  + "px";
-    bar.style.right  = "auto";
+    bar.style.left = left + "px";
+    bar.style.top = top + "px";
+    bar.style.right = "auto";
     bar.style.bottom = "auto";
-    bar.style.width  = bW + "px";
+    bar.style.width = bW + "px";
     bar.style.removeProperty("height");
     barWidth = bW;
     barHeight = 0;
-    if (!barManualPos) { barLeft = left; barTop = top; }
+    barLeft = left;
+    barTop = top;
+  }
+  function applyBarPos() {
+    positionBarNearLauncher();
   }
   function applyTasksHeight() { if (taskArea) taskArea.style.height = tasksHeight + "px"; }
 
@@ -920,7 +974,8 @@
     if (Math.abs(dy) + Math.abs(dx) > 4) launcherDrag.moved = true;
     launcherBottom = Math.max(12, Math.min(window.innerHeight - 64, launcherDrag.b + dy));
     launcherRight  = Math.max(8,  Math.min(window.innerWidth  - 60, launcherDrag.r + dx));
-    applyLauncherPos(); // bar가 열려있으면 applyLauncherPos 내부에서 applyBarPos 호출
+    applyLauncherPos();
+    if (!bar.hidden && !barManualPos) positionBarNearLauncher();
     syncUiSoon({ launcherBottom, launcherRight });
   });
   function endLauncherDrag(e) {
@@ -928,7 +983,10 @@
     try { launcher.releasePointerCapture(e.pointerId); } catch {}
     const moved = launcherDrag.moved; launcherDrag = null;
     if (moved) syncUiSoon({ launcherBottom, launcherRight }, true);
-    else showBar(true);
+    else {
+      barManualPos = false;
+      showBar(true);
+    }
   }
   launcher.addEventListener("pointerup",     endLauncherDrag);
   launcher.addEventListener("pointercancel", () => { launcherDrag = null; });
@@ -1110,15 +1168,25 @@
     else if (d.type === "OPEN") {
       window.postMessage({ __nasaroai: "agent", type: "READY" }, "*");
       setEnabled(true);
-      showBar(true);
-      // 에이전트 버튼에서 열었으면 버튼 위로 배치
-      if (openAboveAnchor(d.anchor)) {
+      bar.hidden = false;
+      applyBarSize();
+      if (d.anchor && window.innerWidth > 640 && openAboveAnchor(d.anchor)) {
         barManualPos = true;
         const r = bar.getBoundingClientRect();
         barLeft = Math.round(r.left);
         barTop = Math.round(r.top);
         syncUiSoon({ barLeft, barTop, barManualPos: true }, true);
+      } else {
+        barManualPos = false;
+        positionBarNearLauncher();
+        syncUiSoon({ barManualPos: false }, true);
       }
+      render();
+      try { chrome.storage.local.set({ barOpen: true }); } catch {}
+      setTimeout(() => {
+        input.focus();
+        tasksWrap.scrollTop = tasksWrap.scrollHeight;
+      }, 50);
     }
     else if (d.type === "CLOSE") endAgent();
   });

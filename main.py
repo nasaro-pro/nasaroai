@@ -911,6 +911,53 @@ def get_openrouter_api_key() -> str:
     return ""
 
 
+def classify_api_key(key: str) -> str:
+    k = key.strip()
+    if not k:
+        return "missing"
+    low = k.lower()
+    if low.startswith("sk-or-"):
+        return "openrouter"
+    if low.startswith("sk-proj-") or low.startswith("sk-"):
+        return "openai"
+    return "unknown"
+
+
+OPENROUTER_AUTH_ERROR_MSG = (
+    "OpenRouter 인증 실패입니다. Render에 OPENROUTER_API_KEY(openrouter.ai/keys)를 설정하세요. "
+    "OPENAI_API_KEY만 있고 OpenAI 전용 키(sk-…)라면 Nasaro AI가 동작하지 않습니다."
+)
+
+
+async def verify_openrouter_auth() -> tuple[bool | None, str | None]:
+    """Probe OpenRouter with the configured key (cached callers should not spam)."""
+    api_key = get_openrouter_api_key()
+    if not api_key:
+        return None, None
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=8.0)) as client:
+            response = await client.post(
+                OPENROUTER_CHAT_URL,
+                headers=build_openrouter_headers(),
+                json={
+                    "model": LAST_RESORT_MODEL,
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "hi"}],
+                },
+            )
+    except httpx.HTTPError as exc:
+        return False, f"OpenRouter 연결 실패: {exc.__class__.__name__}"
+
+    if response.status_code == 200:
+        return True, None
+    if response.status_code == 401:
+        if classify_api_key(api_key) == "openai":
+            return False, OPENROUTER_AUTH_ERROR_MSG
+        return False, "OpenRouter 인증 실패(401). API 키를 확인하세요."
+    snippet = response.text[:160].replace("\n", " ")
+    return False, f"OpenRouter 오류({response.status_code}): {snippet}"
+
+
 def build_openrouter_headers() -> dict[str, str]:
     api_key = get_openrouter_api_key()
     return {
@@ -2029,6 +2076,9 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                         model_id,
                                         response.status_code,
                                     )
+                                    if response.status_code == 401:
+                                        yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
+                                        return
                                     if is_daily_free_limit(body):
                                         yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
                                         return
@@ -2322,14 +2372,27 @@ async def health() -> dict:
     api_key = get_openrouter_api_key()
     has_openrouter_name = bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
     has_openai_name = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+    key_type = classify_api_key(api_key)
     hint = None
     if not api_key:
-        hint = "Render에 OPENROUTER_API_KEY를 추가하세요 (openrouter.ai/keys). OPENAI_API_KEY만으로는 동작하지 않습니다."
-    elif has_openai_name and not has_openrouter_name:
-        hint = "OPENAI_API_KEY로 연결 중입니다. OpenRouter 키면 변수명을 OPENROUTER_API_KEY로 바꾸는 것을 권장합니다."
+        hint = "Render에 OPENROUTER_API_KEY를 추가하세요 (openrouter.ai/keys)."
+    elif key_type == "openai" and not has_openrouter_name:
+        hint = (
+            "OPENAI_API_KEY가 OpenAI 전용 키 형식입니다. "
+            "변수명 문제가 아니라 키 종류 문제 — OpenRouter 키(sk-or-v1-…)를 OPENROUTER_API_KEY로 등록하세요."
+        )
+    elif has_openai_name and not has_openrouter_name and key_type == "openrouter":
+        hint = "OpenRouter 키를 OPENROUTER_API_KEY 변수명으로 옮기는 것을 권장합니다."
+
+    openrouter_key_valid, auth_error = await verify_openrouter_auth()
+    if openrouter_key_valid is False and auth_error:
+        hint = auth_error
+
     return {
         "status": "ok",
         "openrouter_configured": bool(api_key),
+        "openrouter_key_valid": openrouter_key_valid,
+        "openrouter_key_type": key_type,
         "openrouter_key_length": len(api_key),
         "env_openrouter_api_key": has_openrouter_name,
         "env_openai_api_key": has_openai_name,
