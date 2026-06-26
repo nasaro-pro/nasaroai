@@ -255,6 +255,21 @@ class FloatingService : Service() {
         }
 
         @JavascriptInterface
+        fun openOverlaySettings() {
+            android.os.Handler(mainLooper).post {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                    data = android.net.Uri.parse("package:$packageName")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                })
+            }
+        }
+
+        @JavascriptInterface
+        fun canDrawOverlay(): Boolean {
+            return android.provider.Settings.canDrawOverlays(this@FloatingService)
+        }
+
+        @JavascriptInterface
         fun runNativeTask(task: String): String {
             val needsForeground = needsForegroundTask(task)
             val latch = java.util.concurrent.CountDownLatch(1)

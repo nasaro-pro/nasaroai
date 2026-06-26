@@ -7,36 +7,18 @@
   <style>
     :root { color-scheme: light; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
-      background: #f8fafc;
-      color: #0f172a;
-      line-height: 1.75;
-    }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.75; }
     .wrap { max-width: 920px; margin: 0 auto; padding: 28px 18px 64px; }
-    .top {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-      margin-bottom: 24px;
-    }
-    a.back {
-      text-decoration: none; color: #6d28d9; font-weight: 700; font-size: 14px;
-    }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    a.back { text-decoration: none; color: #6d28d9; font-weight: 700; font-size: 14px; }
     h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.03em; }
     .lead { color: #475569; margin: 0 0 24px; }
-    section {
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
-      padding: 18px 20px; margin-bottom: 14px;
-    }
+    section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
     h2 { font-size: 18px; margin: 0 0 10px; color: #1d4ed8; }
-    h3 { font-size: 15px; margin: 14px 0 6px; }
     ul, ol { padding-left: 20px; margin: 8px 0; }
-    li { margin: 4px 0; }
     code { background: #f1f5f9; padding: 2px 6px; border-radius: 6px; font-size: 0.92em; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .card {
-      border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #fafafa;
-    }
+    .card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #fafafa; }
     .card strong { display: block; margin-bottom: 4px; }
     @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
   </style>
@@ -46,7 +28,7 @@
     <div class="top">
       <div>
         <h1>Nasaro AI 구조·아이디어 가이드</h1>
-        <p class="lead">앱·웹·확장·서버가 어떻게 연결되고, 무엇을 더 만들면 좋은지 정리한 문서입니다.</p>
+        <p class="lead">기능 수정 시 이 문서도 함께 갱신합니다. (<code>docs/GUIDE_SYNC.md</code> 참고)</p>
       </div>
       <a class="back" href="/">← Nasaro AI로 돌아가기</a>
     </div>
@@ -54,79 +36,69 @@
     <section>
       <h2>1. Nasaro AI가 하는 일</h2>
       <div class="grid">
-        <div class="card"><strong>비교</strong>같은 질문을 여러 AI에 동시에 보냅니다.</div>
-        <div class="card"><strong>토론</strong>주제에 대해 AI들이 라운드별로 의견을 냅니다.</div>
-        <div class="card"><strong>협업</strong>작업 유형별 4단계 알고리즘으로 실제 진행합니다.</div>
-        <div class="card"><strong>에이전트</strong>PC 확장 또는 Android 오버레이로 화면 위에서 임무를 실행합니다.</div>
+        <div class="card"><strong>비교</strong>여러 AI 답변을 한 화면에서 비교합니다.</div>
+        <div class="card"><strong>토론</strong>주제별 AI 라운드 토론입니다.</div>
+        <div class="card"><strong>협업</strong>작업 유형별 4단계 알고리즘 + 단계별 AI 실행입니다.</div>
+        <div class="card"><strong>에이전트</strong>PC 확장 / Android 오버레이로 화면 위 임무 실행입니다.</div>
       </div>
     </section>
 
     <section>
-      <h2>2. 전체 구조</h2>
+      <h2>2. 계정 · 기록 저장</h2>
       <ul>
-        <li><code>index.html</code> — 메인 웹앱 UI</li>
-        <li><code>main.py</code> — FastAPI 서버 (비교/토론/협업/에이전트 API)</li>
-        <li><code>extension/</code> — PC Chrome 확장 (런처·에이전트 창·탭 조작)</li>
-        <li><code>android-agent/</code> — Android APK (WebView + 오버레이 + 접근성 조작)</li>
-        <li><code>static/</code> — APK/ZIP 다운로드 파일</li>
+        <li><strong>비로그인</strong>: 비교 기록·협업 플랜·에이전트 타임라인은 브라우저/APK <code>localStorage</code>에만 저장됩니다. 앱/웹 데이터 삭제 시 초기화됩니다.</li>
+        <li><strong>로그인</strong>: 이메일·비밀번호 계정으로 서버(SQLite)에 동기화됩니다. 다른 기기에서도 이어갈 수 있습니다.</li>
+        <li>API: <code>/auth/signup</code>, <code>/auth/login</code>, <code>/user/sync</code></li>
       </ul>
     </section>
 
     <section>
       <h2>3. 협업 처리 흐름</h2>
-      <p>사용자가 작업을 입력하면 서버가 10가지 유형 중 하나로 분류합니다.</p>
+      <ol>
+        <li>작업 입력 → <code>/collab/recommend</code>로 유형·4단계 플랜 생성</li>
+        <li>각 단계 <strong>단계 실행</strong> → <code>/collab/run-stage</code> (조사=Perplexity, 구조=Anthropic, 제작=OpenAI, 검증=DeepSeek)</li>
+        <li><strong>플랜 저장</strong> → 로컬 + 로그인 시 서버 동기화</li>
+        <li>빠른 시작: 협업 탭 상단 템플릿 버튼 (<code>/collab/templates</code>)</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>4. 설정 · 권한 · 진단</h2>
+      <p>설정 버튼을 누르면 다음을 확인·실행할 수 있습니다 (멈추지 않고 바로 설정 화면으로 연결).</p>
       <ul>
-        <li>동영상 제작 · 문서 제작 · 앱·웹 개발 · PPT·발표자료 · 이미지·디자인</li>
-        <li>데이터 분석 · 마케팅·카피 · 학습·강의 · 리서치·아이디어 · 업무 자동화</li>
+        <li>오버레이 권한 / 접근성 권한 (Android 앱)</li>
+        <li>PC 확장 설치 페이지</li>
+        <li>서버 상태 · 오늘 쿼터 · 배포 SHA · 확장/APK 버전</li>
       </ul>
-      <p>각 유형마다 <strong>조사 → 구조화 → 제작 → 검증/재제작</strong> 알고리즘이 다릅니다. 협업 탭에서 <strong>단계 실행</strong> 버튼을 누르면 해당 단계의 체크리스트와 도구 사용법을 AI가 생성합니다.</p>
     </section>
 
     <section>
-      <h2>4. PC 확장 에이전트</h2>
+      <h2>5. PC 확장 · Android</h2>
+      <ul>
+        <li>확장: 모든 탭 런처/에이전트 창, Chrome Debugger로 탭 조작</li>
+        <li>새 탭: 확장 <code>newtab.html</code> → Google 리다이렉트 후 주입</li>
+        <li>Android: 오버레이 질문창 + 접근성으로 홈/앱/클릭/입력</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. 다음 보완 아이디어 (15가지 — 미구현)</h2>
       <ol>
-        <li>에이전트 ON → 모든 탭에 <code>content.js</code> 주입</li>
-        <li>런처/창 위치·크기는 모든 탭에 즉시 동기화</li>
-        <li>임무 입력 → DOM 스캔 → <code>/agent/step</code> → Chrome Debugger로 클릭/입력</li>
-      </ol>
-      <p>Chrome 새 탭은 확장이 Google로 연결되도록 설정되어, 새 탭에서도 런처가 표시됩니다.</p>
-    </section>
-
-    <section>
-      <h2>5. Android 앱 에이전트</h2>
-      <ol>
-        <li>앱에서 에이전트 버튼 → 오버레이 질문창</li>
-        <li>접기 → 런처 / 다시 탭 → 질문창</li>
-        <li>접근성 ON → 홈, 뒤로, 앱 실행, 클릭, 입력, 스크롤</li>
-        <li>오버레이가 다른 앱을 가리지 않도록 실행 시 패널을 잠시 숨긴 뒤 조작</li>
-      </ol>
-    </section>
-
-    <section>
-      <h2>6. 모바일 제한과 현실적인 선택</h2>
-      <p><strong>iOS</strong>는 Apple 정책상 다른 앱 화면을 직접 조작할 수 없습니다. PWA로 비교·토론·협업만 가능합니다.</p>
-      <p><strong>Android</strong>는 접근성 서비스 + 오버레이로 다른 앱 조작이 가능하지만, Play Store에 올리면 접근성·오버레이 권한 사용 목적을 Google 검수에서 설명해야 합니다. APK 직접 배포는 검수는 없지만, 사용자가 출처 허용·접근성 허용을 직접 해야 합니다.</p>
-      <p>완전히 “제한 없이” 모든 앱을 AI가 조작하는 것은 OS 보안상 불가능에 가깝습니다. 현실적인 최선은 <strong>접근성(Android) / Chrome Debugger(PC)</strong> 같은 공식 API를 쓰는 것입니다.</p>
-    </section>
-
-    <section>
-      <h2>7. 보완·확장 아이디어 (15가지)</h2>
-      <ol>
-        <li>접근성 명령을 서버 AI와 연결해 다단계 자동 조작</li>
-        <li>오버레이·접근성·서버 상태를 한 화면에서 진단</li>
-        <li>에이전트 판단·클릭 타임라인 기록</li>
-        <li>협업 플랜 저장 및 이어하기</li>
-        <li>협업 단계별 자동 실행·검증 체크리스트</li>
-        <li>계정 기반 서버 저장으로 기기 간 동기화</li>
-        <li>모델 상태·429·속도 대시보드</li>
-        <li>서버 쿼터 실제 차감·리셋</li>
-        <li>확장/APK 버전 자동 진단·업데이트 안내</li>
-        <li>전역 에이전트 긴급 중단 버튼 강화</li>
-        <li>작업 유형별 템플릿 라이브러리</li>
-        <li>제작 AI와 검증 AI 분리</li>
-        <li>오류 유형별 자동 재시도 전략</li>
-        <li>모바일 전용 경량 UI</li>
-        <li>배포 SHA·확장·APK 버전 표시</li>
+        <li>음성 입력으로 에이전트 임무 말하기 (모바일·PC)</li>
+        <li>비교 결과 공유 링크 생성 (읽기 전용 URL)</li>
+        <li>팀 워크스페이스 — 협업 플랜 여러 명이 같이 편집</li>
+        <li>예약 에이전트 — 특정 시간에 임무 자동 실행</li>
+        <li>확장 설정(서버 URL·창 위치) 계정 클라우드 동기화</li>
+        <li>오프라인 캐시 — 최근 비교·협업 결과 로컬 재열람</li>
+        <li>사용자별 기본 AI 모델 프리셋 저장</li>
+        <li>에이전트 완료 시 Webhook / Telegram 알림</li>
+        <li>UI 다국어 (한/영) 전환</li>
+        <li>프라이버시 모드 — 서버 로그·히스토리 최소 저장</li>
+        <li>토론·협업 결과 Markdown/PDF 내보내기</li>
+        <li>커스텀 협업 알고리즘 플러그인 (유형 추가)</li>
+        <li>비교 시작 전 429·모델 장애 사전 경고</li>
+        <li>다크 모드 테마</li>
+        <li>외부 개발자용 REST API 키 발급</li>
       </ol>
     </section>
   </div>

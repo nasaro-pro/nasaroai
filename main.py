@@ -20,6 +20,17 @@ from playwright.async_api import async_playwright
 from pydantic import BaseModel, Field
 
 from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
+from auth_store import (
+    check_and_consume_quota,
+    get_quota_snapshot,
+    get_user_by_token,
+    get_user_data,
+    init_db,
+    login as auth_login,
+    logout as auth_logout,
+    merge_user_data,
+    signup as auth_signup,
+)
 
 load_dotenv()
 
@@ -82,6 +93,53 @@ META_RESPONSE_KEYWORDS = [
 ]
 
 app = FastAPI(title="Nasaro AI Backend")
+
+
+@app.on_event("startup")
+async def _startup_db() -> None:
+    init_db()
+
+
+# 협업 단계별 역할 AI — 조사/구조/제작/검증을 서로 다른 모델이 담당
+COLLAB_STAGE_MODEL_LABELS = ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"]
+
+COLLAB_QUICK_TEMPLATES = [
+    {"title": "유튜브 숏츠", "task": "30초 유튜브 숏츠 영상 기획부터 업로드까지"},
+    {"title": "기획 보고서", "task": "신규 서비스 기획 보고서 작성"},
+    {"title": "랜딩페이지", "task": "스타트업 랜딩페이지 기획 및 제작"},
+    {"title": "앱 MVP", "task": "모바일 앱 MVP 기능 개발 및 배포"},
+    {"title": "PPT 발표", "task": "투자 IR 10분 발표용 PPT 제작"},
+    {"title": "마케팅 카피", "task": "신제품 런칭 광고 카피와 랜딩 문구 작성"},
+]
+
+
+def _bearer_token(request: Request) -> str | None:
+    auth = request.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return None
+
+
+def _resolve_subject(request: Request, device_id: str | None = None) -> tuple[str, dict | None]:
+    user = get_user_by_token(_bearer_token(request))
+    if user:
+        return f"user:{user['id']}", user
+    dev = (device_id or request.headers.get("X-Device-Id") or "anonymous").strip()
+    return f"device:{dev}", None
+
+
+def _require_quota(request: Request, feature: str, device_id: str | None = None) -> dict | None:
+    subject, user = _resolve_subject(request, device_id)
+    ok, info = check_and_consume_quota(subject, feature)
+    if ok:
+        return user
+    raise HTTPException(
+        status_code=429,
+        detail={
+            "message": f"오늘 {feature} 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
+            "quota": info,
+        },
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -245,10 +303,12 @@ class CompareRequest(BaseModel):
     message: str
     model_name: str
     compare_session_id: str = ""
+    user_id: str = ""
 
 
 class CollabRecommendRequest(BaseModel):
     task: str
+    user_id: str = ""
 
 
 class CollabStageRequest(BaseModel):
@@ -260,6 +320,24 @@ class CollabStageRequest(BaseModel):
     tools: list[str] = Field(default_factory=list)
     previous_notes: str = ""
     acceptance: list[str] = Field(default_factory=list)
+    user_id: str = ""
+
+
+class AuthSignupRequest(BaseModel):
+    email: str
+    password: str
+    display_name: str = ""
+
+
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserSyncRequest(BaseModel):
+    compare_history: list[dict] = Field(default_factory=list)
+    collab_plans: list[dict] = Field(default_factory=list)
+    agent_timeline: list[dict] = Field(default_factory=list)
 
 
 COLLAB_TYPE_RULES: list[dict] = [
@@ -514,11 +592,13 @@ def build_collab_plan(task: str) -> dict:
 
 class AgentRequest(BaseModel):
     query: str
+    user_id: str = ""
 
 
 class AgentAskRequest(BaseModel):
     query: str
-    history: list[dict] = Field(default_factory=list)  # [{mission, result}, ...]
+    history: list[dict] = Field(default_factory=list)
+    user_id: str = ""
 
 
 # /agent/step (확장 기반 무상태 두뇌)용 요청 모델.
@@ -538,6 +618,7 @@ class DebateRequest(BaseModel):
     topic: str
     user_input: str | None = None
     retry_speaker_index: int | None = None
+    user_id: str = ""
 
 
 class DebateTurn(BaseModel):
@@ -1642,7 +1723,8 @@ async def release_compare_model(session_id: str, model_id: str) -> None:
 
 
 @app.post("/compare/stream")
-async def stream_compare(data: CompareRequest) -> StreamingResponse:
+async def stream_compare(data: CompareRequest, request: Request) -> StreamingResponse:
+    _require_quota(request, "compare", data.user_id)
     if data.model_name not in COMPANY_LABELS:
         raise HTTPException(status_code=400, detail="Invalid model_name")
 
@@ -1765,8 +1847,9 @@ async def stream_compare(data: CompareRequest) -> StreamingResponse:
 
 
 @app.post("/collab/recommend")
-async def collab_recommend(data: CollabRecommendRequest) -> dict:
+async def collab_recommend(data: CollabRecommendRequest, request: Request) -> dict:
     """사용자 작업 설명을 작업 유형별 협업 알고리즘으로 변환한다."""
+    _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
     plan = build_collab_plan(data.task.strip())
 
@@ -1790,20 +1873,25 @@ async def collab_recommend(data: CollabRecommendRequest) -> dict:
 
 
 @app.post("/collab/run-stage")
-async def collab_run_stage(data: CollabStageRequest) -> dict:
+async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     """협업 워크플로우의 특정 단계를 실제 실행 가능한 지시문으로 변환한다."""
+    _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
     action_lines = "\n".join(f"- {action}" for action in data.actions) or "- (단계 알고리즘 없음)"
     tool_lines = ", ".join(data.tools) if data.tools else "추천 도구 없음"
     acceptance_lines = "\n".join(f"- {item}" for item in data.acceptance) or "- 단계 완료 후 다음 단계로 넘깁니다."
+    stage_model = COLLAB_STAGE_MODEL_LABELS[data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)]
+    stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·리뷰"]
+    stage_role = stage_roles[data.stage_index % len(stage_roles)]
 
     prompt = (
         f"작업: {data.task}\n"
         f"작업 유형: {data.work_type}\n"
-        f"현재 단계: {data.stage_name} ({data.stage_index + 1}/4)\n"
+        f"현재 단계: {data.stage_name} ({data.stage_index + 1}/4) — 역할: {stage_role}\n"
         f"이 단계 알고리즘:\n{action_lines}\n"
         f"추천 도구: {tool_lines}\n"
         f"이전 단계 메모:\n{data.previous_notes or '없음'}\n\n"
+        f"당신은 {stage_role} 전문 AI입니다. 다른 단계 AI와 역할이 겹치지 않게 작성하세요.\n"
         "위 단계를 지금 실행하기 위한 결과를 아래 형식으로 한국어로 작성하세요.\n"
         "1) 지금 할 일 5개 (체크리스트)\n"
         "2) 추천 도구별 사용법 3개\n"
@@ -1812,7 +1900,7 @@ async def collab_run_stage(data: CollabStageRequest) -> dict:
         f"전체 통과 기준 참고:\n{acceptance_lines}"
     )
 
-    result = await call_ai_model("OpenAI", prompt, max_tokens=900)
+    result = await call_ai_model(stage_model, prompt, max_tokens=900)
     guidance = result.content if result.success else (
         f"{data.stage_name} 단계를 진행하세요.\n\n"
         f"알고리즘:\n{action_lines}\n\n"
@@ -1823,13 +1911,21 @@ async def collab_run_stage(data: CollabStageRequest) -> dict:
         "stage_index": data.stage_index,
         "stage_name": data.stage_name,
         "guidance": guidance,
+        "model_label": stage_model,
+        "stage_role": stage_role,
         "success": True,
         "ai_success": result.success,
     }
 
 
+@app.get("/collab/templates")
+def collab_templates() -> dict:
+    return {"templates": COLLAB_QUICK_TEMPLATES}
+
+
 @app.post("/debate/start")
-async def debate_start(request: DebateRequest) -> dict:
+async def debate_start(request: DebateRequest, http_request: Request) -> dict:
+    _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
     session = DebateSession(topic=request.topic)
     DEBATE_SESSIONS[request.session_id] = session
@@ -1983,7 +2079,8 @@ async def agent_step(request: AgentStepRequest):
 
 
 @app.post("/agent/task")
-async def agent_task(request: AgentRequest):
+async def agent_task(request: AgentRequest, http_request: Request):
+    _require_quota(http_request, "agent", request.user_id)
     query = request.query.strip()
     if not query:
         return JSONResponse(
@@ -2070,9 +2167,10 @@ async def agent_task(request: AgentRequest):
 
 
 @app.post("/agent/ask")
-async def agent_ask(request: AgentAskRequest):
+async def agent_ask(request: AgentAskRequest, http_request: Request):
     """브라우저 없이 순수 LLM으로 임무를 수행한다.
     /agent/task(Playwright)가 실패할 때의 폴백이자, 단순 분석/답변 임무에 사용."""
+    _require_quota(http_request, "agent", request.user_id)
     query = request.query.strip()
     if not query:
         return JSONResponse(
@@ -2156,6 +2254,98 @@ def serve_install() -> FileResponse:
     return FileResponse(os.path.join(BASE_DIR, "install.html"))
 
 
+def _read_version_file(path: str, pattern: str) -> str:
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        m = re.search(pattern, text)
+        return m.group(1) if m else "unknown"
+    except OSError:
+        return "unknown"
+
+
+@app.get("/system/info")
+def system_info() -> dict:
+    ext_ver = _read_version_file(
+        os.path.join(BASE_DIR, "extension", "manifest.json"),
+        r'"version"\s*:\s*"([^"]+)"',
+    )
+    apk_ver = _read_version_file(
+        os.path.join(BASE_DIR, "android-agent", "app", "build.gradle"),
+        r'versionName\s+"([^"]+)"',
+    )
+    return {
+        "server": "nasaroai",
+        "deploy_ref": os.environ.get("RENDER_GIT_COMMIT", os.environ.get("GIT_COMMIT", "local")),
+        "extension_version": ext_ver,
+        "apk_version": apk_ver,
+        "guide_path": "/guide",
+    }
+
+
+@app.get("/quota")
+def quota_status(request: Request, device_id: str = "") -> dict:
+    subject, user = _resolve_subject(request, device_id)
+    snap = get_quota_snapshot(subject)
+    return {"subject": subject, "logged_in": user is not None, **snap}
+
+
+@app.post("/auth/signup")
+def auth_signup(body: AuthSignupRequest) -> dict:
+    try:
+        return auth_signup(body.email, body.password, body.display_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/auth/login")
+def auth_login_route(body: AuthLoginRequest) -> dict:
+    try:
+        return auth_login(body.email, body.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@app.post("/auth/logout")
+def auth_logout_route(request: Request) -> dict:
+    token = _bearer_token(request)
+    if token:
+        auth_logout(token)
+    return {"success": True}
+
+
+@app.get("/auth/me")
+def auth_me(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {"user": user}
+
+
+@app.get("/user/data")
+def user_data_get(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {"data": get_user_data(user["id"])}
+
+
+@app.post("/user/sync")
+def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    merged = merge_user_data(
+        user["id"],
+        {
+            "compare_history": body.compare_history,
+            "collab_plans": body.collab_plans,
+            "agent_timeline": body.agent_timeline,
+        },
+    )
+    return {"success": True, "data": merged}
+
+
 @app.get("/guide")
 def serve_guide() -> FileResponse:
     path = os.path.join(BASE_DIR, "guide.html")
@@ -2175,7 +2365,6 @@ def serve_manifest() -> FileResponse:
 @app.get("/extension-update")
 def extension_update(request: Request):
     """Chrome 확장 자동 업데이트 매니페스트 (update_url)"""
-    # 브라우저가 쿼리 파라미터로 ?x=id%3D{id}%26v%3D{ver}%26uc 형태로 보냄
     raw = request.query_params.get("x", "")
     ext_id = ""
     for part in raw.replace("%3D", "=").replace("%26", "&").split("&"):

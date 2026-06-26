@@ -106,5 +106,22 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
         }
+
+        @JavascriptInterface
+        fun openOverlaySettings() {
+            runOnUiThread {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun canDrawOverlay(): Boolean {
+            return Settings.canDrawOverlays(context)
+        }
     }
 }
