@@ -268,17 +268,9 @@
         };
         renderChips();
 
-        if (mode === "agent") {
-            wrap.className = "input-tool-group model-picker-wrap agent-ai-chips-wrap";
-            const label = document.createElement("span");
-            label.className = "input-tool-label";
-            label.textContent = `🤖 ${t("ai_pick")}`;
-            wrap.append(label, chips);
-            return wrap;
-        }
-
         const trigger = document.createElement("div");
-        trigger.className = "input-tool-group ai-picker-trigger model-picker-wrap";
+        trigger.className = "input-tool-group ai-picker-trigger model-picker-wrap" +
+            (mode === "agent" ? " agent-ai-picker-trigger" : "");
 
         pickerBtn = document.createElement("button");
         pickerBtn.type = "button";

@@ -1495,6 +1495,14 @@
             flex-wrap: wrap;
             gap: 6px;
         }
+        .agent-ai-picker-trigger {
+            width: 100%;
+        }
+        .agent-ai-picker-trigger .input-tool-btn {
+            width: 100%;
+            min-height: 40px;
+            justify-content: flex-start;
+        }
 
         .dock-compose-row #mainInput {
             min-height: 40px;
@@ -1754,6 +1762,25 @@
             border-bottom: 1px solid #f3f4f6;
             background: rgba(249, 250, 251, 0.9);
             cursor: move;
+        }
+
+        .agent-panel-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
+        .agent-header-ai-slot .agent-ai-picker-trigger {
+            width: auto;
+        }
+        .agent-header-ai-slot .agent-ai-picker-trigger .input-tool-btn {
+            min-height: 36px;
+            padding: 8px 12px;
+            font-size: 13px;
+            width: auto;
+            min-width: 110px;
+            max-width: 160px;
         }
 
         .agent-panel-title {
@@ -2756,9 +2783,14 @@
         .result-action-btn.primary-save { background: #7c3aed; color: #fff; border-color: #6d28d9; }
         .result-action-btn.primary-save:hover { background: #6d28d9; }
 
-        .agent-inline-chips { flex-wrap: wrap; gap: 5px; }
-        .agent-inline-chips .ai-chip { font-size: 11px; padding: 5px 10px; }
-        .agent-ai-chips-wrap { flex: 1 1 100%; margin-bottom: 4px; }
+        .agent-inline-chips { flex-wrap: wrap; gap: 6px; display: flex; align-items: center; }
+        .agent-inline-chips .ai-chip { font-size: 12px; padding: 6px 12px; min-height: 32px; }
+        .agent-ai-chips-wrap { flex: 1 1 100%; margin-bottom: 0; width: 100%; }
+        .agent-ai-picker-slot { width: 100%; }
+        .agent-ai-picker-slot .agent-ai-toolbar { width: 100%; }
+        .agent-ai-picker-slot .input-tool-label {
+            font-size: 12px; font-weight: 700; color: #6d28d9; margin-bottom: 4px; display: block;
+        }
 
         .result-files-toggle {
             width: 100%; text-align: left; font-size: 12px; font-weight: 700; color: #6d28d9;
@@ -2850,7 +2882,7 @@
             </div>
             <div class="side-menu-section" id="sessionHistorySection">
                 <div class="works-section-title" data-i18n="session_history">기록</div>
-                <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="session_history_hint">이번 세션 질문·답변</div>
+                <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">질문·답변 기록 (로그인 시 서버에 저장)</div>
                 <div id="sessionHistoryList"><div class="works-empty" data-i18n="session_empty">아직 기록이 없습니다.</div></div>
             </div>
             <div class="side-menu-section works-section" id="activeCollabSection">
@@ -2868,92 +2900,21 @@
             </div>
         </aside>
 
-        <!-- 설정 팝오버 패널 -->
-        <div id="settingsPanel" class="settings-panel" role="dialog" aria-label="설정">
-            <div class="settings-panel-head">
-                ⚙️ 설정
-                <button class="settings-panel-close" id="settingsPanelClose" aria-label="닫기">✕</button>
-            </div>
-
-            <div class="settings-panel-body">
-            <!-- 글씨 크기 -->
-            <div class="settings-row">
-                <div class="settings-row-label">글씨 크기</div>
-                <div class="font-size-control">
-                    <button id="fontDecBtn" title="작게">−</button>
-                    <span class="font-size-val" id="fontSizeVal">16px</span>
-                    <button id="fontIncBtn" title="크게">+</button>
-                </div>
-            </div>
-
-            <!-- 계정 -->
-            <div class="settings-row">
-                <div class="settings-row-label">계정</div>
-                <div id="settingsAccountMeta" class="settings-meta">로그인하지 않음 — 앱/웹 데이터 삭제 시 기록이 초기화됩니다.</div>
-                <div class="settings-perm-grid" style="margin-top:8px;">
-                    <button id="settingsLoginBtn" class="settings-action-btn primary-action" type="button">로그인 / 회원가입</button>
-                    <button id="settingsLogoutBtn" class="settings-action-btn" type="button" style="display:none;">로그아웃</button>
-                </div>
-            </div>
-
-            <!-- 진단 -->
-            <div class="settings-row">
-                <div class="settings-row-label">진단</div>
-                <button id="permHealthBtn" class="settings-action-btn" type="button">🌐 서버 상태 확인</button>
-                <div id="settingsDiagMeta" class="settings-meta" style="margin-top:8px;">진단 정보를 불러오려면 설정을 열어주세요.</div>
-            </div>
-
-            <!-- 쿼터 -->
-            <div class="settings-row">
-                <div class="settings-row-label">오늘 사용량</div>
-                <div id="settingsQuotaMeta" class="settings-meta">불러오는 중…</div>
-            </div>
-
-            <!-- 언어 · 테마 -->
-            <div class="settings-row">
-                <div class="settings-row-label" data-i18n="lang">언어</div>
-                <select id="settingsLangSelect" class="input-tool-select" style="width:100%;">
-                    <option value="ko">한국어</option>
-                    <option value="en">English</option>
-                </select>
-            </div>
-            <div class="settings-row">
-                <div class="settings-row-label" data-i18n="theme">테마</div>
-                <select id="settingsThemeSelect" class="input-tool-select" style="width:100%;">
-                    <option value="light" data-i18n="theme_light">라이트</option>
-                    <option value="dark" data-i18n="theme_dark">다크</option>
-                </select>
-            </div>
-
-            <div class="settings-row">
-                <div class="settings-row-label">배포 · 버전</div>
-                <div id="settingsVersionMeta" class="settings-meta">불러오는 중…</div>
-            </div>
-
-            <div class="settings-row" id="supportSection">
-                <div class="settings-row-label">관리자 문의</div>
-                <div id="supportLoginHint" class="settings-meta" style="margin-bottom:6px;">로그인 후 문의할 수 있습니다.</div>
-                <div id="supportFormWrap" style="display:none;">
-                    <textarea id="supportInquiryInput" rows="2" placeholder="문의 내용을 입력하세요…" style="width:100%;border-radius:8px;border:1px solid #d1d5db;padding:8px 10px;font:inherit;resize:vertical;"></textarea>
-                    <button id="supportInquiryBtn" class="settings-action-btn primary-action" type="button" style="margin-top:8px;">📨 문의 보내기</button>
-                    <div id="supportInquiryStatus" class="settings-meta" style="margin-top:6px;"></div>
-                </div>
-                <div class="settings-row-label" style="margin-top:10px;">문의 기록</div>
-                <div id="supportHistoryList" class="support-history-list"><div class="settings-meta">로그인 후 확인할 수 있습니다.</div></div>
-            </div>
-
-            <!-- 결과물 삭제 -->
-            <div class="settings-row">
-                <div class="settings-row-label">결과물 파일</div>
-                <button id="clearResultsBtn" class="settings-action-btn" type="button">🗑 결과물 전부 삭제</button>
-            </div>
-            </div>
+        <div id="hiddenAppPrefs" aria-hidden="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">
+            <select id="settingsLangSelect">
+                <option value="ko">한국어</option>
+                <option value="en">English</option>
+            </select>
+            <select id="settingsThemeSelect">
+                <option value="light">라이트</option>
+                <option value="dark">다크</option>
+            </select>
         </div>
 
         <div id="authModalOverlay" class="auth-modal-overlay" aria-hidden="true">
             <div class="auth-modal" role="dialog" aria-label="계정">
                 <h3 id="authModalTitle">로그인</h3>
-                <p id="authModalDesc">계정에 로그인하면 비교·협업 기록이 서버에 저장되어 기기를 바꿔도 이어집니다.</p>
+                <p id="authModalDesc">로그인하면 기록·결과물이 서버에 저장되어 새로고침·기기 변경 후에도 유지됩니다.</p>
                 <div class="auth-field" id="authEmailField" style="display:none;">
                     <label for="authEmailInput">이메일</label>
                     <input id="authEmailInput" type="email" autocomplete="email" placeholder="name@example.com">
@@ -3331,14 +3292,16 @@
         <div id="agentPanel" class="agent-panel" aria-label="Nasaro AI 에이전트">
             <div class="agent-panel-header">
                 <span class="agent-panel-title">🌐 Nasaro AI 에이전트</span>
-                <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
+                <div class="agent-panel-header-actions">
+                    <div id="agentHeaderTools" class="agent-header-ai-slot"></div>
+                    <button id="agentPanelEndBtn" class="agent-panel-end" type="button">종료</button>
+                </div>
             </div>
             <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
             <div class="agent-history" id="agentHistory">
                 <div class="agent-empty" id="agentEmptyMsg">임무를 입력하면 에이전트가 실행됩니다.</div>
             </div>
             <div class="agent-input-row">
-                <div id="agentInputTools"></div>
                 <textarea id="agentInput" class="agent-input" rows="1" placeholder="에이전트에게 임무를 지시하세요…"></textarea>
                 <div class="agent-input-actions">
                     <button id="agentMinBtn" class="agent-min-btn" type="button" title="내리기" aria-label="내리기">▾ 내리기</button>
@@ -3379,7 +3342,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627b"></script>
+    <script src="/static/nasaro-features.js?v=20260627c"></script>
     <script>
         const API_URL = "";
         const AI_COLORS = {
@@ -3410,6 +3373,46 @@
         }
 
         const sessionHistory = [];
+        const SESSION_HISTORY_STORE_KEY = "nasaroai_session_history";
+
+        function loadSessionHistoryFromStore() {
+            sessionHistory.length = 0;
+            try {
+                const store = (authToken || currentUser) ? localStorage : sessionStorage;
+                const raw = store.getItem(SESSION_HISTORY_STORE_KEY);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (!Array.isArray(parsed)) return;
+                parsed.slice(0, 50).forEach(item => sessionHistory.push(item));
+            } catch {}
+        }
+
+        function saveSessionHistoryToStore() {
+            try {
+                userDataStore().setItem(SESSION_HISTORY_STORE_KEY, JSON.stringify(sessionHistory));
+            } catch {}
+        }
+
+        function persistSessionHistory() {
+            saveSessionHistoryToStore();
+            if (currentUser) scheduleUserSync();
+        }
+
+        function mergeSessionHistoryLists(serverList) {
+            if (!Array.isArray(serverList) || !serverList.length) return;
+            const seen = new Set(sessionHistory.map(h => `${h.mode}:${h.time}:${h.title}`));
+            serverList.forEach(item => {
+                const sig = `${item.mode}:${item.time}:${item.title}`;
+                if (!seen.has(sig)) {
+                    sessionHistory.push(item);
+                    seen.add(sig);
+                }
+            });
+            sessionHistory.sort((a, b) => (b.time || 0) - (a.time || 0));
+            if (sessionHistory.length > 50) sessionHistory.length = 50;
+            saveSessionHistoryToStore();
+            renderSessionHistory();
+        }
 
         function addSessionHistory(entry) {
             sessionHistory.unshift({
@@ -3420,6 +3423,7 @@
                 preview: entry.preview || "",
             });
             if (sessionHistory.length > 50) sessionHistory.length = 50;
+            persistSessionHistory();
             renderSessionHistory();
         }
 
@@ -3458,7 +3462,7 @@
 
         function rebuildAgentToolbar() {
             const NF = window.NasaroFeatures;
-            const agentTools = document.getElementById("agentInputTools");
+            const agentTools = document.getElementById("agentHeaderTools");
             if (!NF || !agentTools) return;
             agentTools.innerHTML = "";
             agentTools.appendChild(NF.buildAgentModelToolbar?.({ showToast }) || NF.buildModelPicker("agent", { showToast }));
@@ -3526,15 +3530,6 @@
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
             appShell.classList.toggle("sidebar-open", open);
-            // 사이드바 닫히면 설정 패널도 닫기
-            if (!open) {
-                const sp = document.getElementById("settingsPanel");
-                if (sp && sp.classList.contains("open")) {
-                    sp.classList.remove("open");
-                    document.getElementById("settingsBtn")?.classList.remove("active");
-                    sp.style.display = "none";
-                }
-            }
         }
 
         menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
@@ -3560,9 +3555,29 @@
         }
 
         function loadSavedResults() {
-            const key = currentUser ? SAVED_RESULTS_KEY : SESSION_RESULTS_KEY;
-            try { savedResults = JSON.parse(userDataStore().getItem(key) || "[]"); }
+            const loggedIn = authToken || currentUser;
+            const key = loggedIn ? SAVED_RESULTS_KEY : SESSION_RESULTS_KEY;
+            const store = loggedIn ? localStorage : sessionStorage;
+            try { savedResults = JSON.parse(store.getItem(key) || "[]"); }
             catch { savedResults = []; }
+        }
+
+        function mergeSavedWorksFromServer(serverList) {
+            if (!Array.isArray(serverList) || !serverList.length) return;
+            if (!savedResults.length) {
+                savedResults = serverList.slice(0, 100);
+            } else {
+                const seen = new Set(savedResults.map(r => r.id));
+                serverList.forEach(item => {
+                    if (item?.id && !seen.has(item.id)) {
+                        savedResults.unshift(item);
+                        seen.add(item.id);
+                    }
+                });
+                if (savedResults.length > 100) savedResults.length = 100;
+            }
+            localStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(savedResults));
+            renderResultFilesList();
         }
 
         function persistSavedResults() {
@@ -3766,15 +3781,19 @@
             if (!authToken || !currentUser) return;
             if (window.NasaroFeatures?.isPrivacyMode?.()) return;
             try {
-                const activeCollab = JSON.parse(userDataStore().getItem(ACTIVE_COLLAB_KEY) || "null");
+                const payload = {};
+                if (aiPresets.length) payload.ai_presets = aiPresets;
+                try {
+                    const activeCollab = JSON.parse(userDataStore().getItem(ACTIVE_COLLAB_KEY) || "null");
+                    if (activeCollab?.task) payload.active_collab = activeCollab;
+                } catch {}
+                if (savedResults.length) payload.saved_works = savedResults;
+                if (sessionHistory.length) payload.session_history = sessionHistory;
+                if (!Object.keys(payload).length) return;
                 await apiFetch("/user/sync", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        saved_works: savedResults,
-                        active_collab: activeCollab,
-                        ai_presets: aiPresets,
-                    }),
+                    body: JSON.stringify(payload),
                 });
             } catch {}
         }
@@ -3786,10 +3805,11 @@
                 if (!res.ok) return;
                 const payload = await res.json();
                 const data = payload.data || {};
-                if (Array.isArray(data.saved_works) && data.saved_works.length) {
-                    savedResults = data.saved_works;
-                    localStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(savedResults));
-                    renderResultFilesList();
+                if (Array.isArray(data.saved_works)) {
+                    mergeSavedWorksFromServer(data.saved_works);
+                }
+                if (Array.isArray(data.session_history)) {
+                    mergeSessionHistoryLists(data.session_history);
                 }
                 if (data.active_collab) {
                     localStorage.setItem(ACTIVE_COLLAB_KEY, JSON.stringify(data.active_collab));
@@ -3895,103 +3915,34 @@
             } catch {}
         }
 
+        function migrateSessionHistoryToAccount() {
+            try {
+                const fromSession = JSON.parse(sessionStorage.getItem(SESSION_HISTORY_STORE_KEY) || "[]");
+                if (fromSession.length) mergeSessionHistoryLists(fromSession);
+                else if (sessionHistory.length) localStorage.setItem(SESSION_HISTORY_STORE_KEY, JSON.stringify(sessionHistory));
+                sessionStorage.removeItem(SESSION_HISTORY_STORE_KEY);
+            } catch {}
+        }
+
         function updateAuthUI() {
-            const NF = window.NasaroFeatures;
-            const meta = document.getElementById("settingsAccountMeta");
-            const loginBtn = document.getElementById("settingsLoginBtn");
-            const logoutBtn = document.getElementById("settingsLogoutBtn");
             const sideAuth = document.getElementById("sideAuthBtns");
             const sideAccount = document.getElementById("sideAccountBox");
             const sideMenuBrand = document.getElementById("sideMenuBrand");
             loadSavedResults();
+            loadSessionHistoryFromStore();
             if (currentUser) {
                 const id = currentUser.username || currentUser.email || "";
-                if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${id}`;
-                if (loginBtn) loginBtn.style.display = "none";
-                if (logoutBtn) logoutBtn.style.display = "";
                 if (sideAuth) sideAuth.style.display = "none";
                 if (sideAccount) sideAccount.style.display = "flex";
                 if (sideMenuBrand) sideMenuBrand.textContent = id;
             } else {
-                if (meta) meta.textContent = NF?.lang === "en"
-                    ? "Not signed in — results stay in this tab only."
-                    : "비로그인 — 결과물은 이 탭에서만 유지됩니다.";
-                if (loginBtn) loginBtn.style.display = "";
-                if (logoutBtn) logoutBtn.style.display = "none";
                 if (sideAuth) sideAuth.style.display = "flex";
                 if (sideAccount) sideAccount.style.display = "none";
                 if (sideMenuBrand) sideMenuBrand.textContent = "Nasaro AI";
             }
+            renderSessionHistory();
             renderResultFilesList();
             notifyExtensionAuth();
-            updateSupportUI();
-        }
-
-        async function loadSupportHistory() {
-            const listEl = document.getElementById("supportHistoryList");
-            if (!listEl || !authToken || !currentUser) return;
-            listEl.innerHTML = "<div class=\"settings-meta\">불러오는 중…</div>";
-            try {
-                const res = await apiFetch("/support/inquiries");
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "불러오기 실패");
-                renderSupportHistory(data.inquiries || []);
-            } catch (err) {
-                listEl.innerHTML = `<div class="settings-meta">${err.message || "불러오기 실패"}</div>`;
-            }
-        }
-
-        function renderSupportHistory(items) {
-            const listEl = document.getElementById("supportHistoryList");
-            if (!listEl) return;
-            if (!items.length) {
-                listEl.innerHTML = "<div class=\"settings-meta\">문의 기록이 없습니다.</div>";
-                return;
-            }
-            listEl.innerHTML = "";
-            items.forEach(item => {
-                const div = document.createElement("div");
-                div.className = "support-history-item" + (item.status === "answered" ? " answered" : "");
-                const adminReplies = (item.replies || []).filter(r => r.from_admin);
-                div.innerHTML = `
-                    <div class="support-history-head">
-                        <span>${item.created_at_iso} · ${item.status === "answered" ? "답변완료" : "대기중"}</span>
-                        <button type="button" class="support-history-delete" data-id="${item.id}">삭제</button>
-                    </div>
-                    <div>${item.message.replace(/</g, "&lt;")}</div>
-                    ${adminReplies.map(r => `<div class="support-reply-box"><strong>관리자</strong> · ${r.created_at_iso}<br>${r.message.replace(/</g, "&lt;")}</div>`).join("")}
-                `;
-                div.querySelector(".support-history-delete")?.addEventListener("click", async () => {
-                    if (!confirm("이 문의를 삭제할까요?")) return;
-                    try {
-                        const res = await apiFetch("/support/inquiry/" + item.id, { method: "DELETE" });
-                        if (!res.ok) {
-                            const data = await res.json().catch(() => ({}));
-                            throw new Error(typeof data.detail === "string" ? data.detail : "삭제 실패");
-                        }
-                        await loadSupportHistory();
-                        showToast("문의가 삭제되었습니다.", "success");
-                    } catch (err) {
-                        showToast(err.message || "삭제 실패", "error");
-                    }
-                });
-                listEl.appendChild(div);
-            });
-        }
-
-        function updateSupportUI() {
-            const hint = document.getElementById("supportLoginHint");
-            const form = document.getElementById("supportFormWrap");
-            const hist = document.getElementById("supportHistoryList");
-            if (currentUser && authToken) {
-                if (hint) hint.style.display = "none";
-                if (form) form.style.display = "";
-                loadSupportHistory();
-            } else {
-                if (hint) hint.style.display = "";
-                if (form) form.style.display = "none";
-                if (hist) hist.innerHTML = "<div class=\"settings-meta\">로그인 후 확인할 수 있습니다.</div>";
-            }
         }
 
         function openAuthModal(mode = "login") {
@@ -4087,11 +4038,12 @@
                     localStorage.removeItem(REMEMBER_LOGIN_KEY);
                 }
                 migrateSessionResultsToAccount();
+                migrateSessionHistoryToAccount();
                 closeAuthModal();
+                await pullUserData();
                 updateAuthUI();
                 notifyExtensionAuth();
                 await syncUserData();
-                await pullUserData();
                 showToast(window.NasaroFeatures?.lang === "en" ? "Signed in" : "계정 연결 완료", "success");
             } catch (err) {
                 errEl.textContent = err.message || "오류가 발생했습니다.";
@@ -4115,6 +4067,7 @@
                 if (!res.ok) throw new Error("invalid");
                 const data = await res.json();
                 currentUser = data.user;
+                loadSessionHistoryFromStore();
                 await pullUserData();
             } catch {
                 authToken = "";
@@ -4147,58 +4100,6 @@
                 kind: "collab",
                 payload: { task: collabSession.task, work_type: collabSession.plan.work_type },
             });
-        }
-
-        function renderSettingsGuide() { /* moved to /guide and admin */ }
-
-        async function refreshSettingsDiagnostics() {
-            const quotaEl = document.getElementById("settingsQuotaMeta");
-            const versionEl = document.getElementById("settingsVersionMeta");
-            const diagEl = document.getElementById("settingsDiagMeta");
-            try {
-                const [quotaRes, infoRes, healthRes, autoRes] = await Promise.all([
-                    apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId())),
-                    apiFetch("/system/info"),
-                    apiFetch("/health"),
-                    apiFetch("/models/auto"),
-                ]);
-                if (quotaRes.ok) {
-                    const q = await quotaRes.json();
-                    const lines = Object.entries(q.features || {}).map(([k, v]) => `${k}: ${v.used}/${v.limit}`);
-                    if (quotaEl) quotaEl.textContent = lines.join("\n") || "사용량 정보 없음";
-                }
-                if (infoRes.ok) {
-                    const info = await infoRes.json();
-                    if (versionEl) {
-                        versionEl.textContent =
-                            `서버: ${info.deploy_ref}\n확장: v${info.extension_version}\nAPK: v${info.apk_version}\n가이드: ${info.guide_path}` +
-                            (info.auto_ai_label ? `\n자동 AI: ${info.auto_ai_label}` : "");
-                    }
-                }
-                let diag = [];
-                if (healthRes.ok) diag.push("서버: 정상");
-                else diag.push("서버: 오류");
-                if (autoRes?.ok) {
-                    const auto = await autoRes.json();
-                    if (auto.best_label) diag.push("자동 AI: " + auto.best_label);
-                }
-                if (hasNativeAndroidAgent) {
-                    diag.push("Android 앱: 연결됨");
-                    if (window.NasaroAndroidAgent.canDrawOverlay) {
-                        diag.push("오버레이: " + (window.NasaroAndroidAgent.canDrawOverlay() ? "허용됨" : "꺼짐 → 설정 열기"));
-                    }
-                    if (window.NasaroAndroidAgent.isAccessibilityReady) {
-                        diag.push("접근성: " + (window.NasaroAndroidAgent.isAccessibilityReady() ? "허용됨" : "꺼짐 → 설정 열기"));
-                    }
-                } else if (isExtensionContext()) {
-                    diag.push("PC 확장: 설치됨");
-                } else {
-                    diag.push("에이전트: 확장/APK 미연결");
-                }
-                if (diagEl) diagEl.textContent = diag.join("\n");
-            } catch {
-                if (quotaEl) quotaEl.textContent = "사용량을 불러오지 못했습니다.";
-            }
         }
 
         function isExtensionContext() {
@@ -4260,13 +4161,6 @@
         }
         newChatBtn.addEventListener("click", startNewChat);
 
-        document.getElementById("clearResultsBtn")?.addEventListener("click", () => {
-            if (!confirm("저장된 결과물을 모두 삭제할까요?")) return;
-            savedResults = [];
-            persistSavedResults();
-            renderResultFilesList();
-        });
-
         document.getElementById("resultFilesToggle")?.addEventListener("click", () => {
             const list = document.getElementById("resultFilesList");
             const viewer = document.getElementById("resultFileViewer");
@@ -4277,33 +4171,6 @@
             btn?.classList.toggle("open", !open);
         });
 
-        // ── 설정 패널 ────────────────────────────────────────────────────────
-        const settingsBtn   = document.getElementById("settingsBtn");
-        const settingsPanel = document.getElementById("settingsPanel");
-        const settingsPanelClose = document.getElementById("settingsPanelClose");
-
-        // 팝오버 토글 (CSS transition이 display:none이면 안 돌아가므로 두 단계로 처리)
-        function openSettings() {
-            if (!settingsPanel) return;
-            settingsPanel.style.display = "flex";
-            requestAnimationFrame(() => settingsPanel.classList.add("open"));
-            settingsBtn?.classList.add("active");
-            refreshSettingsDiagnostics();
-            updateSupportUI();
-        }
-        function closeSettings() {
-            if (!settingsPanel) return;
-            settingsPanel.classList.remove("open");
-            settingsBtn?.classList.remove("active");
-            settingsPanel.addEventListener("transitionend", () => {
-                if (!settingsPanel.classList.contains("open"))
-                    settingsPanel.style.display = "none";
-            }, { once: true });
-        }
-        settingsBtn?.addEventListener("click", (e) => {
-            e.stopPropagation();
-            settingsPanel?.classList.contains("open") ? closeSettings() : openSettings();
-        });
         const guideBar = document.getElementById("guideBar");
         const guideBarBackdrop = document.getElementById("guideBarBackdrop");
 
@@ -4341,36 +4208,6 @@
             closeGuideBar();
         });
 
-        document.getElementById("supportInquiryBtn")?.addEventListener("click", async () => {
-            if (!authToken || !currentUser) {
-                openAuthModal("login");
-                return;
-            }
-            const ta = document.getElementById("supportInquiryInput");
-            const status = document.getElementById("supportInquiryStatus");
-            const msg = (ta?.value || "").trim();
-            if (!msg) {
-                if (status) status.textContent = "문의 내용을 입력해주세요.";
-                return;
-            }
-            if (status) status.textContent = "전송 중…";
-            try {
-                const res = await apiFetch("/support/inquiry", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: msg, device_id: getDeviceId() }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "전송 실패");
-                if (ta) ta.value = "";
-                if (status) status.textContent = "문의가 접수되었습니다.";
-                showToast("관리자 문의가 접수되었습니다.", "success");
-                await loadSupportHistory();
-            } catch (err) {
-                if (status) status.textContent = err.message || "전송 실패";
-            }
-        });
-
         document.getElementById("authUsernameInput")?.addEventListener("keydown", e => {
             if (e.key === "Enter") { e.preventDefault(); document.getElementById("authPasswordInput")?.focus(); }
         });
@@ -4380,10 +4217,7 @@
         document.getElementById("authNameInput")?.addEventListener("keydown", e => {
             if (e.key === "Enter") { e.preventDefault(); document.getElementById("authPasswordInput")?.focus(); }
         });
-        settingsPanelClose?.addEventListener("click", closeSettings);
 
-        document.getElementById("settingsLoginBtn")?.addEventListener("click", () => openAuthModal("login"));
-        document.getElementById("settingsLogoutBtn")?.addEventListener("click", logoutAccount);
         document.getElementById("loginBtn")?.addEventListener("click", () => openAuthModal("login"));
         document.getElementById("signupBtn")?.addEventListener("click", () => openAuthModal("signup"));
         document.getElementById("sideLogoutBtn")?.addEventListener("click", logoutAccount);
@@ -4391,17 +4225,8 @@
         document.getElementById("authToggleModeBtn")?.addEventListener("click", () => openAuthModal(authModalMode === "signup" ? "login" : "signup"));
         document.getElementById("authCloseBtn")?.addEventListener("click", closeAuthModal);
         document.getElementById("authModalOverlay")?.addEventListener("click", (e) => { if (e.target.id === "authModalOverlay") closeAuthModal(); });
-        document.getElementById("permHealthBtn")?.addEventListener("click", refreshSettingsDiagnostics);
         document.getElementById("adminEntryBtn")?.addEventListener("click", () => {
             window.open("/admin", "_blank", "noopener");
-        });
-
-        // 패널 외부 클릭 시 닫기
-        document.addEventListener("click", (e) => {
-            if (!settingsPanel?.classList.contains("open")) return;
-            if (settingsPanel.contains(e.target) ||
-                e.target === settingsBtn || settingsBtn?.contains(e.target)) return;
-            closeSettings();
         });
 
         // ── 글씨 크기 조절 ───────────────────────────────────────────────────
@@ -4412,7 +4237,8 @@
         function applyFontSize(sz) {
             currentFontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, sz));
             document.documentElement.style.setProperty("--nasaro-answer-size", currentFontSize + "px");
-            document.getElementById("fontSizeVal").textContent = currentFontSize + "px";
+            const fontVal = document.getElementById("fontSizeVal");
+            if (fontVal) fontVal.textContent = currentFontSize + "px";
             try { localStorage.setItem(FONT_KEY, currentFontSize); } catch {}
         }
         applyFontSize(currentFontSize); // 초기 적용
@@ -4425,6 +4251,7 @@
 
         // 저장된 대화 기록 로드
         loadSavedResults();
+        loadSessionHistoryFromStore();
         renderResultFilesList();
         renderSessionHistory();
         bootstrapAuth();

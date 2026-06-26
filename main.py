@@ -121,10 +121,20 @@ app = FastAPI(title="Nasaro AI Backend")
 
 @app.on_event("startup")
 async def _startup_db() -> None:
-    if cloud_backup_enabled():
-        restore_db_from_cloud(DB_PATH)
     init_db()
     logger.info("Nasaro DB path: %s (cloud_backup=%s)", DB_PATH, cloud_backup_enabled())
+    if cloud_backup_enabled():
+        asyncio.create_task(_cloud_db_bootstrap())
+
+
+async def _cloud_db_bootstrap() -> None:
+    try:
+        restored = await asyncio.to_thread(restore_db_from_cloud, DB_PATH)
+        if restored:
+            await asyncio.to_thread(init_db)
+        await asyncio.to_thread(upload_db_if_changed, DB_PATH)
+    except Exception:
+        logger.exception("Cloud DB bootstrap failed")
 
 
 async def _periodic_db_cloud_backup() -> None:
@@ -410,13 +420,14 @@ class AuthLoginRequest(BaseModel):
 
 
 class UserSyncRequest(BaseModel):
-    compare_history: list[dict] = Field(default_factory=list)
-    collab_plans: list[dict] = Field(default_factory=list)
-    agent_timeline: list[dict] = Field(default_factory=list)
+    compare_history: list[dict] | None = None
+    collab_plans: list[dict] | None = None
+    agent_timeline: list[dict] | None = None
     active_collab: dict | None = None
-    saved_works: list[dict] = Field(default_factory=list)
-    extension_prefs: dict = Field(default_factory=dict)
-    ai_presets: list[dict] = Field(default_factory=list)
+    saved_works: list[dict] | None = None
+    extension_prefs: dict | None = None
+    ai_presets: list[dict] | None = None
+    session_history: list[dict] | None = None
 
 
 class ShareCreateRequest(BaseModel):
@@ -1175,8 +1186,15 @@ async def ensure_model_cache_fresh() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     log_openrouter_key_status()
-    await refresh_model_cache()
-    asyncio.create_task(refresh_label_health(force=True))
+    asyncio.create_task(_bootstrap_model_cache())
+
+
+async def _bootstrap_model_cache() -> None:
+    try:
+        await refresh_model_cache()
+        asyncio.create_task(refresh_label_health(force=True))
+    except Exception:
+        logger.exception("Model cache bootstrap failed")
 
 
 def sse(payload: dict) -> str:
@@ -2751,18 +2769,7 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
     user = get_user_by_token(_bearer_token(request))
     if not user:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-    merged = merge_user_data(
-        user["id"],
-        {
-            "compare_history": body.compare_history,
-            "collab_plans": body.collab_plans,
-            "agent_timeline": body.agent_timeline,
-            "active_collab": body.active_collab,
-            "saved_works": body.saved_works,
-            "extension_prefs": body.extension_prefs,
-            "ai_presets": body.ai_presets,
-        },
-    )
+    merged = merge_user_data(user["id"], body.model_dump(exclude_none=True))
     return {"success": True, "data": merged}
 
 

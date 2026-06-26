@@ -16,6 +16,19 @@ _last_hash = ""
 _upload_lock = threading.Lock()
 
 
+def _sqlite_user_count(db_path: str) -> int:
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        try:
+            row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
+            return int(row[0]) if row else 0
+        finally:
+            conn.close()
+    except Exception:
+        return 0
+
+
 def _config() -> tuple[str, str, str] | None:
     base = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
@@ -36,7 +49,7 @@ def restore_db_from_cloud(db_path: str) -> bool:
     base, key, bucket = cfg
     url = f"{base}/storage/v1/object/{bucket}/{_BACKUP_NAME}"
     try:
-        with httpx.Client(timeout=60) as client:
+        with httpx.Client(timeout=20) as client:
             res = client.get(url, headers={"Authorization": f"Bearer {key}"})
         if res.status_code == 404:
             logger.info("Cloud DB: no backup yet (first deploy)")
@@ -52,6 +65,19 @@ def restore_db_from_cloud(db_path: str) -> bool:
         tmp = db_path + ".cloud"
         with open(tmp, "wb") as f:
             f.write(res.content)
+        local_users = _sqlite_user_count(db_path) if os.path.isfile(db_path) else 0
+        backup_users = _sqlite_user_count(tmp)
+        if local_users > 0 and backup_users < local_users:
+            logger.warning(
+                "Cloud DB restore skipped: backup users %d < local %d",
+                backup_users,
+                local_users,
+            )
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            return False
         os.replace(tmp, db_path)
         global _last_hash
         _last_hash = hashlib.md5(res.content).hexdigest()
@@ -71,7 +97,7 @@ def upload_db_to_cloud(db_path: str) -> bool:
     try:
         with open(db_path, "rb") as f:
             data = f.read()
-        with httpx.Client(timeout=120) as client:
+        with httpx.Client(timeout=45) as client:
             res = client.post(
                 url,
                 content=data,

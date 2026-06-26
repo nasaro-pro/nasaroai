@@ -395,17 +395,32 @@ def set_user_data(user_id: int, data_key: str, payload: Any) -> None:
 def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     current = get_user_data(user_id)
     skip_empty_scalar_keys = {"extension_prefs", "ai_presets"}
-    replace_list_keys = {"saved_works", "ai_presets"}
+    replace_list_keys = {"ai_presets"}
     for key, value in payload.items():
         if key in skip_empty_scalar_keys and isinstance(value, dict) and not value:
             continue
         if key == "ai_presets" and isinstance(value, list) and not value:
             continue
+        if key == "saved_works" and isinstance(value, list):
+            if not value and isinstance(current.get(key), list) and current[key]:
+                continue
+            current[key] = value[:100]
+            continue
+        if key == "session_history" and isinstance(value, list):
+            prev = current.get(key) if isinstance(current.get(key), list) else []
+            seen = {json.dumps(x, sort_keys=True, ensure_ascii=False) for x in prev}
+            merged = list(prev)
+            for item in value:
+                sig = json.dumps(item, sort_keys=True, ensure_ascii=False)
+                if sig not in seen:
+                    merged.insert(0, item)
+                    seen.add(sig)
+            current[key] = merged[:50]
+            continue
         if key in replace_list_keys and isinstance(value, list):
             current[key] = value
             continue
-        if value is None and key == "active_collab":
-            current[key] = None
+        if key == "active_collab" and value is None:
             continue
         if key not in current:
             current[key] = value

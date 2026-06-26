@@ -120,7 +120,6 @@
     .launcher { width: 48px; height: 48px; font-size: 20px; right: 12px; }
     .bubble { max-width: 180px; font-size: 11px; right: 68px; }
     /* iOS 폼 요소 줌 방지 (font-size < 16px → iOS 자동 줌) */
-    .task-input { font-size: 16px !important; }
     .settings input { font-size: 16px !important; }
     /* 버튼 터치 영역 확장 */
     .tbtn { padding: 5px 11px; font-size: 12px; min-height: 30px; }
@@ -152,10 +151,23 @@
   .end-btn { border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; padding: 5px 12px; white-space: nowrap; }
   .end-btn:hover { background: #fee2e2; }
 
-  .settings { display: none; padding: 8px 14px; border-bottom: 1px solid #f1f1f4; gap: 6px; flex-shrink: 0; }
-  .settings.open { display: flex; }
-  .settings input { flex: 1; padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 12px; }
-  .settings button { padding: 6px 12px; border: 0; background: #7c3aed; color: #fff; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .ai-picker-wrap { position: relative; flex: 0 0 auto; }
+  .ai-pick-btn { border-color: #c4b5fd; background: #ede9fe; color: #6d28d9; font-weight: 700; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  .ai-pick-btn:hover { background: #ddd6fe; }
+  .ai-popover {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 220px; max-width: 92vw;
+  }
+  .ai-popover.open { display: block; }
+  .ai-popover-label { font-size: 11px; font-weight: 800; color: #6d28d9; margin-bottom: 8px; display: block; }
+  .ai-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ai-chip {
+    border: 1px solid #d1d5db; background: #fff; color: #374151; border-radius: 999px;
+    padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer;
+  }
+  .ai-chip.active { border-color: #7c3aed; background: #ede9fe; color: #6d28d9; }
+  .ai-chip-all { border-color: #c4b5fd; }
 
   /* 높이 조절 핸들 */
   .resize-handle {
@@ -318,14 +330,13 @@
           <span class="title"><span class="ax-logo-sm">Nasaro AI</span> 에이전트</span>
           <span class="task-counter" id="ax-counter">0/5 활성</span>
           <div class="head-btns">
-            <button class="icon-btn" id="ax-gear" title="서버 설정">설정</button>
-            <button class="min-btn"  id="ax-min"  title="질문창 닫기">▼ 접기</button>
-            <button class="end-btn"  id="ax-end"  title="에이전트 종료">에이전트 종료</button>
+            <div class="ai-picker-wrap" id="ax-ai-wrap">
+              <button class="icon-btn ai-pick-btn" id="ax-ai-pick" type="button" title="임무 수행 AI 선택">🤖 AI</button>
+              <div class="ai-popover" id="ax-ai-pop" role="dialog" aria-label="AI 선택"></div>
+            </div>
+            <button class="min-btn"  id="ax-min"  type="button" title="질문창 닫기">▼ 접기</button>
+            <button class="end-btn"  id="ax-end"  type="button" title="에이전트 종료">에이전트 종료</button>
           </div>
-        </div>
-        <div class="settings" id="ax-settings">
-          <input id="ax-server" type="text" placeholder="https://nasaroai.onrender.com" />
-          <button id="ax-save">저장</button>
         </div>
         <div class="task-area" id="ax-task-area">
           <aside class="task-sidebar">
@@ -374,12 +385,11 @@
   const bar        = $("ax-bar");
   const counter    = $("ax-counter");
   const headEl     = shadow.querySelector(".head");
-  const gearBtn    = $("ax-gear");
+  const aiPickBtn  = $("ax-ai-pick");
+  const aiPop      = $("ax-ai-pop");
+  const aiWrap     = $("ax-ai-wrap");
   const minBtn     = $("ax-min");
   const endBtn     = $("ax-end");
-  const settings   = $("ax-settings");
-  const serverInput= $("ax-server");
-  const saveBtn    = $("ax-save");
   const taskArea   = $("ax-task-area");
   const resizeHandle=$("ax-resize");
   const tasksWrap  = $("ax-tasks-wrap");
@@ -396,6 +406,83 @@
   const rejectBtn  = $("ax-reject");
   const input      = $("ax-input");
   const sendBtnEl  = $("ax-send");
+
+  const AI_MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
+  let agentModelLabels = AI_MODELS.slice();
+
+  function agentModelsLabel() {
+    if (agentModelLabels.length >= AI_MODELS.length) return "전체";
+    const t = agentModelLabels.join(", ");
+    return t.length > 22 ? t.slice(0, 22) + "…" : t;
+  }
+
+  function updateAiPickBtn() {
+    if (aiPickBtn) aiPickBtn.textContent = "🤖 " + agentModelsLabel();
+  }
+
+  function saveAgentModels() {
+    try { chrome.storage.local.set({ agentModelLabels }); } catch {}
+    try {
+      localStorage.setItem("nasaroai_models_agent", JSON.stringify(agentModelLabels));
+    } catch {}
+  }
+
+  function buildAiPopover() {
+    if (!aiPop) return;
+    aiPop.innerHTML = "";
+    const label = document.createElement("span");
+    label.className = "ai-popover-label";
+    label.textContent = "임무 수행 AI";
+    const chips = document.createElement("div");
+    chips.className = "ai-chips";
+
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "ai-chip ai-chip-all" + (agentModelLabels.length >= AI_MODELS.length ? " active" : "");
+    allBtn.textContent = "전체";
+    allBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      agentModelLabels = agentModelLabels.length >= AI_MODELS.length ? [AI_MODELS[0]] : AI_MODELS.slice();
+      saveAgentModels();
+      buildAiPopover();
+      updateAiPickBtn();
+    });
+    chips.appendChild(allBtn);
+
+    AI_MODELS.forEach(m => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "ai-chip" + (agentModelLabels.includes(m) ? " active" : "");
+      b.textContent = m;
+      b.addEventListener("click", e => {
+        e.stopPropagation();
+        if (agentModelLabels.includes(m)) agentModelLabels = agentModelLabels.filter(x => x !== m);
+        else agentModelLabels.push(m);
+        if (!agentModelLabels.length) agentModelLabels = AI_MODELS.slice();
+        saveAgentModels();
+        buildAiPopover();
+        updateAiPickBtn();
+      });
+      chips.appendChild(b);
+    });
+
+    aiPop.append(label, chips);
+  }
+
+  function closeAiPopover() {
+    aiPop?.classList.remove("open");
+  }
+
+  aiPickBtn?.addEventListener("click", e => {
+    e.stopPropagation();
+    const open = aiPop?.classList.toggle("open");
+    if (open) buildAiPopover();
+  });
+  document.addEventListener("click", e => {
+    if (!aiPop?.classList.contains("open")) return;
+    if (aiWrap?.contains(e.target)) return;
+    closeAiPopover();
+  });
 
   function ensureHostAttached() {
     const parent = document.documentElement || document.body;
@@ -936,16 +1023,6 @@
   // ── 헤더 버튼 ────────────────────────────────────────────────────────
   minBtn.addEventListener("click", () => showBar(false));
   endBtn.addEventListener("click", endAgent);
-  gearBtn.addEventListener("click", () => settings.classList.toggle("open"));
-
-  saveBtn.addEventListener("click", async () => {
-    try {
-      const res = await chrome.runtime.sendMessage({ type: "SET_SERVER_URL", serverUrl: serverInput.value });
-      if (res?.serverUrl) serverInput.value = res.serverUrl;
-      saveBtn.textContent = "저장됨 ✓";
-      setTimeout(() => (saveBtn.textContent = "저장"), 1500);
-    } catch { saveBtn.textContent = "실패"; setTimeout(() => (saveBtn.textContent = "저장"), 1500); }
-  });
 
   sendBtnEl.addEventListener("click", submitTask);
   input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitTask(); } });
@@ -1136,9 +1213,19 @@
   });
 
   chrome.storage.local
-    .get(["agentEnabled", "serverUrl", "agentTasks", "launcherBottom", "launcherRight", "barLeft", "barTop", "barManualPos", "barWidth", "barHeight", "tasksHeight", "barOpen"])
+    .get(["agentEnabled", "serverUrl", "agentTasks", "agentModelLabels", "launcherBottom", "launcherRight", "barLeft", "barTop", "barManualPos", "barWidth", "barHeight", "tasksHeight", "barOpen"])
     .then(s => {
-      if (s.serverUrl) serverInput.value = s.serverUrl;
+      if (Array.isArray(s.agentModelLabels) && s.agentModelLabels.length) {
+        agentModelLabels = s.agentModelLabels.filter(m => AI_MODELS.includes(m));
+      }
+      try {
+        const site = JSON.parse(localStorage.getItem("nasaroai_models_agent") || "null");
+        if (Array.isArray(site) && site.length) {
+          agentModelLabels = site.filter(m => AI_MODELS.includes(m));
+        }
+      } catch {}
+      if (!agentModelLabels.length) agentModelLabels = AI_MODELS.slice();
+      updateAiPickBtn();
       if (typeof s.launcherBottom === "number") launcherBottom = s.launcherBottom;
       if (typeof s.launcherRight  === "number") launcherRight  = s.launcherRight;
       if (typeof s.barLeft === "number") barLeft = s.barLeft;
