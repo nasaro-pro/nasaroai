@@ -239,51 +239,47 @@
             gap: 4px;
         }
 
-        /* ── 설정 버튼 (헤더 우측) ── */
-        .header-actions {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
+        /* ── 설정 · 가이드 (사이드 메뉴 하단) ── */
+        .side-menu-footer {
+            padding: 10px 14px 14px;
+            border-top: 1px solid #f3f4f6;
+            flex-shrink: 0;
             display: flex;
-            gap: 6px;
-            z-index: 3;
+            gap: 8px;
         }
-        .header-icon-btn {
-            width: 34px;
-            height: 34px;
+        .side-menu-util-btn {
+            flex: 1;
+            padding: 8px 10px;
             border-radius: 9px;
             border: 1px solid #e5e7eb;
-            background: #fff;
+            background: #f9fafb;
             color: #374151;
-            font-size: 15px;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background .15s, border-color .15s;
         }
-        .header-icon-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
-        .header-icon-btn.active { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+        .side-menu-util-btn:hover { background: #f3f4f6; }
+        .side-menu-util-btn.active { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
 
         /* ── 설정 팝오버 ── */
         .settings-panel {
             position: fixed;
-            right: 12px;
-            top: 58px;
-            left: auto;
-            bottom: auto;
+            left: min(280px, 82vw);
+            bottom: 0;
+            right: auto;
+            top: auto;
             width: min(300px, 88vw);
-            max-height: min(78dvh, calc(100dvh - 70px));
+            max-height: min(88dvh, calc(100dvh - 56px));
             background: #fff;
             border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            box-shadow: 0 12px 32px rgba(15,23,42,.16);
+            border-radius: 14px 14px 0 0;
+            box-shadow: 0 -8px 32px rgba(15,23,42,.14);
             z-index: 401;
             display: none;
             flex-direction: column;
             overflow: hidden;
-            transform: translateY(-6px);
+            transform: translateY(12px);
             opacity: 0;
             transition: transform .2s cubic-bezier(.4,0,.2,1), opacity .2s;
         }
@@ -909,20 +905,10 @@
 
         .dock-agent-row { display: flex; justify-content: flex-start; margin-bottom: 0; }
         .dock-agent-row .agent-toggle-btn { padding: 6px 12px; min-height: 32px; font-size: 12px; }
-
-        .dock-controls-wrap {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .dock-mode-row { margin: 0; gap: 4px; }
-        .dock-mode-row .mode-btn,
-        .dock-mode-row .dock-btn.muted {
-            padding: 7px 12px;
-            min-height: 34px;
-            font-size: 12px;
-        }
-        #mainInputTools { margin: 0; }
+        .dock-tools-row { margin: 0; }
+        .dock-tools-row .input-tool-row { gap: 4px; flex-wrap: wrap; }
+        .agent-input-row { flex-direction: column; align-items: stretch; gap: 4px; }
+        .agent-input-row .input-tool-row { margin-bottom: 2px; }
 
         .ai-picker-popover {
             display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 400;
@@ -946,6 +932,14 @@
         .support-history-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
         .support-history-delete { border: none; background: transparent; color: #dc2626; cursor: pointer; font-size: 11px; }
         .support-reply-box { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: #ede9fe; color: #4c1d95; }
+
+        .dock-mode-row { margin: 0; gap: 4px; }
+        .dock-mode-row .mode-btn,
+        .dock-mode-row .dock-btn.muted {
+            padding: 7px 12px;
+            min-height: 34px;
+            font-size: 12px;
+        }
 
         .guide-bar-backdrop {
             position: fixed; inset: 0; z-index: 850; background: transparent;
@@ -1000,8 +994,7 @@
         html[data-theme="dark"] .side-menu-brand,
         html[data-theme="dark"] h1, html[data-theme="dark"] h2,
         html[data-theme="dark"] .header-brand p { color: #f1f5f9; }
-        html[data-theme="dark"] .header-icon-btn { background: #1e293b; border-color: #334155; color: #e2e8f0; }
-        html[data-theme="dark"] .header-icon-btn.active { background: #312e81; border-color: #7c3aed; color: #e9d5ff; }
+        html[data-theme="dark"] .side-menu-util-btn { background: #1e293b; border-color: #334155; color: #e2e8f0; }
         html[data-theme="dark"] .works-section-title,
         html[data-theme="dark"] .settings-row-label { color: #cbd5e1; }
         html[data-theme="dark"] .settings-meta,
@@ -2696,6 +2689,10 @@
                 <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
+            <div class="side-menu-footer">
+                <button id="guideBtn" class="side-menu-util-btn" type="button">📘 가이드</button>
+                <button id="settingsBtn" class="side-menu-util-btn" type="button">⚙️ 설정</button>
+            </div>
         </aside>
 
         <!-- 설정 팝오버 패널 -->
@@ -2815,10 +2812,6 @@
                 <div class="header-brand">
                     <h1>Nasaro AI</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
-                </div>
-                <div class="header-actions">
-                    <button id="guideBtn" class="header-icon-btn" type="button" title="사용 가이드" aria-label="사용 가이드">📘</button>
-                    <button id="settingsBtn" class="header-icon-btn" type="button" title="설정" aria-label="설정">⚙️</button>
                 </div>
             </div>
         </header>
@@ -3126,20 +3119,18 @@
                 <div class="dock-agent-row">
                     <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
                 </div>
+                <div id="mainInputTools" class="dock-tools-row"></div>
                 <div class="dock-input-row">
                     <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                     <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                 </div>
-                <div class="dock-controls-wrap">
-                    <div class="dock-mode-row">
-                        <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
-                        <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
-                        <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
-                        <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                        <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
-                        <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
-                    </div>
-                    <div id="mainInputTools"></div>
+                <div class="dock-mode-row">
+                    <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                    <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
+                    <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
+                    <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
+                    <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
+                    <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
                 </div>
             </div>
         </footer>
@@ -3169,6 +3160,15 @@
         const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
         function getActiveModels() {
             return window.NasaroFeatures?.getSelectedModels?.(currentMode) || MODELS;
+        }
+
+        function createUUID() {
+            if (crypto.randomUUID) return crypto.randomUUID();
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
+                const random = Math.random() * 16 | 0;
+                const value = char === "x" ? random : (random & 0x3) | 0x8;
+                return value.toString(16);
+            });
         }
 
         const sessionHistory = [];
@@ -3401,9 +3401,7 @@
 
         const AUTH_TOKEN_KEY = "nasaroai_auth_token";
         const REMEMBER_PWD_KEY = "nasaroai_auto_login";
-        let authToken = localStorage.getItem(REMEMBER_PWD_KEY) === "1"
-            ? (localStorage.getItem(AUTH_TOKEN_KEY) || "")
-            : "";
+        let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || "";
         let currentUser = null;
         let authModalMode = "login";
         let syncTimer = null;
@@ -3789,16 +3787,16 @@
                 const data = await res.json();
                 if (!res.ok) {
                     const d = data.detail;
-                    throw new Error(typeof d === "string" ? d : d?.message || "인증 실패");
+                    const msg = typeof d === "string" ? d : d?.message || "인증 실패";
+                    throw new Error(msg);
                 }
                 authToken = data.token;
                 currentUser = data.user;
-                if (rememberPwd) {
+                localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+                if (rememberPwd || authModalMode === "signup") {
                     localStorage.setItem(REMEMBER_PWD_KEY, "1");
-                    localStorage.setItem(AUTH_TOKEN_KEY, authToken);
                 } else {
                     localStorage.removeItem(REMEMBER_PWD_KEY);
-                    localStorage.removeItem(AUTH_TOKEN_KEY);
                 }
                 migrateSessionResultsToAccount();
                 closeAuthModal();
@@ -4013,7 +4011,8 @@
                     settingsPanel.style.display = "none";
             }, { once: true });
         }
-        settingsBtn.addEventListener("click", () => {
+        settingsBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
             settingsPanel.classList.contains("open") ? closeSettings() : openSettings();
         });
         const guideBar = document.getElementById("guideBar");
@@ -4149,15 +4148,6 @@
             const sync = () => { hint.style.display = grid.children.length ? "none" : "flex"; };
             sync();
             new MutationObserver(sync).observe(grid, { childList: true });
-        }
-
-        function createUUID() {
-            if (crypto.randomUUID) return crypto.randomUUID();
-            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
-                const random = Math.random() * 16 | 0;
-                const value = char === "x" ? random : (random & 0x3) | 0x8;
-                return value.toString(16);
-            });
         }
 
         // ── 토스트 알림 ──────────────────────────────────────────────────────
@@ -4534,6 +4524,7 @@
             agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
             if (active) {
                 openAgentPanel();
+                rebuildAgentToolbar();
             } else {
                 // 진행 중인 임무 중단
                 if (agentAbortCtrl) { agentAbortCtrl.abort(); agentAbortCtrl = null; }

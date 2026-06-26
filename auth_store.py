@@ -166,6 +166,16 @@ def signup(username: str, password: str, display_name: str = "") -> dict[str, An
     if len(password) < 8:
         raise ValueError("비밀번호는 8자 이상이어야 합니다.")
     email_norm = _require_email(username)
+    with _lock:
+        conn = _connect()
+        try:
+            exists = conn.execute(
+                "SELECT id FROM users WHERE email = ?", (email_norm,)
+            ).fetchone()
+        finally:
+            conn.close()
+    if exists:
+        raise ValueError("이미 가입된 이메일입니다. 로그인하거나 다른 이메일을 사용해주세요.")
     now = time.time()
     with _lock:
         conn = _connect()
