@@ -6605,6 +6605,8 @@
                     loadingText: `${speakerIndex}번 발언자를 생성하는 중입니다.`,
                 });
                 if (!data || data.queued) break;
+                const turn = data.turns?.[0];
+                if (!turn || turn.success === false) break;
             }
 
             if (queuedDuringFlight && !debateInFlight) {

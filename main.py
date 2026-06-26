@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import re
+import sqlite3
 import time
 import urllib.parse
 from collections.abc import AsyncIterator
@@ -920,6 +921,7 @@ class ModelCallResult(BaseModel):
 
 DEBATE_SESSIONS: dict[str, DebateSession] = {}
 DEBATE_LOCKS: dict[str, asyncio.Lock] = {}
+DEBATE_AI_SEMAPHORE = asyncio.Semaphore(2)
 COMPARE_ACTIVE_MODELS: dict[str, set[str]] = {}
 COMPARE_SESSION_PLANS: dict[str, dict[str, str]] = {}
 COMPARE_SESSION_PENDING: dict[str, int] = {}
@@ -1487,7 +1489,7 @@ async def final_attempt_model_call(
     return None
 
 
-async def call_ai_model(
+async def _call_ai_model_core(
     label: str,
     prompt: str,
     max_tokens: int | None = None,
@@ -1616,6 +1618,16 @@ async def call_ai_model(
     )
 
 
+async def call_ai_model(
+    label: str,
+    prompt: str,
+    max_tokens: int | None = None,
+    excluded_models: set[str] | None = None,
+) -> ModelCallResult:
+    async with DEBATE_AI_SEMAPHORE:
+        return await _call_ai_model_core(label, prompt, max_tokens, excluded_models)
+
+
 def compress_turn_content(text: str, max_sentences: int = 2, max_chars: int = 180) -> str:
     clean = re.sub(r"\s+", " ", text).strip()
     sentences = re.split(r"(?<=[.!?。!?])\s+", clean)
@@ -1733,6 +1745,64 @@ def get_debate_lock(session_id: str) -> asyncio.Lock:
     if session_id not in DEBATE_LOCKS:
         DEBATE_LOCKS[session_id] = asyncio.Lock()
     return DEBATE_LOCKS[session_id]
+
+
+def _ensure_debate_sessions_table() -> None:
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS debate_sessions (
+                session_id TEXT PRIMARY KEY,
+                data TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def store_debate_session(session_id: str, session: DebateSession) -> None:
+    DEBATE_SESSIONS[session_id] = session
+    try:
+        _ensure_debate_sessions_table()
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO debate_sessions (session_id, data, updated_at) VALUES (?, ?, ?)",
+                (session_id, session.model_dump_json(), time.time()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        logger.exception("Failed to persist debate session session_id=%s", session_id[:8])
+
+
+def load_debate_session(session_id: str) -> DebateSession | None:
+    cached = DEBATE_SESSIONS.get(session_id)
+    if cached is not None:
+        return cached
+    try:
+        _ensure_debate_sessions_table()
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            row = conn.execute(
+                "SELECT data FROM debate_sessions WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return None
+        session = DebateSession.model_validate_json(row[0])
+        DEBATE_SESSIONS[session_id] = session
+        return session
+    except Exception:
+        logger.exception("Failed to load debate session session_id=%s", session_id[:8])
+        return None
 
 
 def append_pending_user_input(session: DebateSession, content: str, target_round: int) -> None:
@@ -2404,20 +2474,22 @@ async def debate_start(request: DebateRequest, http_request: Request) -> dict:
     _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
     session = DebateSession(topic=request.topic)
-    DEBATE_SESSIONS[request.session_id] = session
+    store_debate_session(request.session_id, session)
     lock = get_debate_lock(request.session_id)
 
     async with lock:
         if request.user_input:
             append_pending_user_input(session, request.user_input, target_round=1)
         turns = await run_debate_step(session)
+    store_debate_session(request.session_id, session)
     return debate_response(session, turns)
 
 
 @app.post("/debate/continue")
-async def debate_continue(request: DebateRequest) -> dict:
+async def debate_continue(request: DebateRequest, http_request: Request) -> dict:
+    _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
-    session = DEBATE_SESSIONS.get(request.session_id)
+    session = load_debate_session(request.session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Debate session not found")
 
@@ -2426,16 +2498,19 @@ async def debate_continue(request: DebateRequest) -> dict:
     if request.retry_speaker_index is not None:
         async with lock:
             turns = await retry_debate_speaker(session, request.retry_speaker_index)
+        store_debate_session(request.session_id, session)
         return debate_response(session, turns)
 
     if request.user_input and (lock.locked() or len(session.current_round_turns) < 3):
         append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+        store_debate_session(request.session_id, session)
         return debate_response(session, [], queued=True)
 
     async with lock:
         if request.user_input:
             append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
         turns = await run_debate_step(session)
+    store_debate_session(request.session_id, session)
     return debate_response(session, turns)
 
 
