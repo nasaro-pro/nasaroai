@@ -2155,6 +2155,12 @@ async def release_compare_model(session_id: str, model_id: str) -> None:
 
 @app.post("/compare/stream")
 async def stream_compare(data: CompareRequest, request: Request) -> StreamingResponse:
+    logger.info(
+        "compare/stream request model=%s session=%s client=%s",
+        data.model_name,
+        data.compare_session_id[:8] if data.compare_session_id else "",
+        request.client.host if request.client else "?",
+    )
     _require_quota(request, "compare", data.user_id)
     if data.model_name not in COMPANY_LABELS:
         raise HTTPException(status_code=400, detail="Invalid model_name")
