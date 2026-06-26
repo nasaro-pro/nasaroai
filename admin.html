@@ -88,7 +88,7 @@
   <div id="loginView" class="login-wrap">
     <h1>Nasaro AI 관리자</h1>
     <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">회원 · 활동 · 문의 · 플랫폼 통계</p>
-    <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+    <input id="adminPassword" type="password" placeholder="관리자 비밀번호" autocomplete="off" name="nasaro-admin-pwd">
     <div id="loginErr" class="err"></div>
     <button id="loginBtn" type="button" style="width:100%;margin-top:4px;">접속</button>
     <p style="margin-top:12px;font-size:12px;"><a href="/">← 메인으로</a></p>
@@ -538,6 +538,10 @@
     });
 
     if (adminToken) loadDashboard().catch(showLoginView);
+    else {
+      const ap = document.getElementById("adminPassword");
+      if (ap) ap.value = "";
+    }
   </script>
 </body>
 </html>

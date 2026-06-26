@@ -13,7 +13,28 @@ import time
 from typing import Any
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get("NASAROAI_DB_PATH", os.path.join(BASE_DIR, "data", "nasaroai.db"))
+_PERSIST_DIR = "/var/data"
+_LOCAL_DB = os.path.join(BASE_DIR, "data", "nasaroai.db")
+_PERSIST_DB = os.path.join(_PERSIST_DIR, "nasaroai.db")
+
+
+def _resolve_db_path() -> str:
+    """Use Render persistent disk when available so deploys do not wipe accounts."""
+    env = os.environ.get("NASAROAI_DB_PATH", "").strip()
+    if env:
+        return env
+    if os.path.isdir(_PERSIST_DIR):
+        if not os.path.exists(_PERSIST_DB) and os.path.isfile(_LOCAL_DB):
+            try:
+                import shutil
+                shutil.copy2(_LOCAL_DB, _PERSIST_DB)
+            except OSError:
+                pass
+        return _PERSIST_DB
+    return _LOCAL_DB
+
+
+DB_PATH = _resolve_db_path()
 SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 30 days
 
 _lock = threading.Lock()

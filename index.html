@@ -153,13 +153,15 @@
         .side-menu-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
+            gap: 10px;
             padding: 18px 18px 14px;
             border-bottom: 1px solid #f3f4f6;
         }
         .side-menu-admin-btn {
+            flex-shrink: 0;
             font-size: 11px;
-            padding: 5px 10px;
+            padding: 6px 10px;
             border-radius: 8px;
             border: 1px solid #e5e7eb;
             background: #f9fafb;
@@ -173,6 +175,8 @@
             font-size: 20px;
             font-weight: 900;
             letter-spacing: -0.02em;
+            flex: 1;
+            min-width: 0;
         }
 
         .side-menu-close {
@@ -261,21 +265,24 @@
             justify-content: flex-end;
         }
         .side-menu-guide-btn {
-            flex: 0 0 auto;
-            width: 32px;
-            min-height: 32px;
-            padding: 0;
-            border-radius: 6px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
+            flex: 1 1 auto;
+            min-height: 40px;
+            padding: 0 12px;
+            border-radius: 10px;
+            border: 1px solid #c7d2fe;
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+            color: #4338ca;
             font: inherit;
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
-        .side-menu-guide-btn:hover { color: #2563eb; background: #f3f4f6; }
+        .side-menu-guide-btn:hover { background: #e0e7ff; color: #3730a3; }
         .side-menu-settings-btn {
             width: 44px;
             min-height: 44px;
@@ -988,10 +995,9 @@
             position: fixed; inset: 0; z-index: 850; background: transparent;
         }
         .guide-bar {
-            position: fixed; top: 54px; right: 12px; left: auto;
-            transform: none; z-index: 900;
+            position: fixed; z-index: 900;
             width: min(320px, calc(100vw - 24px));
-            max-height: min(36vh, 260px); overflow: hidden;
+            max-height: min(42vh, 300px); overflow: hidden;
             background: #fff; border: 1px solid #c7d2fe; border-radius: 12px;
             box-shadow: 0 8px 28px rgba(49, 46, 129, 0.15);
             display: flex; flex-direction: column;
@@ -1381,50 +1387,42 @@
         .dock-inner {
             width: min(1160px, 100%);
             margin: 0 auto;
-            padding: 8px 12px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .dock-input-wrap { position: relative; }
-        .dock-actions-row {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .dock-submit-stack {
+            padding: 6px 12px 10px;
             display: flex;
             flex-direction: column;
             gap: 6px;
-            flex-shrink: 0;
-            min-width: 120px;
         }
-        .dock-admin-btn {
-            flex-shrink: 0;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-            color: #9ca3af;
-            cursor: pointer;
-            align-self: flex-end;
+
+        .dock-agent-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            min-height: 0;
         }
-        .dock-admin-btn:hover { color: #6b7280; background: #f3f4f6; }
+        .dock-agent-row .agent-toggle-btn {
+            width: auto;
+            min-width: 108px;
+        }
+
+        .dock-compose-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+        .dock-compose-row #mainInput {
+            flex: 1;
+            min-width: 0;
+        }
 
         .dock-tools-row .input-tool-row { gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
         .dock-tools-row .input-tool-btn {
-            min-height: 44px;
-            padding: 8px 14px;
-            font-size: 13px;
+            min-height: 36px;
+            padding: 6px 12px;
+            font-size: 12px;
             font-weight: 700;
-            border-radius: 10px;
+            border-radius: 8px;
         }
-        .dock-tools-row .privacy-btn-wide { min-height: 44px; }
+        .dock-tools-row .privacy-btn-wide { min-height: 36px; }
 
         .dock-mode-row {
             position: relative;
@@ -1435,41 +1433,43 @@
         }
         .dock-mode-row .mode-btn,
         .dock-mode-row .dock-btn.muted {
-            min-height: 46px;
-            padding: 10px 18px;
-            font-size: 14px;
+            min-height: 38px;
+            padding: 8px 16px;
+            font-size: 13px;
             font-weight: 700;
-            border-radius: 11px;
+            border-radius: 10px;
         }
 
-        .dock-input-wrap #mainInput {
-            width: 100%;
-            min-height: 48px;
-            max-height: 120px;
+        .dock-compose-row #mainInput {
+            min-height: 38px;
+            max-height: 88px;
+            padding: 8px 12px;
+            font-size: 15px;
+            line-height: 1.45;
         }
 
         .dock-submit-btn {
             flex-shrink: 0;
-            min-height: 48px;
-            min-width: 100px;
-            padding: 12px 20px;
-            font-size: 14px;
+            min-height: 38px;
+            min-width: 96px;
+            padding: 8px 16px;
+            font-size: 13px;
             font-weight: 800;
             white-space: nowrap;
         }
 
         #mainInput {
             width: 100%;
-            min-height: 40px;
-            max-height: 100px;
+            min-height: 38px;
+            max-height: 88px;
             resize: none;
             overflow-y: auto;
             border: 1px solid #d1d5db;
-            border-radius: 12px;
-            padding: 12px 14px;
+            border-radius: 10px;
+            padding: 8px 12px;
             font: inherit;
-            font-size: 16px;
-            line-height: 1.5;
+            font-size: 15px;
+            line-height: 1.45;
             color: #111827;
             background: #fff;
         }
@@ -1556,12 +1556,11 @@
 
         /* ===== Agent Mode ===== */
         .agent-toggle-btn {
-            width: 100%;
-            min-height: 40px;
-            padding: 8px 14px;
-            font-size: 13px;
+            min-height: 34px;
+            padding: 6px 14px;
+            font-size: 12px;
             font-weight: 700;
-            border-radius: 10px;
+            border-radius: 8px;
             border: 1px solid #c4b5fd;
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
             color: #5b21b6;
@@ -2751,6 +2750,7 @@
         <div id="sideMenuOverlay" class="side-menu-overlay"></div>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
+                <button id="adminEntryBtn" class="side-menu-admin-btn" type="button" title="관리자 페이지">관리자</button>
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
             </div>
             <div id="sideAccountBox" class="side-account-box" style="display:none;">
@@ -2776,7 +2776,7 @@
                 <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
             </div>
             <div class="side-menu-footer">
-                <button id="guideBtn" class="side-menu-guide-btn" type="button" title="가이드">?</button>
+                <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
                 <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span>설정</span></button>
             </div>
         </aside>
@@ -3242,9 +3242,14 @@
 
         <footer class="input-dock" id="inputDock">
             <div class="dock-inner">
-                <div class="dock-input-wrap">
-                    <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                <div class="dock-agent-row">
+                    <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
                 </div>
+                <div class="dock-compose-row">
+                    <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                    <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
+                </div>
+                <div id="mainInputTools" class="dock-tools-row"></div>
                 <div class="dock-mode-row">
                     <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                     <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
@@ -3252,14 +3257,6 @@
                     <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
                     <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
                     <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
-                </div>
-                <div id="mainInputTools" class="dock-tools-row"></div>
-                <div class="dock-actions-row">
-                    <button id="adminEntryBtn" class="dock-admin-btn" type="button" title="관리자 페이지">관리자</button>
-                    <div class="dock-submit-stack">
-                        <button id="agentToggleBtn" class="dock-btn agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
-                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
-                    </div>
                 </div>
             </div>
         </footer>
@@ -3529,7 +3526,7 @@
         }
 
         const AUTH_TOKEN_KEY = "nasaroai_auth_token";
-        const REMEMBER_PWD_KEY = "nasaroai_auto_login";
+        const REMEMBER_LOGIN_KEY = "nasaroai_remember_login";
         let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || "";
         let currentUser = null;
         let authModalMode = "login";
@@ -3874,7 +3871,7 @@
             const rememberPwd = document.getElementById("authRememberPwd");
             const pwdInput = document.getElementById("authPasswordInput");
             if (userInput && mode === "login") userInput.value = userInput.value || "";
-            if (rememberPwd) rememberPwd.checked = localStorage.getItem(REMEMBER_PWD_KEY) === "1";
+            if (rememberPwd) rememberPwd.checked = localStorage.getItem(REMEMBER_LOGIN_KEY) === "1";
             if (pwdInput) {
                 pwdInput.value = "";
                 pwdInput.setAttribute("autocomplete", mode === "signup" ? "new-password" : "off");
@@ -3941,9 +3938,9 @@
                 currentUser = data.user;
                 localStorage.setItem(AUTH_TOKEN_KEY, authToken);
                 if (rememberPwd || authModalMode === "signup") {
-                    localStorage.setItem(REMEMBER_PWD_KEY, "1");
+                    localStorage.setItem(REMEMBER_LOGIN_KEY, "1");
                 } else {
-                    localStorage.removeItem(REMEMBER_PWD_KEY);
+                    localStorage.removeItem(REMEMBER_LOGIN_KEY);
                 }
                 migrateSessionResultsToAccount();
                 closeAuthModal();
@@ -3962,7 +3959,6 @@
             authToken = "";
             currentUser = null;
             localStorage.removeItem(AUTH_TOKEN_KEY);
-            localStorage.removeItem(REMEMBER_PWD_KEY);
             updateAuthUI();
             notifyExtensionAuth();
             showToast(window.NasaroFeatures?.lang === "en" ? "Signed out" : "로그아웃했습니다.", "success");
@@ -4167,8 +4163,19 @@
 
         function openGuideBar() {
             if (!guideBar) return;
+            const btn = document.getElementById("guideBtn");
             guideBar.style.display = "flex";
             guideBarBackdrop.style.display = "block";
+            if (btn) {
+                const r = btn.getBoundingClientRect();
+                const barW = guideBar.offsetWidth || 300;
+                let left = r.left + r.width / 2 - barW / 2;
+                left = Math.max(8, Math.min(left, window.innerWidth - barW - 8));
+                guideBar.style.left = left + "px";
+                guideBar.style.right = "auto";
+                guideBar.style.top = "auto";
+                guideBar.style.bottom = (window.innerHeight - r.top + 8) + "px";
+            }
         }
         function closeGuideBar() {
             if (!guideBar) return;
@@ -4351,8 +4358,8 @@
 
         function autoResizeInput() {
             mainInput.style.height = "auto";
-            const lineHeight = 24;
-            const maxHeight = lineHeight * 6 + 24;
+            const lineHeight = 22;
+            const maxHeight = lineHeight * 4 + 16;
             mainInput.style.height = `${Math.min(mainInput.scrollHeight, maxHeight)}px`;
             scheduleSyncMainPadding();
         }

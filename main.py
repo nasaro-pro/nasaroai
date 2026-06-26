@@ -37,6 +37,7 @@ from auth_store import (
     get_user_by_token,
     get_user_data,
     init_db,
+    DB_PATH,
     list_guest_devices,
     list_support_inquiries,
     list_user_support_inquiries,
@@ -120,6 +121,7 @@ app = FastAPI(title="Nasaro AI Backend")
 @app.on_event("startup")
 async def _startup_db() -> None:
     init_db()
+    logger.info("Nasaro DB path: %s", DB_PATH)
 
 
 # 협업 단계별 역할 AI — 조사/구조/제작/검증을 서로 다른 모델이 담당
