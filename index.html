@@ -911,7 +911,13 @@
             position: absolute; top: 8px; right: 8px; font-size: 9px; font-weight: 700;
             padding: 2px 5px; border-radius: 999px; background: #f3f4f6; color: #6b7280;
         }
-        .collab-rail-step.selected { border-color: #7c3aed; background: #faf5ff; }
+        .collab-rail-step-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .collab-rail-step-wrap.selected .collab-rail-step { border-color: #7c3aed; background: #faf5ff; }
+        html[data-theme="dark"] .collab-rail-step-wrap.selected .collab-rail-step { background: #1e1b4b; }
         .collab-rail-step.running { border-color: #7c3aed; animation: collabPulse 1.2s ease infinite; }
         .collab-rail-step.done { border-color: #86efac; background: #f0fdf4; }
         .collab-rail-step.done .step-state { background: #dcfce7; color: #15803d; }
@@ -3048,6 +3054,70 @@
         }
         .result-files-popover.open { display: block; }
 
+        .collab-v3-layout {
+            display: flex;
+            flex-direction: column;
+            max-height: min(calc(100vh - 220px), 720px);
+            min-height: 320px;
+        }
+        .collab-v3-sticky {
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 12;
+            background: var(--collab-sticky-bg, #fff);
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        html[data-theme="dark"] .collab-v3-sticky {
+            --collab-sticky-bg: #0c0c0c;
+            border-bottom-color: #262626;
+        }
+        .collab-v3-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .collab-recommend-banner {
+            font-size: 12px;
+            line-height: 1.55;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            color: #5b21b6;
+            margin-top: 6px;
+        }
+        html[data-theme="dark"] .collab-recommend-banner {
+            background: #1a1530;
+            border-color: #4338ca;
+            color: #c4b5fd;
+        }
+        .collab-rail-ai {
+            width: 100%;
+            margin-top: 4px;
+            font-size: 10px;
+            padding: 3px 4px;
+            border-radius: 6px;
+            border: 1px solid #c4b5fd;
+            background: #fff;
+        }
+        html[data-theme="dark"] .collab-rail-ai { background: #141414; border-color: #4338ca; color: #e5e5e5; }
+        .session-history-item .sh-preview {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        html[data-theme="dark"] .session-history-item .sh-preview { color: #a3a3a3; }
         .dock-mode-group {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3057,10 +3127,15 @@
         }
         .dock-extra-btns {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             align-items: center;
             gap: 8px;
             flex: 0 0 auto;
+            min-width: 268px;
+        }
+        .dock-extra-btns .dock-btn.muted.is-hidden {
+            visibility: hidden;
+            pointer-events: none;
         }
 
         .result-action-btn {
@@ -3685,8 +3760,8 @@
                             </div>
                             <div class="dock-extra-btns" id="dockExtraBtns">
                                 <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                                <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
-                                <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                                <button id="dockSecondaryBtn" class="dock-btn muted is-hidden" type="button">질문 추가</button>
+                                <button id="dockNewDebateBtn" class="dock-btn muted is-hidden" type="button">새 토론</button>
                             </div>
                         </div>
                         <div class="dock-btn-right" id="mainInputToolsRight"></div>
@@ -3701,7 +3776,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627g"></script>
+    <script src="/static/nasaro-features.js?v=20260627h"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -3745,9 +3820,9 @@
 
         function loadSessionHistoryFromStore() {
             sessionHistory.length = 0;
+            if (!currentUser && !authToken) return;
             try {
-                const store = (authToken || currentUser) ? localStorage : sessionStorage;
-                const raw = store.getItem(SESSION_HISTORY_STORE_KEY);
+                const raw = localStorage.getItem(SESSION_HISTORY_STORE_KEY);
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
                 if (!Array.isArray(parsed)) return;
@@ -3756,8 +3831,9 @@
         }
 
         function saveSessionHistoryToStore() {
+            if (!currentUser && !authToken) return;
             try {
-                userDataStore().setItem(SESSION_HISTORY_STORE_KEY, JSON.stringify(sessionHistory));
+                localStorage.setItem(SESSION_HISTORY_STORE_KEY, JSON.stringify(sessionHistory));
             } catch {}
         }
 
@@ -3782,18 +3858,77 @@
             renderSessionHistory();
         }
 
+        function buildHistoryPreview(entry) {
+            if (entry?.preview) return entry.preview;
+            const data = entry?.data;
+            if (!data) return "";
+            if (entry.mode === "compare") {
+                const first = Object.values(data.responses || {}).find(Boolean);
+                return String(first || "").slice(0, 140);
+            }
+            if (entry.mode === "debate") {
+                const card = (data.cards || []).find(c => c.content && !c.loading);
+                return String(card?.content || "").slice(0, 140);
+            }
+            if (entry.mode === "collab") {
+                return String(data.finalProduct || data.stageOutputs?.find(Boolean) || data.recommendation || "").slice(0, 140);
+            }
+            if (entry.mode === "agent") {
+                return String(data.result || "").slice(0, 140);
+            }
+            return "";
+        }
+
         function addSessionHistory(entry) {
             sessionHistory.unshift({
                 id: createUUID(),
                 time: Date.now(),
                 mode: entry.mode,
                 title: entry.title,
-                preview: entry.preview || "",
+                preview: buildHistoryPreview(entry),
                 data: entry.data || null,
             });
             if (sessionHistory.length > 50) sessionHistory.length = 50;
             persistSessionHistory();
             renderSessionHistory();
+        }
+
+        function upsertSessionHistory(entry) {
+            const sessionId = entry.data?.sessionId;
+            const idx = sessionId
+                ? sessionHistory.findIndex(h => h.mode === entry.mode && h.data?.sessionId === sessionId)
+                : -1;
+            const preview = buildHistoryPreview(entry);
+            if (idx >= 0) {
+                sessionHistory[idx] = {
+                    ...sessionHistory[idx],
+                    title: entry.title,
+                    preview,
+                    data: entry.data,
+                    time: Date.now(),
+                };
+            } else {
+                addSessionHistory({ ...entry, preview });
+                return;
+            }
+            persistSessionHistory();
+            renderSessionHistory();
+        }
+
+        function syncDebateSessionHistory() {
+            if (!debateStarted || !debateTopic) return;
+            const cards = debateCards.filter(c => !c.loading && c.content);
+            if (!cards.length) return;
+            upsertSessionHistory({
+                mode: "debate",
+                title: debateTopic,
+                preview: cards[cards.length - 1]?.content?.slice(0, 140) || "",
+                data: {
+                    topic: debateTopic,
+                    sessionId: debateSessionId,
+                    cards: cards.map(c => ({ ...c })),
+                },
+            });
         }
 
         function deleteSessionHistoryItem(id) {
@@ -3920,7 +4055,6 @@
         function openSessionHistoryItem(h) {
             if (!h) return;
             window.NasaroFeatures?.hideFloatingResultActions?.();
-            setSideMenuOpen(false);
             switchMode(h.mode);
             if (h.mode === "compare") restoreCompareFromHistory(h.data, h.title);
             else if (h.mode === "debate") restoreDebateFromHistory(h.data, h.title);
@@ -3951,7 +4085,8 @@
                 const item = document.createElement("div");
                 item.className = "session-history-item";
                 const when = new Date(h.time).toLocaleString();
-                item.innerHTML = `<div class="sh-mode">${modeLabel(h.mode)} · ${when}</div><div>${escapeHtml(h.title)}</div>`;
+                const preview = buildHistoryPreview(h);
+                item.innerHTML = `<div class="sh-mode">${modeLabel(h.mode)} · ${when}</div><div>${escapeHtml(h.title)}</div>${preview ? `<div class="sh-preview">${escapeHtml(preview)}</div>` : ""}`;
                 item.addEventListener("click", () => openSessionHistoryItem(h));
                 const del = document.createElement("button");
                 del.type = "button";
@@ -3960,7 +4095,6 @@
                 del.title = "기록 삭제";
                 del.addEventListener("click", e => {
                     e.stopPropagation();
-                    if (!NF?.confirmDelete?.("이 기록을 삭제할까요?")) return;
                     deleteSessionHistoryItem(h.id);
                 });
                 item.appendChild(del);
@@ -4436,7 +4570,6 @@
                     finalProduct: active.finalProduct,
                 }, active.task, true);
                 switchMode("collab");
-                setSideMenuOpen(false);
             });
             list.appendChild(item);
         }
@@ -4739,15 +4872,12 @@
         }
 
         function getCollabExportSections() {
-            if (!collabSession?.plan) return [];
-            const sections = (collabSession.plan.stages || []).map((st, i) => ({
-                heading: st.name,
-                body: collabSession.stageOutputs[i] || "",
-            }));
-            if (collabFinalProduct) {
-                sections.push({ heading: "최종 작업물", body: collabFinalProduct });
+            const body = (collabFinalProduct || "").trim();
+            if (!body) {
+                showToast("최종 작업물이 아직 없습니다. 작업 완료 후 다운로드하세요.", "warn");
+                return [];
             }
-            return sections;
+            return [{ heading: "최종 작업물", body: collabFinalProduct }];
         }
 
         function downloadCollabResult(anchorBtn) {
@@ -5130,8 +5260,9 @@
 
         function updateDockUI() {
             const NF = window.NasaroFeatures;
-            dockSecondaryBtn.style.display = "none";
-            dockNewDebateBtn.style.display = "none";
+            const showDebateExtras = currentMode === "debate" && debateStarted;
+            dockSecondaryBtn.classList.toggle("is-hidden", !showDebateExtras);
+            dockNewDebateBtn.classList.toggle("is-hidden", !showDebateExtras);
 
             if (currentMode === "compare") {
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
@@ -5166,9 +5297,7 @@
                 dockPrimaryBtn.textContent = NF?.t?.("btn_debate_next") || "다음 ▶";
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
-                dockSecondaryBtn.style.display = "inline-block";
                 dockSecondaryBtn.disabled = debateInFlight;
-                dockNewDebateBtn.style.display = "inline-block";
                 dockNewDebateBtn.disabled = debateInFlight;
             }
         }
@@ -6389,14 +6518,25 @@
                 const state = collabSession.stageStates[i] || "idle";
                 const sm = getCollabStageMeta(i);
                 const model = collabStageModels[i] || sm.default_model || "AI";
+                const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
+                const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
+                    `<option value="${esc(m)}" ${collabStageModels[i] === m ? "selected" : ""}>${esc(m)}</option>`
+                ).join("");
                 return `
-                <button type="button" class="collab-rail-step ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
-                    <span class="step-state">${collabStateLabel(state)}</span>
-                    <span class="step-num">${i + 1}단계</span>
-                    <span class="step-name">${esc(sm.short || st.name)}</span>
-                    <span class="step-ai">${esc(model)}</span>
-                </button>`;
+                <div class="collab-rail-step-wrap ${i === sel ? "selected" : ""}">
+                    <button type="button" class="collab-rail-step ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
+                        <span class="step-state">${collabStateLabel(state)}</span>
+                        <span class="step-num">${i + 1}단계</span>
+                        <span class="step-name">${esc(sm.short || st.name)}</span>
+                        <span class="step-ai">${esc(model)}</span>
+                    </button>
+                    <select class="collab-rail-ai" data-rail-ai="${i}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
+                </div>`;
             }).join("");
+
+            const recommendBanner = collabSession.recommendation
+                ? `<div class="collab-recommend-banner"><strong>AI 추천</strong> · ${esc(collabSession.recommendation)}</div>`
+                : (plan.summary ? `<div class="collab-recommend-banner"><strong>AI 추천</strong> · ${esc(plan.summary)}</div>` : "");
 
             const st = plan.stages[sel] || {};
             const sm = getCollabStageMeta(sel);
@@ -6431,29 +6571,41 @@
                 </div>` : "";
 
             container.innerHTML = `
-            <div class="collab-v2 collab-v3">
-                <header class="collab-v2-head compact">
-                    <span class="collab-type-badge">${esc(plan.work_type)}</span>
-                    <h2>${esc(collabSession.task)}</h2>
-                    <div class="collab-v2-summary">${esc(plan.summary || collabSession.recommendation || "")}</div>
-                </header>
-                <div class="collab-stage-rail">${railHtml}</div>
-                ${panelHtml}
-                ${finalBlock}
-                <div class="collab-v2-toolbar compact">
-                    <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
-                    <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
-                    <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
+            <div class="collab-v2 collab-v3 collab-v3-layout">
+                <div class="collab-v3-sticky">
+                    <header class="collab-v2-head compact">
+                        <span class="collab-type-badge">${esc(plan.work_type)}</span>
+                        <h2>${esc(collabSession.task)}</h2>
+                    </header>
+                    ${recommendBanner}
+                    <div class="collab-stage-rail">${railHtml}</div>
                 </div>
-                <div class="collab-activity">
-                    <div class="collab-activity-title">진행 기록</div>
-                    <div id="collabActivityLog" class="collab-activity-log"></div>
+                <div class="collab-v3-scroll">
+                    ${panelHtml}
+                    ${finalBlock}
+                    <div class="collab-v2-toolbar compact">
+                        <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
+                        <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
+                        <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
+                    </div>
+                    <div class="collab-activity">
+                        <div class="collab-activity-title">진행 기록</div>
+                        <div id="collabActivityLog" class="collab-activity-log"></div>
+                    </div>
                 </div>
             </div>`;
 
             container.querySelectorAll("[data-rail-step]").forEach(btn => {
                 btn.addEventListener("click", () => {
                     collabSelectedStage = Number(btn.dataset.railStep);
+                    renderCollabRunner(container);
+                    persistActiveCollab();
+                });
+            });
+            container.querySelectorAll("[data-rail-ai]").forEach(selEl => {
+                selEl.addEventListener("click", e => e.stopPropagation());
+                selEl.addEventListener("change", e => {
+                    setCollabStageModel(Number(e.target.dataset.railAi), e.target.value);
                     renderCollabRunner(container);
                     persistActiveCollab();
                 });
@@ -6734,7 +6886,6 @@
             addSessionHistory({
                 mode: "compare",
                 title: message,
-                preview: activeModels.join(", "),
                 data: { query: message, responses: { ...responses } },
             });
         }
@@ -6795,6 +6946,7 @@
 
             activeCardIndex = Math.max(0, Math.min(activeCardIndex, debateCards.length - 1));
             renderDebateDeck();
+            syncDebateSessionHistory();
         }
 
         const POSITION_CLASSES = ["active", "preview-prev", "preview-next", "hidden-left", "hidden-right"];
@@ -7011,15 +7163,7 @@
                 session_id: debateSessionId,
                 topic: debateTopic,
             }, 1);
-            addSessionHistory({
-                mode: "debate",
-                title: topic,
-                data: {
-                    topic,
-                    sessionId: debateSessionId,
-                    cards: debateCards.filter(c => !c.loading).map(c => ({ ...c })),
-                },
-            });
+            syncDebateSessionHistory();
         }
 
         async function runDebateRoundSequence(firstEndpoint, firstPayload, expectedRound) {

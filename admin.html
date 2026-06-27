@@ -348,7 +348,7 @@
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용 (한도 agent ${(data.quota_limits||{}).agent ?? 100})</span></div>`;
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용 (한도 agent ${(data.quota_limits||{}).agent ?? 5})</span></div>`;
       document.getElementById("platformStats").innerHTML = Object.keys(ps).length
         ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
         : "<span class='empty'>오늘 활동 기록 없음</span>";

@@ -341,7 +341,7 @@ async function getDeviceId() {
   }
 }
 
-async function postStep(serverUrl, task, scan, actionHistory) {
+async function postStep(serverUrl, task, scan, actionHistory, missionId) {
   const deviceId = await getDeviceId();
   let resp;
   try {
@@ -354,6 +354,7 @@ async function postStep(serverUrl, task, scan, actionHistory) {
       },
       body: JSON.stringify({
         task,
+        mission_id: missionId || "",
         elements: scan.elements || [],
         current_url: scan.url || "",
         action_history: actionHistory,
@@ -456,7 +457,7 @@ async function runTask(tabId, text, taskId, pageUrl) {
         }
 
         const scan = await scanCurrentTab(tabId);
-        const data  = await postStep(serverUrl, taskText, scan, actionHistory);
+        const data  = await postStep(serverUrl, taskText, scan, actionHistory, taskId);
         const reasoning = data.reasoning || "(이유 없음)";
         await tsStep(taskId, `(${round}/${MAX_ROUNDS}) ${reasoning}`, "step");
 

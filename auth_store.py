@@ -45,7 +45,7 @@ QUOTA_LIMITS = {
     "compare": 50,
     "debate": 15,
     "collab": 10,
-    "agent": 100,
+    "agent": 5,
 }
 
 

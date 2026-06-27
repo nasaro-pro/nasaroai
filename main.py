@@ -9,6 +9,7 @@ import re
 import sqlite3
 import time
 import urllib.parse
+import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
@@ -281,6 +282,54 @@ async def _require_compare_quota_once(
         device_id=dev,
         platform=_platform(request),
         action="compare",
+    )
+    return user
+
+
+AGENT_MISSION_CHARGED: set[str] = set()
+AGENT_MISSION_LOCK = asyncio.Lock()
+
+
+def _agent_mission_key(subject: str, mission_id: str) -> str:
+    mid = (mission_id or "").strip()
+    return f"{subject}:{mid}" if mid else subject
+
+
+async def _require_agent_mission_quota_once(
+    request: Request,
+    mission_id: str,
+    device_id: str | None = None,
+    *,
+    action: str = "mission",
+    detail: str = "",
+) -> dict | None:
+    """Charge agent quota once per mission (task), not once per step."""
+    subject, user = _resolve_subject(request, device_id)
+    charge_key = _agent_mission_key(subject, mission_id)
+
+    async with AGENT_MISSION_LOCK:
+        if charge_key in AGENT_MISSION_CHARGED:
+            return user
+        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "agent")
+        if not ok:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "message": f"오늘 agent 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
+                    "quota": info,
+                },
+            )
+        AGENT_MISSION_CHARGED.add(charge_key)
+
+    dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
+    log_activity(
+        subject,
+        "agent",
+        user_id=user["id"] if user else None,
+        device_id=dev,
+        platform=_platform(request),
+        action=action,
+        detail=(detail or "")[:500],
     )
     return user
 
@@ -906,6 +955,7 @@ class AgentAskRequest(BaseModel):
 # 에서 비밀번호/캡차/결제 폼을 만나면 LLM 호출 없이 즉시 사용자 핸드오프로 정지한다.
 class AgentStepRequest(BaseModel):
     task: str
+    mission_id: str = ""
     elements: list[dict] = Field(default_factory=list)
     current_url: str = ""
     action_history: list[dict] = Field(default_factory=list)
@@ -2809,9 +2859,12 @@ async def agent_step(request: AgentStepRequest, http_request: Request):
             status_code=400,
             content={"status": "error", "message": "작업 내용을 입력해주세요."},
         )
-    _require_quota(
-        http_request, "agent", request.user_id,
-        action="step", detail=task[:200],
+    await _require_agent_mission_quota_once(
+        http_request,
+        request.mission_id or request.task[:64],
+        request.user_id,
+        action="mission",
+        detail=task[:200],
     )
 
     await ensure_model_cache_fresh()
@@ -2844,9 +2897,12 @@ async def agent_task(request: AgentRequest, http_request: Request):
             status_code=400,
             content={"status": "error", "message": "작업 내용을 입력해주세요."},
         )
-    _require_quota(
-        http_request, "agent", request.user_id,
-        action="task", detail=query[:200],
+    await _require_agent_mission_quota_once(
+        http_request,
+        str(uuid.uuid4()),
+        request.user_id,
+        action="task",
+        detail=query[:200],
     )
 
     if AGENT_LOCK.locked():
@@ -2936,9 +2992,12 @@ async def agent_ask(request: AgentAskRequest, http_request: Request):
             status_code=400,
             content={"status": "error", "message": "임무를 입력해주세요."},
         )
-    _require_quota(
-        http_request, "agent", request.user_id,
-        action="ask", detail=query[:200],
+    await _require_agent_mission_quota_once(
+        http_request,
+        str(uuid.uuid4()),
+        request.user_id,
+        action="ask",
+        detail=query[:200],
     )
 
     await ensure_model_cache_fresh()

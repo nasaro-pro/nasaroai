@@ -550,13 +550,18 @@
 
     function positionResultActionsFloat() {
         if (!resultActionsFloat) return;
-        const anchor = document.getElementById("mainContent");
         const dock = document.getElementById("dockShell");
+        const input = document.getElementById("mainInput");
+        const anchor = dock || input;
         if (!anchor) return;
         const rect = anchor.getBoundingClientRect();
-        const dockH = dock ? dock.getBoundingClientRect().height : 140;
-        resultActionsFloat.style.left = `${Math.max(8, rect.left + 10)}px`;
-        resultActionsFloat.style.bottom = `${Math.max(dockH + 10, window.innerHeight - rect.bottom + 10)}px`;
+        const floatH = resultActionsFloat.offsetHeight || 44;
+        const left = Math.max(8, rect.left + 8);
+        const top = Math.max(8, rect.top - floatH - 6);
+        resultActionsFloat.style.left = `${left}px`;
+        resultActionsFloat.style.top = `${top}px`;
+        resultActionsFloat.style.bottom = "auto";
+        resultActionsFloat.style.right = "auto";
     }
 
     function hideFloatingResultActions() {
