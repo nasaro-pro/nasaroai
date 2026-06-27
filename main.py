@@ -34,6 +34,10 @@ from auth_store import (
     create_support_inquiry,
     db_connection,
     delete_support_inquiry,
+    delete_activity_records,
+    get_activity_by_id,
+    get_activity_retention_days,
+    get_admin_setting,
     get_activity_log,
     get_admin_dashboard,
     get_public_share,
@@ -50,12 +54,15 @@ from auth_store import (
     list_support_inquiries,
     list_user_support_inquiries,
     log_activity,
+    log_user_activity_detail,
     login as auth_login_fn,
     logout as auth_logout_fn,
     merge_user_data,
+    purge_expired_activity,
     resolve_device_id,
     search_users_admin,
     set_subject_ban,
+    set_admin_setting,
     touch_device_presence,
     signup as auth_signup_fn,
     verify_admin_password,
@@ -667,6 +674,32 @@ class AdminBanRequest(BaseModel):
     subject: str
     banned: bool = True
     reason: str = ""
+
+
+class UserActivityLogRequest(BaseModel):
+    feature: str
+    action: str = ""
+    question: str = ""
+    answer: str = ""
+    device_id: str | None = None
+    privacy: bool = False
+
+
+class AdminActivityDeleteRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list)
+    all: bool = False
+
+
+class AdminSettingsRequest(BaseModel):
+    activity_retention_days: int = 0
+
+
+def _privacy_from_request(request: Request, user: dict | None, body_privacy: bool = False) -> bool:
+    if not user:
+        return False
+    header = (request.headers.get("X-Privacy-Mode") or "").strip().lower()
+    header_on = header in ("1", "true", "yes")
+    return bool(body_privacy or header_on)
 
 
 def _admin_bearer(request: Request) -> str | None:
@@ -3500,6 +3533,66 @@ def admin_activity(
         q=q,
     )
     return {"activity": activity, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/admin/activity/{activity_id}")
+def admin_activity_detail(activity_id: int, request: Request) -> dict:
+    _require_admin(request)
+    row = get_activity_by_id(activity_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="활동 기록을 찾을 수 없습니다.")
+    return {"activity": row}
+
+
+@app.delete("/admin/activity")
+def admin_activity_delete(body: AdminActivityDeleteRequest, request: Request) -> dict:
+    _require_admin(request)
+    if body.all:
+        deleted = delete_activity_records(delete_all=True)
+    elif body.ids:
+        deleted = delete_activity_records(ids=body.ids)
+    else:
+        raise HTTPException(status_code=400, detail="삭제할 항목을 선택하세요.")
+    return {"success": True, "deleted": deleted}
+
+
+@app.get("/admin/settings")
+def admin_settings_get(request: Request) -> dict:
+    _require_admin(request)
+    return {"activity_retention_days": get_activity_retention_days()}
+
+
+@app.post("/admin/settings")
+def admin_settings_save(body: AdminSettingsRequest, request: Request) -> dict:
+    _require_admin(request)
+    days = max(0, min(3650, int(body.activity_retention_days)))
+    set_admin_setting("activity_retention_days", str(days))
+    purged = purge_expired_activity()
+    return {"success": True, "activity_retention_days": days, "purged": purged}
+
+
+@app.post("/user/activity")
+def user_activity_log(body: UserActivityLogRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    subject, resolved_user = _resolve_subject(request, body.device_id)
+    uid = user["id"] if user else (resolved_user["id"] if resolved_user else None)
+    if body.privacy and not user:
+        raise HTTPException(status_code=401, detail="프라이버시 모드는 로그인 후 이용할 수 있습니다.")
+    is_secret = _privacy_from_request(request, user, body.privacy)
+    feature = (body.feature or "compare").strip()[:32]
+    dev = (body.device_id or request.headers.get("X-Device-Id") or "").strip()
+    row_id = log_user_activity_detail(
+        subject,
+        feature,
+        user_id=uid,
+        device_id=dev,
+        platform=_platform(request),
+        action=(body.action or feature)[:64],
+        question=body.question,
+        answer=body.answer,
+        is_secret=is_secret,
+    )
+    return {"success": True, "id": row_id, "secret": is_secret}
 
 
 @app.get("/admin/support")

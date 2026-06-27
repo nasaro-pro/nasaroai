@@ -216,6 +216,21 @@ def init_db() -> None:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS admin_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
+            act_cols = {r[1] for r in conn.execute("PRAGMA table_info(activity_log)").fetchall()}
+            if "is_secret" not in act_cols:
+                conn.execute("ALTER TABLE activity_log ADD COLUMN is_secret INTEGER NOT NULL DEFAULT 0")
+            if "question" not in act_cols:
+                conn.execute("ALTER TABLE activity_log ADD COLUMN question TEXT NOT NULL DEFAULT ''")
+            if "answer" not in act_cols:
+                conn.execute("ALTER TABLE activity_log ADD COLUMN answer TEXT NOT NULL DEFAULT ''")
             conn.commit()
         finally:
             conn.close()
@@ -1153,6 +1168,67 @@ def get_admin_dashboard() -> dict[str, Any]:
     }
 
 
+SECRET_ACTIVITY_LABEL = "🔒 시크릿 (프라이버시 모드)"
+
+
+def get_admin_setting(key: str, default: str = "") -> str:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT value FROM admin_settings WHERE key = ?",
+                (key[:64],),
+            ).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return default
+    return str(row["value"] or default)
+
+
+def set_admin_setting(key: str, value: str) -> None:
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                """
+                INSERT INTO admin_settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key[:64], str(value)[:500]),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_activity_retention_days() -> int:
+    raw = get_admin_setting("activity_retention_days", "0").strip()
+    try:
+        days = int(raw)
+    except ValueError:
+        days = 0
+    return max(0, min(3650, days))
+
+
+def purge_expired_activity() -> int:
+    days = get_activity_retention_days()
+    if days <= 0:
+        return 0
+    cutoff = time.time() - days * 86400
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                "DELETE FROM activity_log WHERE created_at < ?",
+                (cutoff,),
+            )
+            conn.commit()
+            return int(cur.rowcount or 0)
+        finally:
+            conn.close()
+
+
 def log_activity(
     subject: str,
     feature: str,
@@ -1162,17 +1238,30 @@ def log_activity(
     platform: str = "web",
     action: str = "",
     detail: str = "",
-) -> None:
+    is_secret: bool = False,
+    question: str = "",
+    answer: str = "",
+) -> int | None:
     now = time.time()
+    secret = 1 if is_secret else 0
+    q_store = (question or "")[:4000]
+    a_store = (answer or "")[:12000]
+    d_store = (detail or "")[:500]
+    if secret:
+        q_store = ""
+        a_store = ""
+        if not d_store or d_store == q_store[:500]:
+            d_store = SECRET_ACTIVITY_LABEL
     try:
         with _lock:
             conn = _connect()
             try:
-                conn.execute(
+                cur = conn.execute(
                     """
                     INSERT INTO activity_log
-                    (subject, user_id, device_id, platform, feature, action, detail, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (subject, user_id, device_id, platform, feature, action, detail,
+                     is_secret, question, answer, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         subject[:128],
@@ -1181,15 +1270,50 @@ def log_activity(
                         (platform or "web")[:32],
                         feature[:32],
                         (action or feature)[:64],
-                        (detail or "")[:500],
+                        d_store,
+                        secret,
+                        q_store,
+                        a_store,
                         now,
                     ),
                 )
                 conn.commit()
+                row_id = int(cur.lastrowid or 0) or None
             finally:
                 conn.close()
+        purge_expired_activity()
+        return row_id
     except Exception:
-        pass
+        return None
+
+
+def log_user_activity_detail(
+    subject: str,
+    feature: str,
+    *,
+    user_id: int | None = None,
+    device_id: str = "",
+    platform: str = "web",
+    action: str = "",
+    question: str = "",
+    answer: str = "",
+    is_secret: bool = False,
+) -> int | None:
+    preview = (question or action or feature)[:120]
+    if is_secret:
+        preview = SECRET_ACTIVITY_LABEL
+    return log_activity(
+        subject,
+        feature,
+        user_id=user_id,
+        device_id=device_id,
+        platform=platform,
+        action=action or feature,
+        detail=preview,
+        is_secret=is_secret,
+        question=question,
+        answer=answer,
+    )
 
 
 def get_activity_log(
@@ -1232,7 +1356,7 @@ def get_activity_log(
             ).fetchall()
         finally:
             conn.close()
-    return [_activity_row(r) for r in rows]
+    return [_activity_row(r, admin_view=True) for r in rows]
 
 
 def count_activity_log(
@@ -1270,7 +1394,16 @@ def count_activity_log(
     return int(row["c"] or 0)
 
 
-def _activity_row(row: sqlite3.Row) -> dict[str, Any]:
+def _activity_row(row: sqlite3.Row, *, admin_view: bool = True) -> dict[str, Any]:
+    keys = row.keys()
+    is_secret = bool(row["is_secret"]) if "is_secret" in keys else False
+    question = str(row["question"] or "") if "question" in keys else ""
+    answer = str(row["answer"] or "") if "answer" in keys else ""
+    detail = str(row["detail"] or "")
+    if admin_view and is_secret:
+        question = ""
+        answer = ""
+        detail = SECRET_ACTIVITY_LABEL
     return {
         "id": row["id"],
         "subject": row["subject"],
@@ -1279,10 +1412,52 @@ def _activity_row(row: sqlite3.Row) -> dict[str, Any]:
         "platform": row["platform"],
         "feature": row["feature"],
         "action": row["action"],
-        "detail": row["detail"],
+        "detail": detail,
+        "is_secret": is_secret,
+        "question": question,
+        "answer": answer,
         "created_at": row["created_at"],
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(row["created_at"])),
     }
+
+
+def get_activity_by_id(activity_id: int) -> dict[str, Any] | None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM activity_log WHERE id = ?",
+                (int(activity_id),),
+            ).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return None
+    return _activity_row(row, admin_view=True)
+
+
+def delete_activity_records(
+    *,
+    ids: list[int] | None = None,
+    delete_all: bool = False,
+) -> int:
+    with _lock:
+        conn = _connect()
+        try:
+            if delete_all:
+                cur = conn.execute("DELETE FROM activity_log")
+            elif ids:
+                placeholders = ",".join("?" * len(ids))
+                cur = conn.execute(
+                    f"DELETE FROM activity_log WHERE id IN ({placeholders})",
+                    [int(i) for i in ids],
+                )
+            else:
+                return 0
+            conn.commit()
+            return int(cur.rowcount or 0)
+        finally:
+            conn.close()
 
 
 def get_platform_stats(day_key: str | None = None) -> dict[str, int]:

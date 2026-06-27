@@ -20,6 +20,8 @@
             privacy_on: "프라이버시 켬",
             privacy_off: "프라이버시 끔",
             privacy_tip: "자동 기록·동기화·공유 없음. 이 화면에서만 표시. 「결과물 저장」은 수동 가능.",
+            privacy_login: "프라이버시 모드는 로그인 후 이용할 수 있습니다.",
+            privacy_on_admin: "프라이버시 켬: 관리자 화면에도 내용이 시크릿으로 표시됩니다.",
             ai_pick: "AI",
             ai_all: "전체",
             ai_collab_pick: "추천 AI",
@@ -44,7 +46,7 @@
             mode_debate: "토론",
             mode_collab: "협업",
             mode_agent: "에이전트",
-            new_chat: "새 대화",
+            new_chat: "새 질문",
             ph_compare: "비교할 질문…",
             ph_debate: "토론 주제…",
             ph_debate_cont: "의견 추가…",
@@ -80,6 +82,8 @@
             privacy_on: "Privacy on",
             privacy_off: "Privacy off",
             privacy_tip: "No auto log/sync/share. Manual save works.",
+            privacy_login: "Privacy mode requires login.",
+            privacy_on_admin: "Privacy on: content appears as secret in admin too.",
             ai_pick: "AI",
             ai_all: "All",
             ai_collab_pick: "Recommend AI",
@@ -104,7 +108,7 @@
             mode_debate: "Debate",
             mode_collab: "Collab",
             mode_agent: "Agent",
-            new_chat: "New chat",
+            new_chat: "New question",
             ph_compare: "Question to compare…",
             ph_debate: "Debate topic…",
             ph_debate_cont: "Add opinion…",
@@ -208,14 +212,15 @@
 
         const updateLabel = () => {
             if (!pickerBtn) return;
+            const allSelected = !singleSelect && current.length >= MODELS.length;
             const label = singleSelect
                 ? current[0]
-                : (current.length >= MODELS.length
-                    ? t("ai_all")
+                : (allSelected
+                    ? (lang === "en" ? "AI All" : "AI 전체")
                     : (current.length === 1 ? current[0] : current.join(" · ")));
             const short = label.length > 24 ? label.slice(0, 24) + "…" : label;
-            pickerBtn.textContent = `🤖 ${short}`;
-            pickerBtn.title = singleSelect ? current[0] : (current.length >= MODELS.length ? t("ai_all") : current.join(", "));
+            pickerBtn.textContent = allSelected ? short : `🤖 ${short}`;
+            pickerBtn.title = singleSelect ? current[0] : (allSelected ? (lang === "en" ? "AI All" : "AI 전체") : current.join(", "));
         };
 
         const sync = () => {
@@ -316,23 +321,40 @@
 
     function buildPrivacyButton(textarea, opts = {}) {
         const privBtn = document.createElement("button");
+        const loggedIn = () => (typeof opts.isLoggedIn === "function" ? opts.isLoggedIn() : !!opts.isLoggedIn);
+        const syncBtn = () => {
+            const on = privacyMode && loggedIn();
+            privBtn.classList.toggle("active", on);
+            privBtn.classList.toggle("disabled", !loggedIn());
+            const pt = privBtn.querySelector(".priv-text");
+            if (pt) pt.textContent = on ? "🔒" : "🔓";
+        };
         privBtn.type = "button";
-        privBtn.className = "input-tool-btn privacy-btn privacy-btn-compact" + (privacyMode ? " active" : "");
+        privBtn.className = "input-tool-btn privacy-btn privacy-btn-compact" + (privacyMode && loggedIn() ? " active" : "");
         privBtn.title = t("privacy_tip");
-        privBtn.innerHTML = `<span class="priv-text">${privacyMode ? "🔒" : "🔓"}</span><span class="priv-q" title="${t("privacy_tip")}">?</span>`;
+        privBtn.innerHTML = `<span class="priv-text">${privacyMode && loggedIn() ? "🔒" : "🔓"}</span><span class="priv-q" title="${t("privacy_tip")}">?</span>`;
         privBtn.addEventListener("click", e => {
             if (e.target.classList.contains("priv-q")) return;
+            if (!loggedIn()) {
+                opts.showToast?.(t("privacy_login"), "warn", 4000);
+                opts.onLoginRequired?.();
+                return;
+            }
             privacyMode = !privacyMode;
             localStorage.setItem("nasaroai_privacy", privacyMode ? "1" : "0");
-            privBtn.classList.toggle("active", privacyMode);
-            const pt = privBtn.querySelector(".priv-text");
-            if (pt) pt.textContent = privacyMode ? "🔒" : "🔓";
+            syncBtn();
             opts.onPrivacyChange?.(privacyMode);
+            if (privacyMode) {
+                opts.showToast?.(t("privacy_on_admin"), "info", 6000);
+            } else {
+                opts.showToast?.(t("privacy_off"), "info", 3000);
+            }
         });
         privBtn.querySelector(".priv-q")?.addEventListener("click", e => {
             e.stopPropagation();
-            opts.showToast?.(t("privacy_tip"), "info", 5000);
+            opts.showToast?.(loggedIn() ? t("privacy_on_admin") : t("privacy_login"), "info", 5000);
         });
+        syncBtn();
         return privBtn;
     }
 
@@ -645,13 +667,18 @@
         });
     }
 
+    function setPrivacyMode(on) {
+        privacyMode = !!on;
+        localStorage.setItem("nasaroai_privacy", privacyMode ? "1" : "0");
+    }
+
     window.NasaroFeatures = {
         t, I18N, MODELS, FASTEST_MODEL,
         get lang() { return lang; },
         set lang(v) { lang = v; applyLang(); },
         get theme() { return theme; },
         set theme(v) { theme = v; applyTheme(); },
-        isPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
+        isPrivacyMode, setPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
         applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
         createShareLink, exportMarkdown, addResultActions, hideFloatingResultActions,
         showExportFormatMenu, loadShareFromUrl,

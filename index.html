@@ -1866,9 +1866,59 @@
         .dock-compose-tools-left,
         .dock-compose-tools-right {
             flex: 0 0 auto;
-            display: flex;
+            display: none;
             align-items: flex-end;
             gap: 6px;
+        }
+        .dock-btn-left,
+        .dock-btn-right {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .dock-mobile-tools {
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+        .dock-btn-row .input-tool-btn {
+            min-height: 40px;
+            height: 40px;
+            padding: 0 14px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+        .dock-btn-row .input-tool-btn.privacy-btn-compact,
+        .dock-btn-row .input-tool-btn.icon-tool-btn {
+            min-height: 36px;
+            height: 36px;
+            min-width: 36px;
+            padding: 0 8px;
+            font-size: 13px;
+        }
+        .dock-btn-row .input-tool-btn.privacy-btn-compact {
+            min-width: 44px;
+        }
+        .dock-btn-row .input-tool-btn.ai-pick-trigger-btn {
+            min-height: 40px;
+            height: 40px;
+            padding: 0 12px;
+            max-width: 148px;
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #6d28d9;
+            font-weight: 800;
+        }
+        .dock-btn-row .input-tool-btn.ai-pick-trigger-btn:hover {
+            background: #ede9fe;
+            border-color: #a78bfa;
         }
         .dock-compose-tools-left {
             min-width: 0;
@@ -3188,7 +3238,7 @@
 
         @keyframes toastFadeOut {
             from { opacity: 1; }
-            to   { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 0; transform: translateY(-8px); }
         }
 
         /* ── 토스트 알림 ── */
@@ -3201,6 +3251,19 @@
             flex-direction: column;
             gap: 8px;
             pointer-events: none;
+        }
+        @media (max-width: 640px) {
+            .ax-toast {
+                top: max(12px, env(safe-area-inset-top, 12px));
+                bottom: auto;
+                left: 12px;
+                right: 12px;
+                align-items: stretch;
+            }
+            .ax-toast-item {
+                max-width: none;
+                width: 100%;
+            }
         }
 
         .ax-toast-item {
@@ -3607,7 +3670,7 @@
             }
             .dock-inner {
                 min-height: 0;
-                padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0));
+                padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0));
                 gap: 8px;
             }
             .dock-compose-row {
@@ -3617,13 +3680,27 @@
                 min-height: 0;
             }
             .dock-compose-tools-left {
+                display: flex;
                 flex: 0 0 auto;
-                max-width: 76px;
+                max-width: 70px;
                 min-width: 0;
             }
             .dock-compose-tools-right {
-                flex: 0 0 auto;
-                gap: 4px;
+                display: none;
+            }
+            .dock-btn-left,
+            .dock-btn-right {
+                display: none;
+            }
+            .dock-mobile-tools {
+                display: inline-flex;
+            }
+            .dock-extra-btns {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex: 1 1 auto;
+                min-width: 0;
             }
             .dock-compose-row #mainInput {
                 flex: 1 1 auto;
@@ -3631,7 +3708,7 @@
                 height: 48px;
                 min-height: 48px;
                 max-height: 96px;
-                padding: 10px 12px;
+                padding: 10px 10px;
                 font-size: 16px;
                 border-radius: 14px;
                 border: 1px solid #e2e8f0;
@@ -3655,23 +3732,23 @@
                 border-radius: 14px;
             }
             .dock-compose-row .input-tool-btn.ai-pick-trigger-btn {
-                width: 76px;
-                max-width: 76px;
+                width: 68px;
+                max-width: 68px;
                 min-height: 48px;
                 height: 48px;
-                padding: 0 6px;
+                padding: 0 4px;
                 font-size: 11px;
                 border-radius: 12px;
             }
-            .dock-compose-row .input-tool-btn.privacy-btn-compact,
-            .dock-compose-row .input-tool-btn.icon-tool-btn {
-                min-height: 48px;
-                height: 48px;
-                min-width: 44px;
-                width: 44px;
+            .dock-mobile-tools .input-tool-btn.privacy-btn-compact,
+            .dock-mobile-tools .input-tool-btn.icon-tool-btn {
+                min-height: 38px;
+                height: 38px;
+                min-width: 40px;
+                width: 40px;
                 padding: 0;
                 font-size: 16px;
-                border-radius: 12px;
+                border-radius: 10px;
             }
             .dock-btn-row {
                 display: flex;
@@ -3733,9 +3810,7 @@
                 gap: 6px;
             }
             .dock-extra-btns .dock-btn.muted.is-hidden {
-                display: inline-flex;
-                visibility: hidden;
-                pointer-events: none;
+                display: none;
             }
             .dock-extra-btns .dock-btn.muted {
                 flex: 1 1 0;
@@ -4430,10 +4505,10 @@
                     <div class="dock-compose-row">
                         <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
-                        <div class="dock-compose-tools-right" id="mainInputToolsRight"></div>
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
                     <div class="dock-btn-row">
+                        <div class="dock-btn-left" id="dockBtnToolsLeft"></div>
                         <div class="dock-btn-center">
                             <div class="dock-mode-group">
                                 <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
@@ -4441,11 +4516,11 @@
                                 <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
                             </div>
                             <div class="dock-extra-btns" id="dockExtraBtns">
-                                <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                                <button id="dockSecondaryBtn" class="dock-btn muted is-hidden" type="button">질문 추가</button>
-                                <button id="dockNewDebateBtn" class="dock-btn muted is-hidden" type="button">새 토론</button>
+                                <span id="dockMobileTools" class="dock-mobile-tools"></span>
+                                <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 질문</button>
                             </div>
                         </div>
+                        <div class="dock-btn-right" id="dockBtnToolsRight"></div>
                     </div>
                 </div>
             </footer>
@@ -4476,7 +4551,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627m"></script>
+    <script src="/static/nasaro-features.js?v=20260627n"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -4872,15 +4947,30 @@
 
         function rebuildMainToolbar() {
             const NF = window.NasaroFeatures;
-            const left = document.getElementById("mainInputToolsLeft");
-            const right = document.getElementById("mainInputToolsRight");
-            if (!NF || !left || !right || !mainInput) return;
-            left.innerHTML = "";
-            right.innerHTML = "";
-            const parts = NF.buildDockToolbarParts?.(mainInput, { mode: currentMode, showToast });
+            const leftCompose = document.getElementById("mainInputToolsLeft");
+            const leftDock = document.getElementById("dockBtnToolsLeft");
+            const rightDock = document.getElementById("dockBtnToolsRight");
+            const mobileTools = document.getElementById("dockMobileTools");
+            if (!NF || !leftCompose || !leftDock || !rightDock || !mainInput) return;
+            leftCompose.innerHTML = "";
+            leftDock.innerHTML = "";
+            rightDock.innerHTML = "";
+            if (mobileTools) mobileTools.innerHTML = "";
+            const toolbarOpts = {
+                mode: currentMode,
+                showToast,
+                isLoggedIn: () => !!currentUser,
+                onLoginRequired: () => openAuthModal("login"),
+            };
+            const parts = NF.buildDockToolbarParts?.(mainInput, toolbarOpts);
             if (!parts) return;
-            left.appendChild(parts.ai);
-            right.append(parts.privacy, parts.voice);
+            if (isMobileCompact()) {
+                leftCompose.appendChild(parts.ai);
+                if (mobileTools) mobileTools.append(parts.privacy, parts.voice);
+            } else {
+                leftDock.appendChild(parts.ai);
+                rightDock.append(parts.privacy, parts.voice);
+            }
         }
 
         function rebuildAgentToolbar() {
@@ -4936,8 +5026,6 @@
 
         const mainInput = document.getElementById("mainInput");
         const dockPrimaryBtn = document.getElementById("dockPrimaryBtn");
-        const dockSecondaryBtn = document.getElementById("dockSecondaryBtn");
-        const dockNewDebateBtn = document.getElementById("dockNewDebateBtn");
         const agentToggleBtn = document.getElementById("agentToggleBtn");
         const inputDock = document.getElementById("inputDock");
         const dockShell = document.getElementById("dockShell");
@@ -5246,7 +5334,28 @@
         function authHeaders(extra = {}) {
             const h = { ...extra, "X-Device-Id": getDeviceId(), "X-Platform": getPlatform() };
             if (authToken) h.Authorization = "Bearer " + authToken;
+            if (currentUser && window.NasaroFeatures?.isPrivacyMode?.()) {
+                h["X-Privacy-Mode"] = "1";
+            }
             return h;
+        }
+
+        async function logUserActivity(feature, question, answer, action = "") {
+            if (!currentUser || !authToken) return;
+            try {
+                await apiFetch("/user/activity", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        feature,
+                        action,
+                        question: String(question || "").slice(0, 4000),
+                        answer: String(answer || "").slice(0, 12000),
+                        device_id: getDeviceId(),
+                        privacy: !!window.NasaroFeatures?.isPrivacyMode?.(),
+                    }),
+                });
+            } catch {}
         }
 
         async function apiFetch(path, options = {}) {
@@ -5674,6 +5783,7 @@
             try { await apiFetch("/auth/logout", { method: "POST" }); } catch {}
             authToken = "";
             currentUser = null;
+            window.NasaroFeatures?.setPrivacyMode?.(false);
             localStorage.removeItem(AUTH_TOKEN_KEY);
             sessionHistory.length = 0;
             updateAuthUI();
@@ -6102,24 +6212,12 @@
         function updateDockUI() {
             const NF = window.NasaroFeatures;
             const mob = isMobileCompact();
-            const showDebateExtras = currentMode === "debate" && debateStarted;
-            dockSecondaryBtn.classList.toggle("is-hidden", !showDebateExtras);
-            dockNewDebateBtn.classList.toggle("is-hidden", !showDebateExtras);
             const newChatBtn = document.getElementById("newChatBtn");
             if (newChatBtn) {
-                newChatBtn.textContent = mob ? "새 채팅" : (NF?.t?.("new_chat") || "✦ 새 채팅");
-                newChatBtn.title = NF?.t?.("new_chat") || "새 채팅";
+                const label = NF?.t?.("new_chat") || "✦ 새 질문";
+                newChatBtn.textContent = mob ? "새 질문" : label;
+                newChatBtn.title = mob ? "새 질문" : (NF?.t?.("new_chat") || "새 질문");
             }
-            if (mob) {
-                dockSecondaryBtn.textContent = "의견 추가";
-                dockSecondaryBtn.title = "토론 중 의견 추가";
-                dockNewDebateBtn.textContent = "새 토론";
-                dockNewDebateBtn.title = "새 토론 시작";
-            } else {
-                dockSecondaryBtn.textContent = "질문 추가";
-                dockNewDebateBtn.textContent = "새 토론";
-            }
-
             if (currentMode === "compare") {
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
                 dockPrimaryBtn.textContent = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
@@ -6161,8 +6259,6 @@
                 dockPrimaryBtn.title = NF?.t?.("btn_debate_next") || "다음";
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
-                dockSecondaryBtn.disabled = debateInFlight;
-                dockNewDebateBtn.disabled = debateInFlight;
             }
             autoResizeInput();
         }
@@ -6208,6 +6304,7 @@
         bottomResizeObserver.observe(dockShellEl || inputDock);
         window.addEventListener("resize", () => {
             scheduleSyncMainPadding();
+            rebuildMainToolbar();
             updateDockUI();
             updateCollabActionBar();
         });
@@ -7054,7 +7151,11 @@
             if (currentMode === "compare") handleCompare();
             else if (currentMode === "debate") {
                 if (!debateStarted) handleDebateStart();
-                else handleAddUserInput();
+                else {
+                    const text = mainInput.value.trim();
+                    if (text) handleAddUserInput();
+                    else handleDebateContinue();
+                }
             } else if (currentMode === "collab") handleCollabSubmit();
         });
 
@@ -7407,6 +7508,9 @@
                 if (!collabFinalProduct) {
                     collabFinalProduct = collabSession.stageOutputs[2] || "";
                 }
+                if (collabFinalProduct && collabSession?.task) {
+                    logUserActivity("collab", collabSession.task, collabFinalProduct, "collab_complete");
+                }
             } finally {
                 collabPipelineRunning = false;
                 if (startBtn) startBtn.disabled = false;
@@ -7651,9 +7755,6 @@
             showToast("협업 계획이 준비되었습니다. 위 단계를 눌러 확인하고 ▶ 작업 시작을 누르세요.", "info", 4000);
         }
 
-        dockSecondaryBtn.addEventListener("click", handleAddUserInput);
-        dockNewDebateBtn.addEventListener("click", handleNewDebate);
-
         function handleNewDebate() {
             debateSessionId = createUUID();
             debateTopic = "";
@@ -7891,6 +7992,8 @@
                 title: message,
                 data: { query: message, responses: { ...responses } },
             });
+            const answerText = activeModels.map(m => `[${m}]\n${responses[m] || ""}`).join("\n\n");
+            logUserActivity("compare", message, answerText, "compare");
         }
 
         function appendLoadingCard(roundNumber, speakerIndex) {
@@ -8191,6 +8294,20 @@
                 queuedDuringFlight = false;
                 await handleDebateContinue();
             }
+            syncDebateActivityLog(firstPayload?.user_input || null);
+        }
+
+        function syncDebateActivityLog(userInput) {
+            if (!debateStarted) return;
+            const cards = debateCards.filter(c => !c.loading && c.content);
+            if (!cards.length) return;
+            const latestRound = Math.max(...cards.map(c => c.round_number || 0));
+            const roundCards = cards.filter(c => c.round_number === latestRound);
+            const answer = roundCards.map(c =>
+                `[${c.round_number}R ${c.speaker_index}번 ${c.model || ""}]\n${c.content}`
+            ).join("\n\n");
+            const question = userInput || (latestRound === 1 ? debateTopic : `라운드 ${latestRound} 의견`);
+            logUserActivity("debate", question, answer, "debate_round");
         }
 
         async function retryDebateSpeaker(roundNumber, speakerIndex) {
@@ -8243,7 +8360,7 @@
             autoResizeInput();
 
             if (debateInFlight) {
-                dockSecondaryBtn.disabled = true;
+                dockPrimaryBtn.disabled = true;
                 try {
                     const response = await apiFetch("/debate/continue", {
                         method: "POST",
