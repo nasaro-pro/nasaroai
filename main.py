@@ -597,6 +597,7 @@ class CollabFollowupRequest(BaseModel):
     work_type: str = ""
     stage_outputs: list[str] = Field(default_factory=list)
     user_id: str = ""
+    pre_work: bool = False
 
 
 class AuthSignupRequest(BaseModel):
@@ -1006,6 +1007,22 @@ def build_collab_plan(task: str, forced_type: str | None = None) -> dict:
             "actions": selected["algorithm"][4:6],
         },
     ]
+    stage_models = COLLAB_TYPE_DEFAULT_MODELS.get(
+        selected["type"],
+        [m["default_model"] for m in COLLAB_STAGE_META],
+    )
+    stage_recommendations = []
+    for i, meta in enumerate(COLLAB_STAGE_META):
+        model = stage_models[i] if i < len(stage_models) else meta["default_model"]
+        alts = [m for m in meta["options"] if m != model][:2]
+        stage_recommendations.append(
+            {
+                "index": i + 1,
+                "model": model,
+                "reason": meta["hint"],
+                "alternatives": alts,
+            }
+        )
     return {
         "task": task,
         "work_type": selected["type"],
@@ -1014,11 +1031,9 @@ def build_collab_plan(task: str, forced_type: str | None = None) -> dict:
             "1) 조사 → 2) 구조·지시문 → 3) 제작 → 4) 검증(피드백·지시) 순으로 단계별 실행합니다. "
             "검증 AI는 재작성하지 않고, 문제 지적 후 해당 단계 AI가 수정합니다."
         ),
-        "stage_models": COLLAB_TYPE_DEFAULT_MODELS.get(
-            selected["type"],
-            [m["default_model"] for m in COLLAB_STAGE_META],
-        ),
+        "stage_models": stage_models,
         "stage_meta": COLLAB_STAGE_META,
+        "stage_recommendations": stage_recommendations,
         "stages": stages,
         "acceptance": selected["acceptance"],
         "handoff": "각 단계 산출물을 다음 단계 입력으로 넘깁니다. 검증 실패 시 지적·지시만 전달하고 조사/구조/제작 단계가 순서대로 수정합니다.",
@@ -2581,6 +2596,65 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
     recommendation = result.content if result.success else (
         "AI 보완 코멘트 생성은 실패했지만, 아래 작업 유형별 협업 알고리즘은 바로 사용할 수 있습니다."
     )
+
+    meta_lines = "\n".join(
+        f"{i + 1}단계 {m['short']}({m['role']}): 후보 {', '.join(m['options'])}"
+        for i, m in enumerate(COLLAB_STAGE_META)
+    )
+    stage_rec_prompt = (
+        f"작업: {task}\n분류: {plan['work_type']}\n\n{meta_lines}\n\n"
+        "각 단계(1~4)에 가장 적합한 AI 1개, 선택 이유(한국어 1~2문장), 대안 AI 2개를 정하세요.\n"
+        'JSON만: {"stages":[{"index":1,"model":"Perplexity","reason":"...","alternatives":["xAI","Google"]}, ...]}'
+    )
+    stage_rec_result = await call_ai_best(stage_rec_prompt, max_tokens=700)
+    if stage_rec_result.success:
+        import re
+
+        m = re.search(r"\{[\s\S]*\}", stage_rec_result.content)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+                recs = parsed.get("stages") or []
+                if isinstance(recs, list) and recs:
+                    merged_recs = []
+                    new_models = []
+                    for i, meta in enumerate(COLLAB_STAGE_META):
+                        hit = next(
+                            (r for r in recs if int(r.get("index", 0)) == i + 1),
+                            None,
+                        )
+                        model = (hit or {}).get("model") or (
+                            plan["stage_models"][i]
+                            if i < len(plan["stage_models"])
+                            else meta["default_model"]
+                        )
+                        if model not in meta["options"]:
+                            model = meta["default_model"]
+                        alts = [
+                            a
+                            for a in (hit or {}).get("alternatives") or []
+                            if a in meta["options"] and a != model
+                        ][:2]
+                        if len(alts) < 2:
+                            for opt in meta["options"]:
+                                if opt != model and opt not in alts:
+                                    alts.append(opt)
+                                if len(alts) >= 2:
+                                    break
+                        merged_recs.append(
+                            {
+                                "index": i + 1,
+                                "model": model,
+                                "reason": (hit or {}).get("reason") or meta["hint"],
+                                "alternatives": alts,
+                            }
+                        )
+                        new_models.append(model)
+                    plan["stage_recommendations"] = merged_recs
+                    plan["stage_models"] = new_models
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+
     return {
         "recommendation": recommendation,
         "plan": plan,
@@ -2698,9 +2772,38 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
 
 @app.post("/collab/followup-route")
 async def collab_followup_route(data: CollabFollowupRequest, request: Request) -> dict:
-    """추가 작업 요청을 분석해 재시작할 단계를 결정한다."""
+    """추가 작업 요청을 분석해 재시작할 단계를 결정하거나(작업 중), 요청사항만 병합(작업 전)."""
     _require_quota(request, "collab", data.user_id, amount=0.5)
     await ensure_model_cache_fresh()
+    if data.pre_work:
+        prompt = (
+            f"원래 작업 요청:\n{data.original_task}\n\n"
+            f"추가 요청:\n{data.task}\n\n"
+            "아직 협업 작업을 시작하지 않았습니다. 추가 요청을 반영해 "
+            "하나의 통합된 작업 설명(요청사항)을 작성하세요.\n"
+            'JSON만: {"merged_task": "통합 요청사항", "reason": "무엇을 반영했는지 한국어 1~2문장"}'
+        )
+        result = await call_ai_best(prompt, max_tokens=400)
+        merged = f"{data.original_task}\n\n[추가] {data.task}"
+        reason = "추가 요청을 요청사항에 반영했습니다."
+        if result.success:
+            import re
+
+            m = re.search(r"\{[\s\S]*?\}", result.content)
+            if m:
+                try:
+                    parsed = json.loads(m.group(0))
+                    merged = parsed.get("merged_task") or merged
+                    reason = parsed.get("reason") or reason
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+        return {
+            "pre_work": True,
+            "merged_task": merged,
+            "reason": reason,
+            "success": True,
+        }
+
     outputs_summary = "\n".join(
         f"[{i + 1}단계] {(t or '')[:400]}" for i, t in enumerate(data.stage_outputs[:3])
     )
@@ -2711,6 +2814,7 @@ async def collab_followup_route(data: CollabFollowupRequest, request: Request) -
         f"현재 단계별 산출물 요약:\n{outputs_summary or '없음'}\n\n"
         "추가 요청을 반영하려면 어느 단계부터 다시 해야 하는지 판단하세요.\n"
         "1=조사, 2=구조, 3=제작. 논리·구조 수정이면 2, 사실·근거면 1, 문장·초안만이면 3.\n"
+        "재작업 후 반드시 4단계 검증을 다시 거쳐야 합니다.\n"
         'JSON만 출력: {"start_stage": 1, "reason": "한국어 설명", "merged_task": "반영된 전체 작업 설명"}'
     )
     result = await call_ai_best(prompt, max_tokens=300)
