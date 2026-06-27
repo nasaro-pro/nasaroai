@@ -469,6 +469,14 @@ DEBATE_DIRECTIVE = (
     "감정적 비방은 피하고, 근거에 기반해 한국어로 발언하세요."
 )
 
+# 1번 발언자 전용: 자기 주장·근거만 (2·3번 역할·종합 금지).
+SPEAKER1_DIRECTIVE = (
+    "당신은 토론 1번 발언자입니다.\n"
+    "자신의 입장(핵심 주장 하나)과 이를 뒷받침하는 근거(사실·데이터·사례 2~3개)만 한국어로 제시하세요.\n"
+    "다른 발언자(2·3번) 입장을 대신 말하거나, 찬반 양쪽을 정리·종합하지 마세요.\n"
+    "앞선 발언에 대한 수용·비판·반박은 하지 마세요. 3~6문장, 200~350자 내외로 간결하게 작성하세요."
+)
+
 MODEL_MAPPING: dict[str, str] = {}
 FALLBACK_MODEL_MAPPING: dict[str, str] = {}
 MODEL_CANDIDATES: dict[str, list[str]] = {}
@@ -1881,27 +1889,26 @@ def build_round_prompt(
 ) -> str:
     if round_number == 1 and speaker_index == 1:
         return (
-            f"{DEBATE_DIRECTIVE}\n\n"
+            f"{SPEAKER1_DIRECTIVE}\n\n"
             f"주제: {topic}\n\n"
-            "당신은 1번 발언자입니다. 다른 발언자의 내용은 아직 없습니다. "
-            "주제에 대해 구체적 근거를 동원해 강한 첫 주장을 한국어로 제시하세요."
+            "다른 발언자의 발언은 아직 없습니다. 주제에 대한 자신의 첫 주장과 근거만 제시하세요."
         )
 
     if speaker_index == 1:
         if user_input:
             return (
-                f"{DEBATE_DIRECTIVE}\n\n"
+                f"{SPEAKER1_DIRECTIVE}\n\n"
                 f"지금까지 토론 요약: {previous_summary or '아직 요약이 없습니다.'}\n\n"
                 f"사용자가 추가로 다음 질문/의견을 남겼습니다: '{user_input}'\n\n"
-                "이 질문/의견을 반드시 반영하여, 근거를 들어 강하게 답변하세요.\n\n"
+                "이 의견을 반영해 자신의 입장과 근거만 답하세요. 다른 발언자를 대신 평가하거나 "
+                "전체를 요약하지 마세요.\n\n"
                 f"주제: {topic}"
             )
         return (
-            f"{DEBATE_DIRECTIVE}\n\n"
+            f"{SPEAKER1_DIRECTIVE}\n\n"
             f"이전 라운드 요약:\n{previous_summary or '아직 요약이 없습니다.'}\n\n"
             f"주제: {topic}\n\n"
-            "당신은 새 라운드의 1번 발언자입니다. 이전 라운드 요약을 바탕으로 "
-            "반복을 피하고 새로운 근거와 관점으로 강하게 주장하세요."
+            "새 라운드 1번 발언자로서, 이전과 겹치지 않는 새 관점의 자기 주장과 근거만 제시하세요."
         )
 
     role_instruction = "앞선 발언을 수용·비판·보완하고 자신의 근거를 제시"
@@ -2107,10 +2114,12 @@ async def produce_debate_speaker(
     )
 
     excluded = set(already_used_models)
+    speaker_max_tokens = 380 if speaker_index == 1 else None
     for _ in range(MAX_MODEL_CANDIDATES_PER_LABEL):
         result = await call_ai_model(
             requested_label,
             prompt,
+            max_tokens=speaker_max_tokens,
             excluded_models=excluded,
         )
         session.failed_candidates.extend(result.failed_candidates)

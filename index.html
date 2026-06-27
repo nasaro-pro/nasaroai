@@ -1843,7 +1843,7 @@
             align-items: center;
             width: min(1160px, 100%);
             margin: 0 auto;
-            padding: 0 10px 12px;
+            padding: 0 10px 14px;
             box-sizing: border-box;
         }
 
@@ -1863,6 +1863,20 @@
             align-items: flex-end;
             min-height: 48px;
         }
+        .dock-compose-tools-left,
+        .dock-compose-tools-right {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+        }
+        .dock-compose-tools-left {
+            min-width: 0;
+            max-width: 148px;
+        }
+        .dock-compose-tools-right {
+            gap: 4px;
+        }
         .dock-compose-row #mainInput {
             flex: 1;
             min-width: 0;
@@ -1874,6 +1888,54 @@
         .dock-compose-row .dock-submit-btn {
             flex: 0 0 auto;
             min-width: 108px;
+        }
+        .dock-compose-row .input-tool-btn {
+            min-height: 40px;
+            height: 40px;
+            padding: 0 14px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+        .dock-compose-row .input-tool-btn.privacy-btn-compact,
+        .dock-compose-row .input-tool-btn.icon-tool-btn {
+            min-height: 40px;
+            height: 40px;
+            min-width: 40px;
+            padding: 0 8px;
+            font-size: 14px;
+        }
+        .dock-compose-row .input-tool-btn.privacy-btn-compact {
+            min-width: 44px;
+        }
+        .dock-compose-row .input-tool-btn.ai-pick-trigger-btn {
+            min-height: 40px;
+            height: 40px;
+            padding: 0 12px;
+            max-width: 148px;
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #6d28d9;
+            font-weight: 800;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dock-compose-row .input-tool-btn.ai-pick-trigger-btn:hover {
+            background: #ede9fe;
+            border-color: #a78bfa;
+        }
+        .dock-compose-tools-left .model-picker-wrap {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            width: 100%;
         }
 
         .dock-btn-row {
@@ -1919,8 +1981,7 @@
             box-sizing: border-box;
             flex-shrink: 0;
         }
-        .dock-btn-row .dock-btn.muted,
-        .dock-btn-row .input-tool-btn {
+        .dock-btn-row .dock-btn.muted {
             min-height: 40px;
             height: 40px;
             padding: 0 14px;
@@ -1933,36 +1994,6 @@
             box-sizing: border-box;
             flex-shrink: 0;
         }
-        .dock-btn-row .input-tool-btn.privacy-btn-compact,
-        .dock-btn-row .input-tool-btn.icon-tool-btn {
-            min-height: 36px;
-            height: 36px;
-            min-width: 36px;
-            padding: 0 8px;
-            font-size: 13px;
-        }
-        .dock-btn-row .input-tool-btn.privacy-btn-compact {
-            min-width: 44px;
-        }
-        .dock-btn-row .input-tool-btn.ai-pick-trigger-btn {
-            min-height: 40px;
-            height: 40px;
-            padding: 0 12px;
-            max-width: 148px;
-            border: 1px solid #c4b5fd;
-            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
-            color: #6d28d9;
-            font-weight: 800;
-            font-size: 12px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .dock-btn-row .input-tool-btn.ai-pick-trigger-btn:hover {
-            background: #ede9fe;
-            border-color: #a78bfa;
-        }
-        .dock-btn-left .model-picker-wrap,
         .agent-ai-toolbar .model-picker-wrap {
             display: flex;
             align-items: center;
@@ -3502,7 +3533,21 @@
             }
             .site-header .header-brand h1 { font-size: 22px; }
             .site-header .header-brand p { display: none; }
-            .header-inner { padding: 8px 12px; gap: 4px; }
+            .site-header {
+                background: rgba(255, 255, 255, 0.96);
+                border-bottom-color: rgba(229, 231, 235, 0.8);
+            }
+            html[data-theme="dark"] .site-header {
+                background: rgba(12, 12, 12, 0.96);
+                border-bottom-color: #262626;
+            }
+            .header-inner { padding: 10px 14px; gap: 4px; }
+            #mainContent {
+                background: #f8fafc;
+            }
+            html[data-theme="dark"] #mainContent {
+                background: #0a0a0a;
+            }
             .collab-intro {
                 min-height: min(48vh, 340px);
                 justify-content: center;
@@ -3540,8 +3585,8 @@
             html[data-theme="dark"] .input-dock { border-color: #262626; }
             .dock-agent-row {
                 position: absolute;
-                right: 6px;
-                bottom: calc(100% - 1px);
+                right: 10px;
+                bottom: calc(100% + 10px);
                 padding: 0;
                 margin: 0;
                 width: auto;
@@ -3552,11 +3597,13 @@
             .dock-agent-row .agent-toggle-btn {
                 pointer-events: auto;
                 width: auto;
-                min-height: 34px;
-                height: 34px;
-                padding: 0 10px;
+                min-height: 36px;
+                height: 36px;
+                padding: 0 12px;
                 font-size: 12px;
-                border-radius: 8px;
+                font-weight: 800;
+                border-radius: 10px;
+                box-shadow: 0 4px 14px rgba(91, 33, 182, 0.22);
             }
             .dock-inner {
                 min-height: 0;
@@ -3565,21 +3612,31 @@
             }
             .dock-compose-row {
                 flex-direction: row;
-                align-items: stretch;
-                gap: 8px;
+                align-items: flex-end;
+                gap: 6px;
                 min-height: 0;
             }
+            .dock-compose-tools-left {
+                flex: 0 0 auto;
+                max-width: 76px;
+                min-width: 0;
+            }
+            .dock-compose-tools-right {
+                flex: 0 0 auto;
+                gap: 4px;
+            }
             .dock-compose-row #mainInput {
-                flex: 1;
+                flex: 1 1 auto;
                 width: auto;
                 height: 48px;
                 min-height: 48px;
                 max-height: 96px;
                 padding: 10px 12px;
                 font-size: 16px;
-                border-radius: 12px;
-                border: 1px solid #d1d5db;
+                border-radius: 14px;
+                border: 1px solid #e2e8f0;
                 background: #fff;
+                box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
             }
             html[data-theme="dark"] .dock-compose-row #mainInput {
                 background: #111;
@@ -3588,13 +3645,32 @@
             }
             .dock-compose-row .dock-submit-btn {
                 width: auto;
-                min-width: 72px;
-                max-width: 96px;
+                min-width: 64px;
+                max-width: 80px;
                 min-height: 48px;
                 height: 48px;
-                padding: 0 10px;
-                font-size: 13px;
+                padding: 0 8px;
+                font-size: 12px;
                 font-weight: 800;
+                border-radius: 14px;
+            }
+            .dock-compose-row .input-tool-btn.ai-pick-trigger-btn {
+                width: 76px;
+                max-width: 76px;
+                min-height: 48px;
+                height: 48px;
+                padding: 0 6px;
+                font-size: 11px;
+                border-radius: 12px;
+            }
+            .dock-compose-row .input-tool-btn.privacy-btn-compact,
+            .dock-compose-row .input-tool-btn.icon-tool-btn {
+                min-height: 48px;
+                height: 48px;
+                min-width: 44px;
+                width: 44px;
+                padding: 0;
+                font-size: 16px;
                 border-radius: 12px;
             }
             .dock-btn-row {
@@ -3604,6 +3680,35 @@
                 gap: 6px;
                 min-height: 0;
             }
+            .dock-mode-group {
+                flex: 1 1 100%;
+                min-width: 0;
+                width: 100%;
+                max-width: none;
+                gap: 4px;
+                padding: 4px;
+                border-radius: 14px;
+                background: #f1f5f9;
+                border: 1px solid #e2e8f0;
+            }
+            html[data-theme="dark"] .dock-mode-group {
+                background: #171717;
+                border-color: #333;
+            }
+            .dock-mode-group .mode-btn {
+                border: none;
+                background: transparent;
+                box-shadow: none;
+            }
+            .dock-mode-group .mode-btn.active {
+                background: #fff;
+                box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+                color: #5b21b6;
+            }
+            html[data-theme="dark"] .dock-mode-group .mode-btn.active {
+                background: #262626;
+                color: #c4b5fd;
+            }
             .dock-btn-center {
                 display: flex;
                 flex: 1 1 100%;
@@ -3612,13 +3717,6 @@
                 gap: 6px;
                 min-width: 0;
                 order: 1;
-            }
-            .dock-mode-group {
-                flex: 1 1 auto;
-                min-width: 0;
-                width: 100%;
-                max-width: none;
-                gap: 6px;
             }
             .dock-btn-row .mode-btn {
                 min-height: 40px;
@@ -3658,34 +3756,9 @@
                 font-size: 12px;
                 padding: 8px 4px;
             }
-            .dock-btn-left {
-                flex: 1 1 auto;
-                min-width: 0;
-                max-width: 58%;
-                order: 2;
-            }
-            .dock-btn-right {
-                flex: 0 0 auto;
-                gap: 3px;
-                order: 3;
-                margin-left: auto;
-            }
-            .dock-btn-row .input-tool-btn.ai-pick-trigger-btn {
-                max-width: 100%;
-                width: 100%;
-                min-height: 30px;
-                height: 30px;
-                padding: 0 6px;
-                font-size: 10px;
-            }
-            .dock-btn-row .input-tool-btn.privacy-btn-compact,
-            .dock-btn-row .input-tool-btn.icon-tool-btn {
-                min-height: 30px;
-                height: 30px;
-                min-width: 30px;
-                width: 30px;
-                padding: 0;
-                font-size: 12px;
+            .compare-card {
+                border: 1px solid #e2e8f0;
+                margin-bottom: 10px;
             }
             .collab-action-bar {
                 flex-direction: row;
@@ -4355,11 +4428,12 @@
                 <div class="dock-inner">
                     <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-compose-row">
+                        <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                        <div class="dock-compose-tools-right" id="mainInputToolsRight"></div>
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
                     <div class="dock-btn-row">
-                        <div class="dock-btn-left" id="mainInputToolsLeft"></div>
                         <div class="dock-btn-center">
                             <div class="dock-mode-group">
                                 <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
@@ -4372,7 +4446,6 @@
                                 <button id="dockNewDebateBtn" class="dock-btn muted is-hidden" type="button">새 토론</button>
                             </div>
                         </div>
-                        <div class="dock-btn-right" id="mainInputToolsRight"></div>
                     </div>
                 </div>
             </footer>
@@ -4403,7 +4476,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627l"></script>
+    <script src="/static/nasaro-features.js?v=20260627m"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
