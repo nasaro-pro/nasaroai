@@ -585,6 +585,17 @@ class CompareRequest(BaseModel):
     user_id: str = ""
 
 
+class CollabIntakeMessage(BaseModel):
+    role: str
+    content: str
+
+
+class CollabIntakeRequest(BaseModel):
+    task: str
+    messages: list[CollabIntakeMessage] = Field(default_factory=list)
+    user_id: str = ""
+
+
 class CollabRecommendRequest(BaseModel):
     task: str
     user_id: str = ""
@@ -2606,6 +2617,76 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.post("/collab/intake")
+async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
+    """AI 추천 전 작업 세부사항을 채팅으로 수집한다 (쿼터 미차감)."""
+    await ensure_model_cache_fresh()
+    task = data.task.strip()
+    if not task:
+        raise HTTPException(status_code=400, detail="작업 내용을 입력하세요.")
+
+    user_turns = sum(1 for m in data.messages if (m.role or "").strip() == "user")
+    history_lines: list[str] = []
+    for m in data.messages:
+        role = (m.role or "").strip().lower()
+        prefix = "사용자" if role == "user" else "기획 AI"
+        content = (m.content or "").strip()
+        if content:
+            history_lines.append(f"{prefix}: {content}")
+    history_text = "\n".join(history_lines) if history_lines else f"사용자: {task}"
+
+    prompt = (
+        f"당신은 Nasaro AI 협업 기획 도우미입니다.\n"
+        f"사용자 작업을 실제로 고품질로 완수하려면 필요한 세부 정보를 파악해야 합니다.\n\n"
+        f"[초기 요청]\n{task}\n\n"
+        f"[지금까지 대화]\n{history_text}\n\n"
+        "지침:\n"
+        "- 한국어로 친절하고 구체적으로, **한 번에 하나의 질문**만 하세요.\n"
+        "- 작업 유형에 맞는 디테일을 물으세요. 예: 자기소개서→제출처·직무·분량·강조 스펙·경험·톤·마감, "
+        "PPT→청중·목적·슬라이드 수, 개발→언어·기능·환경, 마케팅→타깃·채널·KPI 등.\n"
+        "- 이미 답변된 내용은 반복 질문하지 마세요.\n"
+        "- 핵심 정보가 충분히 모였으면 ready=true로 종료하세요 (보통 4~8회 질문).\n"
+        "- ready=true일 때 enriched_task에 수집한 모든 정보를 통합한 완전한 작업 지시문을 작성하세요.\n\n"
+        'JSON만 출력: {"ready": false, "question": "..."} 또는 '
+        '{"ready": true, "enriched_task": "통합 작업 설명..."}'
+    )
+
+    result = await call_ai_best(prompt, max_tokens=900)
+    if result.success:
+        import re
+
+        m = re.search(r"\{[\s\S]*\}", result.content)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+                if parsed.get("ready") and str(parsed.get("enriched_task", "")).strip():
+                    return {
+                        "ready": True,
+                        "enriched_task": str(parsed["enriched_task"]).strip(),
+                        "question": "",
+                    }
+                question = str(parsed.get("question", "")).strip()
+                if question:
+                    return {"ready": False, "question": question, "enriched_task": ""}
+            except (json.JSONDecodeError, TypeError, ValueError):
+                pass
+
+    fallback_questions = [
+        "이 작업의 **최종 제출/사용처**(회사·학교·플랫폼 등)와 **목적**을 알려주세요.",
+        "**분량·형식·마감** 기준이 있나요? (글자 수, 페이지, 파일 형식, 날짜)",
+        "꼭 **넣어야 할 핵심 내용·스펙·경험·키워드**가 있다면 구체적으로 적어주세요.",
+        "**피해야 할 표현·금기 사항**이나 참고할 **톤/샘플**이 있나요?",
+        "수집한 정보로 진행할게요. 추가로 꼭 반영할 내용이 더 있나요? (없으면 「없음」)",
+    ]
+    idx = min(max(0, user_turns - 1), len(fallback_questions) - 1)
+    if user_turns >= len(fallback_questions):
+        merged = f"{task}\n\n[추가 정보]\n" + "\n".join(
+            m.content.strip() for m in data.messages if m.role == "user" and m.content.strip()
+        )
+        return {"ready": True, "enriched_task": merged.strip(), "question": ""}
+    return {"ready": False, "question": fallback_questions[idx], "enriched_task": ""}
 
 
 @app.post("/collab/recommend")

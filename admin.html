@@ -154,6 +154,11 @@
       background: linear-gradient(180deg, #a78bfa 0%, #6d28d9 100%); transition: height .2s;
     }
     .hour-chart-bar-wrap span { font-size: 8px; color: #64748b; margin-top: 3px; }
+    .hour-chart-bar-wrap .bar-hour-label { font-size: 8px; color: #64748b; margin-top: 3px; }
+    .bar-count-label {
+      font-size: 9px; font-weight: 700; color: #e2e8f0; margin-bottom: 2px; line-height: 1;
+      white-space: nowrap;
+    }
     .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
     .chart-panel { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 10px; }
@@ -162,7 +167,7 @@
     .chart-legend span { display: inline-flex; align-items: center; gap: 4px; }
     .chart-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
     .stacked-chart { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 4px 2px; }
-    .stacked-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; height: 100%; }
+    .stacked-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; height: 100%; }
     .stacked-seg { width: 100%; min-height: 1px; border-radius: 2px 2px 0 0; }
     .agent-feed .activity-row { border-left: 3px solid #7c3aed; padding-left: 8px; margin-bottom: 6px; }
     .activity-group {
@@ -702,9 +707,11 @@
       }
       const bars = hours.map((v, hr) => {
         const pct = Math.max(2, Math.round((v / max) * 100));
+        const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
         return `<div class="hour-chart-bar-wrap" title="${hr}시: ${v}회">
+          ${countLabel}
           <div class="hour-chart-bar" style="height:${pct}%;background:linear-gradient(180deg, ${color} 0%, ${color}88 100%)"></div>
-          <span>${hr % 3 === 0 ? hr : ""}</span>
+          <span class="bar-hour-label">${hr % 3 === 0 ? hr : ""}</span>
         </div>`;
       }).join("");
       el.innerHTML = `<div class="hour-chart-graph">${bars}</div>
@@ -727,9 +734,11 @@
       }
       const bars = hourTotals.map((v, hr) => {
         const pct = Math.max(2, Math.round((v / max) * 100));
+        const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
         return `<div class="hour-chart-bar-wrap" title="${hr}시: ${v}회">
+          ${countLabel}
           <div class="hour-chart-bar" style="height:${pct}%"></div>
-          <span>${hr % 3 === 0 ? hr : ""}</span>
+          <span class="bar-hour-label">${hr % 3 === 0 ? hr : ""}</span>
         </div>`;
       }).join("");
       el.innerHTML = `<div class="hour-chart-graph">${bars}</div>
@@ -748,7 +757,9 @@
         const limit = limits[feat] ?? "-";
         const bars = hours.map((v, hr) => {
           const pct = Math.max(1, Math.round((v / max) * 100));
+          const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
           return `<div class="stacked-col" title="${hr}시 ${v}회">
+            ${countLabel}
             <div class="stacked-seg" style="height:${pct}%;background:${FEATURE_COLORS[feat]}"></div>
           </div>`;
         }).join("");
@@ -1049,7 +1060,8 @@
       if (!items?.length) return "<div class='empty'>없음</div>";
       return items.slice(0, limit).map(a => {
         const detail = a.is_secret ? "🔒 시크릿 (프라이버시)" : (a.detail || a.action || "").slice(0, 100);
-        return `<div class="activity-row activity-row-clickable" data-activity-id="${a.id}">
+        const idAttr = a.id != null ? ` data-activity-id="${a.id}"` : "";
+        return `<div class="activity-row activity-row-clickable"${idAttr} role="button" tabindex="0">
           <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
           <div>${detail}</div>
         </div>`;
@@ -1060,6 +1072,12 @@
       if (!root) return;
       root.querySelectorAll("[data-activity-id]").forEach(row => {
         row.addEventListener("click", () => {
+          const id = Number(row.dataset.activityId);
+          if (id) openActivityDetail(id);
+        });
+        row.addEventListener("keydown", e => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
           const id = Number(row.dataset.activityId);
           if (id) openActivityDetail(id);
         });
@@ -1209,7 +1227,7 @@
             · 로그인 ${u.login_stats?.login_count ?? 0}회 · 마지막 로그인 ${u.last_login_iso || "-"}</p>
           <p>플랫폼: ${pc} · 결과물 ${u.saved_results_count ?? 0}개</p>
           ${renderQuotaAdminPanel(subject, u.quota_snapshot, u.quota_limits, u.banned)}
-          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
+          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록 <span style="font-size:11px;color:#94a3b8;font-weight:400;">· 항목 클릭 시 상세</span></h3>
           <div class="activity-list" id="memberActivityList">${renderDetailActivityHtml(u.activity || [], 80)}</div>
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 기록</h3>
           <div class="activity-list">${(u.support_inquiries || []).map(s => `
@@ -1256,7 +1274,7 @@
           <p><button type="button" class="secondary" id="guestDetailBackBtn">← 기기 목록</button></p>
           <p>기기 ID: <code>${deviceId}</code></p>
           ${renderQuotaAdminPanel(subject, snap.features, snap.limits, snap.banned)}
-          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
+          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록 <span style="font-size:11px;color:#94a3b8;font-weight:400;">· 항목 클릭 시 상세</span></h3>
           <div class="activity-list" id="guestActivityList">${renderDetailActivityHtml(data.activity || [], 500)}</div>`;
         wireDetailActivityList(document.getElementById("guestActivityList"));
         document.getElementById("guestDetailBackBtn")?.addEventListener("click", () => {
@@ -1430,6 +1448,12 @@
     });
     document.getElementById("activityDetailModal")?.addEventListener("click", e => {
       if (e.target.id === "activityDetailModal") closeActivityDetail();
+    });
+    document.getElementById("userDetail")?.addEventListener("click", e => {
+      const row = e.target.closest("[data-activity-id]");
+      if (!row || !row.closest(".activity-list")) return;
+      const id = Number(row.dataset.activityId);
+      if (id) openActivityDetail(id);
     });
     document.getElementById("tabStats").addEventListener("click", showOverview);
     document.getElementById("tabMembers").addEventListener("click", () => {

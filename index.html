@@ -560,6 +560,63 @@
             line-height: 1.8;
         }
 
+        .collab-intake-panel {
+            width: 100%;
+            max-width: 640px;
+            margin-top: 16px;
+            text-align: left;
+        }
+        .collab-intake-head {
+            font-size: 13px;
+            font-weight: 700;
+            color: #6d28d9;
+            margin-bottom: 8px;
+        }
+        .collab-intake-chat {
+            max-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+        }
+        .collab-intake-msg {
+            max-width: 92%;
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.55;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .collab-intake-msg.user {
+            align-self: flex-end;
+            background: #ede9fe;
+            color: #4c1d95;
+            border-radius: 14px 14px 4px 14px;
+        }
+        .collab-intake-msg.assistant {
+            align-self: flex-start;
+            background: #f3f4f6;
+            color: #374151;
+            border-radius: 14px 14px 14px 4px;
+        }
+        html[data-theme="dark"] .collab-intake-chat {
+            background: #171717;
+            border-color: #333;
+        }
+        html[data-theme="dark"] .collab-intake-msg.user {
+            background: #312e81;
+            color: #e9d5ff;
+        }
+        html[data-theme="dark"] .collab-intake-msg.assistant {
+            background: #262626;
+            color: #e5e5e5;
+        }
+
         /* 협업 워크스페이스 */
         .collab-workspace {
             display: flex;
@@ -1591,26 +1648,39 @@
             flex-direction: column;
             gap: 16px;
         }
-        .compare-turn-block {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .compare-turn-question {
-            font-size: 14px;
-            font-weight: 700;
-            color: #374151;
-            padding: 10px 12px;
-            border-radius: 10px;
-            background: #f3f4f6;
-            border: 1px solid #e5e7eb;
+        .compare-q-bubble {
+            align-self: flex-end;
+            max-width: 96%;
+            padding: 8px 12px;
+            border-radius: 14px 14px 4px 14px;
+            background: #ede9fe;
+            color: #4c1d95;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
             line-height: 1.45;
             word-break: break-word;
         }
-        html[data-theme="dark"] .compare-turn-question {
-            color: #e5e5e5;
-            background: #171717;
-            border-color: #333;
+        html[data-theme="dark"] .compare-q-bubble {
+            background: #312e81;
+            color: #e9d5ff;
+        }
+        .compare-qa-stack {
+            padding: 8px 12px 12px;
+            display: flex;
+            flex-direction: column;
+        }
+        .compare-qa-pair {
+            padding: 10px 0;
+            border-bottom: 1px dashed #e5e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+        .compare-qa-pair:last-child {
+            border-bottom: none;
+        }
+        html[data-theme="dark"] .compare-qa-pair {
+            border-bottom-color: #333;
         }
 
         .compare-grid {
@@ -4236,7 +4306,7 @@
                 </div>
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
-                <div id="compareResponses" class="compare-turns"></div>
+                <div id="compareResponses" class="compare-grid"></div>
             </section>
 
             <section id="debatePanel" class="panel">
@@ -4261,10 +4331,14 @@
                     <div class="collab-intro-icon">🤝</div>
                     <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
                     <p class="collab-intro-desc">
-                        작업 내용을 입력하면 AI가 <strong>4단계 협업</strong>과 단계별 AI를 추천합니다.<br>
+                        작업 내용을 입력하면 AI가 <strong>세부 정보를 질문</strong>한 뒤, <strong>4단계 협업</strong>과 단계별 AI를 추천합니다.<br>
                         위 <strong>단계 버튼</strong>을 눌러 내용을 보고, 아래 <strong>진행 기록</strong>에서 과정을 확인하세요.
                     </p>
                     <div id="collabTemplateRow" class="collab-template-row"></div>
+                    <div id="collabIntakePanel" class="collab-intake-panel" style="display:none;">
+                        <div class="collab-intake-head">작업 세부 정보 수집</div>
+                        <div id="collabIntakeChat" class="collab-intake-chat"></div>
+                    </div>
                 </div>
 
                 <div id="collabWorkspace" class="collab-workspace" style="display:none;">
@@ -4824,8 +4898,60 @@
             if (currentUser && authToken) await syncUserData();
         }
 
-        function compareModelSlug(turnIndex, model) {
-            return `t${turnIndex}-${String(model).replace(/[^a-zA-Z0-9]+/g, "_")}`;
+        function compareModelKey(model) {
+            return String(model).replace(/[^a-zA-Z0-9]+/g, "_");
+        }
+
+        function compareContentSlug(turnIndex, model) {
+            return `${compareModelKey(model)}-t${turnIndex}`;
+        }
+
+        function ensureCompareModelCards(models) {
+            const root = document.getElementById("compareResponses");
+            if (!root) return;
+            root.className = "compare-grid";
+            models.forEach(model => {
+                const key = compareModelKey(model);
+                if (document.getElementById(`compare-card-${key}`)) return;
+                const color = colorFor(model);
+                const card = document.createElement("article");
+                card.className = "compare-card";
+                card.id = `compare-card-${key}`;
+                card.dataset.model = model;
+                card.style.borderLeftColor = color;
+                card.innerHTML = `
+                    <div class="compare-card-header" style="color: ${color};">
+                        <span class="dot" style="background: ${color};"></span>
+                        <span>${model}</span>
+                        <span class="compare-model-meta" id="model-meta-${key}"></span>
+                        <button type="button" class="compare-copy-btn" data-copy-key="${key}" title="복사">복사</button>
+                    </div>
+                    <div class="compare-qa-stack" id="compare-qa-stack-${key}"></div>`;
+                root.appendChild(card);
+                card.querySelector(".compare-copy-btn")?.addEventListener("click", () => {
+                    const stack = document.getElementById(`compare-qa-stack-${key}`);
+                    const lastContent = stack?.querySelector(".compare-content:last-child");
+                    const text = lastContent?.textContent || "";
+                    navigator.clipboard.writeText(text).then(() => showToast("답변을 복사했습니다.", "success")).catch(() => showToast("복사 실패", "error"));
+                });
+            });
+        }
+
+        function appendCompareQaPair(model, question, turnIndex) {
+            const key = compareModelKey(model);
+            const slug = compareContentSlug(turnIndex, model);
+            const stack = document.getElementById(`compare-qa-stack-${key}`);
+            if (!stack) return slug;
+            const pair = document.createElement("div");
+            pair.className = "compare-qa-pair";
+            pair.id = `compare-qa-pair-${slug}`;
+            pair.innerHTML = `
+                <div class="compare-q-bubble">${escapeHtml(question)}</div>
+                <div id="content-${slug}" class="compare-content"></div>
+                <div id="retry-${slug}" class="retry-row"></div>`;
+            stack.appendChild(pair);
+            pair.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            return slug;
         }
 
         function syncCompareSessionHistory() {
@@ -4872,10 +4998,12 @@
             showNotice("compareError", "");
             const compareHint = document.getElementById("compareEmptyHint");
             if (compareHint) compareHint.style.display = compareTurns.length ? "none" : "flex";
+            const allModels = new Set();
+            compareTurns.forEach(turn => Object.keys(turn.responses || {}).forEach(m => allModels.add(m)));
+            ensureCompareModelCards([...allModels]);
             compareTurns.forEach((turn, turnIndex) => {
-                const grid = appendCompareTurnBlock(turnIndex, turn.query);
-                Object.keys(turn.responses).forEach(model => {
-                    renderCompareCard(model, turnIndex, grid);
+                Object.keys(turn.responses || {}).forEach(model => {
+                    appendCompareQaPair(model, turn.query, turnIndex);
                     updateCompareCard(model, turn.responses[model] || "", turn.responses[model] === COMPARE_FAILURE_MSG, turnIndex);
                 });
             });
@@ -4883,8 +5011,7 @@
             if (last) {
                 const sections = Object.keys(last.responses).map(m => ({ heading: m, body: last.responses[m] || "" }));
                 if (sections.length) {
-                    const turnGrid = document.getElementById(`compare-turn-grid-${compareTurns.length - 1}`);
-                    window.NasaroFeatures?.addResultActions?.(turnGrid || el, {
+                    window.NasaroFeatures?.addResultActions?.(el, {
                         title: last.query,
                         sections,
                         kind: "compare",
@@ -5114,6 +5241,9 @@
 
         let collabTaskAsked = false;
         let collabRecommendInFlight = false;
+        let collabIntakeActive = false;
+        let collabIntakeTask = "";
+        let collabIntakeMessages = [];
         let collabSession = null;
         let collabSelectedStage = 0;
         let collabPipelineRunning = false;
@@ -6032,6 +6162,7 @@
                 lastCompareMessage = "";
                 lastCompareSessionId = "";
                 document.getElementById("compareResponses").innerHTML = "";
+                document.getElementById("compareResponses").className = "compare-grid";
                 showNotice("compareLoading", "");
                 showNotice("compareError", "");
             } else if (mode === "debate") {
@@ -6042,6 +6173,7 @@
                 collabRecommendInFlight = false;
                 collabPipelineRunning = false;
                 collabFinalProduct = "";
+                resetCollabIntake();
                 userDataStore().removeItem(ACTIVE_COLLAB_KEY);
                 document.getElementById("collabWorkspace").style.display = "none";
                 document.getElementById("collabIntro").style.display = "flex";
@@ -6335,15 +6467,23 @@
             }
 
             if (currentMode === "collab") {
-                mainInput.placeholder = collabTaskAsked
-                    ? (NF?.t?.("ph_collab_done") || "추가 수정·요청…")
-                    : (NF?.t?.("ph_collab") || "작업 설명…");
-                dockPrimaryBtn.textContent = collabRecommendInFlight
-                    ? "…"
-                    : (mob
-                        ? (collabTaskAsked ? "추가 ▶" : "추천 ▶")
-                        : (collabTaskAsked ? "추가 작업 ▶" : (NF?.t?.("btn_collab") || "AI 추천 ▶")));
-                dockPrimaryBtn.title = collabTaskAsked ? "추가 작업" : "AI 추천";
+                if (collabIntakeActive) {
+                    mainInput.placeholder = "질문에 답변…";
+                    dockPrimaryBtn.textContent = collabRecommendInFlight
+                        ? "…"
+                        : (mob ? "답변 ▶" : "답변 ▶");
+                    dockPrimaryBtn.title = "답변 전송";
+                } else {
+                    mainInput.placeholder = collabTaskAsked
+                        ? (NF?.t?.("ph_collab_done") || "추가 수정·요청…")
+                        : (NF?.t?.("ph_collab") || "작업 설명…");
+                    dockPrimaryBtn.textContent = collabRecommendInFlight
+                        ? "…"
+                        : (mob
+                            ? (collabTaskAsked ? "추가 ▶" : "시작 ▶")
+                            : (collabTaskAsked ? "추가 작업 ▶" : (NF?.t?.("btn_collab") || "작업 시작 ▶")));
+                    dockPrimaryBtn.title = collabTaskAsked ? "추가 작업" : "작업 시작";
+                }
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = collabRecommendInFlight;
                 mainInput.disabled = false;
@@ -6380,12 +6520,12 @@
             if (panel) panel.classList.add("active");
 
             if (mode === "collab") {
-                if (!collabTaskAsked) {
+                if (!collabTaskAsked && !collabIntakeActive) {
                     document.getElementById("collabIntro").style.display = "flex";
                     document.getElementById("collabWorkspace").style.display = "none";
                 } else {
-                    document.getElementById("collabIntro").style.display = "none";
-                    document.getElementById("collabWorkspace").style.display = "flex";
+                    document.getElementById("collabIntro").style.display = collabIntakeActive ? "flex" : "none";
+                    document.getElementById("collabWorkspace").style.display = collabIntakeActive ? "none" : "flex";
                 }
             }
 
@@ -7264,22 +7404,80 @@
             } else if (currentMode === "collab") handleCollabSubmit();
         });
 
-        async function handleCollabSubmit() {
-            const task = mainInput.value.trim();
-            if (!task || collabRecommendInFlight || collabPipelineRunning) return;
+        function resetCollabIntake() {
+            collabIntakeActive = false;
+            collabIntakeTask = "";
+            collabIntakeMessages = [];
+            const panel = document.getElementById("collabIntakePanel");
+            const chat = document.getElementById("collabIntakeChat");
+            const introTitle = document.querySelector(".collab-intro-title");
+            if (panel) panel.style.display = "none";
+            if (chat) chat.innerHTML = "";
+            if (introTitle) introTitle.textContent = "어떤 작업을 원하십니까?";
+        }
 
-            if (collabTaskAsked && collabSession?.plan) {
-                mainInput.value = "";
-                autoResizeInput();
-                await handleCollabFollowUp(task);
-                updateDockUI();
-                return;
-            }
+        function showCollabIntakePanel() {
+            const panel = document.getElementById("collabIntakePanel");
+            const introTitle = document.querySelector(".collab-intro-title");
+            if (panel) panel.style.display = "block";
+            if (introTitle) introTitle.textContent = "작업 정보를 알려주세요";
+        }
 
+        function appendCollabIntakeMessage(role, text) {
+            const chat = document.getElementById("collabIntakeChat");
+            if (!chat) return null;
+            const el = document.createElement("div");
+            el.className = `collab-intake-msg ${role}`;
+            el.textContent = text;
+            chat.appendChild(el);
+            chat.scrollTop = chat.scrollHeight;
+            return el;
+        }
+
+        async function runCollabIntakeStep() {
             collabRecommendInFlight = true;
             dockPrimaryBtn.disabled = true;
-            mainInput.value = "";
-            autoResizeInput();
+            const thinking = appendCollabIntakeMessage("assistant", "질문을 준비하는 중…");
+            try {
+                const response = await apiFetch("/collab/intake", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        task: collabIntakeTask,
+                        messages: collabIntakeMessages,
+                        user_id: getDeviceId(),
+                    }),
+                });
+                if (!response.ok) {
+                    const errMsg = await parseApiError(response, "정보 수집 실패");
+                    throw new Error(errMsg);
+                }
+                const data = await response.json();
+                thinking?.remove();
+                if (data.ready && data.enriched_task) {
+                    appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.");
+                    collabIntakeActive = false;
+                    await runCollabRecommend(String(data.enriched_task).trim());
+                } else if (data.question) {
+                    collabIntakeMessages.push({ role: "assistant", content: data.question });
+                    appendCollabIntakeMessage("assistant", data.question);
+                } else {
+                    throw new Error("질문을 받지 못했습니다.");
+                }
+            } catch (err) {
+                thinking?.remove();
+                appendCollabIntakeMessage("assistant", `오류: ${err.message}`);
+                showToast(err.message || "정보 수집 실패", "error", 5000);
+            } finally {
+                collabRecommendInFlight = false;
+                dockPrimaryBtn.disabled = false;
+                updateDockUI();
+            }
+        }
+
+        async function runCollabRecommend(task) {
+            collabRecommendInFlight = true;
+            dockPrimaryBtn.disabled = true;
 
             const resultEl = document.getElementById("collabRecommendResult");
             const workspaceEl = document.getElementById("collabWorkspace");
@@ -7308,12 +7506,47 @@
             } catch (err) {
                 resultEl.textContent = `오류: ${err.message}`;
                 showToast(err.message || "협업 요청 실패", "error", 5000);
+                if (!collabSession?.plan) {
+                    workspaceEl.style.display = "none";
+                    introEl.style.display = "flex";
+                    resetCollabIntake();
+                }
             } finally {
                 collabRecommendInFlight = false;
                 dockPrimaryBtn.disabled = false;
                 if (collabSession?.plan) collabTaskAsked = true;
                 updateDockUI();
             }
+        }
+
+        async function handleCollabSubmit() {
+            const task = mainInput.value.trim();
+            if (!task || collabRecommendInFlight || collabPipelineRunning) return;
+
+            if (collabTaskAsked && collabSession?.plan) {
+                mainInput.value = "";
+                autoResizeInput();
+                await handleCollabFollowUp(task);
+                updateDockUI();
+                return;
+            }
+
+            mainInput.value = "";
+            autoResizeInput();
+
+            if (!collabIntakeActive) {
+                collabIntakeActive = true;
+                collabIntakeTask = task;
+                collabIntakeMessages = [{ role: "user", content: task }];
+                showCollabIntakePanel();
+                appendCollabIntakeMessage("user", task);
+                await runCollabIntakeStep();
+                return;
+            }
+
+            collabIntakeMessages.push({ role: "user", content: task });
+            appendCollabIntakeMessage("user", task);
+            await runCollabIntakeStep();
         }
 
         function highlightCollabTools(tools) {
@@ -7909,56 +8142,22 @@
             });
         });
 
-        function appendCompareTurnBlock(turnIndex, message) {
-            const root = document.getElementById("compareResponses");
-            const block = document.createElement("div");
-            block.className = "compare-turn-block";
-            block.id = `compare-turn-${turnIndex}`;
-            block.innerHTML = `
-                <div class="compare-turn-question">${escapeHtml(message)}</div>
-                <div class="compare-grid" id="compare-turn-grid-${turnIndex}"></div>`;
-            root.appendChild(block);
-            block.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            return block.querySelector(".compare-grid");
-        }
-
         function renderCompareCard(model, turnIndex = compareCurrentTurnIndex, gridEl = null) {
-            const slug = compareModelSlug(turnIndex, model);
-            const color = colorFor(model);
-            const card = document.createElement("article");
-            card.className = "compare-card";
-            card.id = `response-${slug}`;
-            card.style.borderLeftColor = color;
-            card.innerHTML = `
-                <div class="compare-card-header" style="color: ${color};">
-                    <span class="dot" style="background: ${color};"></span>
-                    <span>${model}</span>
-                    <span class="compare-model-meta" id="model-meta-${slug}"></span>
-                    <button type="button" class="compare-copy-btn" data-copy-model="${slug}" title="복사">복사</button>
-                </div>
-                <div id="content-${slug}" class="compare-content"></div>
-                <div id="retry-${slug}" class="retry-row"></div>
-            `;
-            const target = gridEl || document.getElementById(`compare-turn-grid-${turnIndex}`) || document.getElementById("compareResponses");
-            target.appendChild(card);
-            card.querySelector(".compare-copy-btn")?.addEventListener("click", () => {
-                const text = document.getElementById(`content-${slug}`)?.textContent || "";
-                navigator.clipboard.writeText(text).then(() => showToast("답변을 복사했습니다.", "success")).catch(() => showToast("복사 실패", "error"));
-            });
+            appendCompareQaPair(model, compareTurns[turnIndex]?.query || lastCompareMessage || "", turnIndex);
         }
 
         function updateCompareModelMeta(model, actualModel, turnIndex = compareCurrentTurnIndex) {
-            const slug = compareModelSlug(turnIndex, model);
-            const meta = document.getElementById(`model-meta-${slug}`);
+            const key = compareModelKey(model);
+            const meta = document.getElementById(`model-meta-${key}`);
             if (meta && actualModel) meta.textContent = actualModel;
         }
 
         function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex) {
-            const slug = compareModelSlug(turnIndex, model);
+            const slug = compareContentSlug(turnIndex, model);
             const element = document.getElementById(`content-${slug}`);
             if (element) element.textContent = content;
 
-            const card = document.getElementById(`response-${slug}`);
+            const card = document.getElementById(`compare-card-${compareModelKey(model)}`);
             if (card) card.classList.toggle("error-card", isError);
 
             const retry = document.getElementById(`retry-${slug}`);
@@ -7995,7 +8194,7 @@
             lastCompareSessionId = turn.sessionId;
             compareResponses = turn.responses;
             turn.responses[model] = "";
-            updateCompareModelMeta(model, "", turnIndex);
+            updateCompareModelMeta(model, "");
             updateCompareCard(model, "다시 시도 중...", false, turnIndex);
             try {
                 await streamCompareModel(model, turn.query, turn.responses, turn.sessionId);
@@ -8019,7 +8218,7 @@
 
             if (!response.ok || !response.body) {
                 const errMsg = await parseApiError(response, COMPARE_FAILURE_MSG);
-                applyStreamChunk(responses, { model, success: false, error: errMsg });
+                applyStreamChunk(responses, { model, success: false, error: errMsg }, compareCurrentTurnIndex);
                 throw new Error(errMsg);
             }
 
@@ -8040,9 +8239,9 @@
                             if (!line) continue;
 
                             try {
-                                applyStreamChunk(responses, JSON.parse(line.slice(6)));
+                                applyStreamChunk(responses, JSON.parse(line.slice(6)), compareCurrentTurnIndex);
                             } catch (error) {
-                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG }, compareCurrentTurnIndex);
                             }
                         }
                     }
@@ -8053,7 +8252,7 @@
                     const line = buffer.split("\n").find(item => item.startsWith("data: "));
                     if (line) {
                         try {
-                            applyStreamChunk(responses, JSON.parse(line.slice(6)));
+                            applyStreamChunk(responses, JSON.parse(line.slice(6)), compareCurrentTurnIndex);
                         } catch {}
                     }
                 }
@@ -8082,16 +8281,20 @@
             const compareHint = document.getElementById("compareEmptyHint");
             if (compareHint) compareHint.style.display = "none";
 
-            const turnGrid = appendCompareTurnBlock(turnIndex, message);
+            const isFirstTurn = turnIndex === 0;
+            const activeModels = getActiveModels();
+            if (isFirstTurn) {
+                document.getElementById("compareResponses").innerHTML = "";
+            }
+            ensureCompareModelCards(activeModels);
 
             dockPrimaryBtn.disabled = true;
             showNotice("compareError", "");
             showNotice("compareLoading", "AI 모델들이 동시에 답변을 생성하는 중입니다.");
 
-            const activeModels = getActiveModels();
             activeModels.forEach(model => {
                 responses[model] = "";
-                renderCompareCard(model, turnIndex, turnGrid);
+                appendCompareQaPair(model, message, turnIndex);
             });
 
             const failures = [];
@@ -8115,7 +8318,8 @@
             dockPrimaryBtn.disabled = false;
 
             const sections = activeModels.map(m => ({ heading: m, body: responses[m] || "" }));
-            window.NasaroFeatures?.addResultActions?.(turnGrid, {
+            const compareRoot = document.getElementById("compareResponses");
+            window.NasaroFeatures?.addResultActions?.(compareRoot, {
                 title: message,
                 sections,
                 kind: "compare",
