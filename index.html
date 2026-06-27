@@ -2482,16 +2482,11 @@
             padding: 12px 14px;
         }
 
-        /* 모바일: 전체 너비 바텀 시트 */
+        /* 모바일: JS가 버튼 위에 앵커 — 전체 너비 바텀시트 강제 제거 */
         @media (max-width: 520px) {
             .agent-panel {
-                left: 0 !important;
-                right: 0 !important;
-                bottom: var(--input-dock-height, 120px) !important;
-                top: auto !important;
-                width: 100% !important;
-                border-radius: 18px 18px 0 0;
-                height: min(65dvh, 560px);
+                border-radius: 16px;
+                max-width: calc(100vw - 16px);
             }
         }
 
@@ -6571,9 +6566,7 @@
                 if (kbOpen) {
                     window.scrollTo(0, 0);
                 }
-                if (agentPanel && window.innerWidth <= 520 && !document.body.classList.contains("native-agent-overlay")) {
-                    agentPanel.style.bottom = kbOpen ? `${Math.max(0, keyboardHeight)}px` : "";
-                }
+                scheduleAgentPanelReposition();
                 scheduleSyncMainPadding();
             }
             window.visualViewport.addEventListener("resize", onViewportResize);
@@ -6696,6 +6689,8 @@
 
         let agentActive    = false;
         let agentInFlight  = false;
+        let agentPanelUserMoved = false;
+        let agentPanelResizeTimer = null;
         let currentMission = "";
         let agentAbortCtrl = null; // AbortController for current task
 
@@ -6718,30 +6713,22 @@
 
         function positionPanelAboveButton(btn) {
             if (!agentPanel || !btn) return;
-            if (window.innerWidth <= 520) {
-                agentPanel.style.removeProperty("left");
-                agentPanel.style.removeProperty("top");
-                agentPanel.style.right = "";
-                agentPanel.style.bottom = "";
-                agentPanel.style.removeProperty("width");
-                agentPanel.style.removeProperty("height");
-                agentPanel.style.removeProperty("maxHeight");
-                return;
-            }
-            const r = btn.getBoundingClientRect();
             const W = window.innerWidth;
             const H = window.innerHeight;
-            const pW = Math.min(560, W - 32);
-            let pH = Math.min(Math.floor(H * 0.78), 760);
-            const gap = 12;
+            const r = btn.getBoundingClientRect();
+            const gap = 10;
+            const pW = Math.min(560, W - 16);
+            let pH = W <= 520
+                ? Math.min(Math.floor(H * 0.55), 520)
+                : Math.min(Math.floor(H * 0.78), 760);
             const spaceAbove = r.top - gap - 8;
-            if (spaceAbove < pH) pH = Math.max(240, spaceAbove);
-            let left = r.left + r.width / 2 - pW / 2;
+            if (spaceAbove < pH) pH = Math.max(200, spaceAbove);
+            // 버튼 우측 기준으로 패널을 바로 위에 배치 (왼쪽으로 치우치지 않게)
+            let left = r.right - pW;
+            left = Math.max(8, Math.min(W - pW - 8, left));
             let top = r.top - pH - gap;
-            if (left < 8) left = 8;
-            if (left + pW > W - 8) left = W - pW - 8;
-            if (top < 8) top = Math.max(8, r.bottom - pH - gap);
-            if (top + pH > H - 8) top = H - pH - 8;
+            if (top < 8) top = Math.min(r.bottom + gap, H - pH - 8);
+            top = Math.max(8, Math.min(H - pH - 8, top));
             agentPanel.style.left = left + "px";
             agentPanel.style.top = top + "px";
             agentPanel.style.right = "auto";
@@ -6752,22 +6739,36 @@
         }
 
         function positionPanelNearLauncher() {
-            if (!agentPanel) return;
+            if (!agentPanel || agentPanelUserMoved) return;
             const anchor = (agentFloatLauncher?.classList.contains("visible") ? agentFloatLauncher : agentToggleBtn);
             positionPanelAboveButton(anchor);
         }
 
+        function scheduleAgentPanelReposition() {
+            if (!agentPanel || agentPanel.style.display === "none" || agentPanelUserMoved) return;
+            if (agentPanelResizeTimer) clearTimeout(agentPanelResizeTimer);
+            agentPanelResizeTimer = setTimeout(() => {
+                agentPanelResizeTimer = null;
+                positionPanelNearLauncher();
+            }, 80);
+        }
+
         function openAgentPanel(fromLauncher = true) {
             if (!agentPanel) return;
-            if (fromLauncher && agentFloatLauncher?.classList.contains("visible")) {
-                positionPanelNearLauncher();
-            } else {
-                positionPanelAboveButton(agentToggleBtn);
-            }
-            agentPanel.style.display = "flex";
+            agentPanelUserMoved = false;
+            const anchor = (fromLauncher && agentFloatLauncher?.classList.contains("visible"))
+                ? agentFloatLauncher
+                : agentToggleBtn;
             agentPanel.classList.remove("minimized");
+            agentPanel.style.visibility = "hidden";
+            agentPanel.style.display = "flex";
+            positionPanelAboveButton(anchor);
+            agentPanel.style.visibility = "";
             hideLauncher();
-            setTimeout(() => agentInputEl?.focus(), 100);
+            requestAnimationFrame(() => {
+                if (!agentPanelUserMoved) positionPanelAboveButton(anchor);
+                setTimeout(() => agentInputEl?.focus(), 60);
+            });
         }
 
         function closeAgentPanel() {
@@ -6811,8 +6812,8 @@
             agentToggleBtn.classList.toggle("active", active);
             agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
             if (active) {
-                openAgentPanel(false);
                 rebuildAgentToolbar();
+                openAgentPanel(false);
             } else {
                 if (agentAbortCtrl) { agentAbortCtrl.abort(); agentAbortCtrl = null; }
                 if (agentPanel) agentPanel.style.display = "none";
@@ -7312,6 +7313,7 @@
                 if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
                 if (!moved) return;
                 if (e.cancelable) e.preventDefault();
+                agentPanelUserMoved = true;
                 const pW = panel.offsetWidth || 560;
                 const pH = panel.offsetHeight || 760;
                 let left = sx + dx;
@@ -7332,12 +7334,11 @@
             window.addEventListener("touchend", onEnd);
         })(agentPanel);
 
-        // 창 크기 변경 시 패널 재배치
-        window.addEventListener("resize", () => {
-            if (agentPanel?.style.display === "none") return;
-            if (agentFloatLauncher?.classList.contains("visible")) positionPanelNearLauncher();
-            else positionPanelAboveButton(agentToggleBtn);
-        });
+        // 창 크기 변경 시 패널 재배치 (사용자가 드래그한 경우 제외)
+        window.addEventListener("resize", scheduleAgentPanelReposition);
+        if (dockShellEl) {
+            new ResizeObserver(() => scheduleAgentPanelReposition()).observe(dockShellEl);
+        }
 
         if (isAgentOverlay) {
             agentActive = true;

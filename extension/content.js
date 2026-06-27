@@ -692,9 +692,9 @@
     const bW = Math.min(560, W - 32);
     const bH = Math.min(Math.floor(H * 0.78), 760);
     const gap = 12;
-    let left = lRect.left + lRect.width / 2 - bW / 2;
+    let left = lRect.right - bW;
     let top = lRect.top - bH - gap;
-    if (top < 8) top = Math.max(8, lRect.bottom - bH - gap);
+    if (top < 8) top = Math.min(lRect.bottom + gap, H - bH - 8);
     if (left < 8) left = 8;
     if (left + bW > W - 8) left = W - bW - 8;
     if (top + bH > H - 8) top = H - bH - 8;
@@ -1178,9 +1178,10 @@
     const width = Number(anchor.width || 0);
     const left0 = Number(anchor.left || 0);
     const top0 = Number(anchor.top || 0);
-    let left = left0 + width / 2 - bW / 2;
-    let top = top0 - bH - 8;
-    if (top < 8) top = 8;
+    const right0 = left0 + width;
+    let left = right0 - bW;
+    let top = top0 - bH - 10;
+    if (top < 8) top = Math.min(top0 + Number(anchor.height || 0) + 10, H - bH - 8);
     if (left < 8) left = 8;
     if (left + bW > W - 8) left = W - bW - 8;
     if (top + bH > H - 8) top = H - bH - 8;
@@ -1188,6 +1189,8 @@
     bar.style.top = top + "px";
     bar.style.right = "auto";
     bar.style.bottom = "auto";
+    barLeft = left;
+    barTop = top;
     return true;
   }
 
@@ -1201,20 +1204,19 @@
       setEnabled(true);
       bar.hidden = false;
       applyBarSize();
-      if (d.anchor && window.innerWidth > 640 && openAboveAnchor(d.anchor)) {
+      if (d.anchor && window.innerWidth > 640) {
+        openAboveAnchor(d.anchor);
         barManualPos = true;
-        const r = bar.getBoundingClientRect();
-        barLeft = Math.round(r.left);
-        barTop = Math.round(r.top);
-        syncUiSoon({ barLeft, barTop, barManualPos: true }, true);
       } else {
         barManualPos = false;
         positionBarNearLauncher();
-        syncUiSoon({ barManualPos: false, barLeft: 0, barTop: 0 }, true);
       }
       render();
+      if (d.anchor && window.innerWidth > 640) openAboveAnchor(d.anchor);
+      syncUiSoon({ barManualPos, barLeft, barTop }, true);
       try { chrome.storage.local.set({ barOpen: true }); } catch {}
       setTimeout(() => {
+        if (d.anchor && window.innerWidth > 640) openAboveAnchor(d.anchor);
         input.focus();
         tasksWrap.scrollTop = tasksWrap.scrollHeight;
       }, 50);
