@@ -904,6 +904,7 @@
             padding: 10px; border-radius: 12px; border: 2px solid #e5e7eb; background: #fff;
             cursor: pointer; text-align: left; position: relative; min-height: 74px;
         }
+        .collab-rail-step.compact-v4 { min-height: 52px; padding: 6px 8px; }
         .collab-rail-step .step-num { font-size: 10px; font-weight: 800; color: #9ca3af; }
         .collab-rail-step .step-name { font-size: 12px; font-weight: 700; color: #374151; }
         .collab-rail-step .step-ai { font-size: 11px; font-weight: 700; color: #7c3aed; margin-top: 2px; }
@@ -949,7 +950,138 @@
         .collab-log-line.info { color: #93c5fd; }
         .collab-sidebars, .collab-preset-sidebar { display: none !important; }
         .collab-workspace-layout { display: block !important; }
-        .collab-recommend-result { max-height: none !important; overflow: visible !important; }
+        #collabWorkspace .collab-recommend-result,
+        #collabWorkspace #collabRecommendResult {
+            max-height: none !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            color: inherit !important;
+            white-space: normal !important;
+        }
+        .collab-runner-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 360px;
+            max-height: calc(100dvh - var(--bottom-offset, 120px) - 72px);
+        }
+        .collab-runner-top {
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 12;
+            background: var(--collab-shell-bg, #fff);
+            padding: 6px 0 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        html[data-theme="dark"] .collab-runner-top,
+        html[data-theme="dark"] .collab-action-bar {
+            --collab-shell-bg: #0c0c0c;
+            border-color: #262626;
+        }
+        .collab-runner-body {
+            flex: 1 1 auto;
+            min-height: 160px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .collab-action-bar {
+            flex-shrink: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px 0 4px;
+            border-top: 1px solid #e5e7eb;
+            background: var(--collab-shell-bg, #fff);
+            position: sticky;
+            bottom: 0;
+            z-index: 12;
+        }
+        .collab-action-bar .collab-stage-btn {
+            flex: 1 1 120px;
+            min-height: 40px;
+        }
+        .collab-activity-section {
+            flex-shrink: 0;
+        }
+        .collab-activity-section .collab-activity-log {
+            max-height: 72px;
+            font-size: 10px;
+        }
+        .collab-stage-rail-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 6px;
+        }
+        .collab-panel-task {
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        html[data-theme="dark"] .collab-panel-task { background: #111; border-color: #333; }
+        .collab-panel-task-label { font-size: 10px; font-weight: 800; color: #7c3aed; margin-bottom: 4px; }
+        .collab-panel-task-text { font-size: 13px; font-weight: 700; line-height: 1.4; }
+        .collab-v4-type { font-size: 10px; color: #6b7280; margin-top: 3px; }
+        .collab-panel-rec {
+            font-size: 11px;
+            line-height: 1.45;
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            color: #5b21b6;
+        }
+        html[data-theme="dark"] .collab-panel-rec { background: #1a1530; border-color: #4338ca; color: #c4b5fd; }
+        .collab-panel-stage-rec {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd6fe;
+            background: #faf5ff;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        html[data-theme="dark"] .collab-panel-stage-rec { background: #1a1530; border-color: #4338ca; }
+        .collab-panel-work {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+        }
+        html[data-theme="dark"] .collab-panel-work { background: #0c0c0c; border-color: #333; }
+        .collab-panel-work-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .collab-panel-work-head h3 { margin: 0; font-size: 13px; font-weight: 800; flex: 1; }
+        .collab-panel-work-head select {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #c4b5fd;
+        }
+        .collab-panel-work-body pre {
+            margin: 0;
+            white-space: pre-wrap;
+            font-size: var(--nasaro-answer-size, 14px);
+            line-height: 1.55;
+        }
+        .collab-final-inline {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed #86efac;
+        }
+        .collab-final-inline h4 { margin: 0 0 4px; font-size: 12px; color: #15803d; }
 
         .collab-v3 .collab-v2-head.compact h2 { font-size: 16px; margin: 4px 0; }
         .collab-v3 .collab-v2-summary { font-size: 12px; padding: 8px 10px; }
@@ -3125,15 +3257,12 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            height: calc(100dvh - var(--bottom-offset, 100px) - 48px);
-            max-height: calc(100dvh - var(--bottom-offset, 100px) - 48px);
         }
         #collabWorkspace {
             flex: 1;
             min-height: 0;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
         #collabWorkspace .collab-workspace-layout,
         #collabWorkspace .collab-workspace-main {
@@ -3141,225 +3270,7 @@
             min-height: 0;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
-        #collabRecommendResult {
-            flex: 1;
-            min-height: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
-            color: inherit !important;
-        }
-        .collab-v4-layout {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            min-height: 0;
-            gap: 6px;
-        }
-        .collab-v4-top {
-            flex-shrink: 0;
-            position: sticky;
-            top: 0;
-            z-index: 15;
-            background: var(--collab-v4-bg, #fff);
-            padding: 6px 0 8px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        html[data-theme="dark"] .collab-v4-top {
-            --collab-v4-bg: #0c0c0c;
-            border-bottom-color: #262626;
-        }
-        .collab-v4-top-label {
-            font-size: 10px;
-            font-weight: 800;
-            color: #9ca3af;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            margin-bottom: 6px;
-        }
-        .collab-v4-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-        .collab-rail-step.compact-v4 {
-            min-height: 50px;
-            padding: 6px 8px;
-        }
-        .collab-v4-scroll {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding-bottom: 4px;
-        }
-        .collab-v4-body {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .collab-v4-task {
-            flex-shrink: 0;
-            padding: 8px 10px;
-            border-radius: 10px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-        }
-        html[data-theme="dark"] .collab-v4-task { background: #111; border-color: #333; }
-        .collab-v4-task-label {
-            font-size: 10px;
-            font-weight: 800;
-            color: #7c3aed;
-            margin-bottom: 4px;
-        }
-        .collab-v4-task-text {
-            font-size: 13px;
-            font-weight: 700;
-            line-height: 1.4;
-            color: #111827;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        html[data-theme="dark"] .collab-v4-task-text { color: #f5f5f5; }
-        .collab-v4-type { font-size: 10px; color: #6b7280; margin-top: 3px; }
-        .collab-v4-rec-banner {
-            flex-shrink: 0;
-            font-size: 11px;
-            line-height: 1.45;
-            padding: 6px 10px;
-            border-radius: 8px;
-            background: #f5f3ff;
-            border: 1px solid #ddd6fe;
-            color: #5b21b6;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        html[data-theme="dark"] .collab-v4-rec-banner {
-            background: #1a1530;
-            border-color: #4338ca;
-            color: #c4b5fd;
-        }
-        .collab-v4-recs-label {
-            flex-shrink: 0;
-            font-size: 10px;
-            font-weight: 800;
-            color: #9ca3af;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-        }
-        .collab-v4-recs {
-            flex-shrink: 0;
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 6px;
-        }
-        @media (max-width: 900px) {
-            .collab-v4-recs, .collab-v4-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        .collab-v4-rec-card {
-            padding: 6px 8px;
-            border-radius: 8px;
-            border: 1px solid #ddd6fe;
-            background: #faf5ff;
-            font-size: 10px;
-            line-height: 1.35;
-            cursor: pointer;
-        }
-        html[data-theme="dark"] .collab-v4-rec-card { background: #1a1530; border-color: #4338ca; }
-        .collab-v4-rec-card.selected { border-color: #7c3aed; box-shadow: 0 0 0 1px #7c3aed; }
-        .collab-v4-rec-card .rec-stage { font-weight: 800; color: #6d28d9; }
-        .collab-v4-rec-card .rec-ai { font-weight: 700; color: #4338ca; margin: 2px 0; }
-        .collab-v4-rec-card .rec-hint {
-            color: #64748b;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        .collab-v4-work {
-            flex: 1 1 auto;
-            min-height: 100px;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 8px 10px;
-            background: #fff;
-            overflow: hidden;
-        }
-        html[data-theme="dark"] .collab-v4-work { background: #0c0c0c; border-color: #333; }
-        .collab-v4-work-head {
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 6px;
-        }
-        .collab-v4-work-head h3 {
-            margin: 0;
-            font-size: 12px;
-            font-weight: 800;
-            flex: 1;
-            min-width: 0;
-        }
-        .collab-v4-work-head select {
-            flex-shrink: 0;
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 6px;
-            border: 1px solid #c4b5fd;
-        }
-        .collab-v4-work-body {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-        }
-        .collab-v4-work-body pre {
-            margin: 0;
-            white-space: pre-wrap;
-            font-size: var(--nasaro-answer-size, 14px);
-            line-height: 1.55;
-        }
-        .collab-v4-foot {
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 8px;
-            background: var(--collab-v4-bg, #fff);
-        }
-        html[data-theme="dark"] .collab-v4-foot {
-            --collab-v4-bg: #0c0c0c;
-            border-top-color: #262626;
-        }
-        .collab-v4-foot .collab-v2-toolbar {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .collab-v4-foot .collab-stage-btn {
-            flex: 1 1 100px;
-            min-height: 38px;
-        }
-        .collab-v4-activity .collab-activity-log {
-            max-height: 52px;
-            font-size: 9px;
-            padding: 4px 8px;
-        }
-        .collab-v4-final {
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px dashed #86efac;
-        }
-        .collab-v4-final h4 { margin: 0 0 4px; font-size: 11px; color: #15803d; }
         .session-history-item .sh-preview {
             font-size: 11px;
             color: #6b7280;
@@ -3733,8 +3644,18 @@
                             <div id="collabPresetList"></div>
                             <button type="button" id="collabPresetSaveBtn" class="collab-preset-save">+ 현재 조합 저장</button>
                         </aside>
-                        <div class="collab-workspace-main">
-                    <div id="collabRecommendResult" class="collab-recommend-result"></div>
+                        <div class="collab-workspace-main collab-runner-shell">
+                    <div id="collabStageRail" class="collab-runner-top"></div>
+                    <div id="collabRecommendResult" class="collab-runner-body collab-recommend-result"></div>
+                    <div id="collabActionBar" class="collab-action-bar" style="display:none;">
+                        <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start">▶ 작업 시작</button>
+                        <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 결과물 다운로드</button>
+                        <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">작업 완료</button>
+                    </div>
+                    <div id="collabActivitySection" class="collab-activity-section compact">
+                        <div class="collab-activity-title">진행 기록</div>
+                        <div id="collabActivityLog" class="collab-activity-log compact"></div>
+                    </div>
                     <div class="collab-sidebars">
                         <div class="collab-sidebar" data-sidebar="1">
                             <div class="collab-sidebar-title">🔍 1단계 · 정보 조사 및<br>아이디어 생성</div>
@@ -5559,6 +5480,7 @@
         renderResultFilesList();
         renderSessionHistory();
         bootstrapAuth();
+        wireCollabActionBar();
         loadCollabTemplates();
 
         function initCompareSuggestions() {
@@ -6630,6 +6552,9 @@
             const introEl = document.getElementById("collabIntro");
 
             resultEl.textContent = "추천 AI를 분석하는 중입니다...";
+            const railEl = document.getElementById("collabStageRail");
+            if (railEl) railEl.innerHTML = "";
+            document.getElementById("collabActionBar").style.display = "none";
             workspaceEl.style.display = "flex";
             introEl.style.display = "none";
             renderCollabPresetSidebar();
@@ -6884,139 +6809,132 @@
 
         const COLLAB_STAGE_MODELS = ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"];
 
-        function renderCollabRunner(container) {
-            if (!collabSession?.plan || !container) return;
-            const plan = collabSession.plan;
-            const stages = plan.stages || [];
-            if (!stages.length) {
-                container.textContent = collabSession.recommendation || "협업 계획을 불러오지 못했습니다.";
-                return;
-            }
-            collabSelectedStage = Math.max(0, Math.min(collabSelectedStage, stages.length - 1));
-            while (collabSession.stageStates.length < stages.length) collabSession.stageStates.push("idle");
-            while (collabSession.stageOutputs.length < stages.length) collabSession.stageOutputs.push("");
-            while (collabStageModels.length < stages.length) {
-                const sm = getCollabStageMeta(collabStageModels.length);
-                collabStageModels.push(sm.default_model || COLLAB_STAGE_MODELS[collabStageModels.length % 4]);
-            }
-            const sel = collabSelectedStage;
-            const esc = v => escapeHtml(v || "");
+        function updateCollabActionBar() {
+            const startBtn = document.getElementById("collabStartBtn");
+            const downloadBtn = document.getElementById("collabDownloadBtn");
+            const completeBtn = document.getElementById("collabCompleteBtn");
+            if (startBtn) startBtn.disabled = !!collabPipelineRunning;
+            if (downloadBtn) downloadBtn.disabled = !collabSession?.plan;
+            if (completeBtn) completeBtn.disabled = !collabSession?.plan;
+            const bar = document.getElementById("collabActionBar");
+            if (bar) bar.style.display = collabSession?.plan ? "flex" : "none";
+            const act = document.getElementById("collabActivitySection");
+            if (act) act.style.display = collabSession?.plan ? "" : "none";
+        }
 
-            const railHtml = stages.map((st, i) => {
-                const state = collabSession.stageStates[i] || "idle";
-                const sm = getCollabStageMeta(i);
-                const model = collabStageModels[i] || sm.default_model || "AI";
-                return `
-                <button type="button" class="collab-rail-step compact-v4 ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
-                    <span class="step-state">${collabStateLabel(state)}</span>
-                    <span class="step-num">${i + 1}단계</span>
-                    <span class="step-name">${esc(sm.short || st.name)}</span>
-                    <span class="step-ai">${esc(model)}</span>
-                </button>`;
-            }).join("");
-
-            const overallRec = collabSession.recommendation || plan.summary || "";
-            const recBanner = overallRec
-                ? `<div class="collab-v4-rec-banner"><strong>AI 추천</strong> · ${esc(overallRec)}</div>`
-                : "";
-
-            const recsHtml = stages.map((st, i) => {
-                const sm = getCollabStageMeta(i);
-                const model = collabStageModels[i] || sm.default_model || "AI";
-                const hint = st.detail || st.goal || sm.hint || "";
-                return `
-                <div class="collab-v4-rec-card ${i === sel ? "selected" : ""}" data-rec-step="${i}">
-                    <div class="rec-stage">${i + 1}. ${esc(sm.short || st.name)}</div>
-                    <div class="rec-ai">▶ ${esc(model)}</div>
-                    <div class="rec-hint">${esc(hint)}</div>
-                </div>`;
-            }).join("");
-
-            const st = plan.stages[sel] || {};
-            const sm = getCollabStageMeta(sel);
-            const output = collabSession.stageOutputs[sel] || "";
-            const state = collabSession.stageStates[sel] || "idle";
-            const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
-            const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
-                `<option value="${esc(m)}" ${collabStageModels[sel] === m ? "selected" : ""}>${esc(m)}</option>`
-            ).join("");
-
-            let workBody = "";
-            if (output) {
-                workBody = `<pre>${esc(output)}</pre>`;
-            } else if (state === "running") {
-                workBody = `<p class="collab-stage-wait">AI 작업 중…</p>`;
-            } else {
-                workBody = `<p class="collab-stage-wait" style="color:#64748b;">▶ 작업 시작을 누르면 이 단계가 실행됩니다.</p>`;
-            }
-            if (collabFinalProduct) {
-                workBody += `
-                <div class="collab-v4-final">
-                    <h4>✅ 최종 작업물</h4>
-                    <pre>${esc(collabFinalProduct)}</pre>
-                </div>`;
-            }
-
-            container.innerHTML = `
-            <div class="collab-v4-layout">
-                <div class="collab-v4-top">
-                    <div class="collab-v4-top-label">간단 단계</div>
-                    <div class="collab-v4-rail collab-stage-rail">${railHtml}</div>
-                </div>
-                <div class="collab-v4-scroll">
-                    <div class="collab-v4-body">
-                        <div class="collab-v4-task">
-                            <div class="collab-v4-task-label">요청사항</div>
-                            <div class="collab-v4-task-text">${esc(collabSession.task)}</div>
-                            <div class="collab-v4-type">${esc(plan.work_type || "협업")}</div>
-                        </div>
-                        ${recBanner}
-                        <div class="collab-v4-recs-label">단계별 AI 추천</div>
-                        <div class="collab-v4-recs">${recsHtml}</div>
-                        <div class="collab-v4-work">
-                            <div class="collab-v4-work-head">
-                                <h3>${sel + 1}단계 작업 · ${esc(sm.short || st.name)}</h3>
-                                <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
-                            </div>
-                            <div class="collab-v4-work-body">${workBody}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="collab-v4-foot">
-                    <div class="collab-v2-toolbar compact">
-                        <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
-                        <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
-                        <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
-                    </div>
-                    <div class="collab-v4-activity collab-activity compact">
-                        <div class="collab-activity-title">진행 기록</div>
-                        <div id="collabActivityLog" class="collab-activity-log compact"></div>
-                    </div>
-                </div>
-            </div>`;
-
-            container.querySelectorAll("[data-rail-step]").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    collabSelectedStage = Number(btn.dataset.railStep);
-                    renderCollabRunner(container);
-                    persistActiveCollab();
-                });
-            });
-            container.querySelectorAll("[data-rec-step]").forEach(card => {
-                card.addEventListener("click", () => {
-                    collabSelectedStage = Number(card.dataset.recStep);
-                    renderCollabRunner(container);
-                    persistActiveCollab();
-                });
-            });
-            container.querySelector(".collab-panel-ai")?.addEventListener("change", e => {
-                setCollabStageModel(Number(e.target.dataset.stageAi), e.target.value);
-                renderCollabRunner(container);
-            });
+        function wireCollabActionBar() {
+            if (wireCollabActionBar._done) return;
+            wireCollabActionBar._done = true;
             document.getElementById("collabStartBtn")?.addEventListener("click", startCollabWork);
-            document.getElementById("collabDownloadBtn")?.addEventListener("click", (e) => downloadCollabResult(e.currentTarget));
+            document.getElementById("collabDownloadBtn")?.addEventListener("click", e => downloadCollabResult(e.currentTarget));
             document.getElementById("collabCompleteBtn")?.addEventListener("click", completeCollabWork);
-            renderCollabActivityLog();
+        }
+
+        function renderCollabRunner(container) {
+            wireCollabActionBar();
+            const railEl = document.getElementById("collabStageRail");
+            const bodyEl = container || document.getElementById("collabRecommendResult");
+            if (!collabSession?.plan || !bodyEl || !railEl) return;
+            try {
+                const plan = collabSession.plan;
+                const stages = plan.stages || [];
+                if (!stages.length) {
+                    bodyEl.textContent = collabSession.recommendation || "협업 계획을 불러오지 못했습니다.";
+                    railEl.innerHTML = "";
+                    updateCollabActionBar();
+                    return;
+                }
+                collabSelectedStage = Math.max(0, Math.min(collabSelectedStage, stages.length - 1));
+                while (collabSession.stageStates.length < stages.length) collabSession.stageStates.push("idle");
+                while (collabSession.stageOutputs.length < stages.length) collabSession.stageOutputs.push("");
+                while (collabStageModels.length < stages.length) {
+                    const sm = getCollabStageMeta(collabStageModels.length);
+                    collabStageModels.push(sm.default_model || COLLAB_STAGE_MODELS[collabStageModels.length % 4]);
+                }
+                const sel = collabSelectedStage;
+                const esc = v => escapeHtml(v || "");
+
+                const railHtml = stages.map((st, i) => {
+                    const state = collabSession.stageStates[i] || "idle";
+                    const sm = getCollabStageMeta(i);
+                    const model = collabStageModels[i] || sm.default_model || "AI";
+                    return `
+                    <button type="button" class="collab-rail-step compact-v4 ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
+                        <span class="step-state">${collabStateLabel(state)}</span>
+                        <span class="step-num">${i + 1}단계</span>
+                        <span class="step-name">${esc(sm.short || st.name)}</span>
+                        <span class="step-ai">${esc(model)}</span>
+                    </button>`;
+                }).join("");
+
+                railEl.innerHTML = `
+                    <div class="collab-stage-rail-label">간단 단계 · AI 추천대로 세팅됨</div>
+                    <div class="collab-stage-rail">${railHtml}</div>`;
+
+                const st = plan.stages[sel] || {};
+                const sm = getCollabStageMeta(sel);
+                const output = collabSession.stageOutputs[sel] || "";
+                const state = collabSession.stageStates[sel] || "idle";
+                const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
+                const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
+                    `<option value="${esc(m)}" ${collabStageModels[sel] === m ? "selected" : ""}>${esc(m)}</option>`
+                ).join("");
+                const overallRec = collabSession.recommendation || plan.summary || "";
+                const stageRec = st.detail || st.goal || sm.hint || "";
+
+                let workBody = "";
+                if (output) {
+                    workBody = `<pre>${esc(output)}</pre>`;
+                } else if (state === "running") {
+                    workBody = `<p class="collab-stage-wait">AI 작업 중…</p>`;
+                } else {
+                    workBody = `<p class="collab-stage-wait" style="color:#64748b;">▶ 아래 「작업 시작」을 누르면 이 단계가 실행됩니다.</p>`;
+                }
+                if (collabFinalProduct) {
+                    workBody += `
+                    <div class="collab-final-inline">
+                        <h4>✅ 최종 작업물</h4>
+                        <pre>${esc(collabFinalProduct)}</pre>
+                    </div>`;
+                }
+
+                bodyEl.innerHTML = `
+                    <div class="collab-panel-task">
+                        <div class="collab-panel-task-label">요청사항</div>
+                        <div class="collab-panel-task-text">${esc(collabSession.task)}</div>
+                        <div class="collab-v4-type">${esc(plan.work_type || "협업")}</div>
+                    </div>
+                    ${overallRec ? `<div class="collab-panel-rec"><strong>AI 추천</strong> · ${esc(overallRec)}</div>` : ""}
+                    <div class="collab-panel-stage-rec">
+                        <strong>${sel + 1}단계 AI 추천 · ${esc(collabStageModels[sel] || sm.default_model || "AI")}</strong><br>
+                        ${esc(stageRec)}
+                    </div>
+                    <div class="collab-panel-work">
+                        <div class="collab-panel-work-head">
+                            <h3>${sel + 1}단계 작업 · ${esc(sm.short || st.name)}</h3>
+                            <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
+                        </div>
+                        <div class="collab-panel-work-body">${workBody}</div>
+                    </div>`;
+
+                railEl.querySelectorAll("[data-rail-step]").forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        collabSelectedStage = Number(btn.dataset.railStep);
+                        renderCollabRunner(bodyEl);
+                        persistActiveCollab();
+                    });
+                });
+                bodyEl.querySelector(".collab-panel-ai")?.addEventListener("change", e => {
+                    setCollabStageModel(Number(e.target.dataset.stageAi), e.target.value);
+                    renderCollabRunner(bodyEl);
+                });
+                updateCollabActionBar();
+                renderCollabActivityLog();
+            } catch (err) {
+                console.error("collab render error", err);
+                bodyEl.innerHTML = `<p class="collab-stage-wait" style="color:#dc2626;">화면 구성 오류: ${escapeHtml(err.message || "unknown")}</p>`;
+                updateCollabActionBar();
+            }
         }
 
         function renderCollabPlan(container, data, taskText) {
