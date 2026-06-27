@@ -243,6 +243,31 @@
             background: #eff6ff;
         }
 
+        #sessionHistorySection {
+            flex: 1 1 auto;
+            min-height: 100px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #sessionHistoryList {
+            flex: 1;
+            overflow-y: auto;
+            max-height: min(52vh, 460px);
+        }
+        #activeCollabSection {
+            flex: 0 0 auto;
+            overflow: visible;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            border-top: 1px solid #f3f4f6;
+        }
+        .side-menu-section#activeCollabSection {
+            flex: 0 0 auto;
+            overflow: visible;
+        }
+        html[data-theme="dark"] #activeCollabSection { border-color: #141414; }
+
         .side-menu-section {
             flex: 1;
             overflow-y: auto;
@@ -1097,6 +1122,12 @@
         html[data-theme="dark"] .ai-chip.active { background: #1e1b4b; border-color: #6366f1; color: #e0e7ff; }
         html[data-theme="dark"] .collab-v2-summary,
         html[data-theme="dark"] .collab-stage-live-output { background: #0a0a0a; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .collab-rail-step { background: #111; border-color: #333; }
+        html[data-theme="dark"] .collab-rail-step .step-name { color: #e5e5e5; }
+        html[data-theme="dark"] .collab-rail-step.selected { background: #1a1530; border-color: #7c3aed; }
+        html[data-theme="dark"] .collab-rail-step.done { background: #052e16; border-color: #166534; }
+        html[data-theme="dark"] .collab-stage-panel { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .collab-ai-pick-row { background: #141414; border-color: #333; }
         html[data-theme="dark"] .collab-final-product { background: #052e1622; border-color: #166534; }
         html[data-theme="dark"] .ai-picker-popover { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
         html[data-theme="dark"] .side-account-box { background: transparent; border: none; }
@@ -1181,6 +1212,41 @@
         html[data-theme="dark"] .debate-turn { background: #111; border-color: #262626; color: #f5f5f5; }
         html[data-theme="dark"] .notice.error { background: #2a1215; color: #fecaca; }
         html[data-theme="dark"] .notice.info { background: #172554; color: #bfdbfe; }
+        html[data-theme="dark"] .result-actions-float {
+            background: rgba(12, 12, 12, 0.96); border-color: #333; box-shadow: 0 8px 28px rgba(0,0,0,.45);
+        }
+        html[data-theme="dark"] .export-format-popover {
+            background: #0c0c0c; border-color: #333; color: #f5f5f5;
+        }
+        html[data-theme="dark"] .export-format-option {
+            background: #141414; border-color: #333; color: #c4b5fd;
+        }
+        html[data-theme="dark"] .export-format-option:hover { background: #1e1b4b; border-color: #4338ca; }
+        html[data-theme="dark"] .result-files-hub-btn {
+            background: linear-gradient(135deg, #1a1530 0%, #141414 100%); border-color: #4338ca; color: #c4b5fd;
+        }
+        html[data-theme="dark"] .result-files-popover,
+        html[data-theme="dark"] .result-file-viewer,
+        html[data-theme="dark"] .settings-guide-box,
+        html[data-theme="dark"] .auth-modal,
+        html[data-theme="dark"] .settings-panel-head,
+        html[data-theme="dark"] #shareViewBanner,
+        html[data-theme="dark"] .collab-stage-panel,
+        html[data-theme="dark"] .dock-inner,
+        html[data-theme="dark"] .side-menu-guide-btn {
+            background: #0c0c0c; border-color: #262626; color: #f5f5f5;
+        }
+        html[data-theme="dark"] .result-action-btn {
+            background: #141414; border-color: #333; color: #c4b5fd;
+        }
+        html[data-theme="dark"] .result-action-btn:hover { background: #1e1b4b; }
+        html[data-theme="dark"] .result-action-btn.primary-save { background: #5b21b6; color: #fff; border-color: #6d28d9; }
+        html[data-theme="dark"] .side-menu-settings-btn { background: #141414; border-color: #333; color: #a3a3a3; }
+        html[data-theme="dark"] .auth-modal { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .auth-modal p { color: #a3a3a3; }
+        html[data-theme="dark"] .settings-panel-body { background: #0c0c0c; color: #f5f5f5; }
+        html[data-theme="dark"] #mainContent { background: transparent; color: #f5f5f5; }
+        html[data-theme="dark"] .works-item-dl { color: #c4b5fd; }
 
         .collab-ai-btn.recommended {
             border-color: #7c3aed;
@@ -2868,9 +2934,12 @@
             border: 1px solid #d1d5db; background: #fff; color: #6b7280; cursor: pointer;
         }
         .session-history-item {
-            font-size: 12px; padding: 8px 10px; margin-bottom: 6px; border-radius: 8px;
-            background: #f9fafb; border: 1px solid #e5e7eb; cursor: default; line-height: 1.4;
+            font-size: 12px; padding: 8px 28px 8px 10px; margin-bottom: 6px; border-radius: 8px;
+            background: #f9fafb; border: 1px solid #e5e7eb; cursor: pointer; line-height: 1.4;
+            position: relative;
         }
+        .session-history-item:hover { background: #ede9fe; border-color: #c4b5fd; }
+        html[data-theme="dark"] .session-history-item:hover { background: #1e1b4b; border-color: #4338ca; }
         .session-history-item .sh-mode { font-size: 10px; color: #6b7280; font-weight: 600; }
         .agent-card-badge.scheduled { background: #fef3c7; color: #92400e; }
         .input-tool-group { display: flex; align-items: center; gap: 4px; }
@@ -2896,7 +2965,104 @@
         }
         .input-tool-help:hover .input-tool-tip { display: block; }
 
-        .result-action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .result-action-row { display: none; }
+        .result-actions-float {
+            position: fixed;
+            z-index: 850;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #ddd6fe;
+            box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
+            backdrop-filter: blur(8px);
+            max-width: min(calc(100vw - 24px), 420px);
+        }
+        .export-format-popover {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 168px;
+            padding: 6px;
+            border-radius: 10px;
+            background: #fff;
+            border: 1px solid #ddd6fe;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+        }
+        .export-format-option {
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            background: #f5f3ff;
+            color: #6d28d9;
+            cursor: pointer;
+        }
+        .export-format-option:hover { background: #ede9fe; border-color: #c4b5fd; }
+
+        .footer-actions {
+            display: flex;
+            width: 100%;
+            gap: 6px;
+            align-items: flex-end;
+        }
+        .result-files-hub {
+            position: relative;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .result-files-hub-btn {
+            width: 100%;
+            min-height: 44px;
+            padding: 8px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 10px;
+            border: 1px solid #ddd6fe;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #6d28d9;
+            cursor: pointer;
+            text-align: left;
+        }
+        .result-files-hub-btn.open,
+        .result-files-hub-btn:hover { background: #ede9fe; }
+        .result-files-popover {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            min-width: min(320px, 88vw);
+            max-height: min(60vh, 480px);
+            overflow: auto;
+            background: #fff;
+            border: 1px solid #ddd6fe;
+            border-radius: 12px;
+            box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.15);
+            padding: 10px;
+            z-index: 500;
+        }
+        .result-files-popover.open { display: block; }
+
+        .dock-mode-group {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            flex: 0 0 auto;
+            width: min(100%, 360px);
+        }
+        .dock-extra-btns {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+
         .result-action-btn {
             font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
             border: 1px solid #c4b5fd; background: #f5f3ff; color: #6d28d9; cursor: pointer;
@@ -2944,6 +3110,10 @@
         .works-item-del {
             position: absolute; right: 6px; top: 6px; border: none; background: transparent;
             color: #9ca3af; cursor: pointer; font-size: 12px;
+        }
+        .works-item-dl {
+            position: absolute; right: 28px; top: 6px; border: none; background: transparent;
+            color: #7c3aed; cursor: pointer; font-size: 12px; font-weight: 700;
         }
         .works-empty { font-size: 11px; color: #9ca3af; }
 
@@ -3012,15 +3182,19 @@
                 <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
                 <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
             </div>
-            <div class="side-menu-section" id="resultFilesSection">
-                <button type="button" id="resultFilesToggle" class="result-files-toggle" data-i18n="result_files">📁 결과물 파일</button>
-                <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:8px 0;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
-                <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
-                <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
-            </div>
             <div class="side-menu-footer">
-                <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
-                <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
+                <div class="footer-actions">
+                    <div class="result-files-hub" id="resultFilesHub">
+                        <button type="button" id="resultFilesToggle" class="result-files-hub-btn" data-i18n="result_files">📁 결과물 파일</button>
+                        <div id="resultFilesPopover" class="result-files-popover">
+                            <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
+                            <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
+                            <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
+                        </div>
+                    </div>
+                    <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
+                    <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
+                </div>
             </div>
         </aside>
 
@@ -3214,8 +3388,8 @@
                     <div class="collab-intro-icon">🤝</div>
                     <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
                     <p class="collab-intro-desc">
-                        작업 내용을 입력하면 <strong>4단계 협업</strong>이 준비됩니다.<br>
-                        위에서 단계별 AI를 고르고 <strong>▶ 작업 시작</strong> — 아래에 진행 기록이 쌓입니다.
+                        작업 내용을 입력하면 AI가 <strong>4단계 협업</strong>과 단계별 AI를 추천합니다.<br>
+                        위 <strong>단계 버튼</strong>을 눌러 내용을 보고, 아래 <strong>진행 기록</strong>에서 과정을 확인하세요.
                     </p>
                     <div id="collabTemplateRow" class="collab-template-row"></div>
                 </div>
@@ -3503,13 +3677,17 @@
                     </div>
                     <div class="dock-btn-row">
                         <div class="dock-btn-left" id="mainInputToolsLeft"></div>
-                        <div class="dock-btn-center dock-mode-group">
-                            <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
-                            <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
-                            <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
-                            <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
-                            <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
-                            <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                        <div class="dock-btn-center">
+                            <div class="dock-mode-group">
+                                <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                                <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
+                                <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
+                            </div>
+                            <div class="dock-extra-btns" id="dockExtraBtns">
+                                <button id="newChatBtn" class="dock-btn muted" type="button" data-i18n="new_chat">✦ 새 채팅</button>
+                                <button id="dockSecondaryBtn" class="dock-btn muted" type="button" style="display:none;">질문 추가</button>
+                                <button id="dockNewDebateBtn" class="dock-btn muted" type="button" style="display:none;">새 토론</button>
+                            </div>
                         </div>
                         <div class="dock-btn-right" id="mainInputToolsRight"></div>
                     </div>
@@ -3523,7 +3701,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627f"></script>
+    <script src="/static/nasaro-features.js?v=20260627g"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -3611,10 +3789,147 @@
                 mode: entry.mode,
                 title: entry.title,
                 preview: entry.preview || "",
+                data: entry.data || null,
             });
             if (sessionHistory.length > 50) sessionHistory.length = 50;
             persistSessionHistory();
             renderSessionHistory();
+        }
+
+        function deleteSessionHistoryItem(id) {
+            const idx = sessionHistory.findIndex(h => h.id === id);
+            if (idx === -1) return;
+            sessionHistory.splice(idx, 1);
+            persistSessionHistory();
+            renderSessionHistory();
+        }
+
+        function restoreCompareFromHistory(data, title) {
+            const query = data?.query || title || "";
+            const responses = data?.responses || {};
+            lastCompareMessage = query;
+            lastCompareSessionId = createUUID();
+            compareResponses = { ...responses };
+            mainInput.value = query;
+            autoResizeInput();
+            const el = document.getElementById("compareResponses");
+            el.innerHTML = "";
+            showNotice("compareLoading", "");
+            showNotice("compareError", "");
+            const compareHint = document.getElementById("compareEmptyHint");
+            if (compareHint) compareHint.style.display = Object.keys(responses).length ? "none" : "flex";
+            Object.keys(responses).forEach(model => {
+                renderCompareCard(model);
+                updateCompareCard(model, responses[model] || "", responses[model] === COMPARE_FAILURE_MSG);
+            });
+            const sections = Object.keys(responses).map(m => ({ heading: m, body: responses[m] || "" }));
+            if (sections.length) {
+                window.NasaroFeatures?.addResultActions?.(el, {
+                    title: query,
+                    sections,
+                    kind: "compare",
+                    payload: { query, responses },
+                    apiFetch,
+                    showToast,
+                    onSaveResult: saveResultRecord,
+                    loggedIn: !!currentUser,
+                });
+            }
+        }
+
+        function restoreDebateFromHistory(data, title) {
+            debateTopic = data?.topic || title || "";
+            debateStarted = true;
+            debateSessionId = data?.sessionId || createUUID();
+            debateCards = Array.isArray(data?.cards) ? data.cards.map(c => ({ ...c })) : [];
+            activeCardIndex = Math.max(0, debateCards.length - 1);
+            userMovedDeck = false;
+            mainInput.value = "";
+            autoResizeInput();
+            syncDebateEmptyHint();
+            renderDebateDeck();
+            updateDockUI();
+            if (debateCards.length) {
+                const sections = debateCards.filter(c => !c.loading).map(c => ({
+                    heading: `${c.round_number}R ${c.speaker_index}번 (${c.actual_label || c.model || ""})`,
+                    body: c.content || "",
+                }));
+                window.NasaroFeatures?.addResultActions?.(document.getElementById("debateContent"), {
+                    title: debateTopic,
+                    sections,
+                    kind: "debate",
+                    payload: { topic: debateTopic, cards: debateCards },
+                    apiFetch,
+                    showToast,
+                    onSaveResult: saveResultRecord,
+                    loggedIn: !!currentUser,
+                });
+            }
+        }
+
+        function restoreCollabFromHistory(data, title, asActive = false) {
+            if (!data?.plan) {
+                mainInput.value = title || "";
+                autoResizeInput();
+                return;
+            }
+            collabTaskAsked = true;
+            collabSelectedStage = data.selectedStage ?? 0;
+            if (Array.isArray(data.stageModels) && data.stageModels.length) {
+                collabStageModels = data.stageModels.slice(0, 4);
+            }
+            collabFinalProduct = data.finalProduct || "";
+            collabSession = {
+                task: data.task || title,
+                plan: data.plan,
+                recommendation: data.recommendation || "",
+                stageStates: data.stageStates || [],
+                stageOutputs: data.stageOutputs || [],
+                activityLog: data.activityLog || [],
+            };
+            document.getElementById("collabWorkspace").style.display = "flex";
+            document.getElementById("collabIntro").style.display = "none";
+            renderCollabRunner(document.getElementById("collabRecommendResult"));
+            if (asActive) persistActiveCollab();
+            else renderActiveCollabSidebar();
+            updateDockUI();
+        }
+
+        function restoreAgentFromHistory(data, title) {
+            setAgentActive(true);
+            if (agentInputEl) {
+                agentInputEl.value = title || "";
+                autoResizeTA(agentInputEl);
+            }
+            if (data?.result && agentHistory) {
+                const emptyEl = agentHistory.querySelector(".agent-empty");
+                if (emptyEl) emptyEl.remove();
+                const card = document.createElement("div");
+                card.className = "agent-card";
+                card.innerHTML = `
+                    <div class="agent-card-header">
+                        <span class="agent-card-title">${escapeHtml(title || "")}</span>
+                        <span class="agent-card-badge ok">✅ 완료</span>
+                    </div>
+                    <div class="agent-card-body" style="display:block;">${escapeHtml(data.result)}</div>`;
+                agentHistory.appendChild(card);
+                agentHistory.scrollTop = agentHistory.scrollHeight;
+            }
+        }
+
+        function openSessionHistoryItem(h) {
+            if (!h) return;
+            window.NasaroFeatures?.hideFloatingResultActions?.();
+            setSideMenuOpen(false);
+            switchMode(h.mode);
+            if (h.mode === "compare") restoreCompareFromHistory(h.data, h.title);
+            else if (h.mode === "debate") restoreDebateFromHistory(h.data, h.title);
+            else if (h.mode === "collab") restoreCollabFromHistory(h.data, h.title);
+            else if (h.mode === "agent") restoreAgentFromHistory(h.data, h.title);
+            else {
+                mainInput.value = h.title || "";
+                autoResizeInput();
+            }
         }
 
         function renderSessionHistory() {
@@ -3631,10 +3946,26 @@
                 collab: NF?.t?.("mode_collab") || "협업",
                 agent: NF?.t?.("mode_agent") || "에이전트",
             }[m] || m);
-            list.innerHTML = sessionHistory.map(h => {
+            list.innerHTML = "";
+            sessionHistory.forEach(h => {
+                const item = document.createElement("div");
+                item.className = "session-history-item";
                 const when = new Date(h.time).toLocaleString();
-                return `<div class="session-history-item"><div class="sh-mode">${modeLabel(h.mode)} · ${when}</div><div>${escapeHtml(h.title)}</div></div>`;
-            }).join("");
+                item.innerHTML = `<div class="sh-mode">${modeLabel(h.mode)} · ${when}</div><div>${escapeHtml(h.title)}</div>`;
+                item.addEventListener("click", () => openSessionHistoryItem(h));
+                const del = document.createElement("button");
+                del.type = "button";
+                del.className = "works-item-del";
+                del.textContent = "✕";
+                del.title = "기록 삭제";
+                del.addEventListener("click", e => {
+                    e.stopPropagation();
+                    if (!NF?.confirmDelete?.("이 기록을 삭제할까요?")) return;
+                    deleteSessionHistoryItem(h.id);
+                });
+                item.appendChild(del);
+                list.appendChild(item);
+            });
         }
 
         function rebuildMainToolbar() {
@@ -3807,6 +4138,7 @@
             if (!viewer) return;
             if (!record) { viewer.style.display = "none"; return; }
             viewer.style.display = "block";
+            const NF = window.NasaroFeatures;
             const parts = (record.sections || []).map(s =>
                 `<h4>${escapeHtml(s.heading || "")}</h4><pre>${escapeHtml(String(s.body || ""))}</pre>`
             ).join("");
@@ -3814,10 +4146,14 @@
                 <div class="result-viewer-head">
                     <strong>${escapeHtml(record.title || "")}</strong>
                     <small style="color:#9ca3af">${escapeHtml(record.saved_at || "")}</small>
+                    <button type="button" id="exportResultViewerBtn" class="result-action-btn">${NF?.t?.("export_result") || "결과물 다운로드"}</button>
                     <button type="button" id="closeResultViewer" aria-label="닫기">✕</button>
                 </div>
                 <div class="result-viewer-body">${parts || escapeHtml(JSON.stringify(record.payload || {}, null, 2))}</div>`;
             document.getElementById("closeResultViewer")?.addEventListener("click", () => { viewer.style.display = "none"; });
+            document.getElementById("exportResultViewerBtn")?.addEventListener("click", (e) => {
+                NF?.showExportFormatMenu?.(e.currentTarget, record.title || "결과물", record.sections || []);
+            });
         }
 
         function renderResultFilesList() {
@@ -3841,6 +4177,15 @@
                 item.className = "works-item";
                 item.innerHTML = `<div>${escapeHtml((rec.title || rec.kind || "결과물").slice(0, 40))}</div><small style="color:#9ca3af">${escapeHtml(rec.saved_at || "")} · ${escapeHtml(rec.kind || "")}</small>`;
                 item.addEventListener("click", () => renderResultFileViewer(rec));
+                const dl = document.createElement("button");
+                dl.className = "works-item-dl";
+                dl.type = "button";
+                dl.textContent = "↓";
+                dl.title = NF?.t?.("export_result") || "결과물 다운로드";
+                dl.addEventListener("click", e => {
+                    e.stopPropagation();
+                    NF?.showExportFormatMenu?.(dl, rec.title || "결과물", rec.sections || []);
+                });
                 const del = document.createElement("button");
                 del.className = "works-item-del";
                 del.textContent = "✕";
@@ -3851,6 +4196,7 @@
                     persistSavedResults();
                     renderResultFilesList();
                 });
+                item.appendChild(dl);
                 item.appendChild(del);
                 list.appendChild(item);
             });
@@ -4041,7 +4387,7 @@
         async function persistActiveCollab() {
             if (!collabSession?.plan) {
                 userDataStore().removeItem(ACTIVE_COLLAB_KEY);
-            } else if (currentUser) {
+            } else {
                 const snap = {
                     task: collabSession.task,
                     plan: collabSession.plan,
@@ -4051,10 +4397,11 @@
                     activityLog: collabSession.activityLog || [],
                     selectedStage: collabSelectedStage,
                     stageModels: collabStageModels.slice(0, 4),
+                    finalProduct: collabFinalProduct || "",
                     updated_at: new Date().toISOString(),
                 };
                 userDataStore().setItem(ACTIVE_COLLAB_KEY, JSON.stringify(snap));
-                scheduleUserSync();
+                if (currentUser) scheduleUserSync();
             }
             renderActiveCollabSidebar();
         }
@@ -4070,26 +4417,24 @@
                 return;
             }
             list.innerHTML = "";
+            const doneCount = (active.stageStates || []).filter(s => s === "done").length;
+            const total = (active.plan?.stages || []).length || 4;
             const item = document.createElement("div");
             item.className = "active-collab-item";
-            item.textContent = (active.task || "").slice(0, 48);
+            item.innerHTML = `<div>${escapeHtml((active.task || "").slice(0, 48))}</div><small style="color:#9ca3af">${doneCount}/${total}단계 · 진행 중</small>`;
             item.title = active.task;
             item.addEventListener("click", () => {
-                collabSession = {
+                restoreCollabFromHistory({
                     task: active.task,
                     plan: active.plan,
                     recommendation: active.recommendation,
-                    stageStates: active.stageStates || [],
-                    stageOutputs: active.stageOutputs || [],
-                    activityLog: active.activityLog || [],
-                };
-                collabSelectedStage = active.selectedStage ?? 0;
-                if (Array.isArray(active.stageModels) && active.stageModels.length) {
-                    collabStageModels = active.stageModels.slice(0, 4);
-                }
-                document.getElementById("collabWorkspace").style.display = "flex";
-                document.getElementById("collabIntro").style.display = "none";
-                renderCollabRunner(document.getElementById("collabRecommendResult"));
+                    stageStates: active.stageStates,
+                    stageOutputs: active.stageOutputs,
+                    activityLog: active.activityLog,
+                    selectedStage: active.selectedStage,
+                    stageModels: active.stageModels,
+                    finalProduct: active.finalProduct,
+                }, active.task, true);
                 switchMode("collab");
                 setSideMenuOpen(false);
             });
@@ -4098,20 +4443,33 @@
 
         async function completeCollabWork() {
             if (!collabSession?.plan) return;
-            const NF = window.NasaroFeatures;
             const title = collabSession.task || "협업 작업";
-            const sections = (collabSession.plan.stages || []).map((st, i) => ({
-                heading: st.name,
-                body: collabSession.stageOutputs[i] || "",
-            }));
+            const snapshot = {
+                task: title,
+                plan: collabSession.plan,
+                stageStates: [...(collabSession.stageStates || [])],
+                stageOutputs: [...(collabSession.stageOutputs || [])],
+                stageModels: collabStageModels.slice(0, 4),
+                activityLog: [...(collabSession.activityLog || [])],
+                recommendation: collabSession.recommendation || "",
+                finalProduct: collabFinalProduct || "",
+                selectedStage: collabSelectedStage,
+            };
+            addSessionHistory({
+                mode: "collab",
+                title,
+                preview: collabSession.plan.work_type || "협업",
+                data: snapshot,
+            });
             collabSession = null;
+            collabFinalProduct = "";
             userDataStore().removeItem(ACTIVE_COLLAB_KEY);
             renderActiveCollabSidebar();
             document.getElementById("collabWorkspace").style.display = "none";
             document.getElementById("collabIntro").style.display = "";
             collabTaskAsked = false;
             updateDockUI();
-            showToast("협업을 마쳤습니다. 「결과물 저장」으로 보관하세요.", "success");
+            showToast("협업을 마쳤습니다. 「기록」에서 다시 볼 수 있습니다.", "success");
         }
 
         function migrateSessionResultsToAccount() {
@@ -4380,19 +4738,22 @@
             return { kind: "unknown", retryable: true, message: msg || "알 수 없는 오류" };
         }
 
-        function saveCollabAsResult() {
-            if (!collabSession?.plan) return;
-            const title = collabSession.task || "협업 작업";
+        function getCollabExportSections() {
+            if (!collabSession?.plan) return [];
             const sections = (collabSession.plan.stages || []).map((st, i) => ({
                 heading: st.name,
                 body: collabSession.stageOutputs[i] || "",
             }));
-            saveResultRecord({
-                title,
-                sections,
-                kind: "collab",
-                payload: { task: collabSession.task, work_type: collabSession.plan.work_type },
-            });
+            if (collabFinalProduct) {
+                sections.push({ heading: "최종 작업물", body: collabFinalProduct });
+            }
+            return sections;
+        }
+
+        function downloadCollabResult(anchorBtn) {
+            if (!collabSession?.plan) return;
+            const title = collabSession.task || "협업 작업";
+            window.NasaroFeatures?.showExportFormatMenu?.(anchorBtn, title, getCollabExportSections());
         }
 
         async function refreshSettingsDiagnostics() {
@@ -4476,6 +4837,7 @@
 
         // ── 새 채팅 ──────────────────────────────────────────────────────────
         function startNewChat() {
+            window.NasaroFeatures?.hideFloatingResultActions?.();
             const mode = currentMode;
             mainInput.value = "";
             mainInput.style.height = "auto";
@@ -4507,14 +4869,20 @@
         }
         newChatBtn.addEventListener("click", startNewChat);
 
-        document.getElementById("resultFilesToggle")?.addEventListener("click", () => {
-            const list = document.getElementById("resultFilesList");
-            const viewer = document.getElementById("resultFileViewer");
+        document.getElementById("resultFilesToggle")?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const pop = document.getElementById("resultFilesPopover");
             const btn = document.getElementById("resultFilesToggle");
-            const open = list?.style.display !== "none";
-            if (list) list.style.display = open ? "none" : "";
-            if (viewer && open) viewer.style.display = "none";
+            const open = pop?.classList.contains("open");
+            pop?.classList.toggle("open", !open);
             btn?.classList.toggle("open", !open);
+            if (open) document.getElementById("resultFileViewer").style.display = "none";
+        });
+        document.addEventListener("click", (e) => {
+            const hub = document.getElementById("resultFilesHub");
+            if (!hub || hub.contains(e.target)) return;
+            document.getElementById("resultFilesPopover")?.classList.remove("open");
+            document.getElementById("resultFilesToggle")?.classList.remove("open");
         });
 
         const settingsBtn   = document.getElementById("settingsBtn");
@@ -4806,6 +5174,7 @@
         }
 
         function switchMode(mode) {
+            window.NasaroFeatures?.hideFloatingResultActions?.();
             currentMode = mode;
             document.querySelectorAll(".mode-btn").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.mode === mode);
@@ -5031,24 +5400,30 @@
                 agentPanel.style.removeProperty("top");
                 agentPanel.style.right = "";
                 agentPanel.style.bottom = "";
+                agentPanel.style.removeProperty("height");
+                agentPanel.style.removeProperty("maxHeight");
                 return;
             }
             const r = btn.getBoundingClientRect();
             const W = window.innerWidth;
             const H = window.innerHeight;
             const pW = Math.min(560, W - 32);
-            const pH = Math.min(Math.floor(H * 0.78), 760);
+            let pH = Math.min(Math.floor(H * 0.78), 760);
+            const gap = 12;
+            const spaceAbove = r.top - gap - 8;
+            if (spaceAbove < pH) pH = Math.max(240, spaceAbove);
             let left = r.left + r.width / 2 - pW / 2;
-            let top = r.top - pH - 10;
+            let top = r.top - pH - gap;
             if (left + pW > W - 8) left = W - pW - 8;
             if (left < 8) left = 8;
-            if (top < 8) top = 8;
-            if (top + pH > H - 8) top = H - pH - 8;
+            if (top < 8) top = Math.max(8, r.top - pH - gap);
             agentPanel.style.left = left + "px";
             agentPanel.style.top = top + "px";
             agentPanel.style.right = "auto";
             agentPanel.style.bottom = "auto";
             agentPanel.style.width = pW + "px";
+            agentPanel.style.height = pH + "px";
+            agentPanel.style.maxHeight = pH + "px";
         }
 
         // ── 패널을 런처 근처에 배치 ───────────────────────────────────────────
@@ -5142,7 +5517,6 @@
                 openAgentPanel(false);
                 rebuildAgentToolbar();
             } else {
-                // 진행 중인 임무 중단
                 if (agentAbortCtrl) { agentAbortCtrl.abort(); agentAbortCtrl = null; }
                 if (agentPanel) agentPanel.style.display = "none";
                 hideLauncher();
@@ -5295,6 +5669,12 @@
                 appendCardLog(logEl, "임무 완료");
                 setAgentStatus("ok", "완료: " + mission);
                 showToast(`임무 완료: ${mission.length > 28 ? mission.slice(0, 28) + "…" : mission}`, "success");
+                addSessionHistory({
+                    mode: "agent",
+                    title: mission,
+                    preview: "완료",
+                    data: { result: content },
+                });
                 actionsEl.innerHTML = `
                     <button class="agent-card-action-btn save-result" type="button">💾 결과물 저장</button>
                     <button class="agent-card-action-btn modify" type="button">✏️ 수정</button>
@@ -5761,7 +6141,6 @@
                 }
                 const data = await response.json();
                 renderCollabPlan(resultEl, data, task);
-                addSessionHistory({ mode: "collab", title: task });
             } catch (err) {
                 resultEl.textContent = `오류: ${err.message}`;
                 showToast(err.message || "협업 요청 실패", "error", 5000);
@@ -5988,7 +6367,6 @@
                     collabSession.stageStates[i] = "idle";
                 }
                 await runCollabPipeline(data.start_stage ?? 0);
-                addSessionHistory({ mode: "collab", title: additionalTask, preview: "추가 작업" });
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -6005,28 +6383,46 @@
             if (!collabSession?.plan) return;
             const plan = collabSession.plan;
             const esc = v => escapeHtml(v || "");
+            const sel = collabSelectedStage;
 
             const railHtml = (plan.stages || []).map((st, i) => {
                 const state = collabSession.stageStates[i] || "idle";
                 const sm = getCollabStageMeta(i);
-                const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
-                const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
-                    `<option value="${esc(m)}" ${collabStageModels[i] === m ? "selected" : ""}>${esc(m)}</option>`
-                ).join("");
-                const output = collabSession.stageOutputs[i] || "";
-                const isOpen = state === "running" || state === "done" || i === collabSelectedStage;
+                const model = collabStageModels[i] || sm.default_model || "AI";
                 return `
-                <div class="collab-stage-card ${state} ${isOpen ? "open" : ""}" data-stage-card="${i}">
-                    <div class="collab-stage-card-head">
-                        <span class="step-state">${collabStateLabel(state)}</span>
-                        <strong>${i + 1}. ${esc(sm.short || st.name)}</strong>
-                        <select class="collab-card-ai" data-stage-ai="${i}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
-                    </div>
+                <button type="button" class="collab-rail-step ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
+                    <span class="step-state">${collabStateLabel(state)}</span>
+                    <span class="step-num">${i + 1}단계</span>
+                    <span class="step-name">${esc(sm.short || st.name)}</span>
+                    <span class="step-ai">${esc(model)}</span>
+                </button>`;
+            }).join("");
+
+            const st = plan.stages[sel] || {};
+            const sm = getCollabStageMeta(sel);
+            const output = collabSession.stageOutputs[sel] || "";
+            const state = collabSession.stageStates[sel] || "idle";
+            const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
+            const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
+                `<option value="${esc(m)}" ${collabStageModels[sel] === m ? "selected" : ""}>${esc(m)}</option>`
+            ).join("");
+
+            const panelHtml = `
+                <div class="collab-stage-panel">
+                    <h3>${sel + 1}. ${esc(sm.short || st.name)}</h3>
                     <p class="collab-stage-detail">${esc(st.goal || sm.hint || "")}</p>
                     ${st.detail ? `<p class="collab-stage-subdetail">${esc(st.detail)}</p>` : ""}
-                    ${output ? `<pre class="collab-stage-live-output">${esc(output)}</pre>` : (state === "running" ? `<p class="collab-stage-wait">AI 작업 중…</p>` : "")}
+                    <div class="collab-ai-pick-row">
+                        <span style="font-size:12px;font-weight:700;color:#6d28d9;">단계 AI</span>
+                        <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
+                        <span class="collab-ai-hint">${esc(sm.hint || "")}</span>
+                    </div>
+                    ${output
+                        ? `<pre class="collab-stage-live-output" style="max-height:360px;">${esc(output)}</pre>`
+                        : (state === "running"
+                            ? `<p class="collab-stage-wait">AI 작업 중…</p>`
+                            : `<p class="collab-stage-wait" style="color:#64748b;">▶ 작업 시작을 누르면 이 단계가 실행됩니다.</p>`)}
                 </div>`;
-            }).join("");
 
             const finalBlock = collabFinalProduct ? `
                 <div class="collab-final-product">
@@ -6039,36 +6435,35 @@
                 <header class="collab-v2-head compact">
                     <span class="collab-type-badge">${esc(plan.work_type)}</span>
                     <h2>${esc(collabSession.task)}</h2>
-                    <div class="collab-v2-summary">${esc(plan.summary || "")}</div>
+                    <div class="collab-v2-summary">${esc(plan.summary || collabSession.recommendation || "")}</div>
                 </header>
-                <div class="collab-stage-cards">${railHtml}</div>
+                <div class="collab-stage-rail">${railHtml}</div>
+                ${panelHtml}
                 ${finalBlock}
                 <div class="collab-v2-toolbar compact">
                     <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
-                    <button type="button" id="collabSaveBtn" class="collab-stage-btn done">💾 결과물 저장</button>
+                    <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
                     <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
                 </div>
-                <div class="collab-activity compact">
+                <div class="collab-activity">
                     <div class="collab-activity-title">진행 기록</div>
-                    <div id="collabActivityLog" class="collab-activity-log compact"></div>
+                    <div id="collabActivityLog" class="collab-activity-log"></div>
                 </div>
             </div>`;
 
-            container.querySelectorAll(".collab-card-ai").forEach(sel => {
-                sel.addEventListener("change", e => {
-                    setCollabStageModel(Number(e.target.dataset.stageAi), e.target.value);
+            container.querySelectorAll("[data-rail-step]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    collabSelectedStage = Number(btn.dataset.railStep);
+                    renderCollabRunner(container);
+                    persistActiveCollab();
                 });
             });
-            container.querySelectorAll(".collab-stage-card-head").forEach(head => {
-                head.addEventListener("click", e => {
-                    if (e.target.tagName === "SELECT") return;
-                    const card = head.closest(".collab-stage-card");
-                    const idx = Number(card?.dataset.stageCard);
-                    if (!isNaN(idx)) { collabSelectedStage = idx; card?.classList.toggle("open"); }
-                });
+            container.querySelector(".collab-panel-ai")?.addEventListener("change", e => {
+                setCollabStageModel(Number(e.target.dataset.stageAi), e.target.value);
+                renderCollabRunner(container);
             });
             document.getElementById("collabStartBtn")?.addEventListener("click", startCollabWork);
-            document.getElementById("collabSaveBtn")?.addEventListener("click", saveCollabAsResult);
+            document.getElementById("collabDownloadBtn")?.addEventListener("click", (e) => downloadCollabResult(e.currentTarget));
             document.getElementById("collabCompleteBtn")?.addEventListener("click", completeCollabWork);
             renderCollabActivityLog();
         }
@@ -6098,10 +6493,7 @@
             appendCollabLog(plan.summary || "4단계 협업을 시작할 수 있습니다.", "info");
             persistActiveCollab();
             renderCollabRunner(container);
-            if (!collabPipelineRunning) {
-                showToast("협업 계획이 준비되었습니다. 단계별 작업을 시작합니다.", "info", 3500);
-                setTimeout(() => startCollabWork(), 500);
-            }
+            showToast("협업 계획이 준비되었습니다. 위 단계를 눌러 확인하고 ▶ 작업 시작을 누르세요.", "info", 4000);
         }
 
         dockSecondaryBtn.addEventListener("click", handleAddUserInput);
@@ -6290,6 +6682,7 @@
             const message = mainInput.value.trim();
             if (!message) return;
 
+            window.NasaroFeatures?.hideFloatingResultActions?.();
             const responsesElement = document.getElementById("compareResponses");
             lastCompareMessage = message;
             lastCompareSessionId = createUUID();
@@ -6338,7 +6731,12 @@
                 onSaveResult: saveResultRecord,
                 loggedIn: !!currentUser,
             });
-            addSessionHistory({ mode: "compare", title: message, preview: activeModels.join(", ") });
+            addSessionHistory({
+                mode: "compare",
+                title: message,
+                preview: activeModels.join(", "),
+                data: { query: message, responses: { ...responses } },
+            });
         }
 
         function appendLoadingCard(roundNumber, speakerIndex) {
@@ -6613,7 +7011,15 @@
                 session_id: debateSessionId,
                 topic: debateTopic,
             }, 1);
-            addSessionHistory({ mode: "debate", title: topic });
+            addSessionHistory({
+                mode: "debate",
+                title: topic,
+                data: {
+                    topic,
+                    sessionId: debateSessionId,
+                    cards: debateCards.filter(c => !c.loading).map(c => ({ ...c })),
+                },
+            });
         }
 
         async function runDebateRoundSequence(firstEndpoint, firstPayload, expectedRound) {

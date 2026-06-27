@@ -43,9 +43,9 @@ _lock = threading.Lock()
 
 QUOTA_LIMITS = {
     "compare": 50,
-    "debate": 10,
-    "collab": 5,
-    "agent": 20,
+    "debate": 15,
+    "collab": 10,
+    "agent": 100,
 }
 
 
@@ -545,6 +545,31 @@ def get_active_session_count() -> int:
     return int(row["c"]) if row else 0
 
 
+def get_online_presence_stats() -> dict[str, int]:
+    now = time.time()
+    cutoff = now - PRESENCE_TTL_SECONDS
+    with _lock:
+        conn = _connect()
+        try:
+            online_users = conn.execute(
+                "SELECT COUNT(*) AS c FROM sessions WHERE expires_at > ? AND last_seen_at > ?",
+                (now, cutoff),
+            ).fetchone()["c"]
+            online_guests = conn.execute(
+                "SELECT COUNT(*) AS c FROM device_presence WHERE last_seen_at > ?",
+                (cutoff,),
+            ).fetchone()["c"]
+        finally:
+            conn.close()
+    users = int(online_users or 0)
+    guests = int(online_guests or 0)
+    return {
+        "online_users": users,
+        "online_guests": guests,
+        "online_total": users + guests,
+    }
+
+
 def get_usage_by_hour(day_key: str | None = None) -> dict[str, int]:
     day_key = day_key or _day_key()
     # KST day window
@@ -568,6 +593,93 @@ def get_usage_by_hour(day_key: str | None = None) -> dict[str, int]:
         key = f"{r['feature']}:{r['hr']:02d}"
         out[key] = int(r["cnt"])
     return out
+
+
+def get_usage_by_hour_by_feature(day_key: str | None = None) -> dict[str, dict[str, int]]:
+    """Per-feature hourly usage for admin charts (KST)."""
+    day_key = day_key or _day_key()
+    out: dict[str, dict[str, int]] = {f: {} for f in QUOTA_LIMITS}
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, CAST(strftime('%H', datetime(created_at, 'unixepoch', '+9 hours')) AS INTEGER) AS hr,
+                       COUNT(*) AS cnt
+                FROM usage_events
+                WHERE strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY feature, hr
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    for r in rows:
+        feat = str(r["feature"])
+        if feat not in out:
+            out[feat] = {}
+        out[feat][f"{int(r['hr']):02d}"] = int(r["cnt"])
+    return out
+
+
+def get_login_by_hour(day_key: str | None = None) -> dict[str, int]:
+    day_key = day_key or _day_key()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT CAST(strftime('%H', datetime(created_at, 'unixepoch', '+9 hours')) AS INTEGER) AS hr,
+                       COUNT(*) AS cnt
+                FROM login_events
+                WHERE event_type = 'login'
+                  AND strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY hr
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {f"{int(r['hr']):02d}": int(r["cnt"]) for r in rows}
+
+
+def get_member_activity_by_hour(day_key: str | None = None) -> dict[str, int]:
+    """Member session touches (last_seen) by KST hour — proxy for active usage times."""
+    day_key = day_key or _day_key()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT CAST(strftime('%H', datetime(last_seen_at, 'unixepoch', '+9 hours')) AS INTEGER) AS hr,
+                       COUNT(*) AS cnt
+                FROM sessions
+                WHERE strftime('%Y-%m-%d', datetime(last_seen_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY hr
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {f"{int(r['hr']):02d}": int(r["cnt"]) for r in rows}
+
+
+def get_agent_activity_log(limit: int = 500) -> list[dict[str, Any]]:
+    limit = max(1, min(5000, limit))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT * FROM activity_log
+                WHERE feature = 'agent'
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [_activity_row(r) for r in rows]
 
 
 def get_user_login_stats(user_id: int) -> dict[str, Any]:
@@ -850,9 +962,15 @@ def get_admin_dashboard() -> dict[str, Any]:
         "day_key": day_key,
         "total_users": int(total_users),
         "active_sessions": get_active_session_count(),
+        **get_online_presence_stats(),
         "share_links": int(share_count),
         "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
         "usage_by_hour": get_usage_by_hour(day_key),
+        "usage_by_hour_by_feature": get_usage_by_hour_by_feature(day_key),
+        "login_by_hour": get_login_by_hour(day_key),
+        "member_activity_by_hour": get_member_activity_by_hour(day_key),
+        "agent_activity": get_agent_activity_log(limit=500),
+        "quota_limits": dict(QUOTA_LIMITS),
         "users": enriched,
         "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),

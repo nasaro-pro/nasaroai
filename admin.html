@@ -74,8 +74,37 @@
     .reply-bubble { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 12px; }
     .reply-bubble.admin { background: #312e81; }
     .reply-bubble.user { background: #0f172a; border: 1px solid #334155; }
-    .hour-chart { display: flex; flex-wrap: wrap; gap: 4px; }
-    .hour-bar { font-size: 10px; background: #312e81; padding: 3px 6px; border-radius: 4px; }
+    .hour-chart { display: flex; flex-direction: column; gap: 8px; }
+    .hour-chart-graph {
+      display: flex; align-items: flex-end; gap: 3px; height: 140px;
+      padding: 8px 4px 4px; border-radius: 8px; background: #0f172a; border: 1px solid #334155;
+    }
+    .hour-chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; height: 100%; justify-content: flex-end; }
+    .hour-chart-bar {
+      width: 100%; max-width: 18px; min-height: 2px; border-radius: 3px 3px 0 0;
+      background: linear-gradient(180deg, #a78bfa 0%, #6d28d9 100%); transition: height .2s;
+    }
+    .hour-chart-bar-wrap span { font-size: 8px; color: #64748b; margin-top: 3px; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+    .chart-panel { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 10px; }
+    .chart-panel h3 { margin: 0 0 8px; font-size: 12px; color: #c4b5fd; font-weight: 700; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; font-size: 10px; color: #94a3b8; }
+    .chart-legend span { display: inline-flex; align-items: center; gap: 4px; }
+    .chart-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+    .stacked-chart { display: flex; align-items: flex-end; gap: 2px; height: 120px; padding: 4px 2px; }
+    .stacked-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; height: 100%; }
+    .stacked-seg { width: 100%; min-height: 1px; border-radius: 2px 2px 0 0; }
+    .agent-feed .activity-row { border-left: 3px solid #7c3aed; padding-left: 8px; margin-bottom: 6px; }
+    .activity-group {
+      padding: 10px 0; border-bottom: 1px solid #334155;
+    }
+    .activity-group:last-child { border-bottom: none; }
+    .activity-group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .activity-group-head strong { font-size: 12px; }
+    .activity-group-count { font-size: 10px; color: #94a3b8; background: #312e81; padding: 2px 6px; border-radius: 999px; }
+    .activity-group-items { padding-left: 8px; border-left: 2px solid #4338ca; }
+    .activity-group-items .activity-row { padding: 4px 0; border-bottom: none; }
     .sidebar-search.hidden { display: none; }
     .overview-note { padding: 10px 12px; font-size: 11px; color: #94a3b8; }
     #overviewPanels.visible { display: grid; }
@@ -164,8 +193,24 @@
           <div id="platformStats" class="empty">불러오는 중…</div>
         </section>
         <section class="panel">
-          <h2>시간대별 사용 (KST)</h2>
+          <h2>시간대별 사용 (KST · 전체)</h2>
           <div id="hourChart" class="hour-chart"></div>
+        </section>
+        <section class="panel full">
+          <h2>기능별 · 시간대별 사용량 (오늘)</h2>
+          <div id="featureHourCharts" class="chart-grid"></div>
+        </section>
+        <section class="panel">
+          <h2>회원 로그인 시간대 (KST)</h2>
+          <div id="loginHourChart" class="hour-chart"></div>
+        </section>
+        <section class="panel">
+          <h2>회원 접속 활동 시간대 (KST)</h2>
+          <div id="memberHourChart" class="hour-chart"></div>
+        </section>
+        <section class="panel full">
+          <h2>에이전트 활동 기록</h2>
+          <div id="agentActivityFeed" class="activity-list agent-feed"></div>
         </section>
         <section class="panel full">
           <h2>최근 활동 (전체)</h2>
@@ -292,34 +337,195 @@
     function renderStats(data) {
       const ps = data.platform_stats || {};
       const plat = Object.entries(ps).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
+      const onlineUsers = data.online_users ?? data.active_sessions ?? 0;
+      const onlineGuests = data.online_guests ?? 0;
+      const onlineTotal = data.online_total ?? (onlineUsers + onlineGuests);
       document.getElementById("statsRow").innerHTML = `
         <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
-        <div class="stat"><b>${data.active_sessions ?? 0}</b><span>실시간 접속 (2분)</span></div>
+        <div class="stat"><b>${onlineTotal}</b><span>실시간 접속 (2분)</span></div>
+        <div class="stat"><b>${onlineUsers}</b><span>회원 접속</span></div>
+        <div class="stat"><b>${onlineGuests}</b><span>비회원 접속</span></div>
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
-        <div class="stat"><b>${guests.length}</b><span>비회원 기기</span></div>
+        <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용</span></div>`;
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용 (한도 agent ${(data.quota_limits||{}).agent ?? 100})</span></div>`;
       document.getElementById("platformStats").innerHTML = Object.keys(ps).length
         ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
         : "<span class='empty'>오늘 활동 기록 없음</span>";
-      const byHour = data.usage_by_hour || {};
-      const keys = Object.keys(byHour).sort();
-      document.getElementById("hourChart").innerHTML = keys.length
-        ? keys.map(k => `<span class="hour-bar">${k}=${byHour[k]}</span>`).join("")
-        : "<span class='empty'>아직 기록 없음</span>";
+      renderHourChart(data.usage_by_hour || {}, "hourChart", "오늘 KST 시간대별 API 사용");
+      renderFeatureHourCharts(data.usage_by_hour_by_feature || {}, data.quota_limits || {});
+      renderSimpleHourChart(data.login_by_hour || {}, "loginHourChart", "#38bdf8", "로그인");
+      renderSimpleHourChart(data.member_activity_by_hour || {}, "memberHourChart", "#86efac", "세션 활동");
+      renderAgentActivityFeed(data.agent_activity || []);
+    }
+
+    const FEATURE_COLORS = {
+      compare: "#60a5fa",
+      debate: "#fb923c",
+      collab: "#c084fc",
+      agent: "#34d399",
+    };
+    const FEATURE_LABELS = {
+      compare: "비교",
+      debate: "토론",
+      collab: "협업",
+      agent: "에이전트",
+    };
+
+    function hourArrayFromMap(map) {
+      const arr = Array.from({ length: 24 }, () => 0);
+      Object.entries(map || {}).forEach(([k, v]) => {
+        const parts = String(k).split(":");
+        const hr = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(hr) && hr >= 0 && hr < 24) arr[hr] += Number(v) || 0;
+      });
+      return arr;
+    }
+
+    function renderSimpleHourChart(map, elId, color, label) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const hours = hourArrayFromMap(map);
+      const max = Math.max(...hours, 1);
+      const total = hours.reduce((a, b) => a + b, 0);
+      if (!total) {
+        el.innerHTML = "<span class='empty'>오늘 기록 없음</span>";
+        return;
+      }
+      const bars = hours.map((v, hr) => {
+        const pct = Math.max(2, Math.round((v / max) * 100));
+        return `<div class="hour-chart-bar-wrap" title="${hr}시: ${v}회">
+          <div class="hour-chart-bar" style="height:${pct}%;background:linear-gradient(180deg, ${color} 0%, ${color}88 100%)"></div>
+          <span>${hr % 3 === 0 ? hr : ""}</span>
+        </div>`;
+      }).join("");
+      el.innerHTML = `<div class="hour-chart-graph">${bars}</div>
+        <div class="hour-chart-legend">${label} ${total}회 (KST)</div>`;
+    }
+
+    function renderHourChart(byHour, elId, legendText) {
+      const el = document.getElementById(elId || "hourChart");
+      const hourTotals = Array.from({ length: 24 }, () => 0);
+      Object.entries(byHour || {}).forEach(([k, v]) => {
+        const parts = String(k).split(":");
+        const hr = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(hr) && hr >= 0 && hr < 24) hourTotals[hr] += Number(v) || 0;
+      });
+      const max = Math.max(...hourTotals, 1);
+      const total = hourTotals.reduce((a, b) => a + b, 0);
+      if (!total) {
+        el.innerHTML = "<span class='empty'>아직 기록 없음</span>";
+        return;
+      }
+      const bars = hourTotals.map((v, hr) => {
+        const pct = Math.max(2, Math.round((v / max) * 100));
+        return `<div class="hour-chart-bar-wrap" title="${hr}시: ${v}회">
+          <div class="hour-chart-bar" style="height:${pct}%"></div>
+          <span>${hr % 3 === 0 ? hr : ""}</span>
+        </div>`;
+      }).join("");
+      el.innerHTML = `<div class="hour-chart-graph">${bars}</div>
+        <div class="hour-chart-legend">${legendText || "오늘 KST"} ${total}회</div>`;
+    }
+
+    function renderFeatureHourCharts(byFeature, limits) {
+      const el = document.getElementById("featureHourCharts");
+      if (!el) return;
+      const features = Object.keys(FEATURE_LABELS);
+      el.innerHTML = features.map(feat => {
+        const map = byFeature[feat] || {};
+        const hours = hourArrayFromMap(map);
+        const max = Math.max(...hours, 1);
+        const total = hours.reduce((a, b) => a + b, 0);
+        const limit = limits[feat] ?? "-";
+        const bars = hours.map((v, hr) => {
+          const pct = Math.max(1, Math.round((v / max) * 100));
+          return `<div class="stacked-col" title="${hr}시 ${v}회">
+            <div class="stacked-seg" style="height:${pct}%;background:${FEATURE_COLORS[feat]}"></div>
+          </div>`;
+        }).join("");
+        return `<div class="chart-panel">
+          <h3>${FEATURE_LABELS[feat]} · ${total}/${limit}회</h3>
+          <div class="stacked-chart">${bars}</div>
+          <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별</span></div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderAgentActivityFeed(items) {
+      const el = document.getElementById("agentActivityFeed");
+      if (!el) return;
+      if (!items?.length) {
+        el.innerHTML = "<div class='empty'>에이전트 활동 기록 없음</div>";
+        return;
+      }
+      const groups = new Map();
+      items.forEach(a => {
+        const key = a.user_id ? `u:${a.user_id}` : `d:${a.device_id || "guest"}`;
+        if (!groups.has(key)) {
+          groups.set(key, { user_id: a.user_id, device_id: a.device_id, items: [], latest: a.created_at_iso || "" });
+        }
+        const g = groups.get(key);
+        g.items.push(a);
+        if ((a.created_at_iso || "") > g.latest) g.latest = a.created_at_iso || "";
+      });
+      const sorted = [...groups.values()].sort((a, b) => (b.latest || "").localeCompare(a.latest || ""));
+      el.innerHTML = sorted.slice(0, 40).map(g => {
+        const label = g.user_id ? `회원 #${g.user_id}` : `비회원 ${(g.device_id || "guest").slice(0, 16)}`;
+        const recent = g.items.slice(0, 6).map(a => `
+          <div class="activity-row">
+            <div><strong>${a.action || "agent"}</strong> ${platformBadge(a.platform)}
+              ${a.detail ? ` · ${(a.detail || "").slice(0, 80)}` : ""}
+            </div>
+            <div class="activity-meta">${a.created_at_iso || "-"}</div>
+          </div>`).join("");
+        return `<div class="activity-group">
+          <div class="activity-group-head">
+            <strong>${label}</strong>
+            <span class="activity-group-count">${g.items.length}건 · ${g.latest || "-"}</span>
+          </div>
+          <div class="activity-group-items">${recent}</div>
+        </div>`;
+      }).join("");
     }
 
     function renderActivityFeed(items) {
       const el = document.getElementById("activityFeed");
       if (!items?.length) { el.innerHTML = "<div class='empty'>활동 기록 없음</div>"; return; }
-      el.innerHTML = items.map(a => `
-        <div class="activity-row">
-          <div><strong>${a.feature}</strong> · ${a.action || ""} ${platformBadge(a.platform)}
-            ${a.user_id ? `<span style="color:#a78bfa;">#${a.user_id}</span>` : `<span style="color:#94a3b8;">비회원</span>`}
+      const groups = new Map();
+      (items || []).forEach(a => {
+        const key = a.user_id ? `u:${a.user_id}` : `d:${a.device_id || "guest"}`;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            user_id: a.user_id,
+            device_id: a.device_id,
+            items: [],
+            latest: a.created_at_iso || "",
+          });
+        }
+        const g = groups.get(key);
+        g.items.push(a);
+        if ((a.created_at_iso || "") > g.latest) g.latest = a.created_at_iso || "";
+      });
+      const sorted = [...groups.values()].sort((a, b) => (b.latest || "").localeCompare(a.latest || ""));
+      el.innerHTML = sorted.slice(0, 60).map(g => {
+        const label = g.user_id
+          ? `회원 #${g.user_id}`
+          : `비회원 ${(g.device_id || "guest").slice(0, 16)}`;
+        const recent = g.items.slice(0, 4).map(a => `
+          <div class="activity-row">
+            <div><strong>${a.feature}</strong> · ${a.action || ""} ${platformBadge(a.platform)}</div>
+            <div>${(a.detail || "").slice(0, 100)}</div>
+            <div class="activity-meta">${a.created_at_iso || "-"}</div>
+          </div>`).join("");
+        return `<div class="activity-group">
+          <div class="activity-group-head">
+            <strong>${label}</strong>
+            <span class="activity-group-count">${g.items.length}건 · ${g.latest || "-"}</span>
           </div>
-          <div>${(a.detail || "").slice(0, 120)}</div>
-          <div class="activity-meta">${a.created_at_iso} · ${a.device_id ? a.device_id.slice(0, 16) : "-"}</div>
-        </div>`).join("");
+          <div class="activity-group-items">${recent}</div>
+        </div>`;
+      }).join("");
     }
 
     function renderUsersTable(users) {
@@ -490,7 +696,7 @@
       dashRefreshTimer = setInterval(() => {
         if (!adminToken || sidebarMode !== "stats") return;
         loadDashboard().catch(() => {});
-      }, 30000);
+      }, 15000);
     }
 
     async function loadDashboard() {

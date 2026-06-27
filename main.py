@@ -71,7 +71,7 @@ MODEL_CACHE_TTL_SECONDS = 600
 # Allow up to 10 candidates per label so a label can keep falling back to other
 # models even when several are rate-limited or out of context budget.
 MAX_MODEL_CANDIDATES_PER_LABEL = 10
-MIN_MODEL_CANDIDATES_PER_LABEL = 5
+MIN_MODEL_CANDIDATES_PER_LABEL = 3
 HEALTHCHECK_CONCURRENCY = 2
 HEALTHCHECK_DELAY_SECONDS = 1.0
 LABEL_HEALTH_TTL_SECONDS = 600
@@ -378,66 +378,50 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
         label="OpenAI",
         official_model_id="openai/gpt-4o-mini",
         substitute_chain=(
-            "openai/gpt-oss-120b:free",
-            "openai/gpt-oss-20b:free",
-            "meta-llama/llama-4-maverick:free",
-            "nvidia/nemotron-ultra-253b-v1:free",
-            "deepseek/deepseek-r1:free",
+            "openai/gpt-5.5",
+            "~openai/gpt-mini-latest",
+            "openai/gpt-chat-latest",
         ),
     ),
     "Anthropic": LabelProviderConfig(
         label="Anthropic",
         official_model_id="anthropic/claude-3-haiku",
         substitute_chain=(
-            "nvidia/nemotron-ultra-253b-v1:free",
-            "nvidia/nemotron-3-super-120b-a12b:free",
-            "meta-llama/llama-4-maverick:free",
-            "deepseek/deepseek-r1:free",
-            "qwen/qwen3-coder:free",
+            "~anthropic/claude-haiku-latest",
+            "~anthropic/claude-sonnet-latest",
+            "anthropic/claude-opus-4.8-fast",
         ),
     ),
     "Google": LabelProviderConfig(
         label="Google",
-        official_model_id="google/gemini-flash-1.5-8b",
+        official_model_id="google/gemini-3.1-flash-lite",
         substitute_chain=(
-            "meta-llama/llama-4-maverick:free",
-            "meta-llama/llama-4-scout:free",
-            "qwen/qwen3-coder:free",
-            "deepseek/deepseek-v3:free",
-            "openai/gpt-oss-120b:free",
+            "~google/gemini-flash-latest",
+            "google/gemini-3.5-flash",
+            "~google/gemini-pro-latest",
         ),
     ),
     "xAI": LabelProviderConfig(
         label="xAI",
-        official_model_id="meta-llama/llama-3.1-8b-instruct",
+        official_model_id="x-ai/grok-4.3",
         substitute_chain=(
-            "deepseek/deepseek-r1:free",
-            "deepseek/deepseek-v3:free",
-            "meta-llama/llama-4-maverick:free",
-            "nvidia/nemotron-3-super-120b-a12b:free",
-            "openai/gpt-oss-20b:free",
+            "x-ai/grok-build-0.1",
         ),
     ),
     "Perplexity": LabelProviderConfig(
         label="Perplexity",
-        official_model_id="perplexity/llama-3.1-sonar-small-128k-online",
+        official_model_id="perplexity/sonar",
         substitute_chain=(
-            "nousresearch/hermes-3-llama-3.1-70b:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "deepseek/deepseek-v3:free",
-            "qwen/qwen3-coder:free",
-            "google/gemma-3-27b-it:free",
+            "perplexity/sonar-pro",
+            "perplexity/sonar-reasoning",
         ),
     ),
     "DeepSeek": LabelProviderConfig(
         label="DeepSeek",
         official_model_id="deepseek/deepseek-chat",
         substitute_chain=(
-            "deepseek/deepseek-r1:free",
-            "deepseek/deepseek-v3:free",
-            "openai/gpt-oss-120b:free",
-            "meta-llama/llama-4-maverick:free",
-            "nvidia/nemotron-3-super-120b-a12b:free",
+            "deepseek/deepseek-v4-flash",
+            "deepseek/deepseek-v4-pro",
         ),
     ),
 }
@@ -2819,13 +2803,16 @@ async def agent_step(request: AgentStepRequest, http_request: Request):
     """확장 프로그램이 사용자의 실제 탭에서 화면을 스캔해 보내면, 다음에 할
     액션 1개만 판단해 돌려주는 무상태 엔드포인트. Playwright를 전혀 쓰지 않는다.
     실제 클릭/입력은 확장(background.js)이 chrome.debugger로 수행한다."""
-    _require_quota(http_request, "agent", request.user_id)
     task = request.task.strip()
     if not task:
         return JSONResponse(
             status_code=400,
             content={"status": "error", "message": "작업 내용을 입력해주세요."},
         )
+    _require_quota(
+        http_request, "agent", request.user_id,
+        action="step", detail=task[:200],
+    )
 
     await ensure_model_cache_fresh()
     models = _resolve_agent_models()
@@ -2851,13 +2838,16 @@ async def agent_step(request: AgentStepRequest, http_request: Request):
 
 @app.post("/agent/task")
 async def agent_task(request: AgentRequest, http_request: Request):
-    _require_quota(http_request, "agent", request.user_id)
     query = request.query.strip()
     if not query:
         return JSONResponse(
             status_code=400,
             content={"status": "error", "message": "작업 내용을 입력해주세요."},
         )
+    _require_quota(
+        http_request, "agent", request.user_id,
+        action="task", detail=query[:200],
+    )
 
     if AGENT_LOCK.locked():
         return JSONResponse(
@@ -2940,13 +2930,16 @@ async def agent_task(request: AgentRequest, http_request: Request):
 async def agent_ask(request: AgentAskRequest, http_request: Request):
     """브라우저 없이 순수 LLM으로 임무를 수행한다.
     /agent/task(Playwright)가 실패할 때의 폴백이자, 단순 분석/답변 임무에 사용."""
-    _require_quota(http_request, "agent", request.user_id)
     query = request.query.strip()
     if not query:
         return JSONResponse(
             status_code=400,
             content={"status": "error", "message": "임무를 입력해주세요."},
         )
+    _require_quota(
+        http_request, "agent", request.user_id,
+        action="ask", detail=query[:200],
+    )
 
     await ensure_model_cache_fresh()
     models = _resolve_agent_models()

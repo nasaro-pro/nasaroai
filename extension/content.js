@@ -641,8 +641,7 @@
   function applyLauncherPos() {
     launcher.style.bottom = (launcherBottom + kbOffset) + "px";
     launcher.style.right  = launcherRight + "px";
-    bubble.style.bottom   = (launcherBottom + 58 + kbOffset) + "px";
-    bubble.style.right    = (launcherRight + 60) + "px";
+    positionBubbleNearUi();
     if (!bar.hidden) {
       if (barManualPos && window.innerWidth > 640) applyManualBarPos();
       else applyBarPos();
@@ -724,13 +723,31 @@
     if (!uiSyncTimer) uiSyncTimer = setTimeout(flushUiSync, 60);
   }
 
+  function positionBubbleNearUi() {
+    if (!bubble.classList.contains("show")) return;
+    if (!bar.hidden && window.innerWidth > 640) {
+      const r = bar.getBoundingClientRect();
+      bubble.style.position = "fixed";
+      bubble.style.bottom = `${Math.max(12, window.innerHeight - r.top + 10)}px`;
+      bubble.style.right = `${Math.max(12, window.innerWidth - r.right)}px`;
+      bubble.style.left = "auto";
+    } else {
+      bubble.style.position = "fixed";
+      bubble.style.bottom = `${launcherBottom + 58 + kbOffset}px`;
+      bubble.style.right = `${launcherRight + 60}px`;
+      bubble.style.left = "auto";
+    }
+  }
+
   // ── 말풍선 ───────────────────────────────────────────────────────────
-  const BUBBLE_CLS = { success:"success", error:"error", handoff:"handoff", cancelled:"cancelled" };
+  const BUBBLE_CLS = { success:"success", error:"error", handoff:"handoff", cancelled:"cancelled", paused:"cancelled" };
   function showBubble(text, kind) {
-    bubbleText.textContent = text;
+    if (!text) return;
+    bubbleText.textContent = text.length > 120 ? text.slice(0, 117) + "…" : text;
     bubble.className = "bubble show" + (BUBBLE_CLS[kind] ? " " + BUBBLE_CLS[kind] : "");
+    positionBubbleNearUi();
     clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(hideBubble, 3000);
+    bubbleTimer = setTimeout(hideBubble, 5500);
   }
   function hideBubble() { clearTimeout(bubbleTimer); bubble.className = "bubble"; }
   bubbleClose.addEventListener("click", hideBubble);
@@ -952,8 +969,8 @@
     try {
       chrome.runtime.sendMessage({ type: "RUN_TASK", task }, (res) => {
         void chrome.runtime.lastError;
-        if (res && !res.ok && res.finalText) {
-          showBubble(res.finalText, res.kind || "error");
+        if (res?.finalText) {
+          showBubble(res.finalText, res.kind || (res.ok ? "success" : "error"));
         }
       });
     } catch (e) {
@@ -1227,9 +1244,9 @@
     }
     if (changes.latestNotification) {
       const n = changes.latestNotification.newValue;
-      if (n && n.t && n.t !== prevNotifT) {
+      if (n && n.text && n.t !== prevNotifT) {
         prevNotifT = n.t;
-        if (bar.hidden) showBubble(n.text, n.kind);
+        showBubble(n.text, n.kind || "success");
       }
     }
     // 탭 간 바 열기/닫기 동기화

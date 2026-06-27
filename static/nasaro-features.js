@@ -23,7 +23,7 @@
             ai_pick: "AI",
             ai_all: "전체",
             ai_collab_pick: "추천 AI",
-            export_result: "결과물 생성",
+            export_result: "결과물 다운로드",
             share_link: "공유 링크",
             work_complete: "작업 완료",
             delete_confirm: "정말 삭제할까요?",
@@ -83,7 +83,7 @@
             ai_pick: "AI",
             ai_all: "All",
             ai_collab_pick: "Recommend AI",
-            export_result: "Export",
+            export_result: "Download result",
             share_link: "Share",
             work_complete: "Done",
             delete_confirm: "Delete permanently?",
@@ -498,15 +498,119 @@
         downloadTextFile(`${safe}.${ext}`, content, format === "txt" ? "text/plain;charset=utf-8" : "text/markdown;charset=utf-8");
     }
 
-    function promptExportFormat(title, sections) {
-        const fmt = prompt(
-            lang === "en"
-                ? "Export format: md / txt / html / pdf\n(md=Markdown, txt=Plain, html=HTML, pdf=Print PDF)"
-                : "내보내기 형식: md / txt / html / pdf\n(md=마크다운, txt=텍스트, html=HTML, pdf=인쇄→PDF)",
-            "md"
+    let exportMenuEl = null;
+    let resultActionsFloat = null;
+    let floatPositionHandler = null;
+
+    function closeExportFormatMenu() {
+        if (exportMenuEl) {
+            exportMenuEl.remove();
+            exportMenuEl = null;
+        }
+    }
+
+    function showExportFormatMenu(anchorBtn, title, sections) {
+        closeExportFormatMenu();
+        if (!anchorBtn) return;
+        const pop = document.createElement("div");
+        pop.className = "export-format-popover";
+        pop.setAttribute("role", "menu");
+        const formats = [
+            { id: "md", label: lang === "en" ? "Markdown (.md)" : "마크다운 (.md)" },
+            { id: "txt", label: lang === "en" ? "Plain text (.txt)" : "텍스트 (.txt)" },
+            { id: "html", label: "HTML (.html)" },
+            { id: "pdf", label: lang === "en" ? "Print → PDF" : "인쇄 → PDF" },
+        ];
+        formats.forEach(f => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "export-format-option";
+            btn.textContent = f.label;
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                closeExportFormatMenu();
+                exportMarkdown(title, sections, f.id);
+            });
+            pop.appendChild(btn);
+        });
+        document.body.appendChild(pop);
+        exportMenuEl = pop;
+        const rect = anchorBtn.getBoundingClientRect();
+        pop.style.position = "fixed";
+        pop.style.left = `${Math.max(8, rect.left)}px`;
+        pop.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+        pop.style.zIndex = "10040";
+        setTimeout(() => {
+            document.addEventListener("click", (e) => {
+                if (pop.contains(e.target) || anchorBtn.contains(e.target)) return;
+                closeExportFormatMenu();
+            }, { once: true });
+        }, 0);
+    }
+
+    function positionResultActionsFloat() {
+        if (!resultActionsFloat) return;
+        const anchor = document.getElementById("mainContent");
+        const dock = document.getElementById("dockShell");
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const dockH = dock ? dock.getBoundingClientRect().height : 140;
+        resultActionsFloat.style.left = `${Math.max(8, rect.left + 10)}px`;
+        resultActionsFloat.style.bottom = `${Math.max(dockH + 10, window.innerHeight - rect.bottom + 10)}px`;
+    }
+
+    function hideFloatingResultActions() {
+        closeExportFormatMenu();
+        if (floatPositionHandler) {
+            window.removeEventListener("scroll", floatPositionHandler, true);
+            window.removeEventListener("resize", floatPositionHandler);
+            floatPositionHandler = null;
+        }
+        if (resultActionsFloat) {
+            resultActionsFloat.remove();
+            resultActionsFloat = null;
+        }
+    }
+
+    function addResultActions(_container, opts) {
+        const { title, sections, kind, payload, apiFetch, showToast, onSaveResult, loggedIn } = opts || {};
+        hideFloatingResultActions();
+
+        const dock = document.createElement("div");
+        dock.id = "resultActionsFloat";
+        dock.className = "result-actions-float";
+        dock.setAttribute("role", "toolbar");
+
+        const save = document.createElement("button");
+        save.type = "button";
+        save.className = "result-action-btn primary-save";
+        save.textContent = "💾 " + t("save_result");
+        save.addEventListener("click", () => onSaveResult?.({ title, sections, kind, payload }));
+
+        const exp = document.createElement("button");
+        exp.type = "button";
+        exp.className = "result-action-btn";
+        exp.textContent = "📄 " + t("export_result");
+        exp.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showExportFormatMenu(exp, title, sections);
+        });
+
+        const share = document.createElement("button");
+        share.type = "button";
+        share.className = "result-action-btn";
+        share.textContent = "🔗 " + t("share_link");
+        share.addEventListener("click", () =>
+            createShareLink(kind, title, payload, apiFetch, showToast, { requireLogin: true, loggedIn: !!loggedIn })
         );
-        if (!fmt) return;
-        exportMarkdown(title, sections, fmt.trim().toLowerCase());
+
+        dock.append(save, exp, share);
+        document.body.appendChild(dock);
+        resultActionsFloat = dock;
+        floatPositionHandler = positionResultActionsFloat;
+        positionResultActionsFloat();
+        window.addEventListener("scroll", floatPositionHandler, true);
+        window.addEventListener("resize", floatPositionHandler);
     }
 
     function downloadTextFile(filename, content, mime) {
@@ -516,29 +620,6 @@
         a.download = filename;
         a.click();
         URL.revokeObjectURL(a.href);
-    }
-
-    function addResultActions(container, { title, sections, kind, payload, apiFetch, showToast, onSaveResult }) {
-        if (!container || container.querySelector(".result-action-row")) return;
-        const row = document.createElement("div");
-        row.className = "result-action-row";
-        const save = document.createElement("button");
-        save.type = "button";
-        save.className = "result-action-btn primary-save";
-        save.textContent = "💾 " + t("save_result");
-        save.addEventListener("click", () => onSaveResult?.({ title, sections, kind, payload }));
-        const exp = document.createElement("button");
-        exp.type = "button";
-        exp.className = "result-action-btn";
-        exp.textContent = "📄 " + t("export_result");
-        exp.addEventListener("click", () => promptExportFormat(title, sections));
-        const share = document.createElement("button");
-        share.type = "button";
-        share.className = "result-action-btn";
-        share.textContent = "🔗 " + t("share_link");
-        share.addEventListener("click", () => createShareLink(kind, title, payload, apiFetch, showToast, { requireLogin: true, loggedIn: !!opts.loggedIn }));
-        row.append(save, exp, share);
-        container.appendChild(row);
     }
 
     function loadShareFromUrl(apiFetch, showToast) {
@@ -593,7 +674,8 @@
         set theme(v) { theme = v; applyTheme(); },
         isPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
         applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
-        createShareLink, exportMarkdown, addResultActions, loadShareFromUrl,
+        createShareLink, exportMarkdown, addResultActions, hideFloatingResultActions,
+        showExportFormatMenu, loadShareFromUrl,
         parseScheduleFromText, addAgentSchedule, startAgentScheduleChecker,
         getUserGuideHtml, isNativeApp, saveOfflineSnapshot,
         confirmDelete(msg) { return confirm(msg || t("delete_confirm")); },
