@@ -1435,4 +1435,10 @@
       pullPrefs().then(pushPrefs);
     }
   });
+
+  window.addEventListener("pageshow", () => {
+    try {
+      chrome.runtime.sendMessage({ type: "AX_REQUEST_SYNC" }, () => void chrome.runtime.lastError);
+    } catch {}
+  });
 })();

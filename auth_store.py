@@ -475,15 +475,7 @@ def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
             current[key] = value[:100]
             continue
         if key == "session_history" and isinstance(value, list):
-            prev = current.get(key) if isinstance(current.get(key), list) else []
-            seen = {json.dumps(x, sort_keys=True, ensure_ascii=False) for x in prev}
-            merged = list(prev)
-            for item in value:
-                sig = json.dumps(item, sort_keys=True, ensure_ascii=False)
-                if sig not in seen:
-                    merged.insert(0, item)
-                    seen.add(sig)
-            current[key] = merged[:50]
+            current[key] = value[:50]
             continue
         if key in replace_list_keys and isinstance(value, list):
             current[key] = value

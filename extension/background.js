@@ -598,6 +598,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         await chrome.storage.local.set({ serverUrl: url });
         sendResponse({ ok: true, serverUrl: url });
 
+      } else if (message.type === "AX_REQUEST_SYNC") {
+        const tabId = sender.tab?.id;
+        if (tabId) await syncOneTabUi(tabId, sender.tab?.url || "");
+        else await broadcastUiState({ ensureContent: true });
+        sendResponse({ ok: true });
+
       } else {
         sendResponse({ ok: false, error: "알 수 없는 메시지" });
       }
@@ -760,9 +766,23 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 // ---- 사이트 이동 시 즉시 content 주입(새로고침 없이 따라오도록 보강) ----
+const GOOGLE_URL_RE = /^https:\/\/(www\.)?google\.[a-z.]+\//i;
+
+async function ensureInjectedWithRetries(tabId, url) {
+  if (!tabId) return;
+  await ensureInjectedIfEnabled(tabId, url || "");
+  if (!url || !GOOGLE_URL_RE.test(url)) return;
+  for (const delay of [400, 1200, 2500]) {
+    setTimeout(() => {
+      ensureInjectedIfEnabled(tabId, url).catch(() => {});
+    }, delay);
+  }
+}
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "loading" && changeInfo.status !== "complete" && !changeInfo.url) return;
-  await ensureInjectedIfEnabled(tabId, tab?.url || "");
+  const url = tab?.url || changeInfo.url || "";
+  await ensureInjectedWithRetries(tabId, url);
 });
 
 // 탭 전환/신규 탭에서도 즉시 사용 가능하도록 보강

@@ -1595,24 +1595,35 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            min-height: 108px;
         }
 
         .dock-compose-row {
             display: flex;
             gap: 6px;
             align-items: flex-end;
+            min-height: 48px;
         }
         .dock-compose-row #mainInput {
             flex: 1;
             min-width: 0;
+            height: 44px;
+            max-height: 44px;
+            overflow-y: auto;
+            resize: none;
+        }
+        .dock-compose-row .dock-submit-btn {
+            flex: 0 0 auto;
+            min-width: 108px;
         }
 
         .dock-btn-row {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             align-items: center;
             justify-content: space-between;
             gap: 8px;
+            min-height: 44px;
         }
         .dock-btn-left {
             flex: 0 0 auto;
@@ -1886,9 +1897,10 @@
         .agent-panel {
             display: none;
             position: fixed;
-            /* 위치는 positionPanelNearLauncher() 로 JS에서 동적 설정 */
-            right: 0;
-            bottom: var(--input-dock-height, 120px);
+            left: auto;
+            top: auto;
+            right: auto;
+            bottom: auto;
             z-index: 230;
             width: min(560px, calc(100vw - 16px));
             height: min(78dvh, 760px);
@@ -3069,18 +3081,72 @@
             z-index: 500;
         }
         .result-files-popover.open { display: block; }
+        .result-files-popover-layout {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+        .result-files-popover-layout .result-files-list-wrap {
+            flex: 0 0 min(240px, 42vw);
+            min-width: 0;
+        }
+        .result-file-viewer-side {
+            display: none;
+            flex: 1;
+            min-width: 0;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #c4b5fd;
+            background: #faf5ff;
+            max-height: min(50vh, 420px);
+            overflow: auto;
+            font-size: 11px;
+        }
+        .result-file-viewer-side.open { display: block; }
+        html[data-theme="dark"] .result-file-viewer-side {
+            background: #111;
+            border-color: #4338ca;
+            color: #f5f5f5;
+        }
+        @media (max-width: 640px) {
+            .result-files-popover-layout { flex-direction: column; }
+            .result-file-viewer-side { max-height: 36vh; }
+        }
 
         .collab-v3-layout {
             display: flex;
             flex-direction: column;
-            max-height: min(calc(100vh - 220px), 720px);
-            min-height: 320px;
+            max-height: none;
+            min-height: 0;
+        }
+        #collabPanel.active {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #collabWorkspace {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        #collabWorkspace .collab-workspace-layout,
+        #collabWorkspace .collab-workspace-main {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        #collabRecommendResult {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
         }
         .collab-v3-sticky {
             flex-shrink: 0;
             position: sticky;
             top: 0;
-            z-index: 12;
+            z-index: 20;
             background: var(--collab-sticky-bg, #fff);
             padding-bottom: 8px;
             border-bottom: 1px solid #e5e7eb;
@@ -3278,9 +3344,13 @@
                     <div class="result-files-hub" id="resultFilesHub">
                         <button type="button" id="resultFilesToggle" class="result-files-hub-btn" data-i18n="result_files">📁 결과물 파일</button>
                         <div id="resultFilesPopover" class="result-files-popover">
-                            <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
-                            <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
-                            <div id="resultFileViewer" class="result-file-viewer" style="display:none;"></div>
+                            <div class="result-files-popover-layout">
+                                <div class="result-files-list-wrap">
+                                    <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
+                                    <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
+                                </div>
+                                <div id="resultFileViewer" class="result-file-viewer-side"></div>
+                            </div>
                         </div>
                     </div>
                     <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
@@ -3834,11 +3904,17 @@
         const sessionHistory = [];
         const SESSION_HISTORY_STORE_KEY = "nasaroai_session_history";
 
+        function sessionHistoryStoreKey() {
+            if (!currentUser?.id) return null;
+            return `${SESSION_HISTORY_STORE_KEY}_u${currentUser.id}`;
+        }
+
         function loadSessionHistoryFromStore() {
             sessionHistory.length = 0;
-            if (!currentUser && !authToken) return;
+            const key = sessionHistoryStoreKey();
+            if (!key) return;
             try {
-                const raw = localStorage.getItem(SESSION_HISTORY_STORE_KEY);
+                const raw = localStorage.getItem(key);
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
                 if (!Array.isArray(parsed)) return;
@@ -3847,9 +3923,10 @@
         }
 
         function saveSessionHistoryToStore() {
-            if (!currentUser && !authToken) return;
+            const key = sessionHistoryStoreKey();
+            if (!key) return;
             try {
-                localStorage.setItem(SESSION_HISTORY_STORE_KEY, JSON.stringify(sessionHistory));
+                localStorage.setItem(key, JSON.stringify(sessionHistory));
             } catch {}
         }
 
@@ -3858,20 +3935,16 @@
             if (currentUser) scheduleUserSync();
         }
 
-        function mergeSessionHistoryLists(serverList) {
-            if (!Array.isArray(serverList) || !serverList.length) return;
-            const seen = new Set(sessionHistory.map(h => `${h.mode}:${h.time}:${h.title}`));
-            serverList.forEach(item => {
-                const sig = `${item.mode}:${item.time}:${item.title}`;
-                if (!seen.has(sig)) {
-                    sessionHistory.push(item);
-                    seen.add(sig);
-                }
-            });
-            sessionHistory.sort((a, b) => (b.time || 0) - (a.time || 0));
-            if (sessionHistory.length > 50) sessionHistory.length = 50;
+        function applyServerSessionHistory(serverList) {
+            if (!currentUser || !Array.isArray(serverList)) return;
+            sessionHistory.length = 0;
+            serverList.slice(0, 50).forEach(item => sessionHistory.push(item));
             saveSessionHistoryToStore();
             renderSessionHistory();
+        }
+
+        function mergeSessionHistoryLists(serverList) {
+            applyServerSessionHistory(serverList);
         }
 
         function buildHistoryPreview(entry) {
@@ -3953,6 +4026,7 @@
             sessionHistory.splice(idx, 1);
             persistSessionHistory();
             renderSessionHistory();
+            if (currentUser && authToken) syncUserData();
         }
 
         function restoreCompareFromHistory(data, title) {
@@ -4047,35 +4121,46 @@
         }
 
         function restoreAgentFromHistory(data, title) {
-            setAgentActive(true);
-            if (agentInputEl) {
-                agentInputEl.value = title || "";
-                autoResizeTA(agentInputEl);
-            }
-            if (data?.result && agentHistory) {
-                const emptyEl = agentHistory.querySelector(".agent-empty");
-                if (emptyEl) emptyEl.remove();
-                const card = document.createElement("div");
-                card.className = "agent-card";
-                card.innerHTML = `
-                    <div class="agent-card-header">
-                        <span class="agent-card-title">${escapeHtml(title || "")}</span>
-                        <span class="agent-card-badge ok">✅ 완료</span>
-                    </div>
-                    <div class="agent-card-body" style="display:block;">${escapeHtml(data.result)}</div>`;
-                agentHistory.appendChild(card);
-                agentHistory.scrollTop = agentHistory.scrollHeight;
+            switchMode("compare");
+            const el = document.getElementById("compareResponses");
+            if (!el) return;
+            el.innerHTML = "";
+            const compareHint = document.getElementById("compareEmptyHint");
+            if (compareHint) compareHint.style.display = "none";
+            showNotice("compareLoading", "");
+            showNotice("compareError", "");
+            const body = data?.result || "";
+            const card = document.createElement("article");
+            card.className = "compare-card";
+            card.innerHTML = `
+                <div class="compare-card-head"><strong>에이전트 임무</strong></div>
+                <pre class="compare-card-body">${escapeHtml(body)}</pre>`;
+            el.appendChild(card);
+            if (body) {
+                window.NasaroFeatures?.addResultActions?.(el, {
+                    title: title || "에이전트",
+                    sections: [{ heading: "에이전트", body }],
+                    kind: "agent",
+                    payload: { mission: title, result: body },
+                    apiFetch,
+                    showToast,
+                    onSaveResult: saveResultRecord,
+                    loggedIn: !!currentUser,
+                });
             }
         }
 
         function openSessionHistoryItem(h) {
             if (!h) return;
             window.NasaroFeatures?.hideFloatingResultActions?.();
+            if (h.mode === "agent") {
+                restoreAgentFromHistory(h.data, h.title);
+                return;
+            }
             switchMode(h.mode);
             if (h.mode === "compare") restoreCompareFromHistory(h.data, h.title);
             else if (h.mode === "debate") restoreDebateFromHistory(h.data, h.title);
             else if (h.mode === "collab") restoreCollabFromHistory(h.data, h.title);
-            else if (h.mode === "agent") restoreAgentFromHistory(h.data, h.title);
             else {
                 mainInput.value = h.title || "";
                 autoResizeInput();
@@ -4337,8 +4422,12 @@
         function renderResultFileViewer(record) {
             const viewer = document.getElementById("resultFileViewer");
             if (!viewer) return;
-            if (!record) { viewer.style.display = "none"; return; }
-            viewer.style.display = "block";
+            if (!record) {
+                viewer.classList.remove("open");
+                viewer.innerHTML = "";
+                return;
+            }
+            viewer.classList.add("open");
             const NF = window.NasaroFeatures;
             const parts = (record.sections || []).map(s =>
                 `<h4>${escapeHtml(s.heading || "")}</h4><pre>${escapeHtml(String(s.body || ""))}</pre>`
@@ -4351,7 +4440,10 @@
                     <button type="button" id="closeResultViewer" aria-label="닫기">✕</button>
                 </div>
                 <div class="result-viewer-body">${parts || escapeHtml(JSON.stringify(record.payload || {}, null, 2))}</div>`;
-            document.getElementById("closeResultViewer")?.addEventListener("click", () => { viewer.style.display = "none"; });
+            document.getElementById("closeResultViewer")?.addEventListener("click", () => {
+                viewer.classList.remove("open");
+                viewer.innerHTML = "";
+            });
             document.getElementById("exportResultViewerBtn")?.addEventListener("click", (e) => {
                 NF?.showExportFormatMenu?.(e.currentTarget, record.title || "결과물", record.sections || []);
             });
@@ -4369,7 +4461,7 @@
             if (!list) return;
             if (!savedResults.length) {
                 list.innerHTML = '<div class="works-empty">저장된 결과물이 없습니다. 답변 옆 「결과물 저장」을 누르세요.</div>';
-                document.getElementById("resultFileViewer").style.display = "none";
+                renderResultFileViewer(null);
                 return;
             }
             list.innerHTML = "";
@@ -4574,7 +4666,7 @@
                     mergeSavedWorksFromServer(data.saved_works);
                 }
                 if (Array.isArray(data.session_history)) {
-                    mergeSessionHistoryLists(data.session_history);
+                    applyServerSessionHistory(data.session_history);
                 }
                 if (data.active_collab) {
                     localStorage.setItem(ACTIVE_COLLAB_KEY, JSON.stringify(data.active_collab));
@@ -4693,7 +4785,6 @@
 
         function migrateSessionHistoryToAccount() {
             sessionHistory.length = 0;
-            try { sessionStorage.removeItem(SESSION_HISTORY_STORE_KEY); } catch {}
             loadSessionHistoryFromStore();
         }
 
@@ -4706,8 +4797,8 @@
             const sideAccount = document.getElementById("sideAccountBox");
             const sideMenuBrand = document.getElementById("sideMenuBrand");
             loadSavedResults();
-            loadSessionHistoryFromStore();
             if (currentUser) {
+                loadSessionHistoryFromStore();
                 const id = currentUser.username || currentUser.email || "";
                 if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${id}`;
                 if (loginBtn) loginBtn.style.display = "none";
@@ -4716,6 +4807,7 @@
                 if (sideAccount) sideAccount.style.display = "flex";
                 if (sideMenuBrand) sideMenuBrand.textContent = id;
             } else {
+                sessionHistory.length = 0;
                 if (meta) meta.textContent = NF?.lang === "en"
                     ? "Not signed in — results stay in this tab only."
                     : "로그인하지 않음 — 이 탭에서만 저장됩니다.";
@@ -4921,7 +5013,7 @@
                 if (!res.ok) throw new Error("invalid");
                 const data = await res.json();
                 currentUser = data.user;
-                loadSessionHistoryFromStore();
+                migrateSessionHistoryToAccount();
                 await pullUserData();
             } catch {
                 authToken = "";
@@ -5080,7 +5172,7 @@
             const open = pop?.classList.contains("open");
             pop?.classList.toggle("open", !open);
             btn?.classList.toggle("open", !open);
-            if (open) document.getElementById("resultFileViewer").style.display = "none";
+            if (open) renderResultFileViewer(null);
         });
         document.addEventListener("click", (e) => {
             const hub = document.getElementById("resultFilesHub");
@@ -5240,7 +5332,6 @@
 
         // 저장된 대화 기록 로드
         loadSavedResults();
-        loadSessionHistoryFromStore();
         renderResultFilesList();
         renderSessionHistory();
         bootstrapAuth();
@@ -5319,11 +5410,7 @@
         }
 
         function autoResizeInput() {
-            mainInput.style.height = "auto";
-            const lineHeight = 20;
-            const maxHeight = lineHeight * 3 + 12;
-            mainInput.style.height = `${Math.min(mainInput.scrollHeight, maxHeight)}px`;
-            scheduleSyncMainPadding();
+            mainInput.style.height = "44px";
         }
 
         function autoResizeTA(ta) {
@@ -5378,12 +5465,14 @@
 
         function switchMode(mode) {
             window.NasaroFeatures?.hideFloatingResultActions?.();
+            if (mode === "agent") mode = "compare";
             currentMode = mode;
             document.querySelectorAll(".mode-btn").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.mode === mode);
             });
             document.querySelectorAll(".panel").forEach(panel => panel.classList.remove("active"));
-            document.getElementById(`${mode}Panel`).classList.add("active");
+            const panel = document.getElementById(`${mode}Panel`);
+            if (panel) panel.classList.add("active");
 
             if (mode === "collab") {
                 if (!collabTaskAsked) {
@@ -5607,10 +5696,10 @@
             const gap = 12;
             const spaceAbove = r.top - gap - 8;
             if (spaceAbove < pH) pH = Math.max(240, spaceAbove);
-            let left = r.left + r.width / 2 - pW / 2;
+            let left = r.right - pW;
             let top = r.top - pH - gap;
-            if (left + pW > W - 8) left = W - pW - 8;
             if (left < 8) left = 8;
+            if (left + pW > W - 8) left = W - pW - 8;
             if (top < 8) top = Math.max(8, r.top - pH - gap);
             agentPanel.style.left = left + "px";
             agentPanel.style.top = top + "px";
@@ -5621,47 +5710,44 @@
             agentPanel.style.maxHeight = pH + "px";
         }
 
-        // ── 패널을 런처 근처에 배치 ───────────────────────────────────────────
         function positionPanelNearLauncher() {
-            if (!agentPanel || !agentFloatLauncher) return;
-            // 모바일: CSS @media가 처리하므로 JS 재정의 불필요
+            if (!agentPanel) return;
             if (window.innerWidth <= 520) {
                 agentPanel.style.removeProperty("left");
                 agentPanel.style.removeProperty("top");
-                agentPanel.style.right  = "";
+                agentPanel.style.right = "";
                 agentPanel.style.bottom = "";
                 return;
             }
 
-            const r  = agentFloatLauncher.getBoundingClientRect();
-            const W  = window.innerWidth;
-            const H  = window.innerHeight;
+            const anchor = (agentFloatLauncher?.classList.contains("visible") ? agentFloatLauncher : agentToggleBtn);
+            if (!anchor) return;
+            const r = anchor.getBoundingClientRect();
+            const W = window.innerWidth;
+            const H = window.innerHeight;
             const pW = Math.min(560, W - 32);
             const pH = Math.min(Math.floor(H * 0.78), 760);
 
-            // 런처 X 기준으로 같은 위치를 따라가며 화면 안으로만 클램프
-            let left = r.left;
-            if (left + pW > W - 8) left = W - pW - 8;
+            let left = r.right - pW;
             if (left < 8) left = 8;
+            if (left + pW > W - 8) left = W - pW - 8;
 
-            // 수직: 런처 하단 기준으로 패널 하단 맞춤
-            let top = r.bottom - pH;
-            if (top < 8) top = 8;
+            let top = r.top - pH - 12;
+            if (top < 8) top = Math.max(8, r.bottom - pH);
             if (top + pH > H - 8) top = H - pH - 8;
 
-            agentPanel.style.left   = left + "px";
-            agentPanel.style.top    = top  + "px";
-            agentPanel.style.right  = "auto";
+            agentPanel.style.left = left + "px";
+            agentPanel.style.top = top + "px";
+            agentPanel.style.right = "auto";
             agentPanel.style.bottom = "auto";
-            agentPanel.style.width  = pW + "px";
+            agentPanel.style.width = pW + "px";
+            agentPanel.style.height = pH + "px";
+            agentPanel.style.maxHeight = pH + "px";
         }
 
-        // ── 패널 열기 / 닫기 / 최소화 ─────────────────────────────────────────
-        // 항상 런처 위치 기준으로 열림
         function openAgentPanel(fromLauncher = true) {
             if (!agentPanel) return;
-            if (fromLauncher) positionPanelNearLauncher();
-            else positionPanelAboveButton(agentToggleBtn);
+            positionPanelNearLauncher();
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
             hideLauncher();
@@ -6575,10 +6661,16 @@
         const COLLAB_STAGE_MODELS = ["Perplexity", "Anthropic", "OpenAI", "DeepSeek"];
 
         function renderCollabRunner(container) {
-            if (!collabSession?.plan) return;
+            if (!collabSession?.plan || !container) return;
             const plan = collabSession.plan;
-            const esc = v => escapeHtml(v || "");
+            const stages = plan.stages || [];
+            if (!stages.length) {
+                container.textContent = collabSession.recommendation || "협업 계획을 불러오지 못했습니다.";
+                return;
+            }
+            collabSelectedStage = Math.max(0, Math.min(collabSelectedStage, stages.length - 1));
             const sel = collabSelectedStage;
+            const esc = v => escapeHtml(v || "");
 
             const railHtml = (plan.stages || []).map((st, i) => {
                 const state = collabSession.stageStates[i] || "idle";
