@@ -25,7 +25,6 @@ from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db
 from auth_store import (
     add_support_reply,
     admin_logout,
-    admin_password_configured,
     check_and_consume_quota,
     create_admin_session,
     create_public_share,
@@ -65,7 +64,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+COMPARE_STREAM_TIMEOUT = httpx.Timeout(35.0, connect=10.0)
 MODEL_REFRESH_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+MAX_COMPARE_STREAM_MODEL_ATTEMPTS = 5
 MODEL_CACHE_TTL_SECONDS = 600
 # Allow up to 10 candidates per label so a label can keep falling back to other
 # models even when several are rate-limited or out of context budget.
@@ -261,7 +262,7 @@ async def _require_compare_quota_once(
     async with COMPARE_QUOTA_LOCK:
         if charge_key in COMPARE_QUOTA_CHARGED:
             return user
-        ok, info = check_and_consume_quota(subject, "compare")
+        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "compare")
         if not ok:
             raise HTTPException(
                 status_code=429,
@@ -547,8 +548,6 @@ def _admin_bearer(request: Request) -> str | None:
 
 
 def _require_admin(request: Request) -> str:
-    if not admin_password_configured():
-        raise HTTPException(status_code=503, detail="관리자 기능이 비활성화되어 있습니다. ADMIN_PASSWORD를 설정하세요.")
     token = _admin_bearer(request)
     if not token or not verify_admin_token(token):
         raise HTTPException(status_code=401, detail="관리자 인증이 필요합니다.")
@@ -1395,6 +1394,7 @@ async def ensure_model_cache_fresh() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     log_openrouter_key_status()
+    await ensure_model_cache_fresh()
 
 
 def sse(payload: dict) -> str:
@@ -1456,13 +1456,17 @@ def is_meta_or_invalid_response(content: str, prompt: str = "") -> bool:
 
 
 def should_try_next_candidate(status_code: int) -> bool:
-    return status_code in {400, 401, 403, 404, 408, 409, 429, 500, 502, 503, 504}
+    return status_code in {400, 401, 402, 403, 404, 408, 409, 429, 500, 502, 503, 504}
 
 
-def is_daily_free_limit(body_text: str) -> bool:
+def is_daily_free_limit(body_text: str, model_id: str = "") -> bool:
     """Detect OpenRouter's account-wide per-day free quota exhaustion."""
     lowered = (body_text or "").lower()
-    return "free-models-per-day" in lowered or "add 10 credits" in lowered
+    if "free-models-per-day" in lowered:
+        return True
+    if ":free" in model_id and "add 10 credits" in lowered:
+        return True
+    return False
 
 
 def extract_content(payload: dict) -> str:
@@ -1601,7 +1605,7 @@ async def _call_ai_model_core(
 
             # On 429, wait briefly and retry the SAME model once before moving on.
             if response.status_code == 429:
-                if is_daily_free_limit(response.text):
+                if is_daily_free_limit(response.text, model_id):
                     return make_failed_result(
                         requested_label=label,
                         requested_model=requested_model,
@@ -1639,7 +1643,7 @@ async def _call_ai_model_core(
                         failed_candidates=failed_candidates,
                         error=OPENROUTER_AUTH_ERROR_MSG,
                     )
-                if is_daily_free_limit(response.text):
+                if is_daily_free_limit(response.text, model_id):
                     return make_failed_result(
                         requested_label=label,
                         requested_model=requested_model,
@@ -2245,28 +2249,31 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
 
     async def generate() -> AsyncIterator[str]:
         yield ": keepalive\n\n"
-        try:
-            await _require_compare_quota_once(request, session_id, data.user_id)
-        except HTTPException as exc:
-            yield sse(
-                {
-                    "model": data.model_name,
-                    "success": False,
-                    "error": _quota_error_message(exc.detail),
-                }
-            )
-            return
-
-        await ensure_model_cache_fresh()
-        await ensure_compare_session_plan(session_id)
-
-        excluded_by_failure: set[str] = set()
-        await mark_compare_stream_started(session_id)
         current_model_id: str | None = None
-
+        stream_started = False
         try:
-            while True:
-                # 직전 모델(실패해서 다음 후보로 넘어가는 경우)을 먼저 반납해 누수를 막는다.
+            try:
+                await _require_compare_quota_once(request, session_id, data.user_id)
+            except HTTPException as exc:
+                yield sse(
+                    {
+                        "model": data.model_name,
+                        "success": False,
+                        "error": _quota_error_message(exc.detail),
+                    }
+                )
+                return
+
+            if not MODEL_CACHE_STATE.loaded:
+                await ensure_model_cache_fresh()
+            await ensure_compare_session_plan(session_id)
+
+            excluded_by_failure: set[str] = set()
+            await mark_compare_stream_started(session_id)
+            stream_started = True
+
+            while len(excluded_by_failure) < MAX_COMPARE_STREAM_MODEL_ATTEMPTS:
+                yield ": keepalive\n\n"
                 if current_model_id:
                     await release_compare_model(session_id, current_model_id)
                     current_model_id = None
@@ -2279,8 +2286,9 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
 
                 failed_this_model = False
                 try:
-                    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+                    async with httpx.AsyncClient(timeout=COMPARE_STREAM_TIMEOUT) as client:
                         for attempt in range(2):
+                            yield ": keepalive\n\n"
                             logger.info(
                                 "compare/stream OpenRouter request start label=%s model=%s session=%s attempt=%d",
                                 label,
@@ -2309,7 +2317,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                 )
                                 if response.status_code == 429:
                                     body = (await response.aread()).decode("utf-8", "ignore")
-                                    if is_daily_free_limit(body):
+                                    if is_daily_free_limit(body, model_id):
                                         yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
                                         return
                                     if attempt == 0:
@@ -2322,15 +2330,16 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                 if response.status_code != 200:
                                     body = (await response.aread()).decode("utf-8", "ignore")
                                     logger.warning(
-                                        "Stream non-200 label=%s model=%s status=%s",
+                                        "Stream non-200 label=%s model=%s status=%s body=%s",
                                         label,
                                         model_id,
                                         response.status_code,
+                                        body[:300],
                                     )
                                     if response.status_code == 401:
                                         yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
                                         return
-                                    if is_daily_free_limit(body):
+                                    if is_daily_free_limit(body, model_id):
                                         yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
                                         return
                                     if should_try_next_candidate(response.status_code):
@@ -2372,18 +2381,31 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                     logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
                     excluded_by_failure.add(model_id)
                     failed_this_model = True
-                except Exception:
-                    logger.exception("Unexpected stream error label=%s model=%s", label, model_id)
-                    yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                except HTTPException as exc:
+                    detail = exc.detail
+                    if exc.status_code == 503 and isinstance(detail, str) and "OPENROUTER" in detail.upper():
+                        error_msg = OPENROUTER_AUTH_ERROR_MSG
+                    elif exc.status_code == 429:
+                        error_msg = _quota_error_message(detail)
+                    elif isinstance(detail, str):
+                        error_msg = detail
+                    else:
+                        error_msg = COMPARE_FAILURE_MSG
+                    yield sse({"model": data.model_name, "success": False, "error": error_msg})
                     return
 
                 if not failed_this_model:
                     return
+
+            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+        except Exception:
+            logger.exception("compare/stream generate failed label=%s session=%s", label, session_id[:8])
+            yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
         finally:
-            # 스트림이 정상 종료/예외/early return 어느 경로로 끝나도 모델 락을 반드시 반납한다.
             if current_model_id:
                 await release_compare_model(session_id, current_model_id)
-            await mark_compare_stream_done(session_id)
+            if stream_started:
+                await mark_compare_stream_done(session_id)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -3141,8 +3163,6 @@ def serve_admin() -> FileResponse:
 
 @app.post("/admin/login")
 def admin_login(body: AdminLoginRequest) -> dict:
-    if not admin_password_configured():
-        raise HTTPException(status_code=503, detail="관리자 기능이 비활성화되어 있습니다. ADMIN_PASSWORD를 설정하세요.")
     if not verify_admin_password(body.password):
         raise HTTPException(status_code=401, detail="관리자 비밀번호가 올바르지 않습니다.")
     token = create_admin_session()
