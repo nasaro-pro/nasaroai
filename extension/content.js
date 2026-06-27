@@ -969,20 +969,77 @@
   });
 
   // ── 임무 제출 ────────────────────────────────────────────────────────
+  function parseScheduleFromTaskText(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+    const rel = [
+      [/(\d+)\s*분\s*(?:뒤|후|후에|이후|뒤에)/i, n => n * 60000, n => `${n}분 후`, 1440],
+      [/(\d+)\s*시간\s*(?:뒤|후|후에|이후)/i, n => n * 3600000, n => `${n}시간 후`, 168],
+      [/(\d+)\s*초\s*(?:뒤|후|후에|이후)/i, n => n * 1000, n => `${n}초 후`, 3600],
+    ];
+    for (const [re, msFn, labelFn, max] of rel) {
+      const m = raw.match(re);
+      if (!m) continue;
+      const n = parseInt(m[1], 10);
+      if (!n || n > max) continue;
+      const mission = raw.replace(m[0], " ").replace(/\s+/g, " ").trim() || raw;
+      const runAt = Date.now() + msFn(n);
+      return { mission, runAt, label: labelFn(n) };
+    }
+    const now = new Date();
+    const clock = [
+      [/(?:오전|AM|am)\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?(?:\s*에|\s*실행)?/, h => h % 12],
+      [/(?:오후|PM|pm)\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?(?:\s*에|\s*실행)?/, h => (h % 12) + 12],
+      [/(\d{1,2})\s*:\s*(\d{2})(?:\s*(?:에|실행))?/, h => h],
+      [/(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?(?:\s*(?:에|에\s*실행|실행))?/, h => (h < 8 ? h + 12 : h)],
+    ];
+    for (const [re, hourFn] of clock) {
+      const m = raw.match(re);
+      if (!m) continue;
+      const hour = hourFn(parseInt(m[1], 10));
+      const minute = parseInt(m[2] || "0", 10) || 0;
+      if (hour < 0 || hour > 23) continue;
+      const target = new Date(now);
+      target.setSeconds(0, 0);
+      target.setHours(hour, minute, 0, 0);
+      if (target.getTime() <= now.getTime() + 5000) target.setDate(target.getDate() + 1);
+      const mission = raw.replace(m[0], " ").replace(/\s+/g, " ").trim() || raw;
+      return { mission, runAt: target.getTime(), label: `${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")} 예약` };
+    }
+    return null;
+  }
+
+  function runTaskMessage(task, onDone) {
+    if (!task) return;
+    try {
+      chrome.runtime.sendMessage({ type: "RUN_TASK", task }, (res) => {
+        void chrome.runtime.lastError;
+        if (res?.finalText) showBubble(res.finalText, res.kind || (res.ok ? "success" : "error"));
+        onDone?.(res);
+      });
+    } catch (e) {}
+  }
+
   function submitTask() {
     const task = input.value.trim();
     if (!task) return;
     input.value = ""; input.style.height = "auto"; input.focus();
-    try {
-      chrome.runtime.sendMessage({ type: "RUN_TASK", task }, (res) => {
-        void chrome.runtime.lastError;
-        if (res?.finalText) {
-          showBubble(res.finalText, res.kind || (res.ok ? "success" : "error"));
-        }
-      });
-    } catch (e) {
-      // Extension context invalidated (확장 리로드 시) → 무시
+    const scheduled = parseScheduleFromTaskText(task);
+    if (scheduled) {
+      try {
+        chrome.runtime.sendMessage({
+          type: "SCHEDULE_TASK",
+          mission: scheduled.mission,
+          runAt: scheduled.runAt,
+          label: scheduled.label,
+        }, (res) => {
+          void chrome.runtime.lastError;
+          showBubble((res?.label || scheduled.label) + " — " + scheduled.mission, "success");
+        });
+      } catch (e) {}
+      return;
     }
+    runTaskMessage(task);
   }
 
   // ── 에이전트 종료 ────────────────────────────────────────────────────
@@ -1222,6 +1279,20 @@
       }, 50);
     }
     else if (d.type === "CLOSE") endAgent();
+    else if (d.type === "RUN_TASK") {
+      showBar(true);
+      runTaskMessage(String(d.task || "").trim());
+    }
+    else if (d.type === "SCHEDULE") {
+      try {
+        chrome.runtime.sendMessage({
+          type: "SCHEDULE_TASK",
+          mission: d.mission,
+          runAt: d.runAt,
+          label: d.label,
+        });
+      } catch (e) {}
+    }
   });
   window.postMessage({ __nasaroai: "agent", type: "READY" }, "*");
   broadcastAgentState(enabled);

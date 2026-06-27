@@ -616,6 +616,29 @@
             background: #262626;
             color: #e5e5e5;
         }
+        .collab-intake-actions {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+        }
+        .collab-intake-skip-btn {
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #5b21b6;
+            border-radius: 10px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .collab-intake-skip-btn:hover {
+            background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+        }
+        html[data-theme="dark"] .collab-intake-skip-btn {
+            background: #312e81;
+            border-color: #6d28d9;
+            color: #e9d5ff;
+        }
 
         /* 협업 워크스페이스 */
         .collab-workspace {
@@ -1669,12 +1692,16 @@
             padding: 8px 12px 12px;
             display: flex;
             flex-direction: column;
+            max-height: min(420px, 52vh);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .compare-qa-pair {
             padding: 10px 0;
             border-bottom: 1px dashed #e5e7eb;
             display: flex;
             flex-direction: column;
+            flex-shrink: 0;
         }
         .compare-qa-pair:last-child {
             border-bottom: none;
@@ -1695,6 +1722,9 @@
             border-left: 4px solid #9ca3af;
             border-radius: 8px;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: min(520px, 58vh);
         }
 
         .compare-card-header {
@@ -1728,14 +1758,14 @@
         }
 
         .compare-content {
-            min-height: 140px;
-            max-height: 520px;
+            max-height: 220px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px 16px;
             font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.8;
+            flex-shrink: 0;
         }
 
         .compare-card.error-card {
@@ -4333,6 +4363,9 @@
                     <div id="collabIntakePanel" class="collab-intake-panel" style="display:none;">
                         <div class="collab-intake-head">작업 세부 정보 수집</div>
                         <div id="collabIntakeChat" class="collab-intake-chat"></div>
+                        <div id="collabIntakeActions" class="collab-intake-actions" style="display:none;">
+                            <button type="button" id="collabIntakeSkipBtn" class="collab-intake-skip-btn">수집한 정보로 AI 추천 시작 ▶</button>
+                        </div>
                     </div>
                 </div>
 
@@ -6890,15 +6923,24 @@
 
         function scheduleAgentMission(mission, scheduleInfo) {
             const NF = window.NasaroFeatures;
-            const runAt = Date.now() + scheduleInfo.delayMs;
+            const runAt = scheduleInfo.runAt || (Date.now() + scheduleInfo.delayMs);
             appendScheduledAgentCard(mission, scheduleInfo.label);
-            NF.addAgentSchedule({ id: createUUID(), mission, runAt, label: scheduleInfo.label }, (m) => {
+            NF.addAgentSchedule({ id: createUUID(), mission, runAt, delayMs: scheduleInfo.delayMs, label: scheduleInfo.label }, (m) => {
                 showToast((NF.t("scheduled_done") || "예약 임무 실행") + ": " + m, "success", 5000);
-                runAgentMission(m, false);
+                executeScheduledAgentMission(m);
             });
             setAgentStatus("idle", (NF.lang === "en" ? "Scheduled: " : "예약됨: ") + scheduleInfo.label);
             showToast((NF.lang === "en" ? "Scheduled " : "예약: ") + scheduleInfo.label, "success");
             addSessionHistory({ mode: "agent", title: mission, preview: scheduleInfo.label });
+        }
+
+        function executeScheduledAgentMission(mission) {
+            if (!agentActive) setAgentActive(true);
+            if (useExtensionAgent()) {
+                window.postMessage({ __nasaroai: "agent", type: "RUN_TASK", task: mission }, "*");
+                return;
+            }
+            runAgentMission(mission, false);
         }
 
         function appendAgentCard(title) {
@@ -7040,6 +7082,13 @@
         async function runAgentMission(mission, isModify, appendToCard) {
             // appendToCard: 기존 카드에 추가 임무로 붙이는 경우의 cardRefs
             if (!mission || agentInFlight) return;
+
+            if (useExtensionAgent() && !appendToCard) {
+                window.postMessage({ __nasaroai: "agent", type: "RUN_TASK", task: mission }, "*");
+                showToast("확장 에이전트에서 임무를 실행합니다.", "success");
+                return;
+            }
+
             currentMission = mission;
             agentInFlight  = true;
             agentAbortCtrl = new AbortController();
@@ -7124,6 +7173,10 @@
                     usedFallback = true;
                     const recentHistory = agentMissionHistory.slice(-3);
                     res = await doFetch("/agent/ask", { query: mission, history: recentHistory });
+                }
+
+                if (res.status === 429) {
+                    throw new Error("다른 에이전트 작업이 실행 중입니다. 잠시 후 다시 시도해주세요.");
                 }
 
                 const data = await res.json();
@@ -7411,16 +7464,38 @@
             collabIntakeMessages = [];
             const panel = document.getElementById("collabIntakePanel");
             const chat = document.getElementById("collabIntakeChat");
+            const actions = document.getElementById("collabIntakeActions");
             const introTitle = document.querySelector(".collab-intro-title");
             if (panel) panel.style.display = "none";
             if (chat) chat.innerHTML = "";
+            if (actions) actions.style.display = "none";
             if (introTitle) introTitle.textContent = "어떤 작업을 원하십니까?";
+        }
+
+        function buildCollabIntakeBrief() {
+            const parts = [collabIntakeTask];
+            collabIntakeMessages.forEach(m => {
+                if (m.role === "user" && m.content?.trim() && m.content.trim() !== collabIntakeTask) {
+                    parts.push(m.content.trim());
+                }
+            });
+            return parts.filter(Boolean).join("\n\n");
+        }
+
+        async function skipCollabIntakeToRecommend() {
+            if (collabRecommendInFlight || collabPipelineRunning) return;
+            const brief = buildCollabIntakeBrief();
+            appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.");
+            collabIntakeActive = false;
+            await runCollabRecommend(brief);
         }
 
         function showCollabIntakePanel() {
             const panel = document.getElementById("collabIntakePanel");
+            const actions = document.getElementById("collabIntakeActions");
             const introTitle = document.querySelector(".collab-intro-title");
             if (panel) panel.style.display = "block";
+            if (actions) actions.style.display = "flex";
             if (introTitle) introTitle.textContent = "작업 정보를 알려주세요";
         }
 
@@ -8744,9 +8819,9 @@
             if (themeSel) { themeSel.value = NF.theme; themeSel.addEventListener("change", e => { NF.theme = e.target.value; }); }
             NF.startAgentScheduleChecker(mission => {
                 showToast((NF.t("scheduled_done") || "예약 임무 실행") + ": " + mission, "success", 5000);
-                if (!agentActive) setAgentActive(true);
-                runAgentMission(mission, false);
+                executeScheduledAgentMission(mission);
             });
+            document.getElementById("collabIntakeSkipBtn")?.addEventListener("click", () => skipCollabIntakeToRecommend());
             window.addEventListener("nasaroai:lang", refreshAppLang);
             NF.loadShareFromUrl(apiFetch, showToast);
             wirePreviewModals();

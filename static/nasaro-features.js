@@ -410,25 +410,83 @@
         rec.start();
     }
 
+    function stripSchedulePhrase(text) {
+        return String(text || "")
+            .replace(/\d+\s*분\s*(?:뒤|후|후에|이후|뒤에)/gi, " ")
+            .replace(/\d+\s*시간\s*(?:뒤|후|후에|이후)/gi, " ")
+            .replace(/\d+\s*초\s*(?:뒤|후|후에|이후)/gi, " ")
+            .replace(/(?:in\s*)?\d+\s*min(?:ute)?s?\s*(?:later|after)?/gi, " ")
+            .replace(/(?:in\s*)?\d+\s*hours?\s*(?:later|after)?/gi, " ")
+            .replace(/(?:오전|AM|am)\s*\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?(?:\s*에)?/gi, " ")
+            .replace(/(?:오후|PM|pm)\s*\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?(?:\s*에)?/gi, " ")
+            .replace(/\d{1,2}\s*:\s*\d{2}(?:\s*(?:에|실행))?/g, " ")
+            .replace(/\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?(?:\s*(?:에|에\s*실행|실행))?/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
     function parseScheduleFromText(text) {
         const raw = String(text || "").trim();
         if (!raw) return null;
-        const ko = raw.match(/(\d+)\s*분\s*(?:뒤|후|후에|이\s*후)?\s*(.*)$/i) || raw.match(/(\d+)분(?:뒤|후)(.*)$/);
-        if (ko) {
-            const mins = parseInt(ko[1], 10);
-            const mission = (ko[2] || raw).replace(/^(에|에\s*)/, "").trim() || raw;
-            if (mins > 0 && mins <= 1440) return { delayMs: mins * 60000, mission: mission || raw, label: `${mins}분 후` };
+
+        const relPatterns = [
+            { re: /(\d+)\s*분\s*(?:뒤|후|후에|이후|뒤에)/i, ms: n => n * 60000, max: 1440, label: n => `${n}분 후` },
+            { re: /(\d+)\s*시간\s*(?:뒤|후|후에|이후)/i, ms: n => n * 3600000, max: 168, label: n => `${n}시간 후` },
+            { re: /(\d+)\s*초\s*(?:뒤|후|후에|이후)/i, ms: n => n * 1000, max: 3600, label: n => `${n}초 후` },
+            { re: /(?:in\s*)?(\d+)\s*min(?:ute)?s?\s*(?:later|after)?/i, ms: n => n * 60000, max: 1440, label: n => `${n} min later` },
+            { re: /(?:in\s*)?(\d+)\s*hours?\s*(?:later|after)?/i, ms: n => n * 3600000, max: 168, label: n => `${n} h later` },
+        ];
+        for (const p of relPatterns) {
+            const m = raw.match(p.re);
+            if (!m) continue;
+            const n = parseInt(m[1], 10);
+            if (!n || n > p.max) continue;
+            const mission = stripSchedulePhrase(raw) || raw;
+            const runAt = Date.now() + p.ms(n);
+            return { delayMs: p.ms(n), mission, label: p.label(n), runAt };
         }
-        const en = raw.match(/(?:in\s*)?(\d+)\s*min(?:ute)?s?\s*(?:later|after)?\s*(.*)$/i);
-        if (en) {
-            const mins = parseInt(en[1], 10);
-            const mission = (en[2] || raw).trim() || raw;
-            if (mins > 0) return { delayMs: mins * 60000, mission: mission || raw, label: `${mins} min later` };
+
+        const now = new Date();
+        const clockMatchers = [
+            {
+                re: /(?:오전|AM|am)\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?(?:\s*에|\s*실행)?/,
+                hour: (h) => h % 12,
+            },
+            {
+                re: /(?:오후|PM|pm)\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?(?:\s*에|\s*실행)?/,
+                hour: (h) => (h % 12) + 12,
+            },
+            {
+                re: /(\d{1,2})\s*:\s*(\d{2})(?:\s*(?:에|실행))?/,
+                hour: (h) => h,
+                minIdx: 2,
+            },
+            {
+                re: /(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?(?:\s*(?:에|에\s*실행|실행))?/,
+                hour: (h) => (h < 8 ? h + 12 : h),
+            },
+        ];
+        for (const cm of clockMatchers) {
+            const m = raw.match(cm.re);
+            if (!m) continue;
+            const hour = cm.hour(parseInt(m[1], 10));
+            const minute = parseInt(m[cm.minIdx || 2] || "0", 10) || 0;
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) continue;
+            const target = new Date(now);
+            target.setSeconds(0, 0);
+            target.setHours(hour, minute, 0, 0);
+            if (target.getTime() <= now.getTime() + 5000) target.setDate(target.getDate() + 1);
+            const delayMs = target.getTime() - now.getTime();
+            const mission = stripSchedulePhrase(raw) || raw;
+            const hh = String(hour).padStart(2, "0");
+            const mm = String(minute).padStart(2, "0");
+            return { delayMs, mission, label: `${hh}:${mm} 예약`, runAt: target.getTime() };
         }
         return null;
     }
 
     function addAgentSchedule(task, onRun) {
+        if (!task.runAt) task.runAt = Date.now() + (task.delayMs || 0);
         agentScheduledTasks.push(task);
         localStorage.setItem("nasaroai_agent_scheduled", JSON.stringify(agentScheduledTasks));
         startAgentScheduleChecker(onRun);
@@ -437,16 +495,22 @@
 
     function startAgentScheduleChecker(onRun) {
         if (agentScheduleTimer) clearInterval(agentScheduleTimer);
-        agentScheduleTimer = setInterval(() => {
+        const tick = () => {
             const now = Date.now();
             const due = [];
             agentScheduledTasks = agentScheduledTasks.filter(task => {
-                if (task.runAt <= now) { due.push(task); return false; }
+                const runAt = Number(task.runAt) || 0;
+                if (runAt > 0 && runAt <= now) {
+                    due.push(task);
+                    return false;
+                }
                 return true;
             });
             if (due.length) localStorage.setItem("nasaroai_agent_scheduled", JSON.stringify(agentScheduledTasks));
             due.forEach(task => onRun?.(task.mission, task));
-        }, 3000);
+        };
+        tick();
+        agentScheduleTimer = setInterval(tick, 1000);
     }
 
     function getUserGuideHtml() {

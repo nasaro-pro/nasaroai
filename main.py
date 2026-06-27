@@ -2628,6 +2628,18 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
         raise HTTPException(status_code=400, detail="작업 내용을 입력하세요.")
 
     user_turns = sum(1 for m in data.messages if (m.role or "").strip() == "user")
+    asked_questions = [
+        (m.content or "").strip()
+        for m in data.messages
+        if (m.role or "").strip().lower() == "assistant"
+        and (m.content or "").strip()
+        and not (m.content or "").strip().startswith("질문을 준비")
+    ]
+    user_facts = [
+        (m.content or "").strip()
+        for m in data.messages
+        if (m.role or "").strip().lower() == "user" and (m.content or "").strip()
+    ]
     history_lines: list[str] = []
     for m in data.messages:
         role = (m.role or "").strip().lower()
@@ -2637,26 +2649,65 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
             history_lines.append(f"{prefix}: {content}")
     history_text = "\n".join(history_lines) if history_lines else f"사용자: {task}"
 
+    asked_block = "\n".join(f"- {q}" for q in asked_questions[-12:]) or "(없음)"
+    facts_block = "\n".join(f"- {u}" for u in user_facts[-12:]) or "(없음)"
+
     prompt = (
         f"당신은 Nasaro AI 협업 기획 도우미입니다.\n"
         f"사용자 작업을 실제로 고품질로 완수하려면 필요한 세부 정보를 파악해야 합니다.\n\n"
         f"[초기 요청]\n{task}\n\n"
         f"[지금까지 대화]\n{history_text}\n\n"
+        f"[이미 물어본 질문 — 절대 반복 금지]\n{asked_block}\n\n"
+        f"[사용자가 이미 말한 내용]\n{facts_block}\n\n"
         "지침:\n"
-        "- 한국어로 친절하고 구체적으로, **한 번에 하나의 질문**만 하세요.\n"
-        "- 작업 유형에 맞는 디테일을 물으세요. 예: 자기소개서→제출처·직무·분량·강조 스펙·경험·톤·마감, "
-        "PPT→청중·목적·슬라이드 수, 개발→언어·기능·환경, 마케팅→타깃·채널·KPI 등.\n"
-        "- 이미 답변된 내용은 반복 질문하지 마세요.\n"
-        "- 핵심 정보가 충분히 모였으면 ready=true로 종료하세요 (보통 4~8회 질문).\n"
+        "- 한국어로 친절하고 구체적으로, **한 번에 하나의 새 질문**만 하세요.\n"
+        "- 위 '이미 물어본 질문'과 **의미가 겹치거나 비슷한 질문은 금지**합니다. 반드시 **다른 각도**의 질문을 하세요.\n"
+        "- 사용자가 이미 답한 내용은 다시 묻지 말고, **아직 없는 정보**만 물으세요.\n"
+        "- 작업 유형별 예: 자기소개서→제출처·직무·분량·강조 스펙·경험·톤·마감 / PPT→청중·목적·슬라이드 수 / 개발→언어·기능·환경\n"
+        "- 질문은 실무에 도움이 되도록 **구체적·실행 가능**하게 (예: '분량이 몇 자인가요?' not '더 알려주세요').\n"
+        "- 핵심 정보가 충분하면 ready=true (보통 3~6회 질문).\n"
         "- ready=true일 때 enriched_task에 수집한 모든 정보를 통합한 완전한 작업 지시문을 작성하세요.\n\n"
         'JSON만 출력: {"ready": false, "question": "..."} 또는 '
         '{"ready": true, "enriched_task": "통합 작업 설명..."}'
     )
 
+    def _norm_q(text: str) -> str:
+        return re.sub(r"\s+", " ", (text or "").lower().replace("?", "").replace("！", "").strip())
+
+    def _is_repeat_question(question: str, prev: list[str]) -> bool:
+        qn = _norm_q(question)
+        if not qn or len(qn) < 6:
+            return False
+        for old in prev:
+            on = _norm_q(old)
+            if not on:
+                continue
+            if qn == on or qn in on or on in qn:
+                return True
+            q_words = set(qn.split())
+            o_words = set(on.split())
+            if len(q_words & o_words) >= max(3, min(len(q_words), len(o_words)) // 2):
+                return True
+        return False
+
+    fallback_questions = [
+        "이 작업의 **최종 제출/사용처**(회사·학교·플랫폼)와 **목적**을 알려주세요.",
+        "**분량·형식·마감** 기준이 있나요? (글자 수, 페이지, 파일 형식, 날짜)",
+        "꼭 **넣어야 할 핵심 내용·스펙·경험·키워드**를 구체적으로 적어주세요.",
+        "**피해야 할 표현·금기**나 참고할 **톤/샘플**이 있나요?",
+        "대상 독자/면접관/교수가 **특히 보는 포인트**가 있다면 알려주세요.",
+        "참고할 **링크·자료·이전 버전**이 있나요? (없으면 「없음」)",
+        "추가로 꼭 반영할 내용이 더 있나요? (없으면 「없음」)",
+    ]
+
+    def _next_fallback_question() -> str | None:
+        for q in fallback_questions:
+            if not _is_repeat_question(q, asked_questions):
+                return q
+        return None
+
     result = await call_ai_best(prompt, max_tokens=900)
     if result.success:
-        import re
-
         m = re.search(r"\{[\s\S]*\}", result.content)
         if m:
             try:
@@ -2668,25 +2719,25 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
                         "question": "",
                     }
                 question = str(parsed.get("question", "")).strip()
-                if question:
+                if question and not _is_repeat_question(question, asked_questions):
                     return {"ready": False, "question": question, "enriched_task": ""}
+                if question and _is_repeat_question(question, asked_questions):
+                    alt = _next_fallback_question()
+                    if alt:
+                        return {"ready": False, "question": alt, "enriched_task": ""}
             except (json.JSONDecodeError, TypeError, ValueError):
                 pass
 
-    fallback_questions = [
-        "이 작업의 **최종 제출/사용처**(회사·학교·플랫폼 등)와 **목적**을 알려주세요.",
-        "**분량·형식·마감** 기준이 있나요? (글자 수, 페이지, 파일 형식, 날짜)",
-        "꼭 **넣어야 할 핵심 내용·스펙·경험·키워드**가 있다면 구체적으로 적어주세요.",
-        "**피해야 할 표현·금기 사항**이나 참고할 **톤/샘플**이 있나요?",
-        "수집한 정보로 진행할게요. 추가로 꼭 반영할 내용이 더 있나요? (없으면 「없음」)",
-    ]
-    idx = min(max(0, user_turns - 1), len(fallback_questions) - 1)
     if user_turns >= len(fallback_questions):
         merged = f"{task}\n\n[추가 정보]\n" + "\n".join(
-            m.content.strip() for m in data.messages if m.role == "user" and m.content.strip()
+            u for u in user_facts if u != task
         )
         return {"ready": True, "enriched_task": merged.strip(), "question": ""}
-    return {"ready": False, "question": fallback_questions[idx], "enriched_task": ""}
+    alt = _next_fallback_question()
+    if alt:
+        return {"ready": False, "question": alt, "enriched_task": ""}
+    merged = f"{task}\n\n[추가 정보]\n" + "\n".join(u for u in user_facts if u != task)
+    return {"ready": True, "enriched_task": merged.strip(), "question": ""}
 
 
 @app.post("/collab/recommend")
@@ -3151,7 +3202,7 @@ async def models_auto() -> dict:
     }
 
 
-AGENT_STEP_MAX_CANDIDATES = 4
+AGENT_STEP_MAX_CANDIDATES = 6
 
 
 def _resolve_agent_models() -> list[str]:

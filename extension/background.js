@@ -521,8 +521,17 @@ async function runTask(tabId, text, taskId, pageUrl) {
         }
 
         const exec = await executeAction(tabId, { action: data.action, target_id: data.target_id, value: data.value });
-        actionHistory.push({ step: round, action: data.action, target: data.target_id, value: data.value, error: exec.success ? null : exec.error });
-        await sleep(400);
+        let execResult = exec;
+        if (!execResult.success && data.action !== "wait" && data.action !== "done") {
+          await sleep(600);
+          const rescan = await scanCurrentTab(tabId);
+          if ((rescan.elements || []).length) {
+            execResult = await executeAction(tabId, { action: data.action, target_id: data.target_id, value: data.value });
+          }
+        }
+        actionHistory.push({ step: round, action: data.action, target: data.target_id, value: data.value, error: execResult.success ? null : execResult.error });
+        if (data.action === "scroll_down" || data.action === "scroll_up") await sleep(700);
+        else await sleep(400);
       }
     } catch (e) {
       finalText = "❌ " + (e.message || e);
@@ -544,7 +553,19 @@ async function runTask(tabId, text, taskId, pageUrl) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
-      if (message.type === "RUN_TASK") {
+      if (message.type === "SCHEDULE_TASK") {
+        const mission = String(message.mission || "").trim();
+        const runAt = Number(message.runAt) || 0;
+        const label = String(message.label || "예약");
+        const tabId = sender.tab?.id;
+        if (!mission || !runAt) { sendResponse({ ok: false, label: "예약 실패" }); return; }
+        const { agentScheduled = [] } = await chrome.storage.local.get("agentScheduled");
+        agentScheduled.push({ id: "s" + Date.now(), mission, runAt, label, tabId: tabId ?? null });
+        await chrome.storage.local.set({ agentScheduled });
+        sendResponse({ ok: true, label });
+        return true;
+
+      } else if (message.type === "RUN_TASK") {
         const tabId = sender.tab?.id;
         const tabUrl = sender.tab?.url || "";
         if (tabId == null) { sendResponse({ ok: false, finalText: "탭 정보를 찾을 수 없습니다.", kind: "error" }); return; }
@@ -856,3 +877,32 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   const tab = await chrome.tabs.get(details.tabId).catch(() => null);
   await ensureInjectedIfEnabled(details.tabId, tab?.url || "");
 });
+
+// ---- 예약 임무 (1초 간격 체크) ----
+async function runScheduledDueTasks() {
+  try {
+    const { agentScheduled = [], agentEnabled } = await chrome.storage.local.get(["agentScheduled", "agentEnabled"]);
+    if (!agentEnabled || !agentScheduled.length) return;
+    const now = Date.now();
+    const due = agentScheduled.filter(t => Number(t.runAt) <= now);
+    if (!due.length) return;
+    const remaining = agentScheduled.filter(t => Number(t.runAt) > now);
+    await chrome.storage.local.set({ agentScheduled: remaining });
+    for (const item of due) {
+      let tabId = item.tabId;
+      if (tabId == null || runningTabs.has(tabId)) {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        tabId = tabs[0]?.id;
+      }
+      if (tabId == null || runningTabs.has(tabId)) continue;
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!tab || INTERNAL_URL_RE.test(tab.url || "")) continue;
+      const taskId = "t" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      runningTabs.add(tabId);
+      tabToTask.set(tabId, taskId);
+      runTask(tabId, item.mission, taskId, tab.url || "").catch(() => {});
+    }
+  } catch {}
+}
+setInterval(runScheduledDueTasks, 1000);
+runScheduledDueTasks();
