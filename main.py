@@ -2140,7 +2140,6 @@ async def acquire_compare_model(
 async def mark_compare_stream_started(session_id: str) -> None:
     if not session_id:
         return
-    await ensure_compare_session_plan(session_id)
     async with COMPARE_SESSION_LOCK:
         COMPARE_SESSION_PENDING[session_id] = COMPARE_SESSION_PENDING.get(session_id, 0) + 1
 
@@ -2188,6 +2187,8 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
     label = data.model_name
     persona = PERSONAS[label]
     session_id = data.compare_session_id.strip()
+
+    await ensure_compare_session_plan(session_id)
 
     async def generate() -> AsyncIterator[str]:
         excluded_by_failure: set[str] = set()
