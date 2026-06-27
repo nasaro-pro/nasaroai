@@ -616,6 +616,7 @@ def _day_key() -> str:
 def check_and_consume_quota(subject: str, feature: str) -> tuple[bool, dict[str, Any]]:
     limit = QUOTA_LIMITS.get(feature, 9999)
     day_key = _day_key()
+    now = time.time()
     with _lock:
         conn = _connect()
         try:
@@ -634,8 +635,14 @@ def check_and_consume_quota(subject: str, feature: str) -> tuple[bool, dict[str,
                 """,
                 (subject, feature, day_key),
             )
+            try:
+                conn.execute(
+                    "INSERT INTO usage_events (subject, feature, created_at) VALUES (?, ?, ?)",
+                    (subject, feature, now),
+                )
+            except Exception:
+                pass
             conn.commit()
-            log_usage_event(subject, feature)
             return True, {"feature": feature, "used": used + 1, "limit": limit, "day_key": day_key}
         finally:
             conn.close()
