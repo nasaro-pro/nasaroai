@@ -1165,6 +1165,8 @@ def get_admin_dashboard() -> dict[str, Any]:
         "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),
         "platform_stats": get_platform_stats(day_key),
+        "member_activity_by_feature": get_member_activity_by_feature(day_key),
+        "guest_activity_by_feature": get_guest_activity_by_feature(day_key),
     }
 
 
@@ -1476,6 +1478,44 @@ def get_platform_stats(day_key: str | None = None) -> dict[str, int]:
         finally:
             conn.close()
     return {r["platform"]: int(r["cnt"]) for r in rows}
+
+
+def get_guest_activity_by_feature(day_key: str | None = None) -> dict[str, int]:
+    day_key = day_key or _day_key()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, COUNT(*) AS cnt FROM activity_log
+                WHERE user_id IS NULL
+                  AND strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY feature
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {r["feature"]: int(r["cnt"]) for r in rows}
+
+
+def get_member_activity_by_feature(day_key: str | None = None) -> dict[str, int]:
+    day_key = day_key or _day_key()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, COUNT(*) AS cnt FROM activity_log
+                WHERE user_id IS NOT NULL
+                  AND strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
+                GROUP BY feature
+                """,
+                (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {r["feature"]: int(r["cnt"]) for r in rows}
 
 
 def list_guest_devices(limit: int = 50) -> list[dict[str, Any]]:

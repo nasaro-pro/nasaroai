@@ -1045,10 +1045,39 @@
         }
         .collab-activity-section {
             flex-shrink: 0;
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px dashed #e5e7eb;
+        }
+        html[data-theme="dark"] .collab-activity-section {
+            border-color: #333;
         }
         .collab-activity-section .collab-activity-log {
             max-height: 140px;
             font-size: 10px;
+        }
+        @media (min-width: 641px) {
+            .collab-runner-shell {
+                display: flex;
+                flex-direction: column;
+                min-height: 360px;
+            }
+            .collab-runner-scroll {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+            }
+            .collab-action-bar {
+                flex-shrink: 0;
+                margin-top: 0;
+                border-top: 1px solid #e5e7eb;
+                padding: 10px 0 4px;
+            }
+            .collab-activity-section .collab-activity-log {
+                max-height: 180px;
+            }
         }
         .collab-stage-rail-label {
             font-size: 10px;
@@ -1555,6 +1584,33 @@
         .notice.info {
             background: #dbeafe;
             color: #1e40af;
+        }
+
+        .compare-turns {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .compare-turn-block {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .compare-turn-question {
+            font-size: 14px;
+            font-weight: 700;
+            color: #374151;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+        html[data-theme="dark"] .compare-turn-question {
+            color: #e5e5e5;
+            background: #171717;
+            border-color: #333;
         }
 
         .compare-grid {
@@ -4180,7 +4236,7 @@
                 </div>
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
-                <div id="compareResponses" class="compare-grid"></div>
+                <div id="compareResponses" class="compare-turns"></div>
             </section>
 
             <section id="debatePanel" class="panel">
@@ -4221,17 +4277,17 @@
                         <div class="collab-workspace-main collab-runner-shell">
                     <div id="collabStageRail" class="collab-runner-top"></div>
                     <div class="collab-runner-scroll">
-                    <div id="collabRecommendResult" class="collab-recommend-result"></div>
+                        <div id="collabRecommendResult" class="collab-recommend-result"></div>
+                        <div id="collabActivitySection" class="collab-activity-section compact">
+                            <div class="collab-activity-title">진행 기록</div>
+                            <div id="collabActivityLog" class="collab-activity-log compact"></div>
+                        </div>
                     </div>
                     <div id="collabActionBar" class="collab-action-bar" style="display:none;">
                         <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start">▶ 작업 시작</button>
                         <button type="button" id="collabViewBtn" class="collab-stage-btn">👁 결과물 보기</button>
                         <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 결과물 다운로드</button>
                         <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">작업 완료</button>
-                    </div>
-                    <div id="collabActivitySection" class="collab-activity-section compact">
-                        <div class="collab-activity-title">진행 기록</div>
-                        <div id="collabActivityLog" class="collab-activity-log compact"></div>
                     </div>
                     <div class="collab-sidebars">
                         <div class="collab-sidebar" data-sidebar="1">
@@ -4687,7 +4743,9 @@
             const data = entry?.data;
             if (!data) return "";
             if (entry.mode === "compare") {
-                const first = Object.values(data.responses || {}).find(Boolean);
+                const turns = data.turns || (data.responses ? [{ responses: data.responses }] : []);
+                const last = turns[turns.length - 1];
+                const first = Object.values(last?.responses || {}).find(Boolean);
                 return String(first || "").slice(0, 140);
             }
             if (entry.mode === "debate") {
@@ -4766,36 +4824,77 @@
             if (currentUser && authToken) await syncUserData();
         }
 
+        function compareModelSlug(turnIndex, model) {
+            return `t${turnIndex}-${String(model).replace(/[^a-zA-Z0-9]+/g, "_")}`;
+        }
+
+        function syncCompareSessionHistory() {
+            if (!compareTurns.length) return;
+            if (!compareConversationId) compareConversationId = createUUID();
+            upsertSessionHistory({
+                mode: "compare",
+                title: compareTurns[0].query,
+                preview: buildHistoryPreview({
+                    mode: "compare",
+                    data: { turns: compareTurns.map(t => ({ query: t.query, responses: { ...t.responses } })) },
+                }),
+                data: {
+                    conversationId: compareConversationId,
+                    sessionId: compareConversationId,
+                    turns: compareTurns.map(t => ({
+                        query: t.query,
+                        responses: { ...t.responses },
+                    })),
+                },
+            });
+        }
+
         function restoreCompareFromHistory(data, title) {
-            const query = data?.query || title || "";
-            const responses = data?.responses || {};
-            lastCompareMessage = query;
-            lastCompareSessionId = createUUID();
-            compareResponses = { ...responses };
-            mainInput.value = query;
+            const turns = Array.isArray(data?.turns) && data.turns.length
+                ? data.turns
+                : [{ query: data?.query || title || "", responses: data?.responses || {} }];
+            compareConversationId = data?.conversationId || data?.sessionId || createUUID();
+            compareTurns = turns.map(t => ({
+                query: t.query || "",
+                responses: { ...(t.responses || {}) },
+                sessionId: createUUID(),
+            }));
+            compareCurrentTurnIndex = Math.max(0, compareTurns.length - 1);
+            const lastTurn = compareTurns[compareCurrentTurnIndex];
+            lastCompareMessage = lastTurn?.query || "";
+            lastCompareSessionId = lastTurn?.sessionId || createUUID();
+            compareResponses = { ...(lastTurn?.responses || {}) };
+            mainInput.value = "";
             autoResizeInput();
             const el = document.getElementById("compareResponses");
             el.innerHTML = "";
             showNotice("compareLoading", "");
             showNotice("compareError", "");
             const compareHint = document.getElementById("compareEmptyHint");
-            if (compareHint) compareHint.style.display = Object.keys(responses).length ? "none" : "flex";
-            Object.keys(responses).forEach(model => {
-                renderCompareCard(model);
-                updateCompareCard(model, responses[model] || "", responses[model] === COMPARE_FAILURE_MSG);
-            });
-            const sections = Object.keys(responses).map(m => ({ heading: m, body: responses[m] || "" }));
-            if (sections.length) {
-                window.NasaroFeatures?.addResultActions?.(el, {
-                    title: query,
-                    sections,
-                    kind: "compare",
-                    payload: { query, responses },
-                    apiFetch,
-                    showToast,
-                    onSaveResult: saveResultRecord,
-                    loggedIn: !!currentUser,
+            if (compareHint) compareHint.style.display = compareTurns.length ? "none" : "flex";
+            compareTurns.forEach((turn, turnIndex) => {
+                const grid = appendCompareTurnBlock(turnIndex, turn.query);
+                Object.keys(turn.responses).forEach(model => {
+                    renderCompareCard(model, turnIndex, grid);
+                    updateCompareCard(model, turn.responses[model] || "", turn.responses[model] === COMPARE_FAILURE_MSG, turnIndex);
                 });
+            });
+            const last = compareTurns[compareTurns.length - 1];
+            if (last) {
+                const sections = Object.keys(last.responses).map(m => ({ heading: m, body: last.responses[m] || "" }));
+                if (sections.length) {
+                    const turnGrid = document.getElementById(`compare-turn-grid-${compareTurns.length - 1}`);
+                    window.NasaroFeatures?.addResultActions?.(turnGrid || el, {
+                        title: last.query,
+                        sections,
+                        kind: "compare",
+                        payload: { query: last.query, responses: last.responses, turns: compareTurns },
+                        apiFetch,
+                        showToast,
+                        onSaveResult: saveResultRecord,
+                        loggedIn: !!currentUser,
+                    });
+                }
             }
         }
 
@@ -5008,6 +5107,9 @@
 
         let lastCompareMessage = "";
         let lastCompareSessionId = "";
+        let compareConversationId = "";
+        let compareTurns = [];
+        let compareCurrentTurnIndex = 0;
         let compareResponses = {};
 
         let collabTaskAsked = false;
@@ -5923,6 +6025,9 @@
             mainInput.value = "";
             mainInput.style.height = "auto";
             if (mode === "compare") {
+                compareConversationId = "";
+                compareTurns = [];
+                compareCurrentTurnIndex = 0;
                 compareResponses = {};
                 lastCompareMessage = "";
                 lastCompareSessionId = "";
@@ -7804,77 +7909,100 @@
             });
         });
 
-        function renderCompareCard(model) {
+        function appendCompareTurnBlock(turnIndex, message) {
+            const root = document.getElementById("compareResponses");
+            const block = document.createElement("div");
+            block.className = "compare-turn-block";
+            block.id = `compare-turn-${turnIndex}`;
+            block.innerHTML = `
+                <div class="compare-turn-question">${escapeHtml(message)}</div>
+                <div class="compare-grid" id="compare-turn-grid-${turnIndex}"></div>`;
+            root.appendChild(block);
+            block.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            return block.querySelector(".compare-grid");
+        }
+
+        function renderCompareCard(model, turnIndex = compareCurrentTurnIndex, gridEl = null) {
+            const slug = compareModelSlug(turnIndex, model);
             const color = colorFor(model);
             const card = document.createElement("article");
             card.className = "compare-card";
-            card.id = `response-${model}`;
+            card.id = `response-${slug}`;
             card.style.borderLeftColor = color;
             card.innerHTML = `
                 <div class="compare-card-header" style="color: ${color};">
                     <span class="dot" style="background: ${color};"></span>
                     <span>${model}</span>
-                    <span class="compare-model-meta" id="model-meta-${model}"></span>
-                    <button type="button" class="compare-copy-btn" data-copy-model="${model}" title="복사">복사</button>
+                    <span class="compare-model-meta" id="model-meta-${slug}"></span>
+                    <button type="button" class="compare-copy-btn" data-copy-model="${slug}" title="복사">복사</button>
                 </div>
-                <div id="content-${model}" class="compare-content"></div>
-                <div id="retry-${model}" class="retry-row"></div>
+                <div id="content-${slug}" class="compare-content"></div>
+                <div id="retry-${slug}" class="retry-row"></div>
             `;
-            document.getElementById("compareResponses").appendChild(card);
+            const target = gridEl || document.getElementById(`compare-turn-grid-${turnIndex}`) || document.getElementById("compareResponses");
+            target.appendChild(card);
             card.querySelector(".compare-copy-btn")?.addEventListener("click", () => {
-                const text = document.getElementById(`content-${model}`)?.textContent || "";
+                const text = document.getElementById(`content-${slug}`)?.textContent || "";
                 navigator.clipboard.writeText(text).then(() => showToast("답변을 복사했습니다.", "success")).catch(() => showToast("복사 실패", "error"));
             });
         }
 
-        function updateCompareModelMeta(model, actualModel) {
-            const meta = document.getElementById(`model-meta-${model}`);
+        function updateCompareModelMeta(model, actualModel, turnIndex = compareCurrentTurnIndex) {
+            const slug = compareModelSlug(turnIndex, model);
+            const meta = document.getElementById(`model-meta-${slug}`);
             if (meta && actualModel) meta.textContent = actualModel;
         }
 
-        function updateCompareCard(model, content, isError = false) {
-            const element = document.getElementById(`content-${model}`);
+        function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex) {
+            const slug = compareModelSlug(turnIndex, model);
+            const element = document.getElementById(`content-${slug}`);
             if (element) element.textContent = content;
 
-            const card = document.getElementById(`response-${model}`);
+            const card = document.getElementById(`response-${slug}`);
             if (card) card.classList.toggle("error-card", isError);
 
-            const retry = document.getElementById(`retry-${model}`);
+            const retry = document.getElementById(`retry-${slug}`);
             if (!retry) return;
             if (isError) {
                 retry.innerHTML = `<button class="retry-button" type="button">다시 시도</button>`;
-                retry.querySelector("button").addEventListener("click", () => retryCompareModel(model));
+                retry.querySelector("button").addEventListener("click", () => retryCompareModel(model, turnIndex));
             } else {
                 retry.innerHTML = "";
             }
         }
 
-        function applyStreamChunk(responses, payload) {
+        function applyStreamChunk(responses, payload, turnIndex = compareCurrentTurnIndex) {
             const model = safeLabel(payload.model, "");
             if (!model) return;
 
             if (payload.success === false || payload.error) {
                 responses[model] = payload.error || COMPARE_FAILURE_MSG;
-                updateCompareCard(model, responses[model], true);
+                updateCompareCard(model, responses[model], true, turnIndex);
             } else if (payload.chunk) {
                 responses[model] += payload.chunk;
-                updateCompareCard(model, responses[model]);
+                updateCompareCard(model, responses[model], false, turnIndex);
                 if (payload.actual_model) {
-                    updateCompareModelMeta(model, payload.actual_model);
+                    updateCompareModelMeta(model, payload.actual_model, turnIndex);
                 }
             }
         }
 
-        async function retryCompareModel(model) {
-            if (!lastCompareMessage) return;
-            compareResponses[model] = "";
-            updateCompareModelMeta(model, "");
-            updateCompareCard(model, "다시 시도 중...");
+        async function retryCompareModel(model, turnIndex = compareCurrentTurnIndex) {
+            const turn = compareTurns[turnIndex];
+            if (!turn) return;
+            compareCurrentTurnIndex = turnIndex;
+            lastCompareMessage = turn.query;
+            lastCompareSessionId = turn.sessionId;
+            compareResponses = turn.responses;
+            turn.responses[model] = "";
+            updateCompareModelMeta(model, "", turnIndex);
+            updateCompareCard(model, "다시 시도 중...", false, turnIndex);
             try {
-                await streamCompareModel(model, lastCompareMessage, compareResponses, lastCompareSessionId);
+                await streamCompareModel(model, turn.query, turn.responses, turn.sessionId);
             } catch (error) {
-                applyStreamChunk(compareResponses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                applyStreamChunk(turn.responses, { model, success: false, error: COMPARE_FAILURE_MSG }, turnIndex);
             }
+            syncCompareSessionHistory();
         }
 
         async function streamCompareModel(model, message, responses, compareSessionId) {
@@ -7938,22 +8066,32 @@
             const message = mainInput.value.trim();
             if (!message) return;
 
+            mainInput.value = "";
+            autoResizeInput();
+
             window.NasaroFeatures?.hideFloatingResultActions?.();
-            const responsesElement = document.getElementById("compareResponses");
-            lastCompareMessage = message;
+            if (!compareConversationId) compareConversationId = createUUID();
+            const turnIndex = compareTurns.length;
             lastCompareSessionId = createUUID();
-            compareResponses = {};
-            const responses = compareResponses;
+            compareCurrentTurnIndex = turnIndex;
+            const responses = {};
+            compareTurns.push({ query: message, responses, sessionId: lastCompareSessionId });
+            lastCompareMessage = message;
+            compareResponses = responses;
+
+            const compareHint = document.getElementById("compareEmptyHint");
+            if (compareHint) compareHint.style.display = "none";
+
+            const turnGrid = appendCompareTurnBlock(turnIndex, message);
 
             dockPrimaryBtn.disabled = true;
             showNotice("compareError", "");
             showNotice("compareLoading", "AI 모델들이 동시에 답변을 생성하는 중입니다.");
-            responsesElement.innerHTML = "";
 
             const activeModels = getActiveModels();
             activeModels.forEach(model => {
                 responses[model] = "";
-                renderCompareCard(model);
+                renderCompareCard(model, turnIndex, turnGrid);
             });
 
             const failures = [];
@@ -7963,7 +8101,7 @@
                         .catch(error => {
                             failures.push(`${model}: ${error.message}`);
                             if (!responses[model] || responses[model] === "") {
-                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG });
+                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG }, turnIndex);
                             }
                         })
                 )
@@ -7977,21 +8115,17 @@
             dockPrimaryBtn.disabled = false;
 
             const sections = activeModels.map(m => ({ heading: m, body: responses[m] || "" }));
-            window.NasaroFeatures?.addResultActions?.(responsesElement, {
+            window.NasaroFeatures?.addResultActions?.(turnGrid, {
                 title: message,
                 sections,
                 kind: "compare",
-                payload: { query: message, responses },
+                payload: { query: message, responses, turns: compareTurns },
                 apiFetch,
                 showToast,
                 onSaveResult: saveResultRecord,
                 loggedIn: !!currentUser,
             });
-            addSessionHistory({
-                mode: "compare",
-                title: message,
-                data: { query: message, responses: { ...responses } },
-            });
+            syncCompareSessionHistory();
             const answerText = activeModels.map(m => `[${m}]\n${responses[m] || ""}`).join("\n\n");
             logUserActivity("compare", message, answerText, "compare");
         }

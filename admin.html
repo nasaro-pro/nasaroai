@@ -188,7 +188,15 @@
     .entity-list-table { width: 100%; }
     .entity-list-table tr { cursor: pointer; }
     .entity-list-table tr:hover { background: rgba(49, 46, 129, 0.2); }
-    .entity-list-table tr.active { background: rgba(49, 46, 129, 0.35); }
+    .activity-row-clickable { cursor: pointer; }
+    .activity-row-clickable:hover { background: rgba(49, 46, 129, 0.18); border-radius: 6px; }
+    .entity-stats-block {
+      margin: 0 0 12px; padding: 10px 12px; background: #0f172a;
+      border: 1px solid #334155; border-radius: 10px;
+    }
+    .entity-stats-block h4 {
+      margin: 0 0 8px; font-size: 12px; color: #c4b5fd; font-weight: 700;
+    }
     .support-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .support-actions .danger { background: #b91c1c; }
     .sidebar-foot {
@@ -347,6 +355,7 @@
           <h2>회원 목록</h2>
           <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;">계정을 클릭하면 상세 · 활동 · 문의 기록을 볼 수 있습니다.</p>
           <div id="membersSummary" class="entity-summary"></div>
+          <div id="membersStatsBlock" class="entity-stats-block"></div>
           <div style="overflow-x:auto;">
             <table class="entity-list-table">
               <thead>
@@ -362,6 +371,7 @@
           <h2>비회원 기기</h2>
           <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;">기기를 클릭하면 활동 · 사용량 상세를 볼 수 있습니다.</p>
           <div id="guestsSummary" class="entity-summary"></div>
+          <div id="guestsStatsBlock" class="entity-stats-block"></div>
           <div style="overflow-x:auto;">
             <table class="entity-list-table">
               <thead>
@@ -978,7 +988,86 @@
       return items;
     }
 
+    function renderFeatureStatCards(map, limits, prefix) {
+      const feats = ["compare", "debate", "collab", "agent"];
+      return feats.map(f => {
+        const used = Number(map?.[f] || 0);
+        const limit = limits?.[f] ?? "-";
+        return `<div class="stat"><b>${used}</b><span>${prefix}${FEATURE_LABELS[f] || f} · 한도 ${limit}</span></div>`;
+      }).join("");
+    }
+
+    function renderMemberStatsBlock() {
+      const el = document.getElementById("membersStatsBlock");
+      if (!el) return;
+      const users = dashData?.users || [];
+      const quotaTotals = { compare: 0, debate: 0, collab: 0, agent: 0 };
+      users.forEach(u => {
+        Object.keys(quotaTotals).forEach(f => {
+          quotaTotals[f] += Number(u.quota_today?.[f] || 0);
+        });
+      });
+      const act = dashData?.member_activity_by_feature || {};
+      const limits = dashData?.quota_limits?.member || {};
+      el.innerHTML = `
+        <h4>회원 통계 (오늘 KST)</h4>
+        <div class="entity-summary" style="margin-bottom:8px;">
+          ${renderFeatureStatCards(quotaTotals, limits, "사용 ")}
+        </div>
+        <h4 style="margin-top:10px;">회원 활동 기록 (오늘 건수)</h4>
+        <div class="entity-summary">
+          ${renderFeatureStatCards(act, null, "")}
+        </div>`;
+    }
+
+    function renderGuestStatsBlock() {
+      const el = document.getElementById("guestsStatsBlock");
+      if (!el) return;
+      const items = guests || [];
+      const platforms = {};
+      items.forEach(g => {
+        const p = g.platform || "web";
+        platforms[p] = (platforms[p] || 0) + 1;
+      });
+      const act = dashData?.guest_activity_by_feature || {};
+      const platText = Object.entries(platforms).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
+      el.innerHTML = `
+        <h4>비회원 통계</h4>
+        <div class="entity-summary" style="margin-bottom:8px;">
+          <div class="stat"><b>${items.filter(g => g.is_online).length}</b><span>접속 중</span></div>
+          <div class="stat"><b>${items.length}</b><span>등록 기기</span></div>
+          <div class="stat"><b>${items.reduce((s, g) => s + (g.activity_count || 0), 0)}</b><span>누적 활동</span></div>
+          <div class="stat"><b style="font-size:12px;">${platText}</b><span>플랫폼 분포</span></div>
+        </div>
+        <h4 style="margin-top:10px;">비회원 활동 기록 (오늘 건수)</h4>
+        <div class="entity-summary">
+          ${renderFeatureStatCards(act, dashData?.quota_limits?.guest || {}, "")}
+        </div>`;
+    }
+
+    function renderDetailActivityHtml(items, limit = 80) {
+      if (!items?.length) return "<div class='empty'>없음</div>";
+      return items.slice(0, limit).map(a => {
+        const detail = a.is_secret ? "🔒 시크릿 (프라이버시)" : (a.detail || a.action || "").slice(0, 100);
+        return `<div class="activity-row activity-row-clickable" data-activity-id="${a.id}">
+          <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
+          <div>${detail}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function wireDetailActivityList(root) {
+      if (!root) return;
+      root.querySelectorAll("[data-activity-id]").forEach(row => {
+        row.addEventListener("click", () => {
+          const id = Number(row.dataset.activityId);
+          if (id) openActivityDetail(id);
+        });
+      });
+    }
+
     function renderMembersListPanel() {
+      renderMemberStatsBlock();
       const users = filteredMembers();
       const online = users.filter(u => u.is_online).length;
       const collab = users.filter(u => u.has_active_collab).length;
@@ -1015,6 +1104,7 @@
     }
 
     function renderGuestsListPanel() {
+      renderGuestStatsBlock();
       const items = filteredGuests();
       const online = items.filter(g => g.is_online).length;
       const totalActs = items.reduce((sum, g) => sum + (g.activity_count || 0), 0);
@@ -1120,17 +1210,14 @@
           <p>플랫폼: ${pc} · 결과물 ${u.saved_results_count ?? 0}개</p>
           ${renderQuotaAdminPanel(subject, u.quota_snapshot, u.quota_limits, u.banned)}
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
-          <div class="activity-list">${(u.activity || []).slice(0, 80).map(a => `
-            <div class="activity-row">
-              <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
-              <div>${a.is_secret ? "🔒 시크릿" : (a.detail || a.action || "").slice(0, 100)}</div>
-            </div>`).join("") || "<div class='empty'>없음</div>"}</div>
+          <div class="activity-list" id="memberActivityList">${renderDetailActivityHtml(u.activity || [], 80)}</div>
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 기록</h3>
           <div class="activity-list">${(u.support_inquiries || []).map(s => `
             <div class="activity-row">
               <div><span class="badge ${s.status}">${s.status}</span> · ${s.created_at_iso}</div>
               <div>${s.message}</div>
             </div>`).join("") || "<div class='empty'>문의 없음</div>"}</div>`;
+        wireDetailActivityList(document.getElementById("memberActivityList"));
         document.getElementById("memberDetailBackBtn")?.addEventListener("click", () => {
           selectedUserId = null;
           updateMainPanels();
@@ -1170,11 +1257,8 @@
           <p>기기 ID: <code>${deviceId}</code></p>
           ${renderQuotaAdminPanel(subject, snap.features, snap.limits, snap.banned)}
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
-          <div class="activity-list">${(data.activity || []).map(a => `
-            <div class="activity-row">
-              <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
-              <div>${a.is_secret ? "🔒 시크릿" : (a.detail || "").slice(0, 120)}</div>
-            </div>`).join("") || "<div class='empty'>없음</div>"}</div>`;
+          <div class="activity-list" id="guestActivityList">${renderDetailActivityHtml(data.activity || [], 500)}</div>`;
+        wireDetailActivityList(document.getElementById("guestActivityList"));
         document.getElementById("guestDetailBackBtn")?.addEventListener("click", () => {
           selectedGuestId = null;
           updateMainPanels();
