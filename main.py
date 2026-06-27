@@ -25,6 +25,7 @@ from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
 from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db_if_changed
 from auth_store import (
     add_support_reply,
+    admin_adjust_quota,
     admin_logout,
     check_and_consume_quota,
     create_admin_session,
@@ -42,6 +43,8 @@ from auth_store import (
     get_user_data,
     init_db,
     DB_PATH,
+    is_guest_subject,
+    is_subject_banned,
     list_guest_devices,
     list_support_inquiries,
     list_user_support_inquiries,
@@ -49,7 +52,9 @@ from auth_store import (
     login as auth_login_fn,
     logout as auth_logout_fn,
     merge_user_data,
+    resolve_device_id,
     search_users_admin,
+    set_subject_ban,
     touch_device_presence,
     signup as auth_signup_fn,
     verify_admin_password,
@@ -215,6 +220,28 @@ def _platform(request: Request) -> str:
     return "web"
 
 
+def _quota_error_payload(feature: str, info: dict) -> dict:
+    if info.get("banned"):
+        return {
+            "message": "이 계정 또는 기기는 사용이 제한되었습니다. 문의해 주세요.",
+            "quota": info,
+            "banned": True,
+        }
+    if info.get("guest"):
+        return {
+            "message": (
+                f"오늘 비회원 {feature} 한도({info['limit']}회)를 모두 사용했습니다. "
+                "로그인하면 더 많이 이용할 수 있습니다."
+            ),
+            "quota": info,
+            "login_required": True,
+        }
+    return {
+        "message": f"오늘 {feature} 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
+        "quota": info,
+    }
+
+
 def _require_quota(
     request: Request,
     feature: str,
@@ -222,9 +249,20 @@ def _require_quota(
     *,
     action: str = "",
     detail: str = "",
+    amount: float = 1.0,
 ) -> dict | None:
     subject, user = _resolve_subject(request, device_id)
-    ok, info = check_and_consume_quota(subject, feature)
+    if is_subject_banned(subject):
+        limits = get_quota_snapshot(subject)["limits"]
+        info = {
+            "feature": feature,
+            "used": 0,
+            "limit": limits.get(feature, 0),
+            "banned": True,
+            "guest": is_guest_subject(subject),
+        }
+        raise HTTPException(status_code=403, detail=_quota_error_payload(feature, info))
+    ok, info = check_and_consume_quota(subject, feature, amount=amount)
     if ok:
         dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
         log_activity(
@@ -239,10 +277,7 @@ def _require_quota(
         return user
     raise HTTPException(
         status_code=429,
-        detail={
-            "message": f"오늘 {feature} 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
-            "quota": info,
-        },
+        detail=_quota_error_payload(feature, info),
     )
 
 
@@ -263,14 +298,11 @@ async def _require_compare_quota_once(
     async with COMPARE_QUOTA_LOCK:
         if charge_key in COMPARE_QUOTA_CHARGED:
             return user
-        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "compare")
+        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "compare", 1.0)
         if not ok:
             raise HTTPException(
                 status_code=429,
-                detail={
-                    "message": f"오늘 compare 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
-                    "quota": info,
-                },
+                detail=_quota_error_payload("compare", info),
             )
         COMPARE_QUOTA_CHARGED.add(charge_key)
 
@@ -310,14 +342,11 @@ async def _require_agent_mission_quota_once(
     async with AGENT_MISSION_LOCK:
         if charge_key in AGENT_MISSION_CHARGED:
             return user
-        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "agent")
+        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "agent", 1.0)
         if not ok:
             raise HTTPException(
                 status_code=429,
-                detail={
-                    "message": f"오늘 agent 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
-                    "quota": info,
-                },
+                detail=_quota_error_payload("agent", info),
             )
         AGENT_MISSION_CHARGED.add(charge_key)
 
@@ -330,6 +359,47 @@ async def _require_agent_mission_quota_once(
         platform=_platform(request),
         action=action,
         detail=(detail or "")[:500],
+    )
+    return user
+
+
+DEBATE_QUOTA_CHARGED: set[str] = set()
+DEBATE_QUOTA_LOCK = asyncio.Lock()
+
+
+def _debate_quota_key(subject: str, session_id: str) -> str:
+    sid = (session_id or "").strip()
+    return f"{subject}:{sid}" if sid else subject
+
+
+async def _require_debate_quota_once(
+    request: Request,
+    session_id: str,
+    device_id: str | None = None,
+) -> dict | None:
+    """Charge debate quota once per debate session (topic), not per round."""
+    subject, user = _resolve_subject(request, device_id)
+    charge_key = _debate_quota_key(subject, session_id)
+
+    async with DEBATE_QUOTA_LOCK:
+        if charge_key in DEBATE_QUOTA_CHARGED:
+            return user
+        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "debate", 1.0)
+        if not ok:
+            raise HTTPException(
+                status_code=429,
+                detail=_quota_error_payload("debate", info),
+            )
+        DEBATE_QUOTA_CHARGED.add(charge_key)
+
+    dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
+    log_activity(
+        subject,
+        "debate",
+        user_id=user["id"] if user else None,
+        device_id=dev,
+        platform=_platform(request),
+        action="debate_start",
     )
     return user
 
@@ -571,6 +641,23 @@ class SupportReplyRequest(BaseModel):
 
 class PresenceRequest(BaseModel):
     device_id: str | None = None
+
+
+class DeviceRegisterRequest(BaseModel):
+    fingerprint: str = ""
+    device_id: str = ""
+
+
+class AdminQuotaAdjustRequest(BaseModel):
+    subject: str
+    feature: str
+    delta: float = 0.0
+
+
+class AdminBanRequest(BaseModel):
+    subject: str
+    banned: bool = True
+    reason: str = ""
 
 
 def _admin_bearer(request: Request) -> str | None:
@@ -1803,9 +1890,17 @@ def build_round_prompt(
         )
 
     role_instruction = "반박/보완" if speaker_index == 2 else "반박하거나 종합"
-    # From the point there are multiple prior speeches, compress older ones to keep
-    # the prompt within free-model context limits.
-    compress_older = len(prior_turns) >= 2
+    compress_older = False
+    if speaker_index == 3:
+        role_instruction = (
+            "1번과 2번 발언을 모두 검토하고, 각각의 허점과 약한 근거를 구체적으로 짚어 "
+            "반박한 뒤 최종 입장을 제시"
+        )
+        compress_older = False
+    elif speaker_index == 2:
+        compress_older = False
+    else:
+        compress_older = len(prior_turns) >= 2
     prior_text = format_prior_turns(prior_turns, compress_older=compress_older)
     return (
         f"{DEBATE_DIRECTIVE}\n\n"
@@ -2564,7 +2659,6 @@ def _collab_stage_prompt(data: CollabStageRequest) -> str:
 @app.post("/collab/run-stage")
 async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     """협업 워크플로우의 특정 단계를 실행한다."""
-    _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
     stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
         data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
@@ -2604,7 +2698,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
 @app.post("/collab/followup-route")
 async def collab_followup_route(data: CollabFollowupRequest, request: Request) -> dict:
     """추가 작업 요청을 분석해 재시작할 단계를 결정한다."""
-    _require_quota(request, "collab", data.user_id)
+    _require_quota(request, "collab", data.user_id, amount=0.5)
     await ensure_model_cache_fresh()
     outputs_summary = "\n".join(
         f"[{i + 1}단계] {(t or '')[:400]}" for i, t in enumerate(data.stage_outputs[:3])
@@ -2643,7 +2737,7 @@ def collab_templates() -> dict:
 
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest, http_request: Request) -> dict:
-    _require_quota(http_request, "debate", request.user_id)
+    await _require_debate_quota_once(http_request, request.session_id, request.user_id)
     await ensure_model_cache_fresh()
     session = DebateSession(topic=request.topic)
     store_debate_session(request.session_id, session)
@@ -2659,7 +2753,6 @@ async def debate_start(request: DebateRequest, http_request: Request) -> dict:
 
 @app.post("/debate/continue")
 async def debate_continue(request: DebateRequest, http_request: Request) -> dict:
-    _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
     lock = get_debate_lock(request.session_id)
 
@@ -3123,6 +3216,13 @@ def quota_status(request: Request, device_id: str = "") -> dict:
     return {"subject": subject, "logged_in": user is not None, **snap}
 
 
+@app.post("/device/register")
+def device_register(body: DeviceRegisterRequest) -> dict:
+    """Stable guest device id — fingerprint prevents quota reset by clearing storage."""
+    dev_id = resolve_device_id(body.fingerprint, body.device_id)
+    return {"device_id": dev_id, "ok": True}
+
+
 @app.post("/presence")
 def touch_presence(body: PresenceRequest, request: Request) -> dict:
     """클라이언트 하트비트 — 관리자 콘솔 실시간 접속 표시용."""
@@ -3290,6 +3390,45 @@ def admin_support_reply(inquiry_id: int, body: SupportReplyRequest, request: Req
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return {"success": True}
+
+
+@app.get("/admin/quota")
+def admin_quota_lookup(
+    request: Request,
+    subject: str = "",
+    user_id: int | None = None,
+    device_id: str = "",
+) -> dict:
+    _require_admin(request)
+    subj = (subject or "").strip()
+    if not subj:
+        if user_id is not None:
+            subj = f"user:{user_id}"
+        elif device_id.strip():
+            subj = f"device:{device_id.strip()}"
+    if not subj:
+        raise HTTPException(status_code=400, detail="subject, user_id, or device_id required")
+    snap = get_quota_snapshot(subj)
+    return {"subject": subj, **snap}
+
+
+@app.post("/admin/quota/adjust")
+def admin_quota_adjust(body: AdminQuotaAdjustRequest, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return admin_adjust_quota(body.subject, body.feature, body.delta)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/admin/ban")
+def admin_ban_subject(body: AdminBanRequest, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        set_subject_ban(body.subject, body.banned, body.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"success": True, "subject": body.subject.strip(), "banned": body.banned}
 
 
 @app.post("/support/inquiry")

@@ -8,8 +8,8 @@
   if (window.__nasaroaiAgentInjected) return;
   const existingHost = document.getElementById("__nasaroai_agent_host");
   if (existingHost?.shadowRoot?.getElementById("ax-launcher")) {
-    window.__nasaroaiAgentInjected = true;
-    return;
+    if (window.__nasaroaiAgentInjected) return;
+    existingHost.remove();
   }
   // 중간 실패로 남은 고아 호스트 정리 후 재주입
   if (existingHost) existingHost.remove();
@@ -325,6 +325,13 @@
   :host([data-theme="dark"]) .task-mini-section { border-color: #262626; background: #111; }
   :host([data-theme="dark"]) .task-card { background: #111; border-color: #262626; color: #f5f5f5; }
   :host([data-theme="dark"]) .task-input { background: #0a0a0a; border-color: #333; color: #fafafa; }
+  :host([data-theme="dark"]) .send-btn { background: #6d28d9; color: #fff; }
+  :host([data-theme="dark"]) .send-btn:disabled { background: #4338ca; color: #c4b5fd; }
+  :host([data-theme="dark"]) .task-card-head { background: #141414; border-color: #262626; color: #e5e5e5; }
+  :host([data-theme="dark"]) .task-mini-row { background: #111; }
+  :host([data-theme="dark"]) .task-mini-btn { background: #141414; border-color: #333; color: #d4d4d4; }
+  :host([data-theme="dark"]) .tbtn { background: #141414; border-color: #333; color: #d4d4d4; }
+  :host([data-theme="dark"]) .launcher { border: 1px solid #4338ca; }
   :host([data-theme="dark"]) .input-row { border-color: #262626; }
   :host([data-theme="dark"]) .resize-handle { background: #141414; border-color: #262626; }
   :host([data-theme="dark"]) .confirm { background: #2a2410; border-color: #333; }

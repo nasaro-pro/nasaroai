@@ -41,12 +41,29 @@ PRESENCE_TTL_SECONDS = 120  # 온라인 = 최근 2분 내 활동
 
 _lock = threading.Lock()
 
-QUOTA_LIMITS = {
-    "compare": 50,
-    "debate": 15,
-    "collab": 10,
-    "agent": 5,
+MEMBER_QUOTA_LIMITS: dict[str, float] = {
+    "compare": 15,
+    "debate": 10,
+    "collab": 3,
+    "agent": 7,
 }
+GUEST_QUOTA_LIMITS: dict[str, float] = {
+    "compare": 5,
+    "debate": 3,
+    "collab": 1,
+    "agent": 2,
+}
+QUOTA_LIMITS = MEMBER_QUOTA_LIMITS  # admin backward compat
+
+
+def quota_limits_for_subject(subject: str) -> dict[str, float]:
+    if (subject or "").startswith("user:"):
+        return MEMBER_QUOTA_LIMITS
+    return GUEST_QUOTA_LIMITS
+
+
+def is_guest_subject(subject: str) -> bool:
+    return not (subject or "").startswith("user:")
 
 
 def _connect() -> sqlite3.Connection:
@@ -179,6 +196,24 @@ def init_db() -> None:
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_user_email
                 ON users(user_email) WHERE user_email IS NOT NULL AND user_email != ''
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS banned_subjects (
+                    subject TEXT PRIMARY KEY,
+                    reason TEXT NOT NULL DEFAULT '',
+                    banned_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS device_registry (
+                    fingerprint TEXT PRIMARY KEY,
+                    device_id TEXT NOT NULL UNIQUE,
+                    created_at REAL NOT NULL
+                )
                 """
             )
             conn.commit()
@@ -725,10 +760,144 @@ def _day_key() -> str:
     return f"{kst.tm_year:04d}-{kst.tm_mon:02d}-{kst.tm_mday:02d}"
 
 
-def check_and_consume_quota(subject: str, feature: str) -> tuple[bool, dict[str, Any]]:
-    limit = QUOTA_LIMITS.get(feature, 9999)
+def is_subject_banned(subject: str) -> bool:
+    clean = (subject or "").strip()
+    if not clean:
+        return False
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM banned_subjects WHERE subject = ? LIMIT 1",
+                (clean,),
+            ).fetchone()
+        finally:
+            conn.close()
+    return row is not None
+
+
+def set_subject_ban(subject: str, banned: bool, reason: str = "") -> None:
+    clean = (subject or "").strip()
+    if not clean:
+        raise ValueError("subject required")
+    with _lock:
+        conn = _connect()
+        try:
+            if banned:
+                conn.execute(
+                    """
+                    INSERT INTO banned_subjects (subject, reason, banned_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(subject) DO UPDATE SET reason = excluded.reason, banned_at = excluded.banned_at
+                    """,
+                    (clean, (reason or "")[:500], time.time()),
+                )
+            else:
+                conn.execute("DELETE FROM banned_subjects WHERE subject = ?", (clean,))
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def resolve_device_id(fingerprint: str, proposed_id: str = "") -> str:
+    fp = (fingerprint or "").strip()[:128]
+    proposed = (proposed_id or "").strip()[:128]
+    with _lock:
+        conn = _connect()
+        try:
+            if fp:
+                row = conn.execute(
+                    "SELECT device_id FROM device_registry WHERE fingerprint = ?",
+                    (fp,),
+                ).fetchone()
+                if row:
+                    return str(row["device_id"])
+            if proposed and proposed.startswith("dev_"):
+                if fp:
+                    try:
+                        conn.execute(
+                            "INSERT INTO device_registry (fingerprint, device_id, created_at) VALUES (?, ?, ?)",
+                            (fp, proposed, time.time()),
+                        )
+                        conn.commit()
+                    except sqlite3.IntegrityError:
+                        conn.rollback()
+                        row = conn.execute(
+                            "SELECT device_id FROM device_registry WHERE fingerprint = ?",
+                            (fp,),
+                        ).fetchone()
+                        if row:
+                            return str(row["device_id"])
+                return proposed
+            new_id = "dev_" + secrets.token_urlsafe(12)
+            if fp:
+                conn.execute(
+                    "INSERT INTO device_registry (fingerprint, device_id, created_at) VALUES (?, ?, ?)",
+                    (fp, new_id, time.time()),
+                )
+                conn.commit()
+            return new_id
+        finally:
+            conn.close()
+
+
+def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, Any]:
+    clean_subject = (subject or "").strip()
+    feat = (feature or "").strip()
+    if not clean_subject or feat not in MEMBER_QUOTA_LIMITS:
+        raise ValueError("invalid subject or feature")
+    day_key = _day_key()
+    limits = quota_limits_for_subject(clean_subject)
+    limit = float(limits.get(feat, 9999))
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
+                (clean_subject, feat, day_key),
+            ).fetchone()
+            used = float(row["count"]) if row else 0.0
+            new_used = max(0.0, used + float(delta))
+            conn.execute(
+                """
+                INSERT INTO quota_usage (subject, feature, day_key, count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(subject, feature, day_key) DO UPDATE SET count = excluded.count
+                """,
+                (clean_subject, feat, day_key, new_used),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {
+        "subject": clean_subject,
+        "feature": feat,
+        "used": new_used,
+        "limit": limit,
+        "remaining": max(0.0, limit - new_used),
+        "day_key": day_key,
+    }
+
+
+def check_and_consume_quota(
+    subject: str,
+    feature: str,
+    amount: float = 1.0,
+) -> tuple[bool, dict[str, Any]]:
+    amt = max(0.0, float(amount))
+    limits = quota_limits_for_subject(subject)
+    limit = float(limits.get(feature, 9999))
     day_key = _day_key()
     now = time.time()
+    if is_subject_banned(subject):
+        return False, {
+            "feature": feature,
+            "used": 0,
+            "limit": limit,
+            "day_key": day_key,
+            "banned": True,
+            "guest": is_guest_subject(subject),
+        }
     with _lock:
         conn = _connect()
         try:
@@ -736,16 +905,22 @@ def check_and_consume_quota(subject: str, feature: str) -> tuple[bool, dict[str,
                 "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
                 (subject, feature, day_key),
             ).fetchone()
-            used = int(row["count"]) if row else 0
-            if used >= limit:
-                return False, {"feature": feature, "used": used, "limit": limit, "day_key": day_key}
+            used = float(row["count"]) if row else 0.0
+            if used + amt > limit + 1e-9:
+                return False, {
+                    "feature": feature,
+                    "used": used,
+                    "limit": limit,
+                    "day_key": day_key,
+                    "guest": is_guest_subject(subject),
+                }
             conn.execute(
                 """
                 INSERT INTO quota_usage (subject, feature, day_key, count)
-                VALUES (?, ?, ?, 1)
-                ON CONFLICT(subject, feature, day_key) DO UPDATE SET count = count + 1
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(subject, feature, day_key) DO UPDATE SET count = count + ?
                 """,
-                (subject, feature, day_key),
+                (subject, feature, day_key, amt, amt),
             )
             try:
                 conn.execute(
@@ -755,27 +930,46 @@ def check_and_consume_quota(subject: str, feature: str) -> tuple[bool, dict[str,
             except Exception:
                 pass
             conn.commit()
-            return True, {"feature": feature, "used": used + 1, "limit": limit, "day_key": day_key}
+            new_used = used + amt
+            return True, {
+                "feature": feature,
+                "used": new_used,
+                "limit": limit,
+                "day_key": day_key,
+                "guest": is_guest_subject(subject),
+            }
         finally:
             conn.close()
 
 
 def get_quota_snapshot(subject: str) -> dict[str, Any]:
     day_key = _day_key()
+    limits = quota_limits_for_subject(subject)
     out = {}
+    banned = is_subject_banned(subject)
     with _lock:
         conn = _connect()
         try:
-            for feature, limit in QUOTA_LIMITS.items():
+            for feature, limit in limits.items():
                 row = conn.execute(
                     "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
                     (subject, feature, day_key),
                 ).fetchone()
-                used = int(row["count"]) if row else 0
-                out[feature] = {"used": used, "limit": limit, "remaining": max(0, limit - used)}
+                used = float(row["count"]) if row else 0.0
+                out[feature] = {
+                    "used": round(used, 2),
+                    "limit": limit,
+                    "remaining": round(max(0.0, limit - used), 2),
+                }
         finally:
             conn.close()
-    return {"day_key": day_key, "features": out}
+    return {
+        "day_key": day_key,
+        "features": out,
+        "guest": is_guest_subject(subject),
+        "banned": banned,
+        "limits": limits,
+    }
 
 
 def create_public_share(kind: str, title: str, payload: Any) -> str:
@@ -892,26 +1086,26 @@ def list_users_admin() -> list[dict[str, Any]]:
     return [_row_to_user(r) for r in rows]
 
 
-def get_user_quota_totals(user_id: int) -> dict[str, int]:
+def get_user_quota_totals(user_id: int) -> dict[str, float]:
     prefix = f"user:{user_id}"
     day_key = _day_key()
-    totals: dict[str, int] = {}
+    totals: dict[str, float] = {}
     with _lock:
         conn = _connect()
         try:
-            for feature in QUOTA_LIMITS:
+            for feature in MEMBER_QUOTA_LIMITS:
                 row = conn.execute(
                     "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
                     (prefix, feature, day_key),
                 ).fetchone()
-                totals[feature] = int(row["count"]) if row else 0
+                totals[feature] = float(row["count"]) if row else 0.0
             all_time = conn.execute(
                 "SELECT feature, SUM(count) AS total FROM quota_usage WHERE subject = ? GROUP BY feature",
                 (prefix,),
             ).fetchall()
         finally:
             conn.close()
-    totals["_all_time"] = {r["feature"]: int(r["total"]) for r in all_time}
+    totals["_all_time"] = {r["feature"]: float(r["total"]) for r in all_time}
     return totals
 
 
@@ -928,7 +1122,7 @@ def get_admin_dashboard() -> dict[str, Any]:
         enriched.append({
             **u,
             "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(u["created_at"])),
-            "quota_today": {k: quotas.get(k, 0) for k in QUOTA_LIMITS},
+            "quota_today": {k: round(float(quotas.get(k, 0)), 2) for k in MEMBER_QUOTA_LIMITS},
             "quota_all_time": quotas.get("_all_time", {}),
             "saved_results_count": len(data.get("saved_works") or []),
             "has_active_collab": bool(collab_info),
@@ -964,13 +1158,16 @@ def get_admin_dashboard() -> dict[str, Any]:
         "active_sessions": get_active_session_count(),
         **get_online_presence_stats(),
         "share_links": int(share_count),
-        "usage_today": {r["feature"]: int(r["total"]) for r in today_usage},
+        "usage_today": {r["feature"]: round(float(r["total"]), 2) for r in today_usage},
         "usage_by_hour": get_usage_by_hour(day_key),
         "usage_by_hour_by_feature": get_usage_by_hour_by_feature(day_key),
         "login_by_hour": get_login_by_hour(day_key),
         "member_activity_by_hour": get_member_activity_by_hour(day_key),
         "agent_activity": get_agent_activity_log(limit=500),
-        "quota_limits": dict(QUOTA_LIMITS),
+        "quota_limits": {
+            "member": dict(MEMBER_QUOTA_LIMITS),
+            "guest": dict(GUEST_QUOTA_LIMITS),
+        },
         "users": enriched,
         "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),
@@ -1112,15 +1309,21 @@ def list_guest_devices(limit: int = 50) -> list[dict[str, Any]]:
         pres = presence_map.get(r["device_id"])
         last_seen = float(pres["last_seen_at"]) if pres else float(r["last_at"])
         plat = pres["platform"] if pres else r["platform"]
+        subject = f"device:{r['device_id']}"
+        snap = get_quota_snapshot(subject)
         out.append({
             "device_id": r["device_id"],
             "platform": plat,
+            "subject": subject,
             "last_at": float(r["last_at"]),
             "last_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["last_at"])),
             "activity_count": int(r["cnt"]),
             "last_seen_at": last_seen,
             "last_seen_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(last_seen)),
             "is_online": last_seen > cutoff,
+            "banned": snap.get("banned", False),
+            "quota_today": {k: v.get("used", 0) for k, v in snap.get("features", {}).items()},
+            "quota_limits": snap.get("limits", GUEST_QUOTA_LIMITS),
         })
     return out
 
@@ -1356,8 +1559,12 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
             "status": r["status"],
             "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
         })
+    subject = f"user:{user_id}"
+    snap = get_quota_snapshot(subject)
     return {
         **user,
+        "subject": subject,
+        "banned": snap.get("banned", False),
         "login_stats": login_stats,
         "is_online": login_stats.get("is_online", False),
         "last_seen_iso": time.strftime(
@@ -1366,7 +1573,9 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
         "last_login_iso": time.strftime(
             "%Y-%m-%d %H:%M", time.localtime(login_stats["last_login_at"])
         ) if login_stats.get("last_login_at") else "-",
-        "quota_today": {k: quotas.get(k, 0) for k in QUOTA_LIMITS},
+        "quota_today": {k: round(float(quotas.get(k, 0)), 2) for k in MEMBER_QUOTA_LIMITS},
+        "quota_snapshot": snap.get("features", {}),
+        "quota_limits": snap.get("limits", MEMBER_QUOTA_LIMITS),
         "quota_all_time": quotas.get("_all_time", {}),
         "saved_results_count": len(data.get("saved_works") or []),
         "activity": activity,

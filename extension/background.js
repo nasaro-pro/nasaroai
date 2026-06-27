@@ -775,6 +775,20 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 chrome.tabs.onCreated.addListener(async (tab) => {
   if (!tab?.id) return;
   await ensureInjectedIfEnabled(tab.id, tab.url || "");
+  if (!tab.url || tab.url === "about:blank") {
+    setTimeout(async () => {
+      try {
+        const t = await chrome.tabs.get(tab.id);
+        await ensureInjectedIfEnabled(tab.id, t.url || "");
+      } catch {}
+    }, 600);
+    setTimeout(async () => {
+      try {
+        const t = await chrome.tabs.get(tab.id);
+        await ensureInjectedIfEnabled(tab.id, t.url || "");
+      } catch {}
+    }, 1800);
+  }
 });
 
 // SPA 라우팅/히스토리 이동에서도 즉시 따라오도록 보강

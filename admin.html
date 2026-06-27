@@ -68,6 +68,9 @@
     }
     .activity-row:last-child, .support-row:last-child { border-bottom: none; }
     .activity-meta { color: #94a3b8; font-size: 10px; margin-top: 2px; }
+    .quota-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; font-size: 11px; }
+    .quota-feat { min-width: 64px; font-weight: 700; color: #c4b5fd; }
+    .quota-val { min-width: 120px; }
     .detail-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-top: 10px; font-size: 12px; }
     .detail-box h3 { margin: 0 0 8px; font-size: 14px; color: #c4b5fd; }
     .reply-thread { margin: 10px 0; max-height: 200px; overflow-y: auto; }
@@ -326,7 +329,100 @@
 
     function fmtQuota(q) {
       if (!q || typeof q !== "object") return "-";
-      return Object.entries(q).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k}:${v}`).join(" ");
+      return Object.entries(q).filter(([k]) => !k.startsWith("_")).map(([k, v]) => {
+        if (v && typeof v === "object") return `${k}:${v.used}/${v.limit}`;
+        return `${k}:${v}`;
+      }).join(" ");
+    }
+
+    function renderQuotaAdminPanel(subject, snapshot, limits, banned) {
+      const feats = Object.keys(limits || snapshot || {});
+      const rows = feats.map(f => {
+        const v = (snapshot && snapshot[f]) || {};
+        const used = v.used ?? 0;
+        const limit = v.limit ?? limits?.[f] ?? "-";
+        const rem = v.remaining ?? Math.max(0, Number(limit) - Number(used));
+        return `<div class="quota-row" data-feature="${f}">
+          <span class="quota-feat">${f}</span>
+          <span class="quota-val" data-qval="${f}">${used}/${limit} (남음 ${rem})</span>
+          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-1">-1</button>
+          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-0.5">-0.5</button>
+          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="0.5">+0.5</button>
+          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="1">+1</button>
+        </div>`;
+      }).join("");
+      return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
+        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">오늘 사용량 (실시간) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
+        ${rows || "<div class='empty'>없음</div>"}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="secondary" id="quotaRefreshBtn">새로고침</button>
+          <button type="button" class="${banned ? "" : "secondary"}" id="banToggleBtn">${banned ? "차단 해제" : "사용 금지"}</button>
+        </div>
+      </div>`;
+    }
+
+    async function refreshQuotaAdminPanel(subject) {
+      if (!subject) return;
+      try {
+        const snap = await api("/admin/quota?subject=" + encodeURIComponent(subject));
+        const box = document.getElementById("quotaAdminBox");
+        if (!box) return;
+        const limits = snap.limits || {};
+        Object.keys(limits).forEach(f => {
+          const el = box.querySelector(`[data-qval="${f}"]`);
+          const v = snap.features?.[f] || {};
+          if (el) el.textContent = `${v.used ?? 0}/${v.limit ?? limits[f]} (남음 ${v.remaining ?? 0})`;
+        });
+        box.dataset.banned = snap.banned ? "1" : "0";
+        const banBtn = document.getElementById("banToggleBtn");
+        if (banBtn) {
+          banBtn.textContent = snap.banned ? "차단 해제" : "사용 금지";
+          banBtn.className = snap.banned ? "" : "secondary";
+        }
+      } catch {}
+    }
+
+    function wireQuotaAdminPanel(subject) {
+      document.getElementById("quotaAdminBox")?.addEventListener("click", async e => {
+        const adj = e.target.closest(".q-adj");
+        if (adj) {
+          const feature = adj.dataset.feature;
+          const delta = Number(adj.dataset.delta);
+          try {
+            await api("/admin/quota/adjust", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subject, feature, delta }),
+            });
+            await refreshQuotaAdminPanel(subject);
+          } catch (err) { alert(err.message); }
+          return;
+        }
+        if (e.target.id === "quotaRefreshBtn") {
+          refreshQuotaAdminPanel(subject);
+          return;
+        }
+        if (e.target.id === "banToggleBtn") {
+          const box = document.getElementById("quotaAdminBox");
+          const banned = box?.dataset.banned === "1";
+          try {
+            await api("/admin/ban", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subject, banned: !banned, reason: "admin" }),
+            });
+            await refreshQuotaAdminPanel(subject);
+            if (selectedUserId) selectUser(selectedUserId);
+          } catch (err) { alert(err.message); }
+        }
+      });
+    }
+
+    let quotaLiveTimer = null;
+    function startQuotaLiveRefresh(subject) {
+      clearInterval(quotaLiveTimer);
+      if (!subject) return;
+      quotaLiveTimer = setInterval(() => refreshQuotaAdminPanel(subject), 5000);
     }
 
     function platformBadge(p) {
@@ -348,7 +444,7 @@
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용 (한도 agent ${(data.quota_limits||{}).agent ?? 5})</span></div>`;
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용 (회원 compare ${(data.quota_limits||{}).member?.compare ?? 15} / 비회원 ${(data.quota_limits||{}).guest?.compare ?? 5})</span></div>`;
       document.getElementById("platformStats").innerHTML = Object.keys(ps).length
         ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
         : "<span class='empty'>오늘 활동 기록 없음</span>";
@@ -609,12 +705,14 @@
       try {
         const u = await api("/admin/users/" + userId);
         const pc = Object.entries(u.platform_counts || {}).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
+        const subject = u.subject || ("user:" + userId);
         document.getElementById("userDetail").innerHTML = `
           <p><strong>${u.username || "-"}</strong> · ${u.email || "-"} · 가입 ${u.created_at_iso || "-"}</p>
           <p>접속: <span class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속 중" : "오프라인"}</span>
             · 마지막 활동 ${u.last_seen_iso || "-"}
             · 로그인 ${u.login_stats?.login_count ?? 0}회 · 마지막 로그인 ${u.last_login_iso || "-"}</p>
-          <p>오늘 사용: ${fmtQuota(u.quota_today)} · 플랫폼: ${pc} · 결과물 ${u.saved_results_count ?? 0}개</p>
+          <p>플랫폼: ${pc} · 결과물 ${u.saved_results_count ?? 0}개</p>
+          ${renderQuotaAdminPanel(subject, u.quota_snapshot, u.quota_limits, u.banned)}
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
           <div class="activity-list">${(u.activity || []).map(a => `
             <div class="activity-row">
@@ -623,6 +721,8 @@
             </div>`).join("") || "<div class='empty'>없음</div>"}</div>
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 내역</h3>
           ${(u.support_inquiries || []).map(s => `<div class="activity-row">${s.status} · ${s.created_at_iso} · ${s.message}</div>`).join("") || "<div class='empty'>없음</div>"}`;
+        wireQuotaAdminPanel(subject);
+        startQuotaLiveRefresh(subject);
       } catch (e) {
         document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
       }
@@ -633,17 +733,25 @@
       showDetailView("guests");
       document.getElementById("userDetailPanel").style.display = "";
       document.getElementById("mainTitle").textContent = "비회원 기기";
-      document.getElementById("mainSub").textContent = "기기별 활동 기록";
-      document.getElementById("userDetail").innerHTML = `<p>기기 ID: <code>${deviceId}</code></p><p>활동 불러오는 중…</p>`;
+      document.getElementById("mainSub").textContent = "기기별 활동 · 사용량";
+      const subject = "device:" + deviceId;
+      document.getElementById("userDetail").innerHTML = `<p>기기 ID: <code>${deviceId}</code></p><p>불러오는 중…</p>`;
       try {
-        const data = await api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=500");
+        const [data, snap] = await Promise.all([
+          api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=500"),
+          api("/admin/quota?subject=" + encodeURIComponent(subject)),
+        ]);
         document.getElementById("userDetail").innerHTML = `
           <p>기기 ID: <code>${deviceId}</code></p>
+          ${renderQuotaAdminPanel(subject, snap.features, snap.limits, snap.banned)}
+          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
           <div class="activity-list">${(data.activity || []).map(a => `
             <div class="activity-row">
               <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
               <div>${(a.detail || "").slice(0, 120)}</div>
             </div>`).join("") || "<div class='empty'>없음</div>"}</div>`;
+        wireQuotaAdminPanel(subject);
+        startQuotaLiveRefresh(subject);
       } catch (e) {
         document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
       }
@@ -694,9 +802,9 @@
     function startDashAutoRefresh() {
       clearInterval(dashRefreshTimer);
       dashRefreshTimer = setInterval(() => {
-        if (!adminToken || sidebarMode !== "stats") return;
-        loadDashboard().catch(() => {});
-      }, 15000);
+        if (!adminToken) return;
+        if (sidebarMode === "stats") loadDashboard().catch(() => {});
+      }, 8000);
     }
 
     async function loadDashboard() {

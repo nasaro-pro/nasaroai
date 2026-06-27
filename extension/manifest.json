@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nasaro AI 에이전트",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "update_url": "https://nasaroai.onrender.com/extension-update",
   "description": "어떤 사이트에서든 Nasaro AI 에이전트가 그 탭을 직접 조작합니다.",
   "icons": {

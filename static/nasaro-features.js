@@ -557,7 +557,7 @@
         const rect = anchor.getBoundingClientRect();
         const floatH = resultActionsFloat.offsetHeight || 44;
         const left = Math.max(8, rect.left + 8);
-        const top = Math.max(8, rect.top - floatH - 6);
+        const top = Math.max(8, rect.top - floatH + 10);
         resultActionsFloat.style.left = `${left}px`;
         resultActionsFloat.style.top = `${top}px`;
         resultActionsFloat.style.bottom = "auto";

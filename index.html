@@ -1247,6 +1247,19 @@
         }
         html[data-theme="dark"] .result-action-btn:hover { background: #1e1b4b; }
         html[data-theme="dark"] .result-action-btn.primary-save { background: #5b21b6; color: #fff; border-color: #6d28d9; }
+        html[data-theme="dark"] .export-format-popover,
+        html[data-theme="dark"] .export-format-option { background: #141414; border-color: #333; color: #e5e5e5; }
+        html[data-theme="dark"] .export-format-option:hover { background: #1e1b4b; border-color: #4338ca; }
+        html[data-theme="dark"] .collab-stage-panel,
+        html[data-theme="dark"] .collab-rail-step,
+        html[data-theme="dark"] .collab-stage-card,
+        html[data-theme="dark"] .settings-action-btn,
+        html[data-theme="dark"] .font-size-control button,
+        html[data-theme="dark"] .auth-modal,
+        html[data-theme="dark"] .result-files-popover { background: #111; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .settings-action-btn:hover { background: #1f1f1f; }
+        html[data-theme="dark"] .collab-rail-step { background: #0c0c0c; }
+        html[data-theme="dark"] .collab-stage-panel { background: #0c0c0c; }
         html[data-theme="dark"] .side-menu-settings-btn { background: #141414; border-color: #333; color: #a3a3a3; }
         html[data-theme="dark"] .auth-modal { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
         html[data-theme="dark"] .auth-modal p { color: #a3a3a3; }
@@ -1607,13 +1620,16 @@
             align-items: center;
         }
         .dock-btn-center {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
+            display: grid;
+            grid-template-columns: min(100%, 360px) 268px;
             justify-content: center;
+            align-items: center;
             gap: 8px;
             flex: 1 1 auto;
             min-width: 0;
+        }
+        @media (max-width: 720px) {
+            .dock-btn-center { grid-template-columns: 1fr; }
         }
         .dock-btn-right {
             flex: 0 0 auto;
@@ -3776,7 +3792,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627h"></script>
+    <script src="/static/nasaro-features.js?v=20260627i"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -4201,13 +4217,64 @@
         // ── 대화 기록 (localStorage — 기기별 독립 저장) ──────────────────────
         // 기기 고유 ID: 처음 방문 시 생성, 이후 동일 브라우저에서만 유효
         // 로그인 없이 접속 시 다른 기기/브라우저의 기록은 보이지 않음
-        function getDeviceId() {
-            let id = localStorage.getItem("nasaroai_device_id");
-            if (!id) {
-                id = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        function buildDeviceFingerprint() {
+            const parts = [
+                navigator.userAgent || "",
+                navigator.language || "",
+                `${screen.width}x${screen.height}x${screen.colorDepth || 0}`,
+                Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+                navigator.platform || "",
+            ];
+            let h = 0;
+            const s = parts.join("|");
+            for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+            return "fp_" + Math.abs(h).toString(36);
+        }
+
+        let cachedDeviceId = null;
+        let deviceIdReady = null;
+
+        async function ensureDeviceId() {
+            if (cachedDeviceId) return cachedDeviceId;
+            if (deviceIdReady) return deviceIdReady;
+            deviceIdReady = (async () => {
+                let id = localStorage.getItem("nasaroai_device_id");
+                const backup = localStorage.getItem("nasaroai_device_id_backup");
+                if (!id && backup) id = backup;
+                const fp = buildDeviceFingerprint();
+                try {
+                    const res = await fetch((API_URL || "") + "/device/register", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ fingerprint: fp, device_id: id || "" }),
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.device_id) id = data.device_id;
+                    }
+                } catch {}
+                if (!id) {
+                    id = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+                }
                 localStorage.setItem("nasaroai_device_id", id);
+                localStorage.setItem("nasaroai_device_id_backup", id);
+                localStorage.setItem("nasaroai_device_fp", fp);
+                cachedDeviceId = id;
+                return id;
+            })();
+            return deviceIdReady;
+        }
+
+        function getDeviceId() {
+            if (cachedDeviceId) return cachedDeviceId;
+            const id = localStorage.getItem("nasaroai_device_id") || localStorage.getItem("nasaroai_device_id_backup");
+            if (id) {
+                cachedDeviceId = id;
+                ensureDeviceId().catch(() => {});
+                return id;
             }
-            return id;
+            ensureDeviceId().catch(() => {});
+            return localStorage.getItem("nasaroai_device_id") || "dev_pending";
         }
         const SESSION_RESULTS_KEY = "nasaroai_session_results";
         const SAVED_RESULTS_KEY = "nasaroai_saved_results";
@@ -4427,7 +4494,12 @@
             try {
                 const data = await response.json();
                 if (typeof data.detail === "string") return data.detail;
-                if (data.detail?.message) return data.detail.message;
+                if (data.detail?.message) {
+                    if (data.detail.login_required && !currentUser) {
+                        setTimeout(() => openAuthModal("login"), 400);
+                    }
+                    return data.detail.message;
+                }
                 if (data.message) return data.message;
             } catch {}
             return `${fallback} (${response.status})`;
@@ -4620,12 +4692,9 @@
         }
 
         function migrateSessionHistoryToAccount() {
-            try {
-                const fromSession = JSON.parse(sessionStorage.getItem(SESSION_HISTORY_STORE_KEY) || "[]");
-                if (fromSession.length) mergeSessionHistoryLists(fromSession);
-                else if (sessionHistory.length) localStorage.setItem(SESSION_HISTORY_STORE_KEY, JSON.stringify(sessionHistory));
-                sessionStorage.removeItem(SESSION_HISTORY_STORE_KEY);
-            } catch {}
+            sessionHistory.length = 0;
+            try { sessionStorage.removeItem(SESSION_HISTORY_STORE_KEY); } catch {}
+            loadSessionHistoryFromStore();
         }
 
         function updateAuthUI() {
@@ -4839,6 +4908,7 @@
             authToken = "";
             currentUser = null;
             localStorage.removeItem(AUTH_TOKEN_KEY);
+            sessionHistory.length = 0;
             updateAuthUI();
             notifyExtensionAuth();
             showToast(window.NasaroFeatures?.lang === "en" ? "Signed out" : "로그아웃했습니다.", "success");
@@ -4898,8 +4968,12 @@
                 ]);
                 if (quotaRes.ok) {
                     const q = await quotaRes.json();
-                    const lines = Object.entries(q.features || {}).map(([k, v]) => `${k}: ${v.used}/${v.limit}`);
-                    if (quotaEl) quotaEl.textContent = lines.join("\n") || "사용량 정보 없음";
+                    const guest = q.guest ? " (비회원)" : " (회원)";
+                    const lines = Object.entries(q.features || {}).map(([k, v]) =>
+                        `${k}: ${v.used}/${v.limit} (남음 ${v.remaining})`);
+                    if (quotaEl) {
+                        quotaEl.textContent = (lines.join("\n") || "사용량 정보 없음") + guest;
+                    }
                 }
                 if (infoRes.ok) {
                     const info = await infoRes.json();
@@ -5333,14 +5407,6 @@
         mainInput.addEventListener("keydown", event => {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                const text = mainInput.value.trim();
-                if (agentActive && text) {
-                    mainInput.value = "";
-                    autoResizeInput();
-                    if (!agentPanel?.classList.contains("open")) setAgentActive(true);
-                    runAgentMission(text, false);
-                    return;
-                }
                 dockPrimaryBtn.click();
             }
         });
@@ -7298,7 +7364,7 @@
             initDebateSuggestions();
             syncDebateEmptyHint();
             bootstrapApiCheck();
-            startPresencePing();
+            ensureDeviceId().finally(() => startPresencePing());
         })();
 
         updateDockUI();
