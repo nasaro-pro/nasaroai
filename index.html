@@ -3301,164 +3301,182 @@
             display: none;
         }
 
-        /* ===== 모바일 하단 도크 · 버튼 ===== */
+        /* ===== 모바일: 최대한 간결한 하단 도크 ===== */
         @media (max-width: 640px) {
+            .dock-shell { position: relative; }
+            .dock-agent-row {
+                position: absolute;
+                right: 6px;
+                bottom: calc(100% - 1px);
+                padding: 0;
+                margin: 0;
+                width: auto;
+                z-index: 3;
+                pointer-events: none;
+            }
+            .dock-agent-outside,
+            .dock-agent-row .agent-toggle-btn {
+                pointer-events: auto;
+                width: auto;
+                min-height: 28px;
+                height: 28px;
+                padding: 0 8px;
+                font-size: 11px;
+                border-radius: 8px;
+            }
             .dock-inner {
                 min-height: 0;
-                padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0));
-                gap: 6px;
+                padding: 3px 6px calc(3px + env(safe-area-inset-bottom, 0));
+                gap: 3px;
             }
             .dock-compose-row {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 6px;
+                flex-direction: row;
+                align-items: flex-end;
+                gap: 4px;
                 min-height: 0;
             }
             .dock-compose-row #mainInput {
-                width: 100%;
-                height: 44px;
-                max-height: 96px;
-                min-height: 44px;
-                font-size: 16px;
-            }
-            .dock-compose-row .dock-submit-btn {
-                width: 100%;
-                min-width: 0;
-                min-height: 44px;
-                height: 44px;
+                flex: 1;
+                width: auto;
+                height: 36px;
+                min-height: 36px;
+                max-height: 72px;
+                padding: 6px 8px;
                 font-size: 15px;
             }
+            .dock-compose-row .dock-submit-btn {
+                width: auto;
+                min-width: 44px;
+                max-width: 56px;
+                min-height: 36px;
+                height: 36px;
+                padding: 0 6px;
+                font-size: 14px;
+                font-weight: 800;
+            }
             .dock-btn-row {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 6px;
-                align-items: stretch;
-                min-height: 0;
+                display: flex;
                 flex-wrap: wrap;
+                align-items: center;
+                gap: 3px;
+                min-height: 0;
             }
             .dock-btn-center {
-                display: contents;
+                display: flex;
+                flex: 1 1 100%;
+                flex-direction: row;
+                align-items: center;
+                gap: 4px;
+                min-width: 0;
+                order: 1;
             }
             .dock-mode-group {
-                grid-column: 1 / -1;
-                width: 100%;
+                flex: 1 1 auto;
+                min-width: 0;
+                width: auto;
                 max-width: none;
-                gap: 6px;
+                gap: 3px;
             }
             .dock-btn-row .mode-btn {
-                min-height: 42px;
-                height: 42px;
-                padding: 0 6px;
-                font-size: 13px;
-                border-radius: 10px;
+                min-height: 30px;
+                height: 30px;
+                padding: 0 2px;
+                font-size: 11px;
+                border-radius: 8px;
             }
             .dock-extra-btns {
-                grid-column: 1 / -1;
-                width: 100%;
+                flex: 0 0 auto;
                 min-width: 0;
-                flex-wrap: wrap;
-                gap: 6px;
+                flex-wrap: nowrap;
+                gap: 3px;
             }
             .dock-extra-btns .dock-btn.muted {
-                flex: 1 1 calc(50% - 3px);
-                min-width: 0;
-                min-height: 40px;
-                height: 40px;
-                padding: 0 10px;
-                font-size: 12px;
+                flex: 0 0 auto;
+                min-width: 28px;
+                min-height: 30px;
+                height: 30px;
+                padding: 0 6px;
+                font-size: 11px;
             }
             .dock-btn-left {
-                grid-column: 1;
+                flex: 1 1 auto;
                 min-width: 0;
+                max-width: 58%;
+                order: 2;
             }
             .dock-btn-right {
-                grid-column: 2;
-                justify-content: flex-end;
-                min-width: 0;
+                flex: 0 0 auto;
+                gap: 3px;
+                order: 3;
+                margin-left: auto;
             }
             .dock-btn-row .input-tool-btn.ai-pick-trigger-btn {
                 max-width: 100%;
                 width: 100%;
-                min-height: 40px;
-                height: 40px;
-                font-size: 11px;
+                min-height: 30px;
+                height: 30px;
+                padding: 0 6px;
+                font-size: 10px;
             }
             .dock-btn-row .input-tool-btn.privacy-btn-compact,
             .dock-btn-row .input-tool-btn.icon-tool-btn {
-                min-height: 40px;
-                height: 40px;
-                min-width: 40px;
-            }
-            .dock-agent-row {
-                padding: 0 8px 6px;
-            }
-            .dock-agent-outside,
-            .dock-agent-row .agent-toggle-btn {
-                width: 100%;
-                max-width: 100%;
-                min-height: 40px;
-                justify-content: center;
+                min-height: 30px;
+                height: 30px;
+                min-width: 30px;
+                width: 30px;
+                padding: 0;
+                font-size: 12px;
             }
             .collab-action-bar {
-                flex-direction: column;
-                gap: 6px;
-                padding: 8px 0;
+                flex-direction: row;
+                flex-wrap: nowrap;
+                gap: 4px;
+                padding: 4px 0;
             }
             .collab-action-bar .collab-stage-btn {
-                width: 100%;
-                flex: 1 1 auto;
-                min-height: 44px;
-                font-size: 13px;
-            }
-            .collab-runner-shell {
-                min-height: 280px;
-                max-height: calc(100dvh - var(--bottom-offset, 200px) - 40px);
-            }
-            .collab-stage-rail .collab-rail-step.compact-v4 {
-                min-height: 48px;
-                padding: 5px 6px;
-            }
-            .collab-stage-rail .step-name { font-size: 11px; }
-            .collab-stage-rail .step-ai { font-size: 10px; }
-            .result-actions-float {
-                left: 8px !important;
-                right: 8px !important;
-                max-width: none;
-                justify-content: stretch;
-            }
-            .result-actions-float .result-action-btn {
-                flex: 1 1 calc(33.333% - 6px);
+                flex: 1 1 0;
                 min-width: 0;
-                text-align: center;
-                padding: 8px 6px;
+                min-height: 34px;
+                height: 34px;
+                padding: 0 4px;
                 font-size: 11px;
             }
-            .side-menu-footer {
-                flex-wrap: wrap;
-                gap: 6px;
+            .collab-runner-shell {
+                min-height: 220px;
+                max-height: calc(100dvh - var(--bottom-offset, 130px) - 24px);
             }
-            .side-menu-guide-btn,
-            .side-menu-settings-btn {
-                min-height: 44px;
-                min-width: 44px;
-            }
-            .result-files-hub-btn {
-                font-size: 12px;
+            .collab-stage-rail .collab-rail-step.compact-v4 {
                 min-height: 42px;
+                padding: 4px 5px;
+            }
+            .collab-stage-rail .step-name { font-size: 10px; }
+            .collab-stage-rail .step-ai { font-size: 9px; }
+            .collab-activity-section .collab-activity-log {
+                max-height: 48px;
+                font-size: 9px;
+            }
+            .result-actions-float {
+                left: 6px !important;
+                right: 6px !important;
+                max-width: none;
+                padding: 4px 6px;
+                gap: 4px;
+            }
+            .result-actions-float .result-action-btn {
+                flex: 1 1 0;
+                min-width: 0;
+                padding: 5px 4px;
+                font-size: 10px;
+            }
+            main {
+                padding: 8px 10px;
+                padding-bottom: calc(var(--bottom-offset, 100px) + 4px);
             }
         }
 
         @media (max-width: 380px) {
-            .dock-btn-row .mode-btn {
-                font-size: 12px;
-                padding: 0 4px;
-            }
-            .dock-extra-btns .dock-btn.muted {
-                flex: 1 1 100%;
-            }
-            .result-actions-float .result-action-btn {
-                flex: 1 1 calc(50% - 4px);
-            }
+            .dock-btn-row .mode-btn { font-size: 10px; }
+            .dock-compose-row .dock-submit-btn { min-width: 40px; max-width: 48px; }
         }
 
         .result-action-btn {
@@ -5715,7 +5733,7 @@
         }
 
         function autoResizeInput() {
-            mainInput.style.height = "44px";
+            mainInput.style.height = isMobileCompact() ? "36px" : "44px";
         }
 
         function autoResizeTA(ta) {
@@ -5724,18 +5742,39 @@
             ta.style.height = Math.min(ta.scrollHeight, 130) + "px";
         }
 
+        function isMobileCompact() {
+            return window.innerWidth <= 640;
+        }
+
         function updateDockUI() {
             const NF = window.NasaroFeatures;
+            const mob = isMobileCompact();
             const showDebateExtras = currentMode === "debate" && debateStarted;
             dockSecondaryBtn.classList.toggle("is-hidden", !showDebateExtras);
             dockNewDebateBtn.classList.toggle("is-hidden", !showDebateExtras);
+            const newChatBtn = document.getElementById("newChatBtn");
+            if (newChatBtn) {
+                newChatBtn.textContent = mob ? "✦" : (NF?.t?.("new_chat") || "✦ 새 채팅");
+                newChatBtn.title = NF?.t?.("new_chat") || "새 채팅";
+            }
+            if (mob) {
+                dockSecondaryBtn.textContent = "+";
+                dockSecondaryBtn.title = "질문 추가";
+                dockNewDebateBtn.textContent = "새";
+                dockNewDebateBtn.title = "새 토론";
+            } else {
+                dockSecondaryBtn.textContent = "질문 추가";
+                dockNewDebateBtn.textContent = "새 토론";
+            }
 
             if (currentMode === "compare") {
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
-                dockPrimaryBtn.textContent = NF?.t?.("btn_compare") || "비교 ▶";
+                dockPrimaryBtn.textContent = mob ? "▶" : (NF?.t?.("btn_compare") || "비교 ▶");
+                dockPrimaryBtn.title = NF?.t?.("btn_compare") || "비교";
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = false;
                 mainInput.disabled = false;
+                autoResizeInput();
                 return;
             }
 
@@ -5744,28 +5783,35 @@
                     ? (NF?.t?.("ph_collab_done") || "추가 수정·요청…")
                     : (NF?.t?.("ph_collab") || "작업 설명…");
                 dockPrimaryBtn.textContent = collabRecommendInFlight
-                    ? (NF?.t?.("btn_collab_busy") || "분석…")
-                    : (collabTaskAsked ? "추가 작업 ▶" : (NF?.t?.("btn_collab") || "AI 추천 ▶"));
+                    ? "…"
+                    : (mob
+                        ? (collabTaskAsked ? "추가▶" : "추천▶")
+                        : (collabTaskAsked ? "추가 작업 ▶" : (NF?.t?.("btn_collab") || "AI 추천 ▶")));
+                dockPrimaryBtn.title = collabTaskAsked ? "추가 작업" : "AI 추천";
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = collabRecommendInFlight;
                 mainInput.disabled = false;
+                autoResizeInput();
                 return;
             }
 
             mainInput.disabled = false;
             if (!debateStarted) {
                 mainInput.placeholder = NF?.t?.("ph_debate") || "토론 주제…";
-                dockPrimaryBtn.textContent = NF?.t?.("btn_debate") || "토론 ▶";
+                dockPrimaryBtn.textContent = mob ? "▶" : (NF?.t?.("btn_debate") || "토론 ▶");
+                dockPrimaryBtn.title = NF?.t?.("btn_debate") || "토론";
                 dockPrimaryBtn.className = "dock-btn secondary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             } else {
                 mainInput.placeholder = NF?.t?.("ph_debate_cont") || "의견 추가…";
-                dockPrimaryBtn.textContent = NF?.t?.("btn_debate_next") || "다음 ▶";
+                dockPrimaryBtn.textContent = mob ? "▶" : (NF?.t?.("btn_debate_next") || "다음 ▶");
+                dockPrimaryBtn.title = NF?.t?.("btn_debate_next") || "다음";
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
                 dockSecondaryBtn.disabled = debateInFlight;
                 dockNewDebateBtn.disabled = debateInFlight;
             }
+            autoResizeInput();
         }
 
         function switchMode(mode) {
@@ -5807,7 +5853,11 @@
         const bottomResizeObserver = new ResizeObserver(scheduleSyncMainPadding);
         const dockShellEl = document.getElementById("dockShell");
         bottomResizeObserver.observe(dockShellEl || inputDock);
-        window.addEventListener("resize", scheduleSyncMainPadding);
+        window.addEventListener("resize", () => {
+            scheduleSyncMainPadding();
+            updateDockUI();
+            updateCollabActionBar();
+        });
         autoResizeInput();
 
         // ── 모바일 키보드 팝업 시 입력창 함께 올라오기 (visualViewport) ────────
@@ -6972,9 +7022,21 @@
             const startBtn = document.getElementById("collabStartBtn");
             const downloadBtn = document.getElementById("collabDownloadBtn");
             const completeBtn = document.getElementById("collabCompleteBtn");
-            if (startBtn) startBtn.disabled = !!collabPipelineRunning;
-            if (downloadBtn) downloadBtn.disabled = !collabSession?.plan;
-            if (completeBtn) completeBtn.disabled = !collabSession?.plan;
+            const mob = isMobileCompact();
+            const NF = window.NasaroFeatures;
+            if (startBtn) {
+                startBtn.disabled = !!collabPipelineRunning;
+                startBtn.textContent = mob ? "▶ 시작" : "▶ 작업 시작";
+            }
+            if (downloadBtn) {
+                downloadBtn.disabled = !collabSession?.plan;
+                downloadBtn.textContent = mob ? "📄" : `📄 ${NF?.t?.("export_result") || "결과물 다운로드"}`;
+                downloadBtn.title = NF?.t?.("export_result") || "결과물 다운로드";
+            }
+            if (completeBtn) {
+                completeBtn.disabled = !collabSession?.plan;
+                completeBtn.textContent = mob ? "완료" : (NF?.t?.("work_complete") || "작업 완료");
+            }
             const bar = document.getElementById("collabActionBar");
             if (bar) bar.style.display = collabSession?.plan ? "flex" : "none";
             const act = document.getElementById("collabActivitySection");
