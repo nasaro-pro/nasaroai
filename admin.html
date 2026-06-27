@@ -180,6 +180,17 @@
     #overviewPanels { display: none; }
     #detailPanels { display: none; }
     #detailPanels.visible { display: grid; }
+    .entity-summary {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 8px; margin-bottom: 12px;
+    }
+    .entity-summary .stat { padding: 8px; }
+    .entity-list-table { width: 100%; }
+    .entity-list-table tr { cursor: pointer; }
+    .entity-list-table tr:hover { background: rgba(49, 46, 129, 0.2); }
+    .entity-list-table tr.active { background: rgba(49, 46, 129, 0.35); }
+    .support-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .support-actions .danger { background: #b91c1c; }
     .sidebar-foot {
       display: flex;
       align-items: center;
@@ -332,18 +343,51 @@
       </div>
 
       <div class="panels" id="detailPanels">
-        <section class="panel" id="userDetailPanel" style="display:none;">
-          <h2>회원 / 비회원 상세</h2>
+        <section class="panel full" id="membersListPanel" style="display:none;">
+          <h2>회원 목록</h2>
+          <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;">계정을 클릭하면 상세 · 활동 · 문의 기록을 볼 수 있습니다.</p>
+          <div id="membersSummary" class="entity-summary"></div>
+          <div style="overflow-x:auto;">
+            <table class="entity-list-table">
+              <thead>
+                <tr>
+                  <th>ID</th><th>아이디</th><th>이메일</th><th>가입</th><th>로그인</th><th>접속</th><th>오늘</th><th>협업</th>
+                </tr>
+              </thead>
+              <tbody id="membersListBody"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel full" id="guestsListPanel" style="display:none;">
+          <h2>비회원 기기</h2>
+          <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;">기기를 클릭하면 활동 · 사용량 상세를 볼 수 있습니다.</p>
+          <div id="guestsSummary" class="entity-summary"></div>
+          <div style="overflow-x:auto;">
+            <table class="entity-list-table">
+              <thead>
+                <tr>
+                  <th>기기 ID</th><th>플랫폼</th><th>접속</th><th>활동</th><th>마지막</th>
+                </tr>
+              </thead>
+              <tbody id="guestsListBody"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel full" id="userDetailPanel" style="display:none;">
+          <h2 id="userDetailPanelTitle">회원 / 비회원 상세</h2>
           <div id="userDetail"></div>
         </section>
-        <section class="panel" id="supportPanel">
+        <section class="panel full" id="supportPanel" style="display:none;">
           <h2>관리자 문의</h2>
           <div id="supportList" class="support-list"></div>
           <div id="supportDetail" class="detail-box" style="display:none;">
             <h3 id="supportDetailTitle">문의</h3>
             <div id="supportThread" class="reply-thread"></div>
             <textarea id="supportReplyInput" placeholder="답변 입력…"></textarea>
-            <button id="supportReplyBtn" type="button" style="margin-top:8px;">답변 보내기</button>
+            <div class="support-actions">
+              <button id="supportReplyBtn" type="button">답변 보내기</button>
+              <button id="supportDeleteBtn" type="button" class="danger">문의 삭제</button>
+            </div>
           </div>
         </section>
       </div>
@@ -377,6 +421,7 @@
     let supportItems = [];
     let sidebarMode = "stats";
     let selectedUserId = null;
+    let selectedGuestId = null;
     let selectedSupportId = null;
     let searchTimer = null;
 
@@ -402,15 +447,45 @@
     function showOverview() {
       sidebarMode = "stats";
       selectedUserId = null;
+      selectedGuestId = null;
       selectedSupportId = null;
       setActiveTab("tabStats");
       document.getElementById("sidebarSearchWrap").classList.add("hidden");
       document.getElementById("mainTitle").textContent = "전체 통계";
       document.getElementById("mainSub").textContent = "회원 · 활동 · 플랫폼 · 사용량";
-      document.getElementById("overviewPanels").classList.add("visible");
-      document.getElementById("detailPanels").classList.remove("visible");
-      document.getElementById("userDetailPanel").style.display = "none";
+      updateMainPanels();
       renderSidebar();
+    }
+
+    function updateMainPanels() {
+      const overview = document.getElementById("overviewPanels");
+      const detailPanels = document.getElementById("detailPanels");
+      const supportPanel = document.getElementById("supportPanel");
+      const userDetailPanel = document.getElementById("userDetailPanel");
+      const membersListPanel = document.getElementById("membersListPanel");
+      const guestsListPanel = document.getElementById("guestsListPanel");
+      const supportDetail = document.getElementById("supportDetail");
+
+      if (sidebarMode === "stats") {
+        overview.classList.add("visible");
+        detailPanels.classList.remove("visible");
+        return;
+      }
+
+      overview.classList.remove("visible");
+      detailPanels.classList.add("visible");
+      supportPanel.style.display = sidebarMode === "support" ? "" : "none";
+      membersListPanel.style.display = sidebarMode === "members" && !selectedUserId ? "" : "none";
+      guestsListPanel.style.display = sidebarMode === "guests" && !selectedGuestId ? "" : "none";
+      userDetailPanel.style.display =
+        (sidebarMode === "members" && selectedUserId) || (sidebarMode === "guests" && selectedGuestId)
+          ? "" : "none";
+
+      if (sidebarMode !== "support") {
+        if (supportDetail) supportDetail.style.display = "none";
+      } else if (selectedSupportId && supportDetail) {
+        supportDetail.style.display = "";
+      }
     }
 
     function setActiveTab(id) {
@@ -422,13 +497,25 @@
     function showDetailView(mode) {
       sidebarMode = mode;
       document.getElementById("sidebarSearchWrap").classList.remove("hidden");
-      document.getElementById("overviewPanels").classList.remove("visible");
-      document.getElementById("detailPanels").classList.add("visible");
-      if (mode === "support") {
-        document.getElementById("userDetailPanel").style.display = "none";
-        document.getElementById("supportPanel").style.display = "";
+      const search = document.getElementById("sidebarSearch");
+      if (mode === "members") search.placeholder = "아이디·이메일 검색…";
+      else if (mode === "guests") search.placeholder = "기기 ID 검색…";
+      else if (mode === "support") search.placeholder = "문의 내용·계정 검색…";
+      if (mode === "members") {
+        selectedGuestId = null;
+        selectedSupportId = null;
+      } else if (mode === "guests") {
+        selectedUserId = null;
+        selectedSupportId = null;
+      } else if (mode === "support") {
+        selectedUserId = null;
+        selectedGuestId = null;
       }
+      updateMainPanels();
       renderSidebar();
+      if (mode === "members") renderMembersListPanel();
+      if (mode === "guests") renderGuestsListPanel();
+      if (mode === "support") renderSupportList();
     }
 
     async function api(path, opts = {}) {
@@ -855,10 +942,64 @@
 
     function renderUsersTable(users) {
       const tbody = document.getElementById("usersBody");
+      if (!tbody) return;
       tbody.innerHTML = "";
       (users || []).forEach(u => {
         const tr = document.createElement("tr");
         tr.style.cursor = "pointer";
+        tr.innerHTML = `
+          <td>${u.id}</td>
+          <td>${u.username || "-"}</td>
+          <td>${u.email || "-"}</td>
+          <td>${u.created_at_iso || "-"}</td>
+          <td>${u.login_count ?? 0}</td>
+          <td class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속중" : "오프"}</td>
+          <td>${fmtQuota(u.quota_today)}</td>
+          <td>${u.has_active_collab ? "진행중" : "-"}</td>`;
+        tr.addEventListener("click", () => {
+          setActiveTab("tabMembers");
+          selectUser(u.id);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filteredMembers() {
+      const q = document.getElementById("sidebarSearch").value.trim().toLowerCase();
+      let users = dashData?.users || [];
+      if (q) users = users.filter(u => `${u.username} ${u.email}`.toLowerCase().includes(q));
+      return users;
+    }
+
+    function filteredGuests() {
+      const q = document.getElementById("sidebarSearch").value.trim().toLowerCase();
+      let items = guests || [];
+      if (q) items = items.filter(g => (g.device_id || "").toLowerCase().includes(q));
+      return items;
+    }
+
+    function renderMembersListPanel() {
+      const users = filteredMembers();
+      const online = users.filter(u => u.is_online).length;
+      const collab = users.filter(u => u.has_active_collab).length;
+      const summary = document.getElementById("membersSummary");
+      if (summary) {
+        summary.innerHTML = `
+          <div class="stat"><b>${users.length}</b><span>표시 회원</span></div>
+          <div class="stat"><b>${online}</b><span>접속 중</span></div>
+          <div class="stat"><b>${collab}</b><span>협업 진행</span></div>
+          <div class="stat"><b>${dashData?.total_users ?? users.length}</b><span>전체 회원</span></div>`;
+      }
+      const tbody = document.getElementById("membersListBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      if (!users.length) {
+        tbody.innerHTML = "<tr><td colspan='8' class='empty'>회원 없음</td></tr>";
+        return;
+      }
+      users.forEach(u => {
+        const tr = document.createElement("tr");
+        tr.className = selectedUserId === u.id ? "active" : "";
         tr.innerHTML = `
           <td>${u.id}</td>
           <td>${u.username || "-"}</td>
@@ -873,6 +1014,39 @@
       });
     }
 
+    function renderGuestsListPanel() {
+      const items = filteredGuests();
+      const online = items.filter(g => g.is_online).length;
+      const totalActs = items.reduce((sum, g) => sum + (g.activity_count || 0), 0);
+      const summary = document.getElementById("guestsSummary");
+      if (summary) {
+        summary.innerHTML = `
+          <div class="stat"><b>${items.length}</b><span>표시 기기</span></div>
+          <div class="stat"><b>${online}</b><span>접속 중</span></div>
+          <div class="stat"><b>${totalActs}</b><span>활동 합계</span></div>
+          <div class="stat"><b>${guests.length}</b><span>누적 기기</span></div>`;
+      }
+      const tbody = document.getElementById("guestsListBody");
+      if (!tbody) return;
+      tbody.innerHTML = "";
+      if (!items.length) {
+        tbody.innerHTML = "<tr><td colspan='5' class='empty'>비회원 기록 없음</td></tr>";
+        return;
+      }
+      items.forEach(g => {
+        const tr = document.createElement("tr");
+        tr.className = selectedGuestId === g.device_id ? "active" : "";
+        tr.innerHTML = `
+          <td><code>${(g.device_id || "").slice(0, 28)}</code></td>
+          <td>${platformBadge(g.platform)}</td>
+          <td class="${g.is_online ? "online" : "offline"}">${g.is_online ? "접속중" : "오프"}</td>
+          <td>${g.activity_count ?? 0}회</td>
+          <td>${g.last_seen_iso || g.last_at_iso || "-"}</td>`;
+        tr.addEventListener("click", () => loadGuestActivity(g.device_id));
+        tbody.appendChild(tr);
+      });
+    }
+
     function renderSidebar() {
       const q = document.getElementById("sidebarSearch").value.trim().toLowerCase();
       const list = document.getElementById("sidebarList");
@@ -882,8 +1056,7 @@
         return;
       }
       if (sidebarMode === "members") {
-        let users = dashData?.users || [];
-        if (q) users = users.filter(u => `${u.username} ${u.email}`.toLowerCase().includes(q));
+        let users = filteredMembers();
         if (!users.length) { list.innerHTML = "<div class='empty'>회원 없음</div>"; return; }
         users.forEach(u => {
           const btn = document.createElement("button");
@@ -896,13 +1069,12 @@
         return;
       }
       if (sidebarMode === "guests") {
-        let items = guests;
-        if (q) items = items.filter(g => (g.device_id || "").toLowerCase().includes(q));
+        let items = filteredGuests();
         if (!items.length) { list.innerHTML = "<div class='empty'>비회원 기록 없음</div>"; return; }
         items.forEach(g => {
           const btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "side-item";
+          btn.className = "side-item" + (selectedGuestId === g.device_id ? " active" : "");
           btn.innerHTML = `<b>${(g.device_id || "").slice(0, 20)}…</b><span>${platformBadge(g.platform)} ${g.is_online ? "접속중" : "오프"} · ${g.activity_count}회 · ${g.last_seen_iso || g.last_at_iso}</span>`;
           btn.addEventListener("click", () => loadGuestActivity(g.device_id));
           list.appendChild(btn);
@@ -924,18 +1096,23 @@
 
     async function selectUser(userId) {
       selectedUserId = userId;
+      selectedGuestId = null;
       selectedSupportId = null;
-      showDetailView("members");
-      document.getElementById("userDetailPanel").style.display = "";
+      sidebarMode = "members";
+      setActiveTab("tabMembers");
       document.getElementById("mainTitle").textContent = "회원 #" + userId;
-      document.getElementById("mainSub").textContent = "활동 · 사용량 · 문의";
-      document.getElementById("userDetail").innerHTML = "불러오는 중…";
+      document.getElementById("mainSub").textContent = "활동 · 사용량 · 문의 기록";
+      document.getElementById("userDetailPanelTitle").textContent = "회원 상세";
+      updateMainPanels();
       renderSidebar();
+      renderMembersListPanel();
+      document.getElementById("userDetail").innerHTML = "불러오는 중…";
       try {
         const u = await api("/admin/users/" + userId);
         const pc = Object.entries(u.platform_counts || {}).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
         const subject = u.subject || ("user:" + userId);
         document.getElementById("userDetail").innerHTML = `
+          <p><button type="button" class="secondary" id="memberDetailBackBtn">← 회원 목록</button></p>
           <p><strong>${u.username || "-"}</strong> · ${u.email || "-"} · 가입 ${u.created_at_iso || "-"}</p>
           <p>접속: <span class="${u.is_online ? "online" : "offline"}">${u.is_online ? "접속 중" : "오프라인"}</span>
             · 마지막 활동 ${u.last_seen_iso || "-"}
@@ -943,13 +1120,25 @@
           <p>플랫폼: ${pc} · 결과물 ${u.saved_results_count ?? 0}개</p>
           ${renderQuotaAdminPanel(subject, u.quota_snapshot, u.quota_limits, u.banned)}
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
-          <div class="activity-list">${(u.activity || []).map(a => `
+          <div class="activity-list">${(u.activity || []).slice(0, 80).map(a => `
             <div class="activity-row">
               <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
-              <div>${(a.detail || a.action || "").slice(0, 100)}</div>
+              <div>${a.is_secret ? "🔒 시크릿" : (a.detail || a.action || "").slice(0, 100)}</div>
             </div>`).join("") || "<div class='empty'>없음</div>"}</div>
-          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 내역</h3>
-          ${(u.support_inquiries || []).map(s => `<div class="activity-row">${s.status} · ${s.created_at_iso} · ${s.message}</div>`).join("") || "<div class='empty'>없음</div>"}`;
+          <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">문의 기록</h3>
+          <div class="activity-list">${(u.support_inquiries || []).map(s => `
+            <div class="activity-row">
+              <div><span class="badge ${s.status}">${s.status}</span> · ${s.created_at_iso}</div>
+              <div>${s.message}</div>
+            </div>`).join("") || "<div class='empty'>문의 없음</div>"}</div>`;
+        document.getElementById("memberDetailBackBtn")?.addEventListener("click", () => {
+          selectedUserId = null;
+          updateMainPanels();
+          renderSidebar();
+          renderMembersListPanel();
+          document.getElementById("mainTitle").textContent = "회원 목록";
+          document.getElementById("mainSub").textContent = "계정을 클릭하면 상세를 볼 수 있습니다";
+        });
         wireQuotaAdminPanel(subject);
         startQuotaLiveRefresh(subject);
       } catch (e) {
@@ -959,26 +1148,41 @@
 
     async function loadGuestActivity(deviceId) {
       selectedUserId = null;
-      showDetailView("guests");
-      document.getElementById("userDetailPanel").style.display = "";
+      selectedGuestId = deviceId;
+      selectedSupportId = null;
+      sidebarMode = "guests";
+      setActiveTab("tabGuests");
       document.getElementById("mainTitle").textContent = "비회원 기기";
       document.getElementById("mainSub").textContent = "기기별 활동 · 사용량";
+      document.getElementById("userDetailPanelTitle").textContent = "비회원 상세";
+      updateMainPanels();
+      renderSidebar();
+      renderGuestsListPanel();
       const subject = "device:" + deviceId;
-      document.getElementById("userDetail").innerHTML = `<p>기기 ID: <code>${deviceId}</code></p><p>불러오는 중…</p>`;
+      document.getElementById("userDetail").innerHTML = `<p><button type="button" class="secondary" id="guestDetailBackBtn">← 기기 목록</button></p><p>기기 ID: <code>${deviceId}</code></p><p>불러오는 중…</p>`;
       try {
         const [data, snap] = await Promise.all([
           api("/admin/activity?device_id=" + encodeURIComponent(deviceId) + "&limit=500"),
           api("/admin/quota?subject=" + encodeURIComponent(subject)),
         ]);
         document.getElementById("userDetail").innerHTML = `
+          <p><button type="button" class="secondary" id="guestDetailBackBtn">← 기기 목록</button></p>
           <p>기기 ID: <code>${deviceId}</code></p>
           ${renderQuotaAdminPanel(subject, snap.features, snap.limits, snap.banned)}
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록</h3>
           <div class="activity-list">${(data.activity || []).map(a => `
             <div class="activity-row">
               <div><strong>${a.feature}</strong> ${platformBadge(a.platform)} · ${a.created_at_iso}</div>
-              <div>${(a.detail || "").slice(0, 120)}</div>
+              <div>${a.is_secret ? "🔒 시크릿" : (a.detail || "").slice(0, 120)}</div>
             </div>`).join("") || "<div class='empty'>없음</div>"}</div>`;
+        document.getElementById("guestDetailBackBtn")?.addEventListener("click", () => {
+          selectedGuestId = null;
+          updateMainPanels();
+          renderSidebar();
+          renderGuestsListPanel();
+          document.getElementById("mainTitle").textContent = "비회원 기기";
+          document.getElementById("mainSub").textContent = "기기를 클릭하면 상세를 볼 수 있습니다";
+        });
         wireQuotaAdminPanel(subject);
         startQuotaLiveRefresh(subject);
       } catch (e) {
@@ -1003,10 +1207,13 @@
 
     async function openSupport(id) {
       selectedSupportId = id;
-      showDetailView("support");
+      selectedUserId = null;
+      selectedGuestId = null;
+      sidebarMode = "support";
       setActiveTab("tabSupport");
       document.getElementById("mainTitle").textContent = "문의 #" + id;
-      document.getElementById("mainSub").textContent = "답변 작성";
+      document.getElementById("mainSub").textContent = "답변 작성 · 삭제";
+      updateMainPanels();
       renderSidebar();
       const box = document.getElementById("supportDetail");
       box.style.display = "";
@@ -1024,6 +1231,23 @@
       } catch (e) {
         document.getElementById("supportThread").innerHTML = `<span class="err">${e.message}</span>`;
       }
+    }
+
+    async function deleteSupportInquiry(id) {
+      if (!confirm("이 문의를 삭제할까요? 답변도 함께 삭제됩니다.")) return;
+      await api("/admin/support/" + id, { method: "DELETE" });
+      selectedSupportId = null;
+      document.getElementById("supportDetail").style.display = "none";
+      const s = await api("/admin/support");
+      supportItems = s.inquiries || [];
+      renderSupportList();
+      renderSidebar();
+      if (dashData) {
+        dashData.open_support_count = supportItems.filter(x => x.status === "open").length;
+        renderStats(dashData);
+      }
+      document.getElementById("mainTitle").textContent = "관리자 문의";
+      document.getElementById("mainSub").textContent = "답변 대기 · 완료";
     }
 
     let dashRefreshTimer = null;
@@ -1125,30 +1349,44 @@
     });
     document.getElementById("tabStats").addEventListener("click", showOverview);
     document.getElementById("tabMembers").addEventListener("click", () => {
+      selectedUserId = null;
+      selectedGuestId = null;
+      selectedSupportId = null;
       showDetailView("members");
       setActiveTab("tabMembers");
       document.getElementById("mainTitle").textContent = "회원 목록";
-      document.getElementById("mainSub").textContent = "클릭하면 상세 활동을 봅니다";
-      document.getElementById("userDetailPanel").style.display = "none";
+      document.getElementById("mainSub").textContent = "계정을 클릭하면 상세 · 문의 기록을 볼 수 있습니다";
     });
     document.getElementById("tabGuests").addEventListener("click", () => {
+      selectedUserId = null;
+      selectedGuestId = null;
+      selectedSupportId = null;
       showDetailView("guests");
       setActiveTab("tabGuests");
       document.getElementById("mainTitle").textContent = "비회원 기기";
-      document.getElementById("mainSub").textContent = "기기별 활동 기록";
-      document.getElementById("userDetailPanel").style.display = "none";
+      document.getElementById("mainSub").textContent = "기기를 클릭하면 상세 활동을 볼 수 있습니다";
     });
     document.getElementById("tabSupport").addEventListener("click", () => {
+      selectedUserId = null;
+      selectedGuestId = null;
+      selectedSupportId = null;
       showDetailView("support");
       setActiveTab("tabSupport");
       document.getElementById("mainTitle").textContent = "관리자 문의";
       document.getElementById("mainSub").textContent = "답변 대기 · 완료";
-      document.getElementById("userDetailPanel").style.display = "none";
-      document.getElementById("supportPanel").style.display = "";
+      document.getElementById("supportDetail").style.display = "none";
     });
     document.getElementById("sidebarSearch").addEventListener("input", () => {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(renderSidebar, 200);
+      searchTimer = setTimeout(() => {
+        renderSidebar();
+        if (sidebarMode === "members") renderMembersListPanel();
+        if (sidebarMode === "guests") renderGuestsListPanel();
+      }, 200);
+    });
+    document.getElementById("supportDeleteBtn")?.addEventListener("click", () => {
+      if (!selectedSupportId) return;
+      deleteSupportInquiry(selectedSupportId).catch(e => alert(e.message || "삭제 실패"));
     });
     document.getElementById("supportReplyBtn").addEventListener("click", async () => {
       if (!selectedSupportId) return;

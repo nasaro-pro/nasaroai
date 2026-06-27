@@ -34,6 +34,7 @@ from auth_store import (
     create_support_inquiry,
     db_connection,
     delete_support_inquiry,
+    delete_support_inquiry_admin,
     delete_activity_records,
     get_activity_by_id,
     get_activity_retention_days,
@@ -3617,6 +3618,16 @@ def admin_support_reply(inquiry_id: int, body: SupportReplyRequest, request: Req
         add_support_reply(inquiry_id, body.message, from_admin=True)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"success": True}
+
+
+@app.delete("/admin/support/{inquiry_id}")
+def admin_support_delete(inquiry_id: int, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        delete_support_inquiry_admin(inquiry_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     return {"success": True}
 
 

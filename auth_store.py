@@ -1729,6 +1729,22 @@ def delete_support_inquiry(inquiry_id: int, user_id: int) -> None:
             conn.close()
 
 
+def delete_support_inquiry_admin(inquiry_id: int) -> None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT id FROM support_inquiries WHERE id = ?", (inquiry_id,)
+            ).fetchone()
+            if not row:
+                raise ValueError("문의를 찾을 수 없습니다.")
+            conn.execute("DELETE FROM support_replies WHERE inquiry_id = ?", (inquiry_id,))
+            conn.execute("DELETE FROM support_inquiries WHERE id = ?", (inquiry_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+
 def get_user_admin_detail(user_id: int) -> dict[str, Any]:
     user = get_user_by_id(user_id)
     data = get_user_data(user_id)
