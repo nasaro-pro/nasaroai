@@ -10,7 +10,8 @@ import secrets
 import sqlite3
 import threading
 import time
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _PERSIST_DIR = "/var/data"
@@ -53,6 +54,18 @@ def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@contextmanager
+def db_connection() -> Iterator[sqlite3.Connection]:
+    """Shared SQLite access for modules outside auth_store (e.g. debate sessions)."""
+    with _lock:
+        conn = _connect()
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def init_db() -> None:
@@ -694,8 +707,12 @@ def get_public_share(share_id: str) -> dict[str, Any] | None:
 ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 8
 
 
+def admin_password_configured() -> bool:
+    return bool(os.getenv("ADMIN_PASSWORD", "").strip())
+
+
 def verify_admin_password(password: str) -> bool:
-    expected = os.getenv("ADMIN_PASSWORD", "050907")
+    expected = os.getenv("ADMIN_PASSWORD", "").strip()
     if not expected:
         return False
     return secrets.compare_digest(str(password), str(expected))

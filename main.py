@@ -25,10 +25,12 @@ from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db
 from auth_store import (
     add_support_reply,
     admin_logout,
+    admin_password_configured,
     check_and_consume_quota,
     create_admin_session,
     create_public_share,
     create_support_inquiry,
+    db_connection,
     delete_support_inquiry,
     get_activity_log,
     get_admin_dashboard,
@@ -240,6 +242,56 @@ def _require_quota(
             "quota": info,
         },
     )
+
+
+def _compare_quota_key(subject: str, session_id: str) -> str:
+    sid = session_id.strip()
+    return f"{subject}:{sid}" if sid else subject
+
+
+async def _require_compare_quota_once(
+    request: Request,
+    session_id: str,
+    device_id: str | None = None,
+) -> dict | None:
+    """Charge compare quota once per compare session, not once per model stream."""
+    subject, user = _resolve_subject(request, device_id)
+    charge_key = _compare_quota_key(subject, session_id)
+
+    async with COMPARE_QUOTA_LOCK:
+        if charge_key in COMPARE_QUOTA_CHARGED:
+            return user
+        ok, info = check_and_consume_quota(subject, "compare")
+        if not ok:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "message": f"오늘 compare 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
+                    "quota": info,
+                },
+            )
+        COMPARE_QUOTA_CHARGED.add(charge_key)
+
+    dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
+    log_activity(
+        subject,
+        "compare",
+        user_id=user["id"] if user else None,
+        device_id=dev,
+        platform=_platform(request),
+        action="compare",
+    )
+    return user
+
+
+def _quota_error_message(detail: object) -> str:
+    if isinstance(detail, dict):
+        message = detail.get("message")
+        if isinstance(message, str) and message.strip():
+            return message
+    if isinstance(detail, str) and detail.strip():
+        return detail
+    return "오늘 compare 사용 한도를 모두 사용했습니다."
 
 app.add_middleware(
     CORSMiddleware,
@@ -495,6 +547,8 @@ def _admin_bearer(request: Request) -> str | None:
 
 
 def _require_admin(request: Request) -> str:
+    if not admin_password_configured():
+        raise HTTPException(status_code=503, detail="관리자 기능이 비활성화되어 있습니다. ADMIN_PASSWORD를 설정하세요.")
     token = _admin_bearer(request)
     if not token or not verify_admin_token(token):
         raise HTTPException(status_code=401, detail="관리자 인증이 필요합니다.")
@@ -872,6 +926,7 @@ class AgentStepRequest(BaseModel):
     elements: list[dict] = Field(default_factory=list)
     current_url: str = ""
     action_history: list[dict] = Field(default_factory=list)
+    user_id: str = ""
 
 
 class DebateRequest(BaseModel):
@@ -933,6 +988,8 @@ COMPARE_ACTIVE_MODELS: dict[str, set[str]] = {}
 COMPARE_SESSION_PLANS: dict[str, dict[str, str]] = {}
 COMPARE_SESSION_PENDING: dict[str, int] = {}
 COMPARE_SESSION_LOCK = asyncio.Lock()
+COMPARE_QUOTA_CHARGED: set[str] = set()
+COMPARE_QUOTA_LOCK = asyncio.Lock()
 AGENT_LOCK = asyncio.Semaphore(1)
 
 # /agent/step은 브라우저를 띄우지 않는 순수 LLM 판단이라 부담이 훨씬 적다.
@@ -1766,36 +1823,27 @@ def get_debate_lock(session_id: str) -> asyncio.Lock:
     return DEBATE_LOCKS[session_id]
 
 
-def _ensure_debate_sessions_table() -> None:
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS debate_sessions (
-                session_id TEXT PRIMARY KEY,
-                data TEXT NOT NULL,
-                updated_at REAL NOT NULL
-            )
-            """
+def _ensure_debate_sessions_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS debate_sessions (
+            session_id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            updated_at REAL NOT NULL
         )
-        conn.commit()
-    finally:
-        conn.close()
+        """
+    )
 
 
 def store_debate_session(session_id: str, session: DebateSession) -> None:
     DEBATE_SESSIONS[session_id] = session
     try:
-        _ensure_debate_sessions_table()
-        conn = sqlite3.connect(DB_PATH)
-        try:
+        with db_connection() as conn:
+            _ensure_debate_sessions_table(conn)
             conn.execute(
                 "INSERT OR REPLACE INTO debate_sessions (session_id, data, updated_at) VALUES (?, ?, ?)",
                 (session_id, session.model_dump_json(), time.time()),
             )
-            conn.commit()
-        finally:
-            conn.close()
     except Exception:
         logger.exception("Failed to persist debate session session_id=%s", session_id[:8])
 
@@ -1805,15 +1853,12 @@ def load_debate_session(session_id: str) -> DebateSession | None:
     if cached is not None:
         return cached
     try:
-        _ensure_debate_sessions_table()
-        conn = sqlite3.connect(DB_PATH)
-        try:
+        with db_connection() as conn:
+            _ensure_debate_sessions_table(conn)
             row = conn.execute(
                 "SELECT data FROM debate_sessions WHERE session_id = ?",
                 (session_id,),
             ).fetchone()
-        finally:
-            conn.close()
         if row is None:
             return None
         session = DebateSession.model_validate_json(row[0])
@@ -2191,19 +2236,30 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
         data.compare_session_id[:8] if data.compare_session_id else "",
         request.client.host if request.client else "?",
     )
-    _require_quota(request, "compare", data.user_id)
     if data.model_name not in COMPANY_LABELS:
         raise HTTPException(status_code=400, detail="Invalid model_name")
 
-    await ensure_model_cache_fresh()
     label = data.model_name
     persona = PERSONAS[label]
     session_id = data.compare_session_id.strip()
 
-    await ensure_compare_session_plan(session_id)
-
     async def generate() -> AsyncIterator[str]:
         yield ": keepalive\n\n"
+        try:
+            await _require_compare_quota_once(request, session_id, data.user_id)
+        except HTTPException as exc:
+            yield sse(
+                {
+                    "model": data.model_name,
+                    "success": False,
+                    "error": _quota_error_message(exc.detail),
+                }
+            )
+            return
+
+        await ensure_model_cache_fresh()
+        await ensure_compare_session_plan(session_id)
+
         excluded_by_failure: set[str] = set()
         await mark_compare_stream_started(session_id)
         current_model_id: str | None = None
@@ -2541,28 +2597,32 @@ async def debate_start(request: DebateRequest, http_request: Request) -> dict:
 async def debate_continue(request: DebateRequest, http_request: Request) -> dict:
     _require_quota(http_request, "debate", request.user_id)
     await ensure_model_cache_fresh()
-    session = load_debate_session(request.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Debate session not found")
-
     lock = get_debate_lock(request.session_id)
 
     if request.retry_speaker_index is not None:
         async with lock:
+            session = load_debate_session(request.session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Debate session not found")
             turns = await retry_debate_speaker(session, request.retry_speaker_index)
-        store_debate_session(request.session_id, session)
+            store_debate_session(request.session_id, session)
         return debate_response(session, turns)
 
-    if request.user_input and (lock.locked() or len(session.current_round_turns) < 3):
-        append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
-        store_debate_session(request.session_id, session)
-        return debate_response(session, [], queued=True)
-
     async with lock:
+        session = load_debate_session(request.session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Debate session not found")
+
+        if request.user_input and len(session.current_round_turns) < 3:
+            append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+            store_debate_session(request.session_id, session)
+            return debate_response(session, [], queued=True)
+
         if request.user_input:
             append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
         turns = await run_debate_step(session)
-    store_debate_session(request.session_id, session)
+        store_debate_session(request.session_id, session)
+
     return debate_response(session, turns)
 
 
@@ -2725,10 +2785,11 @@ def _resolve_agent_models() -> list[str]:
 
 
 @app.post("/agent/step")
-async def agent_step(request: AgentStepRequest):
+async def agent_step(request: AgentStepRequest, http_request: Request):
     """확장 프로그램이 사용자의 실제 탭에서 화면을 스캔해 보내면, 다음에 할
     액션 1개만 판단해 돌려주는 무상태 엔드포인트. Playwright를 전혀 쓰지 않는다.
     실제 클릭/입력은 확장(background.js)이 chrome.debugger로 수행한다."""
+    _require_quota(http_request, "agent", request.user_id)
     task = request.task.strip()
     if not task:
         return JSONResponse(
@@ -3080,6 +3141,8 @@ def serve_admin() -> FileResponse:
 
 @app.post("/admin/login")
 def admin_login(body: AdminLoginRequest) -> dict:
+    if not admin_password_configured():
+        raise HTTPException(status_code=503, detail="관리자 기능이 비활성화되어 있습니다. ADMIN_PASSWORD를 설정하세요.")
     if not verify_admin_password(body.password):
         raise HTTPException(status_code=401, detail="관리자 비밀번호가 올바르지 않습니다.")
     token = create_admin_session()

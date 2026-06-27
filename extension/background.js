@@ -329,17 +329,35 @@ async function executeAction(tabId, action) {
 }
 
 // ---- 서버 호출 ----
+async function getDeviceId() {
+  try {
+    const stored = await chrome.storage.local.get("nasaroDeviceId");
+    if (stored.nasaroDeviceId) return stored.nasaroDeviceId;
+    const id = crypto.randomUUID();
+    await chrome.storage.local.set({ nasaroDeviceId: id });
+    return id;
+  } catch {
+    return "extension-anonymous";
+  }
+}
+
 async function postStep(serverUrl, task, scan, actionHistory) {
+  const deviceId = await getDeviceId();
   let resp;
   try {
     resp = await fetch(serverUrl + "/agent/step", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Device-Id": deviceId,
+        "X-Platform": "extension",
+      },
       body: JSON.stringify({
         task,
         elements: scan.elements || [],
         current_url: scan.url || "",
         action_history: actionHistory,
+        user_id: deviceId,
       }),
     });
   } catch (e) {
