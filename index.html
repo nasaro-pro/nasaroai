@@ -1027,19 +1027,17 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            padding-bottom: 4px;
         }
         .collab-action-bar {
             flex-shrink: 0;
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            padding: 10px 0 6px;
-            margin-top: auto;
+            padding: 8px 0 4px;
             border-top: 1px solid #e5e7eb;
             background: var(--collab-shell-bg, #fff);
             position: static;
-            z-index: 1;
+            z-index: 12;
         }
         .collab-action-bar .collab-stage-btn {
             flex: 1 1 120px;
@@ -3934,6 +3932,7 @@
                     <div id="collabStageRail" class="collab-runner-top"></div>
                     <div class="collab-runner-scroll">
                     <div id="collabRecommendResult" class="collab-recommend-result"></div>
+                    </div>
                     <div id="collabActionBar" class="collab-action-bar" style="display:none;">
                         <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start">▶ 작업 시작</button>
                         <button type="button" id="collabViewBtn" class="collab-stage-btn">👁 결과물 보기</button>
@@ -3943,7 +3942,6 @@
                     <div id="collabActivitySection" class="collab-activity-section compact">
                         <div class="collab-activity-title">진행 기록</div>
                         <div id="collabActivityLog" class="collab-activity-log compact"></div>
-                    </div>
                     </div>
                     <div class="collab-sidebars">
                         <div class="collab-sidebar" data-sidebar="1">
@@ -6179,6 +6177,7 @@
                 agentPanel.style.removeProperty("top");
                 agentPanel.style.right = "";
                 agentPanel.style.bottom = "";
+                agentPanel.style.removeProperty("width");
                 agentPanel.style.removeProperty("height");
                 agentPanel.style.removeProperty("maxHeight");
                 return;
@@ -6191,11 +6190,12 @@
             const gap = 12;
             const spaceAbove = r.top - gap - 8;
             if (spaceAbove < pH) pH = Math.max(240, spaceAbove);
-            let left = r.right - pW;
+            let left = r.left + r.width / 2 - pW / 2;
             let top = r.top - pH - gap;
             if (left < 8) left = 8;
             if (left + pW > W - 8) left = W - pW - 8;
-            if (top < 8) top = Math.max(8, r.top - pH - gap);
+            if (top < 8) top = Math.max(8, r.bottom - pH - gap);
+            if (top + pH > H - 8) top = H - pH - 8;
             agentPanel.style.left = left + "px";
             agentPanel.style.top = top + "px";
             agentPanel.style.right = "auto";
@@ -6207,42 +6207,17 @@
 
         function positionPanelNearLauncher() {
             if (!agentPanel) return;
-            if (window.innerWidth <= 520) {
-                agentPanel.style.removeProperty("left");
-                agentPanel.style.removeProperty("top");
-                agentPanel.style.right = "";
-                agentPanel.style.bottom = "";
-                return;
-            }
-
             const anchor = (agentFloatLauncher?.classList.contains("visible") ? agentFloatLauncher : agentToggleBtn);
-            if (!anchor) return;
-            const r = anchor.getBoundingClientRect();
-            const W = window.innerWidth;
-            const H = window.innerHeight;
-            const pW = Math.min(560, W - 32);
-            const pH = Math.min(Math.floor(H * 0.78), 760);
-
-            let left = r.right - pW;
-            if (left < 8) left = 8;
-            if (left + pW > W - 8) left = W - pW - 8;
-
-            let top = r.top - pH - 12;
-            if (top < 8) top = Math.max(8, r.bottom - pH);
-            if (top + pH > H - 8) top = H - pH - 8;
-
-            agentPanel.style.left = left + "px";
-            agentPanel.style.top = top + "px";
-            agentPanel.style.right = "auto";
-            agentPanel.style.bottom = "auto";
-            agentPanel.style.width = pW + "px";
-            agentPanel.style.height = pH + "px";
-            agentPanel.style.maxHeight = pH + "px";
+            positionPanelAboveButton(anchor);
         }
 
         function openAgentPanel(fromLauncher = true) {
             if (!agentPanel) return;
-            positionPanelNearLauncher();
+            if (fromLauncher && agentFloatLauncher?.classList.contains("visible")) {
+                positionPanelNearLauncher();
+            } else {
+                positionPanelAboveButton(agentToggleBtn);
+            }
             agentPanel.style.display = "flex";
             agentPanel.classList.remove("minimized");
             hideLauncher();

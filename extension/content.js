@@ -692,11 +692,11 @@
     const bW = Math.min(560, W - 32);
     const bH = Math.min(Math.floor(H * 0.78), 760);
     const gap = 12;
-    let left = lRect.left - bW - gap;
-    if (left < 8) left = Math.max(8, lRect.right - bW);
+    let left = lRect.left + lRect.width / 2 - bW / 2;
+    let top = lRect.top - bH - gap;
+    if (top < 8) top = Math.max(8, lRect.bottom - bH - gap);
     if (left < 8) left = 8;
-    let top = lRect.bottom - bH;
-    if (top < 8) top = 8;
+    if (left + bW > W - 8) left = W - bW - 8;
     if (top + bH > H - 8) top = H - bH - 8;
     bar.style.left = left + "px";
     bar.style.top = top + "px";
@@ -1210,7 +1210,7 @@
       } else {
         barManualPos = false;
         positionBarNearLauncher();
-        syncUiSoon({ barManualPos: false }, true);
+        syncUiSoon({ barManualPos: false, barLeft: 0, barTop: 0 }, true);
       }
       render();
       try { chrome.storage.local.set({ barOpen: true }); } catch {}
