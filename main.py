@@ -2056,12 +2056,16 @@ def debate_response(session: DebateSession, turns: list[DebateTurn], queued: boo
 
 async def ensure_compare_session_plan(session_id: str) -> dict[str, str]:
     """Atomically assign one unique primary model per UI label for a compare session."""
+    sid = session_id[:8] if session_id else ""
+    logger.info("ensure_compare_session_plan start session_id=%s", sid)
     if not session_id:
+        logger.info("ensure_compare_session_plan done session_id=%s plan_size=0", sid)
         return {}
 
     async with COMPARE_SESSION_LOCK:
         existing = COMPARE_SESSION_PLANS.get(session_id)
         if existing is not None:
+            logger.info("ensure_compare_session_plan done session_id=%s plan_size=%d", sid, len(existing))
             return existing
 
         used: set[str] = set()
@@ -2085,6 +2089,7 @@ async def ensure_compare_session_plan(session_id: str) -> dict[str, str]:
 
         COMPARE_SESSION_PLANS[session_id] = plan
         logger.info("Compare session plan session_id=%s plan=%s", session_id[:8], plan)
+        logger.info("ensure_compare_session_plan done session_id=%s plan_size=%d", sid, len(plan))
         return plan
 
 
@@ -2112,13 +2117,18 @@ async def acquire_compare_model(
     Pick the next unused actual_model for this label within a compare session.
     Falls back to the global free pool when label candidates are exhausted.
     """
+    sid = session_id[:8] if session_id else ""
+    logger.info("acquire_compare_model start session_id=%s label=%s", sid, label)
     if not session_id:
         pool = build_model_try_order(label, excluded_by_failure)
-        return pool[0] if pool else None
+        model_id = pool[0] if pool else None
+        logger.info("acquire_compare_model done session_id=%s label=%s model=%s", sid, label, model_id)
+        return model_id
 
     plan = await ensure_compare_session_plan(session_id)
     pool = build_compare_candidate_pool(label, plan, excluded_by_failure)
     if not pool:
+        logger.info("acquire_compare_model done session_id=%s label=%s model=None", sid, label)
         return None
 
     async with COMPARE_SESSION_LOCK:
@@ -2126,6 +2136,7 @@ async def acquire_compare_model(
         for model_id in pool:
             if model_id not in used:
                 used.add(model_id)
+                logger.info("acquire_compare_model done session_id=%s label=%s model=%s", sid, label, model_id)
                 return model_id
         logger.warning(
             "Compare model pool exhausted session_id=%s label=%s used=%s pool=%s",
@@ -2134,6 +2145,7 @@ async def acquire_compare_model(
             sorted(used),
             pool,
         )
+        logger.info("acquire_compare_model done session_id=%s label=%s model=None", sid, label)
         return None
 
 
@@ -2191,6 +2203,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
     await ensure_compare_session_plan(session_id)
 
     async def generate() -> AsyncIterator[str]:
+        yield ": keepalive\n\n"
         excluded_by_failure: set[str] = set()
         await mark_compare_stream_started(session_id)
         current_model_id: str | None = None
@@ -2212,6 +2225,13 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                 try:
                     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                         for attempt in range(2):
+                            logger.info(
+                                "compare/stream OpenRouter request start label=%s model=%s session=%s attempt=%d",
+                                label,
+                                model_id,
+                                session_id[:8] if session_id else "",
+                                attempt + 1,
+                            )
                             async with client.stream(
                                 "POST",
                                 OPENROUTER_CHAT_URL,
@@ -2225,6 +2245,12 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                     )
                                 },
                             ) as response:
+                                logger.info(
+                                    "compare/stream OpenRouter response label=%s model=%s status=%s",
+                                    label,
+                                    model_id,
+                                    response.status_code,
+                                )
                                 if response.status_code == 429:
                                     body = (await response.aread()).decode("utf-8", "ignore")
                                     if is_daily_free_limit(body):
