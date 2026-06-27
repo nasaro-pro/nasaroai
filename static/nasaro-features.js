@@ -437,7 +437,7 @@
             <p><strong>Privacy 🔒</strong> — No auto logging. Answers stay on screen until you save.</p>`;
         }
         return `<p><strong>비교</strong> — 한 번 질문하면 여러 AI 답을 나란히 봅니다. AI 칩으로 선택하세요.</p>
-            <p><strong>토론</strong> — AI들이 주제별로 라운드 토론합니다.</p>
+            <p><strong>토론</strong> — AI들이 주제별로 라운드 토론합니다. 앞 발언을 수용·비판·보완하며 각자 근거를 제시합니다.</p>
             <p><strong>협업</strong> — 4단계 작업. 단계별 AI 추천·변경 가능.</p>
             <p><strong>에이전트</strong> — PC(확장) 또는 Android 앱으로 자동 실행. 「5분 뒤 ○○해줘」라고 하면 예약됩니다.</p>
             <p><strong>결과물 저장</strong> — 답변 후 💾 결과물 저장. 로그인하면 기기 간 유지.</p>

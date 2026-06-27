@@ -3414,9 +3414,51 @@
             display: none;
         }
 
-        /* ===== 모바일: 최대한 간결한 하단 도크 ===== */
+        /* ===== 모바일: 앱형 레이아웃 + 키보드 시 본문 고정 ===== */
         @media (max-width: 640px) {
-            .dock-shell { position: relative; }
+            html.keyboard-open,
+            html.keyboard-open body {
+                overflow: hidden;
+                height: 100%;
+                width: 100%;
+                position: fixed;
+            }
+            .app {
+                height: 100dvh;
+                max-height: 100dvh;
+                overflow: hidden;
+            }
+            #mainContent {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior-y: contain;
+            }
+            .site-header .header-brand h1 { font-size: 22px; }
+            .site-header .header-brand p { display: none; }
+            .header-inner { padding: 8px 12px; gap: 4px; }
+            .collab-intro {
+                min-height: min(48vh, 340px);
+                justify-content: center;
+                margin: 6px 0;
+                border-radius: 16px;
+                padding: 20px 16px !important;
+            }
+            .collab-intro-title { font-size: 20px; }
+            .collab-template-row button,
+            .collab-template-btn {
+                min-height: 44px;
+                font-size: 13px;
+            }
+            .dock-shell {
+                position: fixed !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0;
+                z-index: 200;
+                transition: bottom 0.15s ease-out;
+            }
             .dock-agent-row {
                 position: absolute;
                 right: 6px;
@@ -3897,7 +3939,7 @@
                 <div id="debateEmptyHint" class="collab-intro" style="display:flex;padding:24px;">
                     <div class="collab-intro-icon">💬</div>
                     <h2 class="collab-intro-title">어떤 주제로 토론할까요?</h2>
-                    <p class="collab-intro-desc">주제를 입력하면 AI들이 라운드별로 의견을 주고받습니다. 기획·논점 정리·찬반 검토에 적합합니다.</p>
+                    <p class="collab-intro-desc">주제를 입력하면 AI들이 라운드별로 의견을 주고받습니다. 앞 답변을 비판·수용·보완하며 각자의 근거를 제시합니다.</p>
                     <div class="collab-template-row" id="debateSuggestRow"></div>
                 </div>
                 <div id="debateError" class="notice error"></div>
@@ -4261,7 +4303,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627j"></script>
+    <script src="/static/nasaro-features.js?v=20260627k"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -5998,37 +6040,26 @@
         });
         autoResizeInput();
 
-        // ── 모바일 키보드 팝업 시 입력창 함께 올라오기 (visualViewport) ────────
+        // ── 모바일 키보드: 질문창(도크)만 올리고 본문은 그대로 ────────
         if (window.visualViewport) {
-            let prevVVHeight = window.visualViewport.height;
             function onViewportResize() {
                 const vv = window.visualViewport;
                 const keyboardHeight = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+                const kbOpen = keyboardHeight > 60;
+                document.documentElement.classList.toggle("keyboard-open", kbOpen);
                 const shell = document.getElementById("dockShell");
                 if (shell) {
-                    shell.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                    shell.style.bottom = kbOpen ? `${keyboardHeight}px` : "";
                 } else {
-                    inputDock.style.bottom = keyboardHeight > 60 ? `${keyboardHeight}px` : "";
+                    inputDock.style.bottom = kbOpen ? `${keyboardHeight}px` : "";
                 }
-                // 모바일 에이전트 패널은 키보드 바로 위에 자연스럽게 붙임
+                if (kbOpen) {
+                    window.scrollTo(0, 0);
+                }
                 if (agentPanel && window.innerWidth <= 520 && !document.body.classList.contains("native-agent-overlay")) {
-                    if (keyboardHeight > 60) {
-                        agentPanel.style.bottom = `${Math.max(0, keyboardHeight)}px`;
-                    } else {
-                        agentPanel.style.bottom = "";
-                    }
+                    agentPanel.style.bottom = kbOpen ? `${Math.max(0, keyboardHeight)}px` : "";
                 }
                 scheduleSyncMainPadding();
-                // 포커스된 입력창을 화면에 보이도록 스크롤
-                if (keyboardHeight > 60) {
-                    const focused = document.activeElement;
-                    if (focused && (focused.tagName === "TEXTAREA" || focused.tagName === "INPUT")) {
-                        setTimeout(() => {
-                            focused.scrollIntoView({ behavior: "smooth", block: "end" });
-                        }, 80);
-                    }
-                }
-                prevVVHeight = vv.height;
             }
             window.visualViewport.addEventListener("resize", onViewportResize);
             window.visualViewport.addEventListener("scroll", onViewportResize);
@@ -7696,7 +7727,7 @@
                 round_number: roundNumber,
                 speaker_index: speakerIndex,
                 model: `${speakerIndex}번`,
-                role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 반박" : "3번 종합",
+                role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 비평·보완" : "3번 종합",
                 content: "답변 작성 중...",
             });
             if (!userMovedDeck && speakerIndex === 1) activeCardIndex = debateCards.length - 1;
@@ -7930,7 +7961,7 @@
                     round_number: expectedRound,
                     speaker_index: expectedSpeaker,
                     model: `${expectedSpeaker}번`,
-                    role: expectedSpeaker === 1 ? "1번 주장" : expectedSpeaker === 2 ? "2번 반박" : "3번 종합",
+                    role: expectedSpeaker === 1 ? "1번 주장" : expectedSpeaker === 2 ? "2번 비평·보완" : "3번 종합",
                     content: DEBATE_FAILURE_MSG,
                     success: false,
                 }]);
@@ -8000,7 +8031,7 @@
                     round_number: roundNumber,
                     speaker_index: speakerIndex,
                     model: `${speakerIndex}번`,
-                    role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 반박" : "3번 종합",
+                    role: speakerIndex === 1 ? "1번 주장" : speakerIndex === 2 ? "2번 비평·보완" : "3번 종합",
                     content: "다시 시도하는 중...",
                 };
                 activeCardIndex = index;

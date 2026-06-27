@@ -460,14 +460,13 @@ PERSONAS: dict[str, str] = {
     ),
 }
 
-# 토론 발언에 공통으로 덧붙이는 강한 지시: 정보 수집 · 주장 · 비판.
+# 토론 발언에 공통으로 덧붙이는 지시: 수용·비판·보완·자기 주장 (무조건 반대 금지).
 DEBATE_DIRECTIVE = (
-    "당신은 치열한 토론의 참가자입니다. 다음을 반드시 지키세요.\n"
-    "1) 정보 수집: 주제와 관련된 사실, 데이터, 사례, 통계, 전문가 견해 등 "
-    "구체적 근거를 적극적으로 끌어와 제시하세요.\n"
-    "2) 주장: 모호하게 양비론으로 빠지지 말고, 명확한 입장을 선택해 강하게 주장하세요.\n"
-    "3) 비판: 상대 발언의 논리적 허점, 근거 부족, 반례를 날카롭게 지적하고 반박하세요.\n"
-    "감정적 비방은 피하되, 근거에 기반해 단호하고 설득력 있게 한국어로 발언하세요."
+    "당신은 라운드 토론의 참가자입니다. 찬반 토론처럼 무조건 반대할 필요는 없습니다.\n"
+    "1) 앞선 발언을 먼저 읽고, 타당한 부분은 인정·수용하세요.\n"
+    "2) 부족한 근거, 논리적 비약, 빠진 관점은 구체적으로 비판·보완하세요.\n"
+    "3) 수용·비판을 반영해 자신의 입장과 근거(사실, 데이터, 사례)를 명확히 제시하세요.\n"
+    "감정적 비방은 피하고, 근거에 기반해 한국어로 발언하세요."
 )
 
 MODEL_MAPPING: dict[str, str] = {}
@@ -1905,15 +1904,19 @@ def build_round_prompt(
             "반복을 피하고 새로운 근거와 관점으로 강하게 주장하세요."
         )
 
-    role_instruction = "반박/보완" if speaker_index == 2 else "반박하거나 종합"
+    role_instruction = "앞선 발언을 수용·비판·보완하고 자신의 근거를 제시"
     compress_older = False
     if speaker_index == 3:
         role_instruction = (
-            "1번과 2번 발언을 모두 검토하고, 각각의 허점과 약한 근거를 구체적으로 짚어 "
-            "반박한 뒤 최종 입장을 제시"
+            "1번과 2번 발언을 검토해 각각 수용할 점과 보완할 점을 짚고, "
+            "종합적인 최종 입장을 제시"
         )
         compress_older = False
     elif speaker_index == 2:
+        role_instruction = (
+            "1번 발언에서 타당한 점은 인정하고, 부족하거나 약한 부분은 근거와 함께 "
+            "비판·보완한 뒤 자신의 관점과 추가 근거를 제시 (무조건 반대만 하지 말 것)"
+        )
         compress_older = False
     else:
         compress_older = len(prior_turns) >= 2
@@ -1923,8 +1926,7 @@ def build_round_prompt(
         f"주제: {topic}\n\n"
         f"현재 라운드에서 당신보다 앞선 발언입니다.\n\n"
         f"{prior_text}\n\n"
-        f"당신은 {speaker_index}번 발언자입니다. 위 발언의 허점과 약한 근거를 "
-        f"구체적으로 짚어 {role_instruction}하고, 당신의 근거를 들어 강하게 답변하세요."
+        f"당신은 {speaker_index}번 발언자입니다. {role_instruction}하세요."
     )
 
 
@@ -1935,7 +1937,7 @@ def build_summary_prompt(existing_summary: str, turns: list[DebateTurn]) -> str:
         "직전 라운드의 전체 원문입니다.\n\n"
         f"{format_prior_turns(turns)}\n\n"
         "위 내용을 의미 있게 압축해 누적 요약을 갱신하세요. "
-        "'1번(라벨)은 ~라고 주장했고, 2번(라벨)은 ~라고 반박했고, 3번(라벨)은 ~라고 종합했다' "
+        "'1번(라벨)은 ~라고 주장했고, 2번(라벨)은 ~를 수용·비판·보완했고, 3번(라벨)은 ~라고 종합했다' "
         "형태가 드러나야 합니다. 글자수로 자르지 말고 한국어 문단으로 요약하세요."
     )
 
@@ -2031,7 +2033,7 @@ def append_pending_user_input(session: DebateSession, content: str, target_round
 
 ROLE_BY_INDEX = {
     1: "1번 주장",
-    2: "2번 반박",
+    2: "2번 비평·보완",
     3: "3번 종합",
 }
 
