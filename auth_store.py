@@ -692,21 +692,7 @@ def get_member_activity_by_hour(day_key: str | None = None) -> dict[str, int]:
 
 
 def get_agent_activity_log(limit: int = 500) -> list[dict[str, Any]]:
-    limit = max(1, min(5000, limit))
-    with _lock:
-        conn = _connect()
-        try:
-            rows = conn.execute(
-                """
-                SELECT * FROM activity_log
-                WHERE feature = 'agent'
-                ORDER BY created_at DESC LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-        finally:
-            conn.close()
-    return [_activity_row(r) for r in rows]
+    return get_activity_log(feature="agent", limit=limit)
 
 
 def get_user_login_stats(user_id: int) -> dict[str, Any]:
@@ -1209,36 +1195,79 @@ def log_activity(
 def get_activity_log(
     user_id: int | None = None,
     device_id: str | None = None,
+    *,
+    feature: str | None = None,
+    q: str | None = None,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     limit = max(1, min(50000, limit))
+    offset = max(0, offset)
+    conditions: list[str] = []
+    params: list[Any] = []
+    if user_id is not None:
+        conditions.append("user_id = ?")
+        params.append(user_id)
+    elif device_id:
+        conditions.append("device_id = ?")
+        params.append(device_id.strip())
+    if feature:
+        conditions.append("feature = ?")
+        params.append(feature.strip()[:32])
+    if q:
+        like = f"%{q.strip()[:80]}%"
+        conditions.append("(detail LIKE ? OR action LIKE ? OR subject LIKE ? OR device_id LIKE ?)")
+        params.extend([like, like, like, like])
+    where = " AND ".join(conditions) if conditions else "1=1"
     with _lock:
         conn = _connect()
         try:
-            if user_id is not None:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM activity_log WHERE user_id = ?
-                    ORDER BY created_at DESC LIMIT ?
-                    """,
-                    (user_id, limit),
-                ).fetchall()
-            elif device_id:
-                rows = conn.execute(
-                    """
-                    SELECT * FROM activity_log WHERE device_id = ?
-                    ORDER BY created_at DESC LIMIT ?
-                    """,
-                    (device_id.strip(), limit),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?",
-                    (limit,),
-                ).fetchall()
+            rows = conn.execute(
+                f"""
+                SELECT * FROM activity_log
+                WHERE {where}
+                ORDER BY created_at DESC LIMIT ? OFFSET ?
+                """,
+                (*params, limit, offset),
+            ).fetchall()
         finally:
             conn.close()
     return [_activity_row(r) for r in rows]
+
+
+def count_activity_log(
+    user_id: int | None = None,
+    device_id: str | None = None,
+    *,
+    feature: str | None = None,
+    q: str | None = None,
+) -> int:
+    conditions: list[str] = []
+    params: list[Any] = []
+    if user_id is not None:
+        conditions.append("user_id = ?")
+        params.append(user_id)
+    elif device_id:
+        conditions.append("device_id = ?")
+        params.append(device_id.strip())
+    if feature:
+        conditions.append("feature = ?")
+        params.append(feature.strip()[:32])
+    if q:
+        like = f"%{q.strip()[:80]}%"
+        conditions.append("(detail LIKE ? OR action LIKE ? OR subject LIKE ? OR device_id LIKE ?)")
+        params.extend([like, like, like, like])
+    where = " AND ".join(conditions) if conditions else "1=1"
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                f"SELECT COUNT(*) AS c FROM activity_log WHERE {where}",
+                tuple(params),
+            ).fetchone()
+        finally:
+            conn.close()
+    return int(row["c"] or 0)
 
 
 def _activity_row(row: sqlite3.Row) -> dict[str, Any]:

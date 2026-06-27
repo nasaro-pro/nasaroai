@@ -28,6 +28,7 @@ from auth_store import (
     admin_adjust_quota,
     admin_logout,
     check_and_consume_quota,
+    count_activity_log,
     create_admin_session,
     create_public_share,
     create_support_inquiry,
@@ -3361,10 +3362,29 @@ def admin_activity(
     request: Request,
     user_id: int | None = None,
     device_id: str | None = None,
-    limit: int = 10000,
+    feature: str | None = None,
+    q: str | None = None,
+    offset: int = 0,
+    limit: int = 200,
 ) -> dict:
     _require_admin(request)
-    return {"activity": get_activity_log(user_id=user_id, device_id=device_id, limit=limit)}
+    limit = max(1, min(5000, limit))
+    offset = max(0, offset)
+    activity = get_activity_log(
+        user_id=user_id,
+        device_id=device_id,
+        feature=feature,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
+    total = count_activity_log(
+        user_id=user_id,
+        device_id=device_id,
+        feature=feature,
+        q=q,
+    )
+    return {"activity": activity, "total": total, "limit": limit, "offset": offset}
 
 
 @app.get("/admin/support")

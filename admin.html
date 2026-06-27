@@ -62,7 +62,43 @@
     th { color: #94a3b8; white-space: nowrap; }
     .online { color: #86efac; font-weight: 700; }
     .offline { color: #64748b; }
-    .activity-list, .support-list { max-height: min(70vh, 640px); overflow-y: auto; }
+    .activity-list, .support-list { max-height: min(52vh, 480px); overflow-y: auto; }
+    .activity-list.compact { max-height: min(46vh, 420px); }
+    .activity-dual-panel { grid-column: 1 / -1; padding: 12px 14px; }
+    .activity-dual-head {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 10px; margin-bottom: 10px;
+    }
+    .activity-dual-head h2 { margin: 0; }
+    .activity-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .activity-filters select, .activity-filters input {
+      width: auto; min-width: 110px; max-width: 180px;
+    }
+    .activity-filters input[type="search"] { min-width: 160px; max-width: 220px; }
+    .activity-dual-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    }
+    @media (max-width: 900px) { .activity-dual-grid { grid-template-columns: 1fr; } }
+    .activity-dual-col {
+      background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+      padding: 10px; min-height: 0; display: flex; flex-direction: column; gap: 6px;
+    }
+    .activity-dual-col h3 {
+      margin: 0; font-size: 12px; color: #c4b5fd; font-weight: 700;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .activity-dual-col h3 span { font-size: 10px; color: #64748b; font-weight: 600; }
+    .activity-row-compact {
+      display: grid; grid-template-columns: 92px 52px 72px 1fr;
+      gap: 6px; align-items: start; padding: 4px 0;
+      border-bottom: 1px solid #1e293b; font-size: 10px; line-height: 1.35;
+    }
+    .activity-row-compact:last-child { border-bottom: none; }
+    .activity-row-compact .act-time { color: #64748b; white-space: nowrap; }
+    .activity-row-compact .act-feat { color: #c4b5fd; font-weight: 700; }
+    .activity-row-compact .act-action { color: #94a3b8; }
+    .activity-row-compact .act-detail { color: #cbd5e1; word-break: break-all; }
+    .activity-load-more { align-self: flex-start; margin-top: 2px; }
     .activity-row, .support-row {
       padding: 8px 0; border-bottom: 1px solid #334155; font-size: 11px;
     }
@@ -211,13 +247,34 @@
           <h2>회원 접속 활동 시간대 (KST)</h2>
           <div id="memberHourChart" class="hour-chart"></div>
         </section>
-        <section class="panel full">
-          <h2>에이전트 활동 기록</h2>
-          <div id="agentActivityFeed" class="activity-list agent-feed"></div>
-        </section>
-        <section class="panel full">
-          <h2>최근 활동 (전체)</h2>
-          <div id="activityFeed" class="activity-list"></div>
+        <section class="panel full activity-dual-panel">
+          <div class="activity-dual-head">
+            <h2>활동 기록</h2>
+            <div class="activity-filters">
+              <select id="activityFeatureFilter">
+                <option value="">전체 기능</option>
+                <option value="agent">에이전트</option>
+                <option value="compare">비교</option>
+                <option value="debate">토론</option>
+                <option value="collab">협업</option>
+                <option value="auth">인증</option>
+              </select>
+              <input id="activitySearch" type="search" placeholder="검색 (내용·기기·계정)…">
+              <button id="activitySearchBtn" type="button">조회</button>
+            </div>
+          </div>
+          <div class="activity-dual-grid">
+            <div class="activity-dual-col">
+              <h3>에이전트 기록 <span id="agentActivityCount">0건</span></h3>
+              <div id="agentActivityFeed" class="activity-list compact agent-feed"></div>
+              <button id="agentLoadMore" class="secondary activity-load-more" type="button">더 보기</button>
+            </div>
+            <div class="activity-dual-col">
+              <h3>최근 활동 (전체) <span id="activityFeedCount">0건</span></h3>
+              <div id="activityFeed" class="activity-list compact"></div>
+              <button id="activityLoadMore" class="secondary activity-load-more" type="button">더 보기</button>
+            </div>
+          </div>
         </section>
         <section class="panel full">
           <h2>회원 목록 (요약)</h2>
@@ -452,7 +509,6 @@
       renderFeatureHourCharts(data.usage_by_hour_by_feature || {}, data.quota_limits || {});
       renderSimpleHourChart(data.login_by_hour || {}, "loginHourChart", "#38bdf8", "로그인");
       renderSimpleHourChart(data.member_activity_by_hour || {}, "memberHourChart", "#86efac", "세션 활동");
-      renderAgentActivityFeed(data.agent_activity || []);
     }
 
     const FEATURE_COLORS = {
@@ -548,80 +604,92 @@
       }).join("");
     }
 
-    function renderAgentActivityFeed(items) {
-      const el = document.getElementById("agentActivityFeed");
-      if (!el) return;
-      if (!items?.length) {
-        el.innerHTML = "<div class='empty'>에이전트 활동 기록 없음</div>";
-        return;
-      }
-      const groups = new Map();
-      items.forEach(a => {
-        const key = a.user_id ? `u:${a.user_id}` : `d:${a.device_id || "guest"}`;
-        if (!groups.has(key)) {
-          groups.set(key, { user_id: a.user_id, device_id: a.device_id, items: [], latest: a.created_at_iso || "" });
-        }
-        const g = groups.get(key);
-        g.items.push(a);
-        if ((a.created_at_iso || "") > g.latest) g.latest = a.created_at_iso || "";
-      });
-      const sorted = [...groups.values()].sort((a, b) => (b.latest || "").localeCompare(a.latest || ""));
-      el.innerHTML = sorted.slice(0, 40).map(g => {
-        const label = g.user_id ? `회원 #${g.user_id}` : `비회원 ${(g.device_id || "guest").slice(0, 16)}`;
-        const recent = g.items.slice(0, 6).map(a => `
-          <div class="activity-row">
-            <div><strong>${a.action || "agent"}</strong> ${platformBadge(a.platform)}
-              ${a.detail ? ` · ${(a.detail || "").slice(0, 80)}` : ""}
-            </div>
-            <div class="activity-meta">${a.created_at_iso || "-"}</div>
-          </div>`).join("");
-        return `<div class="activity-group">
-          <div class="activity-group-head">
-            <strong>${label}</strong>
-            <span class="activity-group-count">${g.items.length}건 · ${g.latest || "-"}</span>
-          </div>
-          <div class="activity-group-items">${recent}</div>
+    let activityQuery = { q: "", feature: "" };
+    let agentActivityItems = [];
+    let allActivityItems = [];
+    let agentActivityOffset = 0;
+    let allActivityOffset = 0;
+    let agentActivityTotal = 0;
+    let allActivityTotal = 0;
+    const ACTIVITY_PAGE = 120;
+
+    function renderCompactActivityRows(items) {
+      if (!items?.length) return "<div class='empty'>기록 없음</div>";
+      return items.map(a => {
+        const who = a.user_id ? `#${a.user_id}` : (a.device_id || "guest").slice(0, 12);
+        const detail = [who, a.detail || ""].filter(Boolean).join(" · ");
+        return `<div class="activity-row-compact">
+          <span class="act-time">${a.created_at_iso || "-"}</span>
+          <span class="act-feat">${a.feature || "-"}</span>
+          <span class="act-action">${a.action || "-"}</span>
+          <span class="act-detail">${detail.slice(0, 120)}</span>
         </div>`;
       }).join("");
     }
 
-    function renderActivityFeed(items) {
+    function renderAgentActivityFeed(items, total) {
+      const el = document.getElementById("agentActivityFeed");
+      const countEl = document.getElementById("agentActivityCount");
+      if (!el) return;
+      agentActivityItems = items || [];
+      agentActivityTotal = total ?? agentActivityItems.length;
+      if (countEl) countEl.textContent = `${agentActivityTotal}건`;
+      el.innerHTML = renderCompactActivityRows(agentActivityItems);
+      const moreBtn = document.getElementById("agentLoadMore");
+      if (moreBtn) moreBtn.style.display = agentActivityItems.length < agentActivityTotal ? "" : "none";
+    }
+
+    function renderActivityFeed(items, total) {
       const el = document.getElementById("activityFeed");
-      if (!items?.length) { el.innerHTML = "<div class='empty'>활동 기록 없음</div>"; return; }
-      const groups = new Map();
-      (items || []).forEach(a => {
-        const key = a.user_id ? `u:${a.user_id}` : `d:${a.device_id || "guest"}`;
-        if (!groups.has(key)) {
-          groups.set(key, {
-            user_id: a.user_id,
-            device_id: a.device_id,
-            items: [],
-            latest: a.created_at_iso || "",
-          });
-        }
-        const g = groups.get(key);
-        g.items.push(a);
-        if ((a.created_at_iso || "") > g.latest) g.latest = a.created_at_iso || "";
-      });
-      const sorted = [...groups.values()].sort((a, b) => (b.latest || "").localeCompare(a.latest || ""));
-      el.innerHTML = sorted.slice(0, 60).map(g => {
-        const label = g.user_id
-          ? `회원 #${g.user_id}`
-          : `비회원 ${(g.device_id || "guest").slice(0, 16)}`;
-        const recent = g.items.slice(0, 4).map(a => `
-          <div class="activity-row">
-            <div><strong>${a.feature}</strong> · ${a.action || ""} ${platformBadge(a.platform)}</div>
-            <div>${(a.detail || "").slice(0, 100)}</div>
-            <div class="activity-meta">${a.created_at_iso || "-"}</div>
-          </div>`).join("");
-        return `<div class="activity-group">
-          <div class="activity-group-head">
-            <strong>${label}</strong>
-            <span class="activity-group-count">${g.items.length}건 · ${g.latest || "-"}</span>
-          </div>
-          <div class="activity-group-items">${recent}</div>
-        </div>`;
-      }).join("");
+      const countEl = document.getElementById("activityFeedCount");
+      if (!el) return;
+      allActivityItems = items || [];
+      allActivityTotal = total ?? allActivityItems.length;
+      if (countEl) countEl.textContent = `${allActivityTotal}건`;
+      el.innerHTML = renderCompactActivityRows(allActivityItems);
+      const moreBtn = document.getElementById("activityLoadMore");
+      if (moreBtn) moreBtn.style.display = allActivityItems.length < allActivityTotal ? "" : "none";
+    }
+
+    async function fetchActivityPanels(reset = true) {
+      if (reset) {
+        agentActivityOffset = 0;
+        allActivityOffset = 0;
+      }
+      const q = activityQuery.q || "";
+      const feature = activityQuery.feature || "";
+      const [agentRes, allRes] = await Promise.all([
+        api(`/admin/activity?feature=agent&q=${encodeURIComponent(q)}&limit=${ACTIVITY_PAGE}&offset=${agentActivityOffset}`),
+        api(`/admin/activity?feature=${encodeURIComponent(feature)}&q=${encodeURIComponent(q)}&limit=${ACTIVITY_PAGE}&offset=${allActivityOffset}`),
+      ]);
+      if (reset) {
+        renderAgentActivityFeed(agentRes.activity || [], agentRes.total);
+        renderActivityFeed(allRes.activity || [], allRes.total);
+      } else {
+        renderAgentActivityFeed(
+          agentActivityOffset ? [...agentActivityItems, ...(agentRes.activity || [])] : (agentRes.activity || []),
+          agentRes.total
+        );
+        renderActivityFeed(
+          allActivityOffset ? [...allActivityItems, ...(allRes.activity || [])] : (allRes.activity || []),
+          allRes.total
+        );
+      }
+    }
+
+    async function loadMoreAgentActivity() {
+      agentActivityOffset += ACTIVITY_PAGE;
+      const q = activityQuery.q || "";
+      const data = await api(`/admin/activity?feature=agent&q=${encodeURIComponent(q)}&limit=${ACTIVITY_PAGE}&offset=${agentActivityOffset}`);
+      renderAgentActivityFeed([...agentActivityItems, ...(data.activity || [])], data.total);
+    }
+
+    async function loadMoreAllActivity() {
+      allActivityOffset += ACTIVITY_PAGE;
+      const q = activityQuery.q || "";
+      const feature = activityQuery.feature || "";
+      const data = await api(`/admin/activity?feature=${encodeURIComponent(feature)}&q=${encodeURIComponent(q)}&limit=${ACTIVITY_PAGE}&offset=${allActivityOffset}`);
+      renderActivityFeed([...allActivityItems, ...(data.activity || [])], data.total);
     }
 
     function renderUsersTable(users) {
@@ -816,7 +884,10 @@
       document.getElementById("loginView").style.display = "none";
       document.getElementById("appShell").classList.add("open");
       renderStats(dashData);
-      renderActivityFeed(dashData.recent_activity || []);
+      fetchActivityPanels(true).catch(() => {
+        renderAgentActivityFeed(dashData.agent_activity || [], (dashData.agent_activity || []).length);
+        renderActivityFeed(dashData.recent_activity || [], (dashData.recent_activity || []).length);
+      });
       renderUsersTable(dashData.users || []);
       renderSupportList();
       showOverview();
@@ -857,6 +928,20 @@
       showLoginView();
     });
     document.getElementById("refreshBtn").addEventListener("click", () => loadDashboard().catch(showLoginView));
+    document.getElementById("activitySearchBtn")?.addEventListener("click", () => {
+      activityQuery.q = document.getElementById("activitySearch")?.value.trim() || "";
+      activityQuery.feature = document.getElementById("activityFeatureFilter")?.value || "";
+      fetchActivityPanels(true).catch(e => alert(e.message || "활동 기록 조회 실패"));
+    });
+    document.getElementById("activitySearch")?.addEventListener("keydown", e => {
+      if (e.key === "Enter") document.getElementById("activitySearchBtn")?.click();
+    });
+    document.getElementById("activityFeatureFilter")?.addEventListener("change", () => {
+      activityQuery.feature = document.getElementById("activityFeatureFilter")?.value || "";
+      fetchActivityPanels(true).catch(() => {});
+    });
+    document.getElementById("agentLoadMore")?.addEventListener("click", () => loadMoreAgentActivity().catch(() => {}));
+    document.getElementById("activityLoadMore")?.addEventListener("click", () => loadMoreAllActivity().catch(() => {}));
     document.getElementById("tabStats").addEventListener("click", showOverview);
     document.getElementById("tabMembers").addEventListener("click", () => {
       showDetailView("members");

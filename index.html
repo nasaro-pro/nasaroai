@@ -3187,13 +3187,19 @@
             min-height: 50px;
             padding: 6px 8px;
         }
-        .collab-v4-body {
+        .collab-v4-scroll {
             flex: 1;
             min-height: 0;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 6px;
-            overflow: hidden;
+            padding-bottom: 4px;
+        }
+        .collab-v4-body {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
         .collab-v4-task {
             flex-shrink: 0;
@@ -3278,8 +3284,8 @@
             overflow: hidden;
         }
         .collab-v4-work {
-            flex: 1;
-            min-height: 0;
+            flex: 1 1 auto;
+            min-height: 100px;
             display: flex;
             flex-direction: column;
             border: 1px solid #e5e7eb;
@@ -3326,6 +3332,22 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 8px;
+            background: var(--collab-v4-bg, #fff);
+        }
+        html[data-theme="dark"] .collab-v4-foot {
+            --collab-v4-bg: #0c0c0c;
+            border-top-color: #262626;
+        }
+        .collab-v4-foot .collab-v2-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .collab-v4-foot .collab-stage-btn {
+            flex: 1 1 100px;
+            min-height: 38px;
         }
         .collab-v4-activity .collab-activity-log {
             max-height: 52px;
@@ -6871,6 +6893,12 @@
                 return;
             }
             collabSelectedStage = Math.max(0, Math.min(collabSelectedStage, stages.length - 1));
+            while (collabSession.stageStates.length < stages.length) collabSession.stageStates.push("idle");
+            while (collabSession.stageOutputs.length < stages.length) collabSession.stageOutputs.push("");
+            while (collabStageModels.length < stages.length) {
+                const sm = getCollabStageMeta(collabStageModels.length);
+                collabStageModels.push(sm.default_model || COLLAB_STAGE_MODELS[collabStageModels.length % 4]);
+            }
             const sel = collabSelectedStage;
             const esc = v => escapeHtml(v || "");
 
@@ -6935,32 +6963,34 @@
                     <div class="collab-v4-top-label">간단 단계</div>
                     <div class="collab-v4-rail collab-stage-rail">${railHtml}</div>
                 </div>
-                <div class="collab-v4-body">
-                    <div class="collab-v4-task">
-                        <div class="collab-v4-task-label">요청사항</div>
-                        <div class="collab-v4-task-text">${esc(collabSession.task)}</div>
-                        <div class="collab-v4-type">${esc(plan.work_type || "협업")}</div>
+                <div class="collab-v4-scroll">
+                    <div class="collab-v4-body">
+                        <div class="collab-v4-task">
+                            <div class="collab-v4-task-label">요청사항</div>
+                            <div class="collab-v4-task-text">${esc(collabSession.task)}</div>
+                            <div class="collab-v4-type">${esc(plan.work_type || "협업")}</div>
+                        </div>
+                        ${recBanner}
+                        <div class="collab-v4-recs-label">단계별 AI 추천</div>
+                        <div class="collab-v4-recs">${recsHtml}</div>
+                        <div class="collab-v4-work">
+                            <div class="collab-v4-work-head">
+                                <h3>${sel + 1}단계 작업 · ${esc(sm.short || st.name)}</h3>
+                                <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
+                            </div>
+                            <div class="collab-v4-work-body">${workBody}</div>
+                        </div>
                     </div>
-                    ${recBanner}
-                    <div class="collab-v4-recs-label">단계별 AI 추천</div>
-                    <div class="collab-v4-recs">${recsHtml}</div>
-                    <div class="collab-v4-work">
-                        <div class="collab-v4-work-head">
-                            <h3>${sel + 1}단계 작업 · ${esc(sm.short || st.name)}</h3>
-                            <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
-                        </div>
-                        <div class="collab-v4-work-body">${workBody}</div>
+                </div>
+                <div class="collab-v4-foot">
+                    <div class="collab-v2-toolbar compact">
+                        <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
+                        <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
+                        <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
                     </div>
-                    <div class="collab-v4-foot">
-                        <div class="collab-v2-toolbar compact">
-                            <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
-                            <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
-                            <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
-                        </div>
-                        <div class="collab-v4-activity collab-activity compact">
-                            <div class="collab-activity-title">진행 기록</div>
-                            <div id="collabActivityLog" class="collab-activity-log compact"></div>
-                        </div>
+                    <div class="collab-v4-activity collab-activity compact">
+                        <div class="collab-activity-title">진행 기록</div>
+                        <div id="collabActivityLog" class="collab-activity-log compact"></div>
                     </div>
                 </div>
             </div>`;
