@@ -66,7 +66,7 @@ REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 MODEL_REFRESH_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 MODEL_CACHE_TTL_SECONDS = 600
 # Allow up to 10 candidates per label so a label can keep falling back to other
-# free models even when several are rate-limited or out of context budget.
+# models even when several are rate-limited or out of context budget.
 MAX_MODEL_CANDIDATES_PER_LABEL = 10
 MIN_MODEL_CANDIDATES_PER_LABEL = 5
 HEALTHCHECK_CONCURRENCY = 2
@@ -91,7 +91,7 @@ DAILY_LIMIT_MSG = (
 # Last resort only when OpenRouter's model catalog cannot be fetched at startup.
 LAST_RESORT_MODEL = "openai/gpt-oss-20b:free"
 
-# 에이전트 전용 우선 모델 목록 (무료 모델만 사용)
+# 에이전트 폴백용 무료 모델 목록 (유료 primary 실패 시 사용)
 AGENT_PREFERRED_MODELS = [
     "openai/gpt-oss-20b:free",
     "openai/gpt-oss-120b:free",
@@ -319,10 +319,11 @@ class LabelProviderConfig:
     substitute_chain: tuple[str, ...] = ()
 
 
-# Fixed substitute preferences when a label has no free company model in the catalog.
+# Paid primary models via OpenRouter; substitute_chain is free-model fallback on failure.
 LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     "OpenAI": LabelProviderConfig(
         label="OpenAI",
+        official_model_id="openai/gpt-4o-mini",
         substitute_chain=(
             "openai/gpt-oss-120b:free",
             "openai/gpt-oss-20b:free",
@@ -333,6 +334,7 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     ),
     "Anthropic": LabelProviderConfig(
         label="Anthropic",
+        official_model_id="anthropic/claude-3-haiku",
         substitute_chain=(
             "nvidia/nemotron-ultra-253b-v1:free",
             "nvidia/nemotron-3-super-120b-a12b:free",
@@ -343,6 +345,7 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     ),
     "Google": LabelProviderConfig(
         label="Google",
+        official_model_id="google/gemini-flash-1.5-8b",
         substitute_chain=(
             "meta-llama/llama-4-maverick:free",
             "meta-llama/llama-4-scout:free",
@@ -353,6 +356,7 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     ),
     "xAI": LabelProviderConfig(
         label="xAI",
+        official_model_id="meta-llama/llama-3.1-8b-instruct",
         substitute_chain=(
             "deepseek/deepseek-r1:free",
             "deepseek/deepseek-v3:free",
@@ -363,6 +367,7 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     ),
     "Perplexity": LabelProviderConfig(
         label="Perplexity",
+        official_model_id="perplexity/llama-3.1-sonar-small-128k-online",
         substitute_chain=(
             "nousresearch/hermes-3-llama-3.1-70b:free",
             "meta-llama/llama-3.3-70b-instruct:free",
@@ -373,6 +378,7 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     ),
     "DeepSeek": LabelProviderConfig(
         label="DeepSeek",
+        official_model_id="deepseek/deepseek-chat",
         substitute_chain=(
             "deepseek/deepseek-r1:free",
             "deepseek/deepseek-v3:free",
@@ -390,6 +396,7 @@ class ModelCacheState:
     source: str = "not_loaded"
     error: str | None = None
     refreshed_at: float = 0.0
+    all_model_ids: set[str] = field(default_factory=set)
     free_model_ids: set[str] = field(default_factory=set)
     free_models_by_label: dict[str, list[str]] = field(default_factory=dict)
     all_free_models: list[str] = field(default_factory=list)
@@ -1098,6 +1105,8 @@ def largest_free_model_for_prefix(prefix: str) -> str | None:
 
 
 def resolve_catalog_model(model_id: str) -> str | None:
+    if model_id in MODEL_CACHE_STATE.all_model_ids:
+        return model_id
     if model_id in MODEL_CACHE_STATE.free_model_ids:
         return model_id
     if model_id == "qwen/qwen3-coder:free":
@@ -1115,18 +1124,16 @@ def resolve_catalog_model(model_id: str) -> str | None:
 
 
 def build_model_chain_for_label(label: str) -> list[str]:
-    """Ordered preference chain for one label: own-company free models first, then substitutes."""
-    prefix = COMPANY_PREFIXES[label]
+    """Ordered preference chain: paid primary, free substitutes, then catalog extras."""
+    config = LABEL_PROVIDER_CONFIG[label]
     chain: list[str] = []
 
-    company_model = largest_free_model_for_prefix(prefix)
-    if company_model:
-        chain.append(company_model)
+    if config.official_model_id:
+        chain.append(config.official_model_id)
 
-    for substitute in LABEL_PROVIDER_CONFIG[label].substitute_chain:
-        resolved = resolve_catalog_model(substitute)
-        if resolved:
-            chain.append(resolved)
+    for substitute in config.substitute_chain:
+        resolved = resolve_catalog_model(substitute) or substitute
+        chain.append(resolved)
 
     own_prefix = COMPANY_PREFIXES[label]
     extras = [
@@ -1225,7 +1232,7 @@ def get_all_available_free_models() -> list[str]:
 
 
 def build_model_try_order(label: str, excluded: set[str] | None = None) -> list[str]:
-    """Ordered unique candidates: label chain first, then global free pool."""
+    """Ordered unique candidates: label chain first, then global free fallback pool."""
     excluded = excluded or set()
     label_candidates = resolve_label_models(label)
     global_candidates = get_all_available_free_models()
@@ -1269,6 +1276,12 @@ async def refresh_model_cache() -> None:
             payload = response.json()
     except Exception as exc:
         logger.exception("Failed to fetch OpenRouter model catalog. Using last-resort fallback.")
+        configured_ids = [
+            config.official_model_id
+            for config in LABEL_PROVIDER_CONFIG.values()
+            if config.official_model_id
+        ]
+        MODEL_CACHE_STATE.all_model_ids = set(configured_ids + [LAST_RESORT_MODEL])
         MODEL_CACHE_STATE.free_model_ids = {LAST_RESORT_MODEL}
         MODEL_CACHE_STATE.all_free_models = [LAST_RESORT_MODEL]
         MODEL_CACHE_STATE.free_models_by_label = {"OpenAI": [LAST_RESORT_MODEL]}
@@ -1278,10 +1291,15 @@ async def refresh_model_cache() -> None:
 
     free_models_by_label: dict[str, list[str]] = {label: [] for label in COMPANY_LABELS}
     all_free_models: list[str] = []
+    all_model_ids: list[str] = []
 
     for model in payload.get("data", []):
         model_id = model.get("id")
-        if not isinstance(model_id, str) or not is_free_model(model):
+        if not isinstance(model_id, str):
+            continue
+
+        all_model_ids.append(model_id)
+        if not is_free_model(model):
             continue
 
         all_free_models.append(model_id)
@@ -1295,22 +1313,23 @@ async def refresh_model_cache() -> None:
         all_free_models = [LAST_RESORT_MODEL]
         free_models_by_label = {"OpenAI": [LAST_RESORT_MODEL]}
 
+    MODEL_CACHE_STATE.all_model_ids = set(all_model_ids)
     MODEL_CACHE_STATE.free_model_ids = set(all_free_models)
     MODEL_CACHE_STATE.all_free_models = unique(all_free_models)
     MODEL_CACHE_STATE.free_models_by_label = free_models_by_label
     MODEL_CACHE_STATE.error = None
     rebuild_model_mappings("openrouter_catalog")
-    logger.info("Loaded OpenRouter free model cache: %s", MODEL_CANDIDATES)
+    logger.info("Loaded OpenRouter model cache: %s", MODEL_CANDIDATES)
 
 
 async def ensure_model_cache_fresh() -> None:
-    is_empty = not MODEL_CACHE_STATE.loaded or not MODEL_CACHE_STATE.free_model_ids
+    is_empty = not MODEL_CACHE_STATE.loaded
     is_stale = time.time() - MODEL_CACHE_STATE.refreshed_at > MODEL_CACHE_TTL_SECONDS
     if not is_empty and not is_stale:
         return
 
     async with MODEL_CACHE_LOCK:
-        is_empty = not MODEL_CACHE_STATE.loaded or not MODEL_CACHE_STATE.free_model_ids
+        is_empty = not MODEL_CACHE_STATE.loaded
         is_stale = time.time() - MODEL_CACHE_STATE.refreshed_at > MODEL_CACHE_TTL_SECONDS
         if is_empty or is_stale:
             await refresh_model_cache()
@@ -2661,15 +2680,18 @@ AGENT_STEP_MAX_CANDIDATES = 4
 
 
 def _resolve_agent_models() -> list[str]:
-    """에이전트가 시도할 모델 목록(무료 모델만 사용)."""
+    """에이전트가 시도할 모델 목록: 유료 primary 우선, 실패 시 무료 폴백."""
     configured = os.environ.get("AGENT_MODEL", "").strip()
     candidates: list[str] = []
-    if configured and ":free" in configured:
+    if configured:
         candidates.append(configured)
+    for label in COMPANY_LABELS:
+        config = LABEL_PROVIDER_CONFIG[label]
+        if config.official_model_id:
+            candidates.append(config.official_model_id)
     candidates.extend(AGENT_PREFERRED_MODELS)
-    # 모델 캐시에서 받은 값도 ':free'만 허용 (402 방지)
-    candidates.extend(m for m in get_all_available_free_models() if ":free" in m)
-    deduped = list(dict.fromkeys(c for c in candidates if c and ":free" in c))
+    candidates.extend(get_all_available_free_models())
+    deduped = list(dict.fromkeys(c for c in candidates if c))
     if not deduped:
         deduped = [LAST_RESORT_MODEL]
     return deduped[:AGENT_STEP_MAX_CANDIDATES]
