@@ -2407,7 +2407,15 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
             if stream_started:
                 await mark_compare_stream_done(session_id)
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/collab/recommend")
