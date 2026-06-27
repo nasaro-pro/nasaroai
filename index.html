@@ -2972,6 +2972,14 @@
             background: #f9fafb; border: 1px solid #e5e7eb; cursor: pointer; line-height: 1.4;
             position: relative;
         }
+        .session-history-item .works-item-del {
+            z-index: 2;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .session-history-item:hover { background: #ede9fe; border-color: #c4b5fd; }
         html[data-theme="dark"] .session-history-item:hover { background: #1e1b4b; border-color: #4338ca; }
         .session-history-item .sh-mode { font-size: 10px; color: #6b7280; font-weight: 600; }
@@ -3113,22 +3121,19 @@
             .result-file-viewer-side { max-height: 36vh; }
         }
 
-        .collab-v3-layout {
-            display: flex;
-            flex-direction: column;
-            max-height: none;
-            min-height: 0;
-        }
         #collabPanel.active {
             display: flex;
             flex-direction: column;
             min-height: 0;
+            height: calc(100dvh - var(--bottom-offset, 100px) - 48px);
+            max-height: calc(100dvh - var(--bottom-offset, 100px) - 48px);
         }
         #collabWorkspace {
             flex: 1;
             min-height: 0;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         #collabWorkspace .collab-workspace-layout,
         #collabWorkspace .collab-workspace-main {
@@ -3136,59 +3141,203 @@
             min-height: 0;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         #collabRecommendResult {
             flex: 1;
             min-height: 0;
-            overflow: auto;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            color: inherit !important;
         }
-        .collab-v3-sticky {
+        .collab-v4-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            gap: 6px;
+        }
+        .collab-v4-top {
             flex-shrink: 0;
             position: sticky;
             top: 0;
-            z-index: 20;
-            background: var(--collab-sticky-bg, #fff);
-            padding-bottom: 8px;
+            z-index: 15;
+            background: var(--collab-v4-bg, #fff);
+            padding: 6px 0 8px;
             border-bottom: 1px solid #e5e7eb;
         }
-        html[data-theme="dark"] .collab-v3-sticky {
-            --collab-sticky-bg: #0c0c0c;
+        html[data-theme="dark"] .collab-v4-top {
+            --collab-v4-bg: #0c0c0c;
             border-bottom-color: #262626;
         }
-        .collab-v3-scroll {
+        .collab-v4-top-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 6px;
+        }
+        .collab-v4-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+        .collab-rail-step.compact-v4 {
+            min-height: 50px;
+            padding: 6px 8px;
+        }
+        .collab-v4-body {
             flex: 1;
             min-height: 0;
-            overflow-y: auto;
-            padding-top: 10px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 6px;
+            overflow: hidden;
         }
-        .collab-recommend-banner {
-            font-size: 12px;
-            line-height: 1.55;
+        .collab-v4-task {
+            flex-shrink: 0;
             padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        html[data-theme="dark"] .collab-v4-task { background: #111; border-color: #333; }
+        .collab-v4-task-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #7c3aed;
+            margin-bottom: 4px;
+        }
+        .collab-v4-task-text {
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.4;
+            color: #111827;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        html[data-theme="dark"] .collab-v4-task-text { color: #f5f5f5; }
+        .collab-v4-type { font-size: 10px; color: #6b7280; margin-top: 3px; }
+        .collab-v4-rec-banner {
+            flex-shrink: 0;
+            font-size: 11px;
+            line-height: 1.45;
+            padding: 6px 10px;
             border-radius: 8px;
             background: #f5f3ff;
             border: 1px solid #ddd6fe;
             color: #5b21b6;
-            margin-top: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
-        html[data-theme="dark"] .collab-recommend-banner {
+        html[data-theme="dark"] .collab-v4-rec-banner {
             background: #1a1530;
             border-color: #4338ca;
             color: #c4b5fd;
         }
-        .collab-rail-ai {
-            width: 100%;
-            margin-top: 4px;
+        .collab-v4-recs-label {
+            flex-shrink: 0;
             font-size: 10px;
-            padding: 3px 4px;
+            font-weight: 800;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .collab-v4-recs {
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+        }
+        @media (max-width: 900px) {
+            .collab-v4-recs, .collab-v4-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        .collab-v4-rec-card {
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid #ddd6fe;
+            background: #faf5ff;
+            font-size: 10px;
+            line-height: 1.35;
+            cursor: pointer;
+        }
+        html[data-theme="dark"] .collab-v4-rec-card { background: #1a1530; border-color: #4338ca; }
+        .collab-v4-rec-card.selected { border-color: #7c3aed; box-shadow: 0 0 0 1px #7c3aed; }
+        .collab-v4-rec-card .rec-stage { font-weight: 800; color: #6d28d9; }
+        .collab-v4-rec-card .rec-ai { font-weight: 700; color: #4338ca; margin: 2px 0; }
+        .collab-v4-rec-card .rec-hint {
+            color: #64748b;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .collab-v4-work {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 8px 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+        html[data-theme="dark"] .collab-v4-work { background: #0c0c0c; border-color: #333; }
+        .collab-v4-work-head {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .collab-v4-work-head h3 {
+            margin: 0;
+            font-size: 12px;
+            font-weight: 800;
+            flex: 1;
+            min-width: 0;
+        }
+        .collab-v4-work-head select {
+            flex-shrink: 0;
+            font-size: 11px;
+            padding: 4px 8px;
             border-radius: 6px;
             border: 1px solid #c4b5fd;
-            background: #fff;
         }
-        html[data-theme="dark"] .collab-rail-ai { background: #141414; border-color: #4338ca; color: #e5e5e5; }
+        .collab-v4-work-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .collab-v4-work-body pre {
+            margin: 0;
+            white-space: pre-wrap;
+            font-size: var(--nasaro-answer-size, 14px);
+            line-height: 1.55;
+        }
+        .collab-v4-foot {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .collab-v4-activity .collab-activity-log {
+            max-height: 52px;
+            font-size: 9px;
+            padding: 4px 8px;
+        }
+        .collab-v4-final {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed #86efac;
+        }
+        .collab-v4-final h4 { margin: 0 0 4px; font-size: 11px; color: #15803d; }
         .session-history-item .sh-preview {
             font-size: 11px;
             color: #6b7280;
@@ -3903,10 +4052,57 @@
 
         const sessionHistory = [];
         const SESSION_HISTORY_STORE_KEY = "nasaroai_session_history";
+        const SESSION_HISTORY_DELETED_KEY = "nasaroai_session_history_deleted";
 
         function sessionHistoryStoreKey() {
             if (!currentUser?.id) return null;
             return `${SESSION_HISTORY_STORE_KEY}_u${currentUser.id}`;
+        }
+
+        function sessionHistoryDeletedKey() {
+            if (!currentUser?.id) return null;
+            return `${SESSION_HISTORY_DELETED_KEY}_u${currentUser.id}`;
+        }
+
+        function loadDeletedHistoryIds() {
+            const key = sessionHistoryDeletedKey();
+            if (!key) return new Set();
+            try {
+                const parsed = JSON.parse(localStorage.getItem(key) || "[]");
+                return new Set(Array.isArray(parsed) ? parsed : []);
+            } catch {
+                return new Set();
+            }
+        }
+
+        function markHistoryDeleted(id) {
+            if (!id) return;
+            const key = sessionHistoryDeletedKey();
+            if (!key) return;
+            const deleted = loadDeletedHistoryIds();
+            deleted.add(id);
+            localStorage.setItem(key, JSON.stringify([...deleted].slice(-200)));
+        }
+
+        function ensureHistoryId(item) {
+            if (item.id) return item.id;
+            const sig = `${item.mode || ""}|${item.time || ""}|${item.title || ""}|${item.data?.sessionId || ""}`;
+            let h = 0;
+            for (let i = 0; i < sig.length; i++) h = ((h << 5) - h + sig.charCodeAt(i)) | 0;
+            item.id = `h_${Math.abs(h).toString(36)}`;
+            return item.id;
+        }
+
+        function normalizeSessionHistoryList(list) {
+            const deleted = loadDeletedHistoryIds();
+            const out = [];
+            (Array.isArray(list) ? list : []).slice(0, 50).forEach(item => {
+                if (!item || typeof item !== "object") return;
+                ensureHistoryId(item);
+                if (deleted.has(item.id)) return;
+                out.push(item);
+            });
+            return out;
         }
 
         function loadSessionHistoryFromStore() {
@@ -3917,8 +4113,7 @@
                 const raw = localStorage.getItem(key);
                 if (!raw) return;
                 const parsed = JSON.parse(raw);
-                if (!Array.isArray(parsed)) return;
-                parsed.slice(0, 50).forEach(item => sessionHistory.push(item));
+                normalizeSessionHistoryList(parsed).forEach(item => sessionHistory.push(item));
             } catch {}
         }
 
@@ -3938,7 +4133,7 @@
         function applyServerSessionHistory(serverList) {
             if (!currentUser || !Array.isArray(serverList)) return;
             sessionHistory.length = 0;
-            serverList.slice(0, 50).forEach(item => sessionHistory.push(item));
+            normalizeSessionHistoryList(serverList).forEach(item => sessionHistory.push(item));
             saveSessionHistoryToStore();
             renderSessionHistory();
         }
@@ -4020,13 +4215,15 @@
             });
         }
 
-        function deleteSessionHistoryItem(id) {
+        async function deleteSessionHistoryItem(id) {
             const idx = sessionHistory.findIndex(h => h.id === id);
             if (idx === -1) return;
+            const removed = sessionHistory[idx];
+            if (removed?.id) markHistoryDeleted(removed.id);
             sessionHistory.splice(idx, 1);
             persistSessionHistory();
             renderSessionHistory();
-            if (currentUser && authToken) syncUserData();
+            if (currentUser && authToken) await syncUserData();
         }
 
         function restoreCompareFromHistory(data, title) {
@@ -4102,6 +4299,8 @@
             collabSelectedStage = data.selectedStage ?? 0;
             if (Array.isArray(data.stageModels) && data.stageModels.length) {
                 collabStageModels = data.stageModels.slice(0, 4);
+            } else if (Array.isArray(data.plan?.stage_models) && data.plan.stage_models.length) {
+                collabStageModels = data.plan.stage_models.slice(0, 4);
             }
             collabFinalProduct = data.finalProduct || "";
             collabSession = {
@@ -4183,6 +4382,7 @@
             }[m] || m);
             list.innerHTML = "";
             sessionHistory.forEach(h => {
+                ensureHistoryId(h);
                 const item = document.createElement("div");
                 item.className = "session-history-item";
                 const when = new Date(h.time).toLocaleString();
@@ -4196,11 +4396,13 @@
                 del.title = "기록 삭제";
                 del.addEventListener("click", e => {
                     e.stopPropagation();
+                    e.preventDefault();
                     deleteSessionHistoryItem(h.id);
                 });
                 item.appendChild(del);
                 list.appendChild(item);
             });
+            if (currentUser) saveSessionHistoryToStore();
         }
 
         function rebuildMainToolbar() {
@@ -4645,7 +4847,7 @@
                     if (activeCollab?.task) payload.active_collab = activeCollab;
                 } catch {}
                 if (savedResults.length) payload.saved_works = savedResults;
-                if (sessionHistory.length) payload.session_history = sessionHistory;
+                payload.session_history = sessionHistory.slice(0, 50);
                 if (!Object.keys(payload).length) return;
                 await apiFetch("/user/sync", {
                     method: "POST",
@@ -6672,29 +6874,35 @@
             const sel = collabSelectedStage;
             const esc = v => escapeHtml(v || "");
 
-            const railHtml = (plan.stages || []).map((st, i) => {
+            const railHtml = stages.map((st, i) => {
                 const state = collabSession.stageStates[i] || "idle";
                 const sm = getCollabStageMeta(i);
                 const model = collabStageModels[i] || sm.default_model || "AI";
-                const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
-                const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
-                    `<option value="${esc(m)}" ${collabStageModels[i] === m ? "selected" : ""}>${esc(m)}</option>`
-                ).join("");
                 return `
-                <div class="collab-rail-step-wrap ${i === sel ? "selected" : ""}">
-                    <button type="button" class="collab-rail-step ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
-                        <span class="step-state">${collabStateLabel(state)}</span>
-                        <span class="step-num">${i + 1}단계</span>
-                        <span class="step-name">${esc(sm.short || st.name)}</span>
-                        <span class="step-ai">${esc(model)}</span>
-                    </button>
-                    <select class="collab-rail-ai" data-rail-ai="${i}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
-                </div>`;
+                <button type="button" class="collab-rail-step compact-v4 ${state} ${i === sel ? "selected" : ""}" data-rail-step="${i}">
+                    <span class="step-state">${collabStateLabel(state)}</span>
+                    <span class="step-num">${i + 1}단계</span>
+                    <span class="step-name">${esc(sm.short || st.name)}</span>
+                    <span class="step-ai">${esc(model)}</span>
+                </button>`;
             }).join("");
 
-            const recommendBanner = collabSession.recommendation
-                ? `<div class="collab-recommend-banner"><strong>AI 추천</strong> · ${esc(collabSession.recommendation)}</div>`
-                : (plan.summary ? `<div class="collab-recommend-banner"><strong>AI 추천</strong> · ${esc(plan.summary)}</div>` : "");
+            const overallRec = collabSession.recommendation || plan.summary || "";
+            const recBanner = overallRec
+                ? `<div class="collab-v4-rec-banner"><strong>AI 추천</strong> · ${esc(overallRec)}</div>`
+                : "";
+
+            const recsHtml = stages.map((st, i) => {
+                const sm = getCollabStageMeta(i);
+                const model = collabStageModels[i] || sm.default_model || "AI";
+                const hint = st.detail || st.goal || sm.hint || "";
+                return `
+                <div class="collab-v4-rec-card ${i === sel ? "selected" : ""}" data-rec-step="${i}">
+                    <div class="rec-stage">${i + 1}. ${esc(sm.short || st.name)}</div>
+                    <div class="rec-ai">▶ ${esc(model)}</div>
+                    <div class="rec-hint">${esc(hint)}</div>
+                </div>`;
+            }).join("");
 
             const st = plan.stages[sel] || {};
             const sm = getCollabStageMeta(sel);
@@ -6705,50 +6913,54 @@
                 `<option value="${esc(m)}" ${collabStageModels[sel] === m ? "selected" : ""}>${esc(m)}</option>`
             ).join("");
 
-            const panelHtml = `
-                <div class="collab-stage-panel">
-                    <h3>${sel + 1}. ${esc(sm.short || st.name)}</h3>
-                    <p class="collab-stage-detail">${esc(st.goal || sm.hint || "")}</p>
-                    ${st.detail ? `<p class="collab-stage-subdetail">${esc(st.detail)}</p>` : ""}
-                    <div class="collab-ai-pick-row">
-                        <span style="font-size:12px;font-weight:700;color:#6d28d9;">단계 AI</span>
-                        <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
-                        <span class="collab-ai-hint">${esc(sm.hint || "")}</span>
-                    </div>
-                    ${output
-                        ? `<pre class="collab-stage-live-output" style="max-height:360px;">${esc(output)}</pre>`
-                        : (state === "running"
-                            ? `<p class="collab-stage-wait">AI 작업 중…</p>`
-                            : `<p class="collab-stage-wait" style="color:#64748b;">▶ 작업 시작을 누르면 이 단계가 실행됩니다.</p>`)}
-                </div>`;
-
-            const finalBlock = collabFinalProduct ? `
-                <div class="collab-final-product">
-                    <h3>✅ 최종 작업물</h3>
+            let workBody = "";
+            if (output) {
+                workBody = `<pre>${esc(output)}</pre>`;
+            } else if (state === "running") {
+                workBody = `<p class="collab-stage-wait">AI 작업 중…</p>`;
+            } else {
+                workBody = `<p class="collab-stage-wait" style="color:#64748b;">▶ 작업 시작을 누르면 이 단계가 실행됩니다.</p>`;
+            }
+            if (collabFinalProduct) {
+                workBody += `
+                <div class="collab-v4-final">
+                    <h4>✅ 최종 작업물</h4>
                     <pre>${esc(collabFinalProduct)}</pre>
-                </div>` : "";
+                </div>`;
+            }
 
             container.innerHTML = `
-            <div class="collab-v2 collab-v3 collab-v3-layout">
-                <div class="collab-v3-sticky">
-                    <header class="collab-v2-head compact">
-                        <span class="collab-type-badge">${esc(plan.work_type)}</span>
-                        <h2>${esc(collabSession.task)}</h2>
-                    </header>
-                    ${recommendBanner}
-                    <div class="collab-stage-rail">${railHtml}</div>
+            <div class="collab-v4-layout">
+                <div class="collab-v4-top">
+                    <div class="collab-v4-top-label">간단 단계</div>
+                    <div class="collab-v4-rail collab-stage-rail">${railHtml}</div>
                 </div>
-                <div class="collab-v3-scroll">
-                    ${panelHtml}
-                    ${finalBlock}
-                    <div class="collab-v2-toolbar compact">
-                        <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
-                        <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
-                        <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
+                <div class="collab-v4-body">
+                    <div class="collab-v4-task">
+                        <div class="collab-v4-task-label">요청사항</div>
+                        <div class="collab-v4-task-text">${esc(collabSession.task)}</div>
+                        <div class="collab-v4-type">${esc(plan.work_type || "협업")}</div>
                     </div>
-                    <div class="collab-activity">
-                        <div class="collab-activity-title">진행 기록</div>
-                        <div id="collabActivityLog" class="collab-activity-log"></div>
+                    ${recBanner}
+                    <div class="collab-v4-recs-label">단계별 AI 추천</div>
+                    <div class="collab-v4-recs">${recsHtml}</div>
+                    <div class="collab-v4-work">
+                        <div class="collab-v4-work-head">
+                            <h3>${sel + 1}단계 작업 · ${esc(sm.short || st.name)}</h3>
+                            <select class="collab-panel-ai" data-stage-ai="${sel}" ${collabPipelineRunning ? "disabled" : ""}>${modelOptions}</select>
+                        </div>
+                        <div class="collab-v4-work-body">${workBody}</div>
+                    </div>
+                    <div class="collab-v4-foot">
+                        <div class="collab-v2-toolbar compact">
+                            <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start" ${collabPipelineRunning ? "disabled" : ""}>▶ 작업 시작</button>
+                            <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 ${window.NasaroFeatures?.t?.("export_result") || "결과물 다운로드"}</button>
+                            <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">${window.NasaroFeatures?.t?.("work_complete") || "작업 완료"}</button>
+                        </div>
+                        <div class="collab-v4-activity collab-activity compact">
+                            <div class="collab-activity-title">진행 기록</div>
+                            <div id="collabActivityLog" class="collab-activity-log compact"></div>
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -6760,10 +6972,9 @@
                     persistActiveCollab();
                 });
             });
-            container.querySelectorAll("[data-rail-ai]").forEach(selEl => {
-                selEl.addEventListener("click", e => e.stopPropagation());
-                selEl.addEventListener("change", e => {
-                    setCollabStageModel(Number(e.target.dataset.railAi), e.target.value);
+            container.querySelectorAll("[data-rec-step]").forEach(card => {
+                card.addEventListener("click", () => {
+                    collabSelectedStage = Number(card.dataset.recStep);
                     renderCollabRunner(container);
                     persistActiveCollab();
                 });
