@@ -266,6 +266,40 @@ async function dispatchKey(tabId, keyName) {
   await sendCommand(tabId, "Input.dispatchKeyEvent", { type: "keyUp",   ...k });
 }
 
+const SCROLL_DOWN_EXPRESSION = `(() => {
+  const step = Math.max(320, Math.min(900, Math.floor(window.innerHeight * 0.65)));
+  const roots = [document.scrollingElement, document.documentElement, document.body].filter(Boolean);
+  let moved = false;
+  for (const el of roots) {
+    const before = el.scrollTop;
+    el.scrollBy({ top: step, left: 0, behavior: 'auto' });
+    if (el.scrollTop !== before) moved = true;
+  }
+  if (!moved) {
+    const nodes = Array.from(document.querySelectorAll('*')).filter(el => {
+      const s = getComputedStyle(el);
+      const oy = s.overflowY;
+      return (oy === 'auto' || oy === 'scroll' || oy === 'overlay')
+        && el.scrollHeight > el.clientHeight + 8;
+    }).sort((a, b) => (b.clientHeight * b.clientWidth) - (a.clientHeight * a.clientWidth));
+    for (const el of nodes.slice(0, 4)) {
+      el.scrollBy({ top: step, left: 0, behavior: 'auto' });
+    }
+  }
+  window.dispatchEvent(new Event('scroll', { bubbles: true }));
+  return true;
+})()`;
+
+const SCROLL_UP_EXPRESSION = `(() => {
+  const step = Math.max(320, Math.min(900, Math.floor(window.innerHeight * 0.65)));
+  const roots = [document.scrollingElement, document.documentElement, document.body].filter(Boolean);
+  for (const el of roots) {
+    el.scrollBy({ top: -step, left: 0, behavior: 'auto' });
+  }
+  window.dispatchEvent(new Event('scroll', { bubbles: true }));
+  return true;
+})()`;
+
 async function executeAction(tabId, action) {
   const type = action?.action;
   try {
@@ -305,9 +339,9 @@ async function executeAction(tabId, action) {
       const res = await sendCommand(tabId, "Runtime.evaluate", { expression: expr, returnByValue: true });
       if (!res?.result?.value) return { success: false, error: "select 옵션 없음: " + action.value };
     } else if (type === "scroll_down") {
-      await sendCommand(tabId, "Runtime.evaluate", { expression: "window.scrollBy(0,600)" });
+      await sendCommand(tabId, "Runtime.evaluate", { expression: SCROLL_DOWN_EXPRESSION });
     } else if (type === "scroll_up") {
-      await sendCommand(tabId, "Runtime.evaluate", { expression: "window.scrollBy(0,-600)" });
+      await sendCommand(tabId, "Runtime.evaluate", { expression: SCROLL_UP_EXPRESSION });
     } else if (type === "press_key") {
       await dispatchKey(tabId, String(action.value || "Enter"));
     } else if (type === "navigate") {

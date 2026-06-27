@@ -18,8 +18,71 @@ HISTORY_WINDOW = 5
 MAX_ELEMENTS = 200
 MAX_DOM_CHARS = 6000
 ACTION_WAIT_MS = 800
-LLM_MAX_TOKENS = 400
+LLM_MAX_TOKENS = 512
 PARSE_FAIL_LIMIT = 3
+
+ACTION_ALIASES: dict[str, str] = {
+    "click": "click",
+    "type": "type",
+    "input": "type",
+    "fill": "type",
+    "select": "select",
+    "scroll": "scroll_down",
+    "scroll_down": "scroll_down",
+    "scrolldown": "scroll_down",
+    "scroll_up": "scroll_up",
+    "scrollup": "scroll_up",
+    "press_key": "press_key",
+    "key": "press_key",
+    "navigate": "navigate",
+    "goto": "navigate",
+    "go_to": "navigate",
+    "back": "back",
+    "wait": "wait",
+    "done": "done",
+    "finish": "done",
+    "complete": "done",
+}
+
+ALLOWED_ACTIONS = frozenset(ACTION_ALIASES.values())
+
+SCROLL_DOWN_JS = """
+(() => {
+  const step = Math.max(320, Math.min(900, Math.floor(window.innerHeight * 0.65)));
+  const roots = [document.scrollingElement, document.documentElement, document.body].filter(Boolean);
+  let moved = false;
+  for (const el of roots) {
+    const before = el.scrollTop;
+    el.scrollBy({ top: step, left: 0, behavior: 'auto' });
+    if (el.scrollTop !== before) moved = true;
+  }
+  if (!moved) {
+    const nodes = Array.from(document.querySelectorAll('*')).filter(el => {
+      const s = getComputedStyle(el);
+      const oy = s.overflowY;
+      return (oy === 'auto' || oy === 'scroll' || oy === 'overlay')
+        && el.scrollHeight > el.clientHeight + 8;
+    }).sort((a, b) => (b.clientHeight * b.clientWidth) - (a.clientHeight * a.clientWidth));
+    for (const el of nodes.slice(0, 4)) {
+      el.scrollBy({ top: step, left: 0, behavior: 'auto' });
+    }
+  }
+  window.dispatchEvent(new Event('scroll', { bubbles: true }));
+  return true;
+})()
+"""
+
+SCROLL_UP_JS = """
+(() => {
+  const step = Math.max(320, Math.min(900, Math.floor(window.innerHeight * 0.65)));
+  const roots = [document.scrollingElement, document.documentElement, document.body].filter(Boolean);
+  for (const el of roots) {
+    el.scrollBy({ top: -step, left: 0, behavior: 'auto' });
+  }
+  window.dispatchEvent(new Event('scroll', { bubbles: true }));
+  return true;
+})()
+"""
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -138,18 +201,21 @@ class AgentAction(BaseModel):
         needs_value = {"type", "select", "press_key", "navigate"}
 
         if self.action in needs_target and not self.target_id:
-            self.action = "scroll_down"
-            self.reasoning = "[보정] target_id 없음 → scroll_down"
+            self.action = "wait"
+            self.value = self.value or "800"
+            self.reasoning = "[보정] target_id 없음 → 잠시 대기"
             return self
 
         if self.action in needs_value and not self.value:
-            self.action = "scroll_down"
-            self.reasoning = "[보정] value 없음 → scroll_down"
+            self.action = "wait"
+            self.value = "800"
+            self.reasoning = "[보정] value 없음 → 잠시 대기"
             return self
 
         if self.target_id and len(self.target_id) > 50:
-            self.action = "scroll_down"
-            self.reasoning = "[보정] target_id 형식 이상 → scroll_down"
+            self.action = "wait"
+            self.value = "800"
+            self.reasoning = "[보정] target_id 형식 이상 → 잠시 대기"
             return self
 
         if self.value and len(self.value) > 2000:
@@ -162,6 +228,91 @@ class AgentAction(BaseModel):
             self.reasoning = "(reasoning 없음)"
 
         return self
+
+
+def _extract_json_object(text: str) -> str | None:
+    """중괄호 균형을 맞춰 JSON 객체 문자열을 추출한다 (reasoning 안의 } 오탐 방지)."""
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def _normalize_action_dict(data: dict) -> dict | None:
+    if not isinstance(data, dict):
+        return None
+    raw_action = str(data.get("action") or "").strip().lower().replace(" ", "_").replace("-", "_")
+    action = ACTION_ALIASES.get(raw_action)
+    if not action:
+        return None
+    out = dict(data)
+    out["action"] = action
+    for key in ("target_id", "value", "reasoning"):
+        val = out.get(key)
+        if val is None or val == "null":
+            out[key] = None
+        elif isinstance(val, (int, float, bool)):
+            out[key] = str(val)
+        elif isinstance(val, str):
+            out[key] = val.strip()
+        else:
+            out[key] = str(val)
+    if not out.get("reasoning"):
+        out["reasoning"] = "(reasoning 없음)"
+    return out
+
+
+def parse_agent_action(raw_text: str) -> AgentAction | None:
+    """LLM 응답에서 AgentAction을 파싱한다. 실패 시 None."""
+    if not raw_text or not raw_text.strip():
+        return None
+
+    candidates: list[str] = [raw_text.strip()]
+    cleaned = re.sub(r"```(?:json)?", "", raw_text, flags=re.IGNORECASE).strip()
+    if cleaned and cleaned not in candidates:
+        candidates.append(cleaned)
+    extracted = _extract_json_object(raw_text)
+    if extracted and extracted not in candidates:
+        candidates.append(extracted)
+    if cleaned:
+        extracted_clean = _extract_json_object(cleaned)
+        if extracted_clean and extracted_clean not in candidates:
+            candidates.append(extracted_clean)
+
+    for text in candidates:
+        try:
+            parsed = json.loads(text)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            continue
+        normalized = _normalize_action_dict(parsed if isinstance(parsed, dict) else {})
+        if not normalized:
+            continue
+        try:
+            return AgentAction(**normalized)
+        except Exception:
+            continue
+    return None
 
 
 def _extract_start_url(query: str) -> str:
@@ -187,7 +338,12 @@ class CustomWebAgent:
         for step in range(1, MAX_STEPS + 1):
             elements = await self._scan_dom(current_page)
             raw = await self._ask_llm(task, elements, action_history)
-            action = self._safe_parse_action(raw)
+            action = parse_agent_action(raw)
+            if action is None and raw:
+                repair_raw = await self._ask_llm_repair(task, elements, action_history, raw)
+                action = parse_agent_action(repair_raw) if repair_raw else None
+            if action is None:
+                action = self._safe_parse_action(raw)
 
             if action.action == "done":
                 return action.reasoning or "작업이 완료되었습니다."
@@ -257,53 +413,64 @@ class CustomWebAgent:
             f"이전 액션 히스토리 (최근 {HISTORY_WINDOW}개):\n"
             f"{json.dumps(recent_history, ensure_ascii=False)}"
         )
+        payload_base = {
+            "model": self.model,
+            "max_tokens": LLM_MAX_TOKENS,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+        }
+        payloads = [
+            {**payload_base, "response_format": {"type": "json_object"}},
+            payload_base,
+        ]
         try:
             async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    OPENROUTER_CHAT_URL,
-                    headers=self.headers,
-                    json={
-                        "model": self.model,
-                        "max_tokens": LLM_MAX_TOKENS,
-                        "stream": False,
-                        "messages": [
-                            {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-                            {"role": "user", "content": user_msg},
-                        ],
-                    },
-                )
+                last_detail = ""
+                for payload in payloads:
+                    resp = await client.post(
+                        OPENROUTER_CHAT_URL,
+                        headers=self.headers,
+                        json=payload,
+                    )
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        data = {}
 
-            try:
-                data = resp.json()
-            except Exception:
-                data = {}
+                    if resp.status_code >= 400 or (isinstance(data, dict) and data.get("error")):
+                        detail = ""
+                        if isinstance(data, dict) and data.get("error"):
+                            error_obj = data["error"]
+                            detail = error_obj.get("message") if isinstance(error_obj, dict) else str(error_obj)
+                        if not detail:
+                            detail = resp.text[:300]
+                        last_detail = detail
+                        logger.warning(
+                            "[Agent] LLM 호출 실패 model=%s status=%s detail=%s",
+                            self.model,
+                            resp.status_code,
+                            detail,
+                        )
+                        continue
 
-            # HTTP 에러 또는 응답 본문에 error 키가 있으면 원인을 명확히 남긴다.
-            if resp.status_code >= 400 or (isinstance(data, dict) and data.get("error")):
-                detail = ""
-                if isinstance(data, dict) and data.get("error"):
-                    error_obj = data["error"]
-                    detail = error_obj.get("message") if isinstance(error_obj, dict) else str(error_obj)
-                if not detail:
-                    detail = resp.text[:300]
-                logger.error("[Agent] LLM 호출 실패 status=%s detail=%s", resp.status_code, detail)
-                self._last_llm_error = f"LLM 호출 실패 (status={resp.status_code}): {detail}"
+                    choices = data.get("choices") if isinstance(data, dict) else None
+                    if not choices:
+                        last_detail = "LLM 응답에 choices가 없습니다."
+                        continue
+
+                    content = (choices[0].get("message") or {}).get("content") or ""
+                    if not content.strip():
+                        last_detail = "LLM이 빈 응답을 반환했습니다."
+                        continue
+
+                    self._last_llm_error = None
+                    return content
+
+                self._last_llm_error = f"LLM 호출 실패: {last_detail or '알 수 없는 오류'}"
                 return ""
-
-            choices = data.get("choices") if isinstance(data, dict) else None
-            if not choices:
-                logger.error("[Agent] LLM 응답에 choices 없음 raw=%s", resp.text[:300])
-                self._last_llm_error = "LLM 응답에 choices가 없습니다."
-                return ""
-
-            content = (choices[0].get("message") or {}).get("content") or ""
-            if not content.strip():
-                logger.error("[Agent] LLM 빈 응답 raw=%s", resp.text[:300])
-                self._last_llm_error = "LLM이 빈 응답을 반환했습니다."
-                return ""
-
-            self._last_llm_error = None
-            return content
         except httpx.TimeoutException:
             logger.error("[Agent] LLM 호출 타임아웃 (30초 초과)")
             self._last_llm_error = "LLM 호출이 30초 내에 응답하지 않았습니다 (타임아웃)."
@@ -313,14 +480,55 @@ class CustomWebAgent:
             self._last_llm_error = f"LLM 호출 중 예외: {exc}"
             return ""
 
+            self._last_llm_error = f"LLM 호출 중 예외: {exc}"
+            return ""
+
+    async def _ask_llm_repair(self, task: str, elements: list, action_history: list, bad_raw: str) -> str:
+        """파싱 실패 시 JSON만 다시 요청한다."""
+        elements_json = json.dumps(elements, ensure_ascii=False)[:MAX_DOM_CHARS]
+        recent_history = action_history[-HISTORY_WINDOW:]
+        user_msg = (
+            f"목표: {task}\n\n"
+            f"현재 페이지 요소 (JSON):\n{elements_json}\n\n"
+            f"이전 액션 히스토리 (최근 {HISTORY_WINDOW}개):\n"
+            f"{json.dumps(recent_history, ensure_ascii=False)}\n\n"
+            f"이전 응답(파싱 실패): {bad_raw[:400]}\n"
+            "위 응답은 형식이 잘못되었습니다. 설명 없이 아래 스키마의 JSON 객체 하나만 다시 출력하세요:\n"
+            '{"action":"...","target_id":null,"value":null,"reasoning":"..."}'
+        )
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(
+                    OPENROUTER_CHAT_URL,
+                    headers=self.headers,
+                    json={
+                        "model": self.model,
+                        "max_tokens": LLM_MAX_TOKENS,
+                        "stream": False,
+                        "response_format": {"type": "json_object"},
+                        "messages": [
+                            {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+                            {"role": "user", "content": user_msg},
+                        ],
+                    },
+                )
+            data = resp.json() if resp.content else {}
+            if resp.status_code >= 400 or (isinstance(data, dict) and data.get("error")):
+                return ""
+            choices = data.get("choices") if isinstance(data, dict) else None
+            if not choices:
+                return ""
+            return (choices[0].get("message") or {}).get("content") or ""
+        except Exception:
+            return ""
+
     def _safe_parse_action(self, raw_text: str) -> AgentAction:
-        fallback_scroll = AgentAction(action="scroll_down", reasoning="파싱 실패, 스크롤 재시도")
-        done_reason = "연속 파싱 실패로 안전 종료"
+        fallback_wait = AgentAction(action="wait", value="1000", reasoning="응답 분석 중…")
+        done_reason = "AI 응답을 해석하지 못해 안전 종료"
         if self._last_llm_error:
-            done_reason = f"연속 파싱 실패로 안전 종료 (원인: {self._last_llm_error})"
+            done_reason = f"AI 응답 오류로 종료 (원인: {self._last_llm_error})"
         fallback_done = AgentAction(action="done", reasoning=done_reason)
 
-        # 빈 응답은 파싱 문제가 아니라 LLM 호출 실패이므로 곧바로 처리한다.
         if not raw_text:
             self._parse_fail_count += 1
             logger.warning(
@@ -330,52 +538,18 @@ class CustomWebAgent:
             )
             if self._parse_fail_count >= PARSE_FAIL_LIMIT:
                 return fallback_done
-            return fallback_scroll
+            return fallback_wait
 
-        def try_parse(text: str) -> AgentAction | None:
-            try:
-                parsed = json.loads(text)
-                allowed = {
-                    "click",
-                    "type",
-                    "select",
-                    "scroll_down",
-                    "scroll_up",
-                    "press_key",
-                    "navigate",
-                    "back",
-                    "wait",
-                    "done",
-                }
-                if parsed.get("action") not in allowed:
-                    return None
-                return AgentAction(**parsed)
-            except Exception:
-                return None
-
-        result = try_parse(raw_text)
-        if result:
+        parsed = parse_agent_action(raw_text)
+        if parsed:
             self._parse_fail_count = 0
-            return result
-
-        cleaned = re.sub(r"```(?:json)?", "", raw_text).strip()
-        result = try_parse(cleaned)
-        if result:
-            self._parse_fail_count = 0
-            return result
-
-        match = re.search(r"\{.*?\}", raw_text, re.DOTALL)
-        if match:
-            result = try_parse(match.group(0))
-            if result:
-                self._parse_fail_count = 0
-                return result
+            return parsed
 
         self._parse_fail_count += 1
-        logger.warning("[Agent] 파싱 실패 %d회 raw=%s", self._parse_fail_count, raw_text[:80])
+        logger.warning("[Agent] 파싱 실패 %d회 raw=%s", self._parse_fail_count, raw_text[:120])
         if self._parse_fail_count >= PARSE_FAIL_LIMIT:
             return fallback_done
-        return fallback_scroll
+        return fallback_wait
 
     async def _execute(self, current_page: Page, action: AgentAction) -> tuple[Page, str | None]:
         try:
@@ -428,10 +602,10 @@ class CustomWebAgent:
                     await locator.select_option(label=action.value, timeout=3000)  # type: ignore[arg-type]
 
             elif action.action == "scroll_down":
-                await current_page.evaluate("window.scrollBy(0, 600)")
+                await current_page.evaluate(SCROLL_DOWN_JS)
 
             elif action.action == "scroll_up":
-                await current_page.evaluate("window.scrollBy(0, -600)")
+                await current_page.evaluate(SCROLL_UP_JS)
 
             elif action.action == "press_key":
                 await current_page.keyboard.press(action.value)  # type: ignore[arg-type]
@@ -675,11 +849,17 @@ async def decide_next_step(
         agent = CustomWebAgent(openrouter_headers=headers, model=model)
         raw = await agent._ask_llm(task, elements, action_history)
         if not raw:
-            # 이 모델은 호출 실패(한도/타임아웃 등). 다음 후보로 폴백.
             last_error = agent._last_llm_error or last_error
             continue
 
-        action = agent._safe_parse_action(raw)
+        action = parse_agent_action(raw)
+        if action is None:
+            repair_raw = await agent._ask_llm_repair(task, elements, action_history, raw)
+            action = parse_agent_action(repair_raw) if repair_raw else None
+        if action is None:
+            last_error = "AI 응답 형식 오류 (JSON 파싱 실패)"
+            logger.warning("[Agent] step parse fail model=%s raw=%s", model, raw[:120])
+            continue
         confirm_required, confirm_message = needs_confirmation(action, elements)
         if not confirm_required:
             nav_confirm, nav_message = needs_sensitive_navigation(action, current_url)
