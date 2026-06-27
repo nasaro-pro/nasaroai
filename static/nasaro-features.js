@@ -499,8 +499,7 @@
     }
 
     let exportMenuEl = null;
-    let resultActionsFloat = null;
-    let floatPositionHandler = null;
+    let resultActionsSlot = null;
 
     function closeExportFormatMenu() {
         if (exportMenuEl) {
@@ -548,43 +547,23 @@
         }, 0);
     }
 
-    function positionResultActionsFloat() {
-        if (!resultActionsFloat) return;
-        const dock = document.getElementById("dockShell");
-        const input = document.getElementById("mainInput");
-        const anchor = dock || input;
-        if (!anchor) return;
-        const rect = anchor.getBoundingClientRect();
-        const floatH = resultActionsFloat.offsetHeight || 44;
-        const left = Math.max(8, rect.left + 8);
-        const top = Math.max(8, rect.top - floatH + 10);
-        resultActionsFloat.style.left = `${left}px`;
-        resultActionsFloat.style.top = `${top}px`;
-        resultActionsFloat.style.bottom = "auto";
-        resultActionsFloat.style.right = "auto";
-    }
-
     function hideFloatingResultActions() {
         closeExportFormatMenu();
-        if (floatPositionHandler) {
-            window.removeEventListener("scroll", floatPositionHandler, true);
-            window.removeEventListener("resize", floatPositionHandler);
-            floatPositionHandler = null;
+        const slot = document.getElementById("dockResultActionsSlot");
+        if (slot) {
+            slot.innerHTML = "";
+            slot.classList.remove("has-actions");
         }
-        if (resultActionsFloat) {
-            resultActionsFloat.remove();
-            resultActionsFloat = null;
-        }
+        resultActionsSlot = null;
     }
 
     function addResultActions(_container, opts) {
         const { title, sections, kind, payload, apiFetch, showToast, onSaveResult, loggedIn } = opts || {};
         hideFloatingResultActions();
 
-        const dock = document.createElement("div");
-        dock.id = "resultActionsFloat";
-        dock.className = "result-actions-float";
-        dock.setAttribute("role", "toolbar");
+        const slot = document.getElementById("dockResultActionsSlot");
+        if (!slot) return;
+        slot.classList.add("has-actions");
 
         const save = document.createElement("button");
         save.type = "button";
@@ -609,13 +588,8 @@
             createShareLink(kind, title, payload, apiFetch, showToast, { requireLogin: true, loggedIn: !!loggedIn })
         );
 
-        dock.append(save, exp, share);
-        document.body.appendChild(dock);
-        resultActionsFloat = dock;
-        floatPositionHandler = positionResultActionsFloat;
-        positionResultActionsFloat();
-        window.addEventListener("scroll", floatPositionHandler, true);
-        window.addEventListener("resize", floatPositionHandler);
+        slot.append(save, exp, share);
+        resultActionsSlot = slot;
     }
 
     function downloadTextFile(filename, content, mime) {

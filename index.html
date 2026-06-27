@@ -990,13 +990,14 @@
         #collabWorkspace .collab-recommend-result,
         #collabWorkspace #collabRecommendResult {
             max-height: none !important;
-            overflow-y: auto !important;
+            overflow: visible !important;
             overflow-x: hidden !important;
             background: transparent !important;
             border: none !important;
             padding: 0 !important;
             color: inherit !important;
             white-space: normal !important;
+            flex-shrink: 0;
         }
         .collab-runner-shell {
             display: flex;
@@ -1019,25 +1020,26 @@
             --collab-shell-bg: #0c0c0c;
             border-color: #262626;
         }
-        .collab-runner-body {
+        .collab-runner-scroll {
             flex: 1 1 auto;
-            min-height: 160px;
+            min-height: 0;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 8px;
+            padding-bottom: 4px;
         }
         .collab-action-bar {
             flex-shrink: 0;
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
-            padding: 8px 0 4px;
+            padding: 10px 0 6px;
+            margin-top: auto;
             border-top: 1px solid #e5e7eb;
             background: var(--collab-shell-bg, #fff);
-            position: sticky;
-            bottom: 0;
-            z-index: 12;
+            position: static;
+            z-index: 1;
         }
         .collab-action-bar .collab-stage-btn {
             flex: 1 1 120px;
@@ -1047,7 +1049,7 @@
             flex-shrink: 0;
         }
         .collab-activity-section .collab-activity-log {
-            max-height: 120px;
+            max-height: 140px;
             font-size: 10px;
         }
         .collab-stage-rail-label {
@@ -1118,17 +1120,19 @@
             margin-bottom: 4px;
         }
         html[data-theme="dark"] .collab-panel-work-brief { background: #111; border-color: #333; }
-        .collab-result-modal {
+        .collab-result-modal,
+        .saved-result-modal {
             display: none;
             position: fixed;
             inset: 0;
-            z-index: 2000;
+            z-index: 10060;
             background: rgba(0, 0, 0, 0.55);
             align-items: center;
             justify-content: center;
             padding: 16px;
         }
-        .collab-result-modal.open { display: flex; }
+        .collab-result-modal.open,
+        .saved-result-modal.open { display: flex; }
         .collab-result-modal-box {
             width: min(92vw, 720px);
             max-height: min(85vh, 820px);
@@ -1138,6 +1142,12 @@
             display: flex;
             flex-direction: column;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+            position: relative;
+            z-index: 1;
+        }
+        .saved-result-modal .collab-result-modal-box {
+            width: min(94vw, 780px);
+            max-height: min(88vh, 860px);
         }
         html[data-theme="dark"] .collab-result-modal-box { background: #111; border: 1px solid #333; }
         .collab-result-modal-head {
@@ -1155,6 +1165,10 @@
             height: 32px;
             cursor: pointer;
             font-size: 14px;
+            position: relative;
+            z-index: 2;
+            pointer-events: auto;
+            flex-shrink: 0;
         }
         html[data-theme="dark"] .collab-result-modal-close { background: #262626; color: #e5e5e5; }
         .collab-result-modal-body {
@@ -3255,6 +3269,23 @@
         .input-tool-help:hover .input-tool-tip { display: block; }
 
         .result-action-row { display: none; }
+        .dock-result-actions-slot {
+            display: none;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 2px 4px;
+        }
+        .dock-result-actions-slot.has-actions { display: flex; }
+        .dock-result-actions-slot .result-action-btn {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 140px;
+            font-size: 11px;
+            padding: 6px 8px;
+        }
         .result-actions-float {
             position: fixed;
             z-index: 850;
@@ -3336,37 +3367,6 @@
             z-index: 500;
         }
         .result-files-popover.open { display: block; }
-        .result-files-popover-layout {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-        }
-        .result-files-popover-layout .result-files-list-wrap {
-            flex: 0 0 min(240px, 42vw);
-            min-width: 0;
-        }
-        .result-file-viewer-side {
-            display: none;
-            flex: 1;
-            min-width: 0;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #c4b5fd;
-            background: #faf5ff;
-            max-height: min(50vh, 420px);
-            overflow: auto;
-            font-size: 11px;
-        }
-        .result-file-viewer-side.open { display: block; }
-        html[data-theme="dark"] .result-file-viewer-side {
-            background: #111;
-            border-color: #4338ca;
-            color: #f5f5f5;
-        }
-        @media (max-width: 640px) {
-            .result-files-popover-layout { flex-direction: column; }
-            .result-file-viewer-side { max-height: 36vh; }
-        }
 
         #collabPanel.active {
             display: flex;
@@ -3572,19 +3572,13 @@
             .collab-stage-rail .step-name { font-size: 10px; }
             .collab-stage-rail .step-ai { font-size: 9px; }
             .collab-activity-section .collab-activity-log {
-                max-height: 88px;
+                max-height: 100px;
                 font-size: 9px;
             }
-            .result-actions-float {
-                left: 6px !important;
-                right: 6px !important;
-                max-width: none;
-                padding: 4px 6px;
-                gap: 4px;
-            }
-            .result-actions-float .result-action-btn {
+            .dock-result-actions-slot .result-action-btn {
                 flex: 1 1 0;
                 min-width: 0;
+                max-width: none;
                 padding: 5px 4px;
                 font-size: 10px;
             }
@@ -3723,13 +3717,8 @@
                     <div class="result-files-hub" id="resultFilesHub">
                         <button type="button" id="resultFilesToggle" class="result-files-hub-btn" data-i18n="result_files">📁 결과물 파일</button>
                         <div id="resultFilesPopover" class="result-files-popover">
-                            <div class="result-files-popover-layout">
-                                <div class="result-files-list-wrap">
-                                    <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
-                                    <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
-                                </div>
-                                <div id="resultFileViewer" class="result-file-viewer-side"></div>
-                            </div>
+                            <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
+                            <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
                         </div>
                     </div>
                     <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
@@ -3943,7 +3932,8 @@
                         </aside>
                         <div class="collab-workspace-main collab-runner-shell">
                     <div id="collabStageRail" class="collab-runner-top"></div>
-                    <div id="collabRecommendResult" class="collab-runner-body collab-recommend-result"></div>
+                    <div class="collab-runner-scroll">
+                    <div id="collabRecommendResult" class="collab-recommend-result"></div>
                     <div id="collabActionBar" class="collab-action-bar" style="display:none;">
                         <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start">▶ 작업 시작</button>
                         <button type="button" id="collabViewBtn" class="collab-stage-btn">👁 결과물 보기</button>
@@ -3953,6 +3943,7 @@
                     <div id="collabActivitySection" class="collab-activity-section compact">
                         <div class="collab-activity-title">진행 기록</div>
                         <div id="collabActivityLog" class="collab-activity-log compact"></div>
+                    </div>
                     </div>
                     <div class="collab-sidebars">
                         <div class="collab-sidebar" data-sidebar="1">
@@ -4226,6 +4217,7 @@
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
+                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-btn-row">
                         <div class="dock-btn-left" id="mainInputToolsLeft"></div>
                         <div class="dock-btn-center">
@@ -4249,10 +4241,29 @@
         <!-- 토스트 알림 컨테이너 -->
         <div id="axToast" class="ax-toast" aria-live="polite" aria-atomic="false"></div>
 
+        <div id="collabResultModal" class="collab-result-modal" aria-hidden="true">
+            <div class="collab-result-modal-box" role="dialog" aria-modal="true" aria-labelledby="collabResultModalTitle">
+                <div class="collab-result-modal-head">
+                    <h3 id="collabResultModalTitle">결과물 보기</h3>
+                    <button type="button" id="collabResultModalClose" class="collab-result-modal-close" aria-label="닫기">✕</button>
+                </div>
+                <div id="collabResultModalBody" class="collab-result-modal-body"></div>
+            </div>
+        </div>
+        <div id="savedResultModal" class="collab-result-modal saved-result-modal" aria-hidden="true">
+            <div class="collab-result-modal-box" role="dialog" aria-modal="true" aria-labelledby="savedResultModalTitle">
+                <div class="collab-result-modal-head">
+                    <h3 id="savedResultModalTitle">저장된 결과물</h3>
+                    <button type="button" id="savedResultModalClose" class="collab-result-modal-close" aria-label="닫기">✕</button>
+                </div>
+                <div id="savedResultModalBody" class="collab-result-modal-body"></div>
+            </div>
+        </div>
+
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627i"></script>
+    <script src="/static/nasaro-features.js?v=20260627j"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -4863,33 +4874,41 @@
         }
 
         function renderResultFileViewer(record) {
-            const viewer = document.getElementById("resultFileViewer");
-            if (!viewer) return;
+            const modal = document.getElementById("savedResultModal");
+            const body = document.getElementById("savedResultModalBody");
+            const titleEl = document.getElementById("savedResultModalTitle");
+            if (!modal || !body) return;
             if (!record) {
-                viewer.classList.remove("open");
-                viewer.innerHTML = "";
+                closeSavedResultModal();
                 return;
             }
-            viewer.classList.add("open");
             const NF = window.NasaroFeatures;
             const parts = (record.sections || []).map(s =>
-                `<h4>${escapeHtml(s.heading || "")}</h4><pre>${escapeHtml(String(s.body || ""))}</pre>`
+                `<h4 style="margin:12px 0 6px;font-size:14px;color:#6d28d9;">${escapeHtml(s.heading || "")}</h4><pre style="white-space:pre-wrap;margin:0 0 12px;font-family:inherit;line-height:1.55;">${escapeHtml(String(s.body || ""))}</pre>`
             ).join("");
-            viewer.innerHTML = `
-                <div class="result-viewer-head">
-                    <strong>${escapeHtml(record.title || "")}</strong>
-                    <small style="color:#9ca3af">${escapeHtml(record.saved_at || "")}</small>
-                    <button type="button" id="exportResultViewerBtn" class="result-action-btn">${NF?.t?.("export_result") || "결과물 다운로드"}</button>
-                    <button type="button" id="closeResultViewer" aria-label="닫기">✕</button>
-                </div>
-                <div class="result-viewer-body">${parts || escapeHtml(JSON.stringify(record.payload || {}, null, 2))}</div>`;
-            document.getElementById("closeResultViewer")?.addEventListener("click", () => {
-                viewer.classList.remove("open");
-                viewer.innerHTML = "";
-            });
-            document.getElementById("exportResultViewerBtn")?.addEventListener("click", (e) => {
+            if (titleEl) titleEl.textContent = record.title || "저장된 결과물";
+            body.innerHTML = `
+                <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;">${escapeHtml(record.saved_at || "")} · ${escapeHtml(record.kind || "")}</div>
+                ${parts || `<pre style="white-space:pre-wrap;margin:0;font-family:inherit;">${escapeHtml(JSON.stringify(record.payload || {}, null, 2))}</pre>`}
+                <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" id="savedResultExportBtn" class="result-action-btn">${NF?.t?.("export_result") || "결과물 다운로드"}</button>
+                </div>`;
+            document.getElementById("savedResultExportBtn")?.addEventListener("click", (e) => {
                 NF?.showExportFormatMenu?.(e.currentTarget, record.title || "결과물", record.sections || []);
             });
+            modal.classList.add("open");
+            modal.setAttribute("aria-hidden", "false");
+            document.getElementById("resultFilesPopover")?.classList.remove("open");
+            document.getElementById("resultFilesToggle")?.classList.remove("open");
+        }
+
+        function closeSavedResultModal() {
+            const modal = document.getElementById("savedResultModal");
+            const body = document.getElementById("savedResultModalBody");
+            if (!modal) return;
+            modal.classList.remove("open");
+            modal.setAttribute("aria-hidden", "true");
+            if (body) body.innerHTML = "";
         }
 
         function renderResultFilesList() {
@@ -7066,6 +7085,35 @@
             modal.setAttribute("aria-hidden", "true");
         }
 
+        function wirePreviewModals() {
+            if (wirePreviewModals._done) return;
+            wirePreviewModals._done = true;
+            document.getElementById("collabResultModalClose")?.addEventListener("click", e => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeCollabResultModal();
+            });
+            document.getElementById("savedResultModalClose")?.addEventListener("click", e => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeSavedResultModal();
+            });
+            document.querySelectorAll(".collab-result-modal-box").forEach(box => {
+                box.addEventListener("click", e => e.stopPropagation());
+            });
+            document.getElementById("collabResultModal")?.addEventListener("click", e => {
+                if (e.target.id === "collabResultModal") closeCollabResultModal();
+            });
+            document.getElementById("savedResultModal")?.addEventListener("click", e => {
+                if (e.target.id === "savedResultModal") closeSavedResultModal();
+            });
+            document.addEventListener("keydown", e => {
+                if (e.key !== "Escape") return;
+                if (document.getElementById("collabResultModal")?.classList.contains("open")) closeCollabResultModal();
+                if (document.getElementById("savedResultModal")?.classList.contains("open")) closeSavedResultModal();
+            });
+        }
+
         function buildCollabPreviousNotes(stageIndex) {
             return collabSession.stageOutputs
                 .slice(0, stageIndex)
@@ -7269,10 +7317,6 @@
             document.getElementById("collabViewBtn")?.addEventListener("click", openCollabResultModal);
             document.getElementById("collabDownloadBtn")?.addEventListener("click", e => downloadCollabResult(e.currentTarget));
             document.getElementById("collabCompleteBtn")?.addEventListener("click", completeCollabWork);
-            document.getElementById("collabResultModalClose")?.addEventListener("click", closeCollabResultModal);
-            document.getElementById("collabResultModal")?.addEventListener("click", e => {
-                if (e.target.id === "collabResultModal") closeCollabResultModal();
-            });
         }
 
         function renderCollabRunner(container) {
@@ -8069,6 +8113,7 @@
             });
             window.addEventListener("nasaroai:lang", refreshAppLang);
             NF.loadShareFromUrl(apiFetch, showToast);
+            wirePreviewModals();
             renderActiveCollabSidebar();
             loadSavedResults();
             renderResultFilesList();
@@ -8083,14 +8128,5 @@
 
         updateDockUI();
     </script>
-    <div id="collabResultModal" class="collab-result-modal" aria-hidden="true">
-        <div class="collab-result-modal-box">
-            <div class="collab-result-modal-head">
-                <h3>결과물 보기</h3>
-                <button type="button" id="collabResultModalClose" class="collab-result-modal-close" aria-label="닫기">✕</button>
-            </div>
-            <div id="collabResultModalBody" class="collab-result-modal-body"></div>
-        </div>
-    </div>
 </body>
 </html>
