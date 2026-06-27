@@ -19,10 +19,17 @@
     .login-wrap { max-width: 400px; margin: 80px auto; padding: 24px; background: #1e293b; border-radius: 14px; border: 1px solid #334155; }
     .login-wrap h1 { margin: 0 0 8px; font-size: 20px; }
     .err { color: #fca5a5; font-size: 13px; min-height: 18px; margin: 6px 0; }
-    .app-shell { display: none; min-height: 100vh; }
-    .app-shell.open { display: grid; grid-template-columns: 260px 1fr; }
-    @media (max-width: 900px) { .app-shell.open { grid-template-columns: 1fr; } .sidebar { max-height: 220px; overflow: hidden; } }
-    .sidebar { background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; min-height: 100vh; }
+    .app-shell { display: none; min-height: 100vh; height: 100vh; overflow: hidden; }
+    .app-shell.open { display: grid; grid-template-columns: 260px 1fr; height: 100vh; overflow: hidden; }
+    @media (max-width: 900px) { .app-shell.open { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
+    .sidebar {
+      background: #1e293b; border-right: 1px solid #334155;
+      display: flex; flex-direction: column;
+      height: 100vh; max-height: 100vh; overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      .sidebar { height: auto; max-height: 220px; border-right: none; border-bottom: 1px solid #334155; }
+    }
     .sidebar-head { padding: 14px 14px 10px; border-bottom: 1px solid #334155; }
     .sidebar-head h1 { margin: 0; font-size: 16px; }
     .sidebar-head p { margin: 4px 0 0; font-size: 11px; color: #94a3b8; }
@@ -46,7 +53,8 @@
     .badge.mobile_web { background: #713f12; color: #fde68a; }
     .badge.open { background: #7f1d1d; color: #fecaca; }
     .badge.answered { background: #14532d; color: #bbf7d0; }
-    .main { padding: 16px 18px 40px; overflow-x: hidden; }
+    .main { padding: 16px 18px 40px; overflow-x: hidden; overflow-y: auto; height: 100vh; min-height: 0; }
+    @media (max-width: 900px) { .main { height: auto; min-height: 0; } }
     .main-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 14px; }
     .stat { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; }
@@ -650,10 +658,11 @@
 
     function renderStats(data) {
       const ps = data.platform_stats || {};
-      const plat = Object.entries(ps).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
       const onlineUsers = data.online_users ?? data.active_sessions ?? 0;
       const onlineGuests = data.online_guests ?? 0;
       const onlineTotal = data.online_total ?? (onlineUsers + onlineGuests);
+      const usageAll = data.usage_all_time || {};
+      const usageToday = data.usage_today || {};
       document.getElementById("statsRow").innerHTML = `
         <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
         <div class="stat"><b>${onlineTotal}</b><span>실시간 접속 (2분)</span></div>
@@ -662,7 +671,8 @@
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(data.usage_today)}</b><span>기능 사용 (회원 compare ${(data.quota_limits||{}).member?.compare ?? 15} / 비회원 ${(data.quota_limits||{}).guest?.compare ?? 5})</span></div>`;
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageToday)}</b><span>오늘 기능 사용 (quota)</span></div>
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageAll)}</b><span>전체 누적 기능 사용 (quota)</span></div>`;
       document.getElementById("platformStats").innerHTML = Object.keys(ps).length
         ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
         : "<span class='empty'>오늘 활동 기록 없음</span>";
@@ -1013,21 +1023,32 @@
       if (!el) return;
       const users = dashData?.users || [];
       const quotaTotals = { compare: 0, debate: 0, collab: 0, agent: 0 };
+      const quotaAllTotals = { compare: 0, debate: 0, collab: 0, agent: 0 };
       users.forEach(u => {
         Object.keys(quotaTotals).forEach(f => {
           quotaTotals[f] += Number(u.quota_today?.[f] || 0);
+          quotaAllTotals[f] += Number(u.quota_all_time?.[f] || 0);
         });
       });
-      const act = dashData?.member_activity_by_feature || {};
+      const actToday = dashData?.member_activity_by_feature || {};
+      const actAll = dashData?.member_activity_all_time || {};
       const limits = dashData?.quota_limits?.member || {};
       el.innerHTML = `
-        <h4>회원 통계 (오늘 KST)</h4>
+        <h4>회원 통계 — 오늘 quota 사용</h4>
         <div class="entity-summary" style="margin-bottom:8px;">
           ${renderFeatureStatCards(quotaTotals, limits, "사용 ")}
         </div>
-        <h4 style="margin-top:10px;">회원 활동 기록 (오늘 건수)</h4>
+        <h4 style="margin-top:10px;">회원 통계 — 전체 누적 quota</h4>
+        <div class="entity-summary" style="margin-bottom:8px;">
+          ${renderFeatureStatCards(quotaAllTotals, limits, "누적 ")}
+        </div>
+        <h4 style="margin-top:10px;">회원 활동 기록 — 오늘</h4>
+        <div class="entity-summary" style="margin-bottom:8px;">
+          ${renderFeatureStatCards(actToday, null, "")}
+        </div>
+        <h4 style="margin-top:10px;">회원 활동 기록 — 전체</h4>
         <div class="entity-summary">
-          ${renderFeatureStatCards(act, null, "")}
+          ${renderFeatureStatCards(actAll, null, "")}
         </div>`;
     }
 
@@ -1040,7 +1061,8 @@
         const p = g.platform || "web";
         platforms[p] = (platforms[p] || 0) + 1;
       });
-      const act = dashData?.guest_activity_by_feature || {};
+      const actToday = dashData?.guest_activity_by_feature || {};
+      const actAll = dashData?.guest_activity_all_time || {};
       const platText = Object.entries(platforms).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
       el.innerHTML = `
         <h4>비회원 통계</h4>
@@ -1050,9 +1072,13 @@
           <div class="stat"><b>${items.reduce((s, g) => s + (g.activity_count || 0), 0)}</b><span>누적 활동</span></div>
           <div class="stat"><b style="font-size:12px;">${platText}</b><span>플랫폼 분포</span></div>
         </div>
-        <h4 style="margin-top:10px;">비회원 활동 기록 (오늘 건수)</h4>
+        <h4 style="margin-top:10px;">비회원 활동 기록 — 오늘</h4>
+        <div class="entity-summary" style="margin-bottom:8px;">
+          ${renderFeatureStatCards(actToday, dashData?.quota_limits?.guest || {}, "")}
+        </div>
+        <h4 style="margin-top:10px;">비회원 활동 기록 — 전체</h4>
         <div class="entity-summary">
-          ${renderFeatureStatCards(act, dashData?.quota_limits?.guest || {}, "")}
+          ${renderFeatureStatCards(actAll, dashData?.quota_limits?.guest || {}, "")}
         </div>`;
     }
 

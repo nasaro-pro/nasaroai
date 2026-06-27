@@ -1152,6 +1152,7 @@ def get_admin_dashboard() -> dict[str, Any]:
         **get_online_presence_stats(),
         "share_links": int(share_count),
         "usage_today": {r["feature"]: round(float(r["total"]), 2) for r in today_usage},
+        "usage_all_time": get_usage_totals_all_time(),
         "usage_by_hour": get_usage_by_hour(day_key),
         "usage_by_hour_by_feature": get_usage_by_hour_by_feature(day_key),
         "login_by_hour": get_login_by_hour(day_key),
@@ -1166,7 +1167,9 @@ def get_admin_dashboard() -> dict[str, Any]:
         "open_support_count": count_open_support(),
         "platform_stats": get_platform_stats(day_key),
         "member_activity_by_feature": get_member_activity_by_feature(day_key),
+        "member_activity_all_time": get_member_activity_by_feature_all_time(),
         "guest_activity_by_feature": get_guest_activity_by_feature(day_key),
+        "guest_activity_all_time": get_guest_activity_by_feature_all_time(),
     }
 
 
@@ -1512,6 +1515,50 @@ def get_member_activity_by_feature(day_key: str | None = None) -> dict[str, int]
                 GROUP BY feature
                 """,
                 (day_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {r["feature"]: int(r["cnt"]) for r in rows}
+
+
+def get_usage_totals_all_time() -> dict[str, float]:
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT feature, SUM(count) AS total FROM quota_usage GROUP BY feature",
+            ).fetchall()
+        finally:
+            conn.close()
+    return {r["feature"]: round(float(r["total"]), 2) for r in rows}
+
+
+def get_member_activity_by_feature_all_time() -> dict[str, int]:
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, COUNT(*) AS cnt FROM activity_log
+                WHERE user_id IS NOT NULL
+                GROUP BY feature
+                """,
+            ).fetchall()
+        finally:
+            conn.close()
+    return {r["feature"]: int(r["cnt"]) for r in rows}
+
+
+def get_guest_activity_by_feature_all_time() -> dict[str, int]:
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, COUNT(*) AS cnt FROM activity_log
+                WHERE user_id IS NULL
+                GROUP BY feature
+                """,
             ).fetchall()
         finally:
             conn.close()

@@ -531,16 +531,18 @@
             display: block;
         }
 
-        /* 협업 초기 안내 화면 */
+        /* 협업 — 채팅 우선 (히어로 문구 숨김) */
         .collab-intro {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 40dvh;
-            text-align: center;
-            gap: 12px;
-            padding: 32px 16px;
+            align-items: stretch;
+            min-height: calc(100dvh - var(--input-dock-height, 140px) - 80px);
+            text-align: left;
+            gap: 0;
+            padding: 8px 12px 12px;
+        }
+        .collab-intro-hero {
+            display: none !important;
         }
 
         .collab-intro-icon {
@@ -562,24 +564,25 @@
 
         .collab-intake-panel {
             width: 100%;
-            max-width: 640px;
-            margin-top: 16px;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            margin: 0;
             text-align: left;
         }
         .collab-intake-head {
-            font-size: 13px;
-            font-weight: 700;
-            color: #6d28d9;
-            margin-bottom: 8px;
+            display: none;
         }
         .collab-intake-chat {
-            max-height: 320px;
+            flex: 1 1 auto;
+            min-height: 240px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            padding: 12px;
-            border-radius: 12px;
+            padding: 14px;
+            border-radius: 14px;
             border: 1px solid #e5e7eb;
             background: #fff;
         }
@@ -1692,9 +1695,6 @@
             padding: 8px 12px 12px;
             display: flex;
             flex-direction: column;
-            max-height: min(420px, 52vh);
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
         }
         .compare-qa-pair {
             padding: 10px 0;
@@ -1724,7 +1724,6 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            max-height: min(520px, 58vh);
         }
 
         .compare-card-header {
@@ -1758,8 +1757,6 @@
         }
 
         .compare-content {
-            max-height: 220px;
-            overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-word;
             padding: 14px 16px;
@@ -2077,11 +2074,14 @@
             border-color: #a78bfa;
         }
         .dock-compose-tools-left {
-            min-width: 0;
+            width: 148px;
+            min-width: 148px;
             max-width: 148px;
         }
         .dock-compose-tools-right {
             gap: 4px;
+            width: 88px;
+            min-width: 88px;
         }
         .dock-compose-row #mainInput {
             flex: 1;
@@ -2093,7 +2093,13 @@
         }
         .dock-compose-row .dock-submit-btn {
             flex: 0 0 auto;
-            min-width: 108px;
+            min-width: 112px;
+            width: 112px;
+            padding-left: 8px;
+            padding-right: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .dock-compose-row .input-tool-btn {
             min-height: 40px;
@@ -2156,6 +2162,7 @@
             flex: 0 0 auto;
             display: flex;
             align-items: center;
+            min-width: 152px;
         }
         .dock-btn-center {
             display: grid;
@@ -2174,6 +2181,8 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            min-width: 96px;
+            justify-content: flex-end;
         }
         .dock-btn-row .mode-btn {
             min-height: 44px;
@@ -2332,8 +2341,6 @@
             #comparePanel.active .compare-grid {
                 flex: 1 1 auto;
                 min-height: 0;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
             }
             .compare-card {
                 border-radius: 14px;
@@ -3524,10 +3531,19 @@
             width: 18px; height: 18px; border-radius: 50%; background: #e5e7eb; font-size: 11px; font-weight: 700;
         }
         .side-account-box {
-            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            display: flex; flex-direction: column; gap: 6px;
             padding: 10px 14px; margin: 0 12px 8px; border-radius: 10px; background: #f3f4f6;
         }
-        .side-account-name { font-size: 13px; font-weight: 700; color: #111827; overflow: hidden; text-overflow: ellipsis; }
+        .side-account-top {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .side-account-name { font-size: 13px; font-weight: 700; color: #111827; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+        .side-account-foot {
+            display: flex; align-items: center; justify-content: space-between; gap: 6px;
+        }
+        .side-quota-brief {
+            font-size: 10px; color: #6b7280; line-height: 1.35; flex: 1; min-width: 0;
+        }
         .side-logout-btn {
             flex-shrink: 0; font-size: 11px; padding: 4px 8px; border-radius: 6px;
             border: 1px solid #d1d5db; background: #fff; color: #6b7280; cursor: pointer;
@@ -4136,7 +4152,13 @@
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
             </div>
             <div id="sideAccountBox" class="side-account-box" style="display:none;">
-                <button id="sideLogoutBtn" class="side-logout-btn" type="button" data-i18n="logout">로그아웃</button>
+                <div class="side-account-top">
+                    <span id="sideAccountName" class="side-account-name"></span>
+                </div>
+                <div class="side-account-foot">
+                    <span id="sideQuotaBrief" class="side-quota-brief"></span>
+                    <button id="sideLogoutBtn" class="side-logout-btn" type="button" data-i18n="logout">로그아웃</button>
+                </div>
             </div>
             <div class="side-menu-auth" id="sideAuthBtns">
                 <button id="loginBtn" class="side-menu-btn primary" type="button" data-i18n="login">로그인</button>
@@ -4353,14 +4375,16 @@
 
             <section id="collabPanel" class="panel">
                 <div id="collabIntro" class="collab-intro">
-                    <div class="collab-intro-icon">🤝</div>
-                    <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
-                    <p class="collab-intro-desc">
-                        작업 내용을 입력하면 AI가 <strong>세부 정보를 질문</strong>한 뒤, <strong>4단계 협업</strong>과 단계별 AI를 추천합니다.<br>
-                        위 <strong>단계 버튼</strong>을 눌러 내용을 보고, 아래 <strong>진행 기록</strong>에서 과정을 확인하세요.
-                    </p>
-                    <div id="collabTemplateRow" class="collab-template-row"></div>
-                    <div id="collabIntakePanel" class="collab-intake-panel" style="display:none;">
+                    <div class="collab-intro-hero">
+                        <div class="collab-intro-icon">🤝</div>
+                        <h2 class="collab-intro-title">어떤 작업을 원하십니까?</h2>
+                        <p class="collab-intro-desc">
+                            작업 내용을 입력하면 AI가 <strong>세부 정보를 질문</strong>한 뒤, <strong>4단계 협업</strong>과 단계별 AI를 추천합니다.<br>
+                            위 <strong>단계 버튼</strong>을 눌러 내용을 보고, 아래 <strong>진행 기록</strong>에서 과정을 확인하세요.
+                        </p>
+                        <div id="collabTemplateRow" class="collab-template-row"></div>
+                    </div>
+                    <div id="collabIntakePanel" class="collab-intake-panel">
                         <div class="collab-intake-head">작업 세부 정보 수집</div>
                         <div id="collabIntakeChat" class="collab-intake-chat"></div>
                         <div id="collabIntakeActions" class="collab-intake-actions" style="display:none;">
@@ -4970,6 +4994,7 @@
             const slug = compareContentSlug(turnIndex, model);
             const stack = document.getElementById(`compare-qa-stack-${key}`);
             if (!stack) return slug;
+            stack.innerHTML = "";
             const pair = document.createElement("div");
             pair.className = "compare-qa-pair";
             pair.id = `compare-qa-pair-${slug}`;
@@ -4978,7 +5003,9 @@
                 <div id="content-${slug}" class="compare-content"></div>
                 <div id="retry-${slug}" class="retry-row"></div>`;
             stack.appendChild(pair);
-            pair.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            requestAnimationFrame(() => {
+                pair.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            });
             return slug;
         }
 
@@ -5029,21 +5056,21 @@
             const allModels = new Set();
             compareTurns.forEach(turn => Object.keys(turn.responses || {}).forEach(m => allModels.add(m)));
             ensureCompareModelCards([...allModels]);
-            compareTurns.forEach((turn, turnIndex) => {
-                Object.keys(turn.responses || {}).forEach(model => {
-                    appendCompareQaPair(model, turn.query, turnIndex);
-                    updateCompareCard(model, turn.responses[model] || "", turn.responses[model] === COMPARE_FAILURE_MSG, turnIndex);
+            const lastTurnIdx = compareCurrentTurnIndex;
+            if (lastTurn) {
+                Object.keys(lastTurn.responses || {}).forEach(model => {
+                    appendCompareQaPair(model, lastTurn.query, lastTurnIdx);
+                    updateCompareCard(model, lastTurn.responses[model] || "", lastTurn.responses[model] === COMPARE_FAILURE_MSG, lastTurnIdx);
                 });
-            });
-            const last = compareTurns[compareTurns.length - 1];
-            if (last) {
-                const sections = Object.keys(last.responses).map(m => ({ heading: m, body: last.responses[m] || "" }));
+            }
+            if (lastTurn) {
+                const sections = Object.keys(lastTurn.responses).map(m => ({ heading: m, body: lastTurn.responses[m] || "" }));
                 if (sections.length) {
                     window.NasaroFeatures?.addResultActions?.(el, {
-                        title: last.query,
+                        title: lastTurn.query,
                         sections,
                         kind: "compare",
-                        payload: { query: last.query, responses: last.responses, turns: compareTurns },
+                        payload: { query: lastTurn.query, responses: lastTurn.responses, turns: compareTurns },
                         apiFetch,
                         showToast,
                         onSaveResult: saveResultRecord,
@@ -5840,6 +5867,7 @@
             const sideAuth = document.getElementById("sideAuthBtns");
             const sideAccount = document.getElementById("sideAccountBox");
             const sideMenuBrand = document.getElementById("sideMenuBrand");
+            const sideAccountName = document.getElementById("sideAccountName");
             loadSavedResults();
             if (currentUser) {
                 loadSessionHistoryFromStore();
@@ -5850,6 +5878,8 @@
                 if (sideAuth) sideAuth.style.display = "none";
                 if (sideAccount) sideAccount.style.display = "flex";
                 if (sideMenuBrand) sideMenuBrand.textContent = id;
+                if (sideAccountName) sideAccountName.textContent = id;
+                refreshSideQuota();
             } else {
                 sessionHistory.length = 0;
                 if (meta) meta.textContent = NF?.lang === "en"
@@ -5860,11 +5890,29 @@
                 if (sideAuth) sideAuth.style.display = "flex";
                 if (sideAccount) sideAccount.style.display = "none";
                 if (sideMenuBrand) sideMenuBrand.textContent = "Nasaro AI";
+                const sideQuota = document.getElementById("sideQuotaBrief");
+                if (sideQuota) sideQuota.textContent = "";
             }
             renderSessionHistory();
             renderResultFilesList();
             notifyExtensionAuth();
             updateSupportUI();
+        }
+
+        async function refreshSideQuota() {
+            const el = document.getElementById("sideQuotaBrief");
+            if (!el || !currentUser) return;
+            try {
+                const res = await apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId()));
+                if (!res.ok) return;
+                const q = await res.json();
+                const labels = { compare: "비교", debate: "토론", collab: "협업", agent: "에이전트" };
+                const parts = Object.entries(q.features || {}).map(([k, v]) =>
+                    `${labels[k] || k} ${v.remaining ?? "?"}`);
+                el.textContent = parts.length ? "남은 " + parts.join(" · ") : "";
+            } catch {
+                el.textContent = "";
+            }
         }
 
         async function loadSupportHistory() {
@@ -6507,9 +6555,7 @@
                         : (NF?.t?.("ph_collab") || "작업 설명…");
                     dockPrimaryBtn.textContent = collabRecommendInFlight
                         ? "…"
-                        : (mob
-                            ? (collabTaskAsked ? "추가 ▶" : "시작 ▶")
-                            : (collabTaskAsked ? "추가 작업 ▶" : (NF?.t?.("btn_collab") || "작업 시작 ▶")));
+                        : (collabTaskAsked ? "추가 ▶" : "시작 ▶");
                     dockPrimaryBtn.title = collabTaskAsked ? "추가 작업" : "작업 시작";
                 }
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
@@ -6556,7 +6602,6 @@
                     document.getElementById("collabWorkspace").style.display = collabIntakeActive ? "none" : "flex";
                 }
             }
-
             rebuildMainToolbar();
             updateDockUI();
         }
@@ -7462,14 +7507,15 @@
             collabIntakeActive = false;
             collabIntakeTask = "";
             collabIntakeMessages = [];
-            const panel = document.getElementById("collabIntakePanel");
             const chat = document.getElementById("collabIntakeChat");
             const actions = document.getElementById("collabIntakeActions");
-            const introTitle = document.querySelector(".collab-intro-title");
-            if (panel) panel.style.display = "none";
             if (chat) chat.innerHTML = "";
             if (actions) actions.style.display = "none";
-            if (introTitle) introTitle.textContent = "어떤 작업을 원하십니까?";
+        }
+
+        function showCollabIntakePanel() {
+            const actions = document.getElementById("collabIntakeActions");
+            if (actions) actions.style.display = "flex";
         }
 
         function buildCollabIntakeBrief() {
@@ -7488,15 +7534,6 @@
             appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.");
             collabIntakeActive = false;
             await runCollabRecommend(brief);
-        }
-
-        function showCollabIntakePanel() {
-            const panel = document.getElementById("collabIntakePanel");
-            const actions = document.getElementById("collabIntakeActions");
-            const introTitle = document.querySelector(".collab-intro-title");
-            if (panel) panel.style.display = "block";
-            if (actions) actions.style.display = "flex";
-            if (introTitle) introTitle.textContent = "작업 정보를 알려주세요";
         }
 
         function appendCollabIntakeMessage(role, text) {
@@ -7591,6 +7628,7 @@
                 collabRecommendInFlight = false;
                 dockPrimaryBtn.disabled = false;
                 if (collabSession?.plan) collabTaskAsked = true;
+                if (currentUser) refreshSideQuota();
                 updateDockUI();
             }
         }
@@ -8392,6 +8430,7 @@
 
             showNotice("compareLoading", "");
             dockPrimaryBtn.disabled = false;
+            if (currentUser) refreshSideQuota();
 
             const sections = activeModels.map(m => ({ heading: m, body: responses[m] || "" }));
             const compareRoot = document.getElementById("compareResponses");
