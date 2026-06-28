@@ -1463,8 +1463,17 @@
 
         html[data-theme="dark"] {
             color-scheme: dark;
+            --dm-bg: #0f1219;
+            --dm-surface: #181c27;
+            --dm-surface-2: #1f2636;
+            --dm-border: #2a3142;
+            --dm-border-soft: #232a3a;
+            --dm-text: #e8ecf4;
+            --dm-text-muted: #9aa3b5;
+            --dm-accent: #c4b5fd;
+            --dm-accent-bg: #2d2650;
         }
-        html[data-theme="dark"] body { background: #050505; color: #f5f5f5; }
+        html[data-theme="dark"] body { background: var(--dm-bg); color: var(--dm-text); }
         html[data-theme="dark"] .site-header,
         html[data-theme="dark"] .settings-panel,
         html[data-theme="dark"] section.panel,
@@ -1473,52 +1482,52 @@
         html[data-theme="dark"] .compare-card,
         html[data-theme="dark"] .debate-card,
         html[data-theme="dark"] .collab-stage-card,
-        html[data-theme="dark"] .collab-intro { background: #0c0c0c; border-color: #1a1a1a; color: #f5f5f5; }
+        html[data-theme="dark"] .collab-intro { background: var(--dm-surface); border-color: var(--dm-border-soft); color: var(--dm-text); }
         html[data-theme="dark"] .side-menu {
-            background: #080808;
-            border-color: #141414;
-            box-shadow: 4px 0 24px rgba(0,0,0,.5);
+            background: #141824;
+            border-color: var(--dm-border-soft);
+            box-shadow: 4px 0 24px rgba(0,0,0,.35);
         }
         html[data-theme="dark"] .side-menu-header,
         html[data-theme="dark"] .side-menu-auth,
-        html[data-theme="dark"] .side-menu-footer { border-color: #141414; }
+        html[data-theme="dark"] .side-menu-footer { border-color: var(--dm-border-soft); }
         html[data-theme="dark"] .side-menu-brand,
         html[data-theme="dark"] h1, html[data-theme="dark"] h2,
-        html[data-theme="dark"] .header-brand p { color: #fafafa; }
+        html[data-theme="dark"] .header-brand p { color: #f3f4f8; }
         html[data-theme="dark"] .side-menu-guide-btn,
-        html[data-theme="dark"] .side-menu-settings-btn { background: transparent; border: none; color: #a3a3a3; }
+        html[data-theme="dark"] .side-menu-settings-btn { background: transparent; border: none; color: var(--dm-text-muted); }
         html[data-theme="dark"] .side-menu-guide-btn:hover,
-        html[data-theme="dark"] .side-menu-settings-btn:hover { background: #141414; color: #fafafa; }
-        html[data-theme="dark"] .side-menu-settings-btn.active { background: #1a1a2e; color: #c4b5fd; }
+        html[data-theme="dark"] .side-menu-settings-btn:hover { background: var(--dm-surface-2); color: #f3f4f8; }
+        html[data-theme="dark"] .side-menu-settings-btn.active { background: var(--dm-accent-bg); color: var(--dm-accent); }
         html[data-theme="dark"] .works-section-title,
-        html[data-theme="dark"] .settings-row-label { color: #d4d4d4; }
+        html[data-theme="dark"] .settings-row-label { color: #d1d9e6; }
         html[data-theme="dark"] .settings-meta,
-        html[data-theme="dark"] .works-empty { color: #737373; }
+        html[data-theme="dark"] .works-empty { color: var(--dm-text-muted); }
         html[data-theme="dark"] #mainInput,
         html[data-theme="dark"] .agent-input,
         html[data-theme="dark"] .input-tool-select,
-        html[data-theme="dark"] .auth-field input { background: #0a0a0a; border-color: #262626; color: #fafafa; }
-        html[data-theme="dark"] .mode-btn { background: #111; color: #d4d4d4; border-color: #262626; }
-        html[data-theme="dark"] .mode-btn.active { background: #1e1b4b; color: #e0e7ff; border-color: #4338ca; }
-        html[data-theme="dark"] .dock-btn.muted { background: #111; color: #d4d4d4; border-color: #262626; }
-        html[data-theme="dark"] .ai-chip { background: #111; border-color: #333; color: #e5e5e5; }
-        html[data-theme="dark"] .ai-chip.active { background: #1e1b4b; border-color: #6366f1; color: #e0e7ff; }
+        html[data-theme="dark"] .auth-field input { background: var(--dm-surface-2); border-color: var(--dm-border); color: #f3f4f8; }
+        html[data-theme="dark"] .mode-btn { background: var(--dm-surface-2); color: #c8d0de; border-color: var(--dm-border); }
+        html[data-theme="dark"] .mode-btn.active { background: var(--dm-accent-bg); color: #e9d5ff; border-color: #5b4b9a; }
+        html[data-theme="dark"] .dock-btn.muted { background: var(--dm-surface-2); color: #c8d0de; border-color: var(--dm-border); }
+        html[data-theme="dark"] .ai-chip { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .ai-chip.active { background: var(--dm-accent-bg); border-color: #6366f1; color: #e9d5ff; }
         html[data-theme="dark"] .collab-v2-summary,
-        html[data-theme="dark"] .collab-stage-live-output { background: #0a0a0a; border-color: #262626; color: #f5f5f5; }
-        html[data-theme="dark"] .collab-rail-step { background: #111; border-color: #333; }
-        html[data-theme="dark"] .collab-rail-step .step-name { color: #e5e5e5; }
-        html[data-theme="dark"] .collab-rail-step.selected { background: #1a1530; border-color: #7c3aed; }
-        html[data-theme="dark"] .collab-rail-step.done { background: #052e16; border-color: #166534; }
-        html[data-theme="dark"] .collab-stage-panel { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
-        html[data-theme="dark"] .collab-ai-pick-row { background: #141414; border-color: #333; }
-        html[data-theme="dark"] .collab-final-product { background: #052e1622; border-color: #166534; }
-        html[data-theme="dark"] .ai-picker-popover { background: #0c0c0c; border-color: #262626; color: #f5f5f5; }
+        html[data-theme="dark"] .collab-stage-live-output { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .collab-rail-step { background: var(--dm-surface-2); border-color: var(--dm-border); }
+        html[data-theme="dark"] .collab-rail-step .step-name { color: var(--dm-text); }
+        html[data-theme="dark"] .collab-rail-step.selected { background: var(--dm-accent-bg); border-color: #7c3aed; }
+        html[data-theme="dark"] .collab-rail-step.done { background: #1a3a2a; border-color: #166534; }
+        html[data-theme="dark"] .collab-stage-panel { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .collab-ai-pick-row { background: var(--dm-surface-2); border-color: var(--dm-border); }
+        html[data-theme="dark"] .collab-final-product { background: rgba(22, 101, 52, 0.18); border-color: #166534; }
+        html[data-theme="dark"] .ai-picker-popover { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text); }
         html[data-theme="dark"] .side-account-box { background: transparent; border: none; }
-        html[data-theme="dark"] .session-history-item { background: #111; border-color: #262626; color: #f5f5f5; }
-        html[data-theme="dark"] .side-menu-btn.outline { background: transparent; border-color: #333; color: #93c5fd; }
-        html[data-theme="dark"] .result-files-toggle { background: #111; border-color: #333; color: #c4b5fd; }
+        html[data-theme="dark"] .session-history-item { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .side-menu-btn.outline { background: transparent; border-color: var(--dm-border); color: #93c5fd; }
+        html[data-theme="dark"] .result-files-toggle { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-accent); }
         html[data-theme="dark"] .works-item,
-        html[data-theme="dark"] .active-collab-item { background: #111; border-color: #262626; }
+        html[data-theme="dark"] .active-collab-item { background: var(--dm-surface-2); border-color: var(--dm-border); }
         html[data-theme="dark"] .input-tool-btn {
             background: #141414; border-color: #333; color: #f5f5f5;
         }
@@ -1543,13 +1552,19 @@
             color: #fff; border-color: #6d28d9;
         }
         html[data-theme="dark"] .compare-card-header {
-            background: #111; border-color: #262626; color: #f5f5f5;
+            background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text);
         }
         html[data-theme="dark"] .compare-card-body,
         html[data-theme="dark"] .compare-card-content {
-            background: #0a0a0a; color: #e5e5e5;
+            background: #151a26; color: #dce3ef;
         }
-        html[data-theme="dark"] .compare-model-meta { color: #737373; }
+        html[data-theme="dark"] .compare-model-meta { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .compare-q-bubble {
+            background: var(--dm-accent-bg); color: #e9d5ff;
+        }
+        html[data-theme="dark"] .compare-qa-pair {
+            border-bottom-color: var(--dm-border-soft);
+        }
         html[data-theme="dark"] .agent-panel-header {
             background: #1a1530; border-color: #333; color: #e9d5ff;
         }
@@ -1692,9 +1707,6 @@
             margin-bottom: 8px;
             line-height: 1.45;
             word-break: break-word;
-            position: sticky;
-            top: 0;
-            z-index: 2;
         }
         .compare-affinity-badge {
             display: inline-block;
@@ -1703,10 +1715,6 @@
             font-weight: 800;
             font-size: 11px;
             vertical-align: middle;
-        }
-        html[data-theme="dark"] .compare-q-bubble {
-            background: #312e81;
-            color: #e9d5ff;
         }
         .compare-qa-stack {
             padding: 8px 12px 12px;
@@ -4981,7 +4989,10 @@
         }
         function getModeCoinCost(mode) {
             const NF = window.NasaroFeatures;
-            if (mode === "compare") return (NF?.getSelectedModels?.("compare") || getActiveModels()).length || 1;
+            if (mode === "compare") {
+                const modelCount = (NF?.getSelectedModels?.("compare") || getActiveModels()).length || 1;
+                return modelCount + 1;
+            }
             if (mode === "debate") {
                 if (!debateStarted) return getDebateRoundCoinCost(true);
                 return getDebateRoundCoinCost(false);
@@ -7022,7 +7033,7 @@
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
                 const cmpLabel = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
                 dockPrimaryBtn.textContent = dockBtnLabel(cmpLabel.replace(/\s*🪙\d+$/, ""), getModeCoinCost("compare"));
-                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · AI ${getModeCoinCost("compare")}${COIN}/회`;
+                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · AI ${getModeCoinCost("compare")}${COIN} (모델+요약)`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = false;
                 mainInput.disabled = false;
@@ -8945,14 +8956,29 @@
             updateCompareModelMeta(model, "");
             updateCompareCard(model, "다시 시도 중...", false, turnIndex);
             try {
-                await streamCompareModel(model, turn.query, turn.responses, turn.sessionId);
+                await streamCompareModel(model, turn.query, turn.responses, turn.sessionId, turnIndex);
             } catch (error) {
                 applyStreamChunk(turn.responses, { model, success: false, error: COMPARE_FAILURE_MSG }, turnIndex);
             }
             syncCompareSessionHistory();
         }
 
-        async function streamCompareModel(model, message, responses, compareSessionId) {
+        function buildCompareModelHistory(model, turnIndex) {
+            const history = [];
+            for (let i = 0; i < turnIndex; i++) {
+                const turn = compareTurns[i];
+                if (!turn?.query) continue;
+                const assistant = String(turn.responses?.[model] || "").trim();
+                history.push({
+                    user: turn.query,
+                    assistant: assistant && assistant !== COMPARE_FAILURE_MSG ? assistant : "(이전 답변 없음)",
+                });
+            }
+            return history;
+        }
+
+        async function streamCompareModel(model, message, responses, compareSessionId, turnIndex = compareCurrentTurnIndex) {
+            const history = buildCompareModelHistory(model, turnIndex);
             const response = await apiFetch("/compare/stream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -8961,6 +8987,7 @@
                     model_name: model,
                     compare_session_id: compareSessionId,
                     user_id: getDeviceId(),
+                    history,
                 }),
             });
 
@@ -9051,7 +9078,7 @@
             const failures = [];
             await Promise.all(
                 activeModels.map(model =>
-                    streamCompareModel(model, message, responses, lastCompareSessionId)
+                    streamCompareModel(model, message, responses, lastCompareSessionId, turnIndex)
                         .catch(error => {
                             failures.push(`${model}: ${error.message}`);
                             if (!responses[model] || responses[model] === "") {

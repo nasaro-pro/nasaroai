@@ -171,6 +171,16 @@
     @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
     .chart-panel { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 10px; }
     .chart-panel h3 { margin: 0 0 8px; font-size: 12px; color: #c4b5fd; font-weight: 700; }
+    .chart-panel-head {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 8px; margin-bottom: 8px;
+    }
+    .chart-panel-head h2 { margin: 0; }
+    .chart-range-toggle { display: inline-flex; gap: 4px; }
+    .chart-range-toggle button {
+      padding: 4px 10px; font-size: 11px; background: #334155; min-width: 44px;
+    }
+    .chart-range-toggle button.active { background: #7c3aed; }
     .chart-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; font-size: 10px; color: #94a3b8; }
     .chart-legend span { display: inline-flex; align-items: center; gap: 4px; }
     .chart-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
@@ -308,7 +318,13 @@
           <div id="usageCompareTable"></div>
         </section>
         <section class="panel">
-          <h2>시간대별 AI 호출 (KST · 오늘)</h2>
+          <div class="chart-panel-head">
+            <h2>시간대별 AI 호출 (KST)</h2>
+            <div class="chart-range-toggle" id="hourChartToggle">
+              <button type="button" data-range="today" class="active">오늘</button>
+              <button type="button" data-range="all">전체</button>
+            </div>
+          </div>
           <div id="hourChart" class="hour-chart"></div>
         </section>
         <section class="panel">
@@ -316,7 +332,13 @@
           <div id="usageAudienceTable"></div>
         </section>
         <section class="panel full">
-          <h2>기능별 · 시간대별 AI 호출 (오늘)</h2>
+          <div class="chart-panel-head">
+            <h2>기능별 · 시간대별 AI 호출</h2>
+            <div class="chart-range-toggle" id="featureHourChartToggle">
+              <button type="button" data-range="today" class="active">오늘</button>
+              <button type="button" data-range="all">전체</button>
+            </div>
+          </div>
           <div id="featureHourCharts" class="chart-grid"></div>
         </section>
         <section class="panel full activity-dual-panel">
@@ -448,6 +470,7 @@
 
   <script>
     const TOKEN_KEY = "nasaroai_admin_token";
+    const ADMIN_UI_KEY = "nasaroai_admin_ui";
     let adminToken = sessionStorage.getItem(TOKEN_KEY) || "";
     let dashData = null;
     let guests = [];
@@ -456,7 +479,62 @@
     let selectedUserId = null;
     let selectedGuestId = null;
     let selectedSupportId = null;
+    let chartStatsRange = "today";
     let searchTimer = null;
+
+    function saveAdminUiState() {
+      try {
+        sessionStorage.setItem(ADMIN_UI_KEY, JSON.stringify({
+          sidebarMode,
+          selectedUserId,
+          selectedGuestId,
+          selectedSupportId,
+          chartStatsRange,
+          activityQ: activityQuery.q || "",
+          activityFeature: activityQuery.feature || "",
+          sidebarSearch: document.getElementById("sidebarSearch")?.value || "",
+        }));
+      } catch {}
+    }
+
+    function loadAdminUiState() {
+      try {
+        const raw = sessionStorage.getItem(ADMIN_UI_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    function syncChartRangeButtons() {
+      document.querySelectorAll(".chart-range-toggle").forEach(toggle => {
+        toggle.querySelectorAll("button[data-range]").forEach(btn => {
+          btn.classList.toggle("active", btn.dataset.range === chartStatsRange);
+        });
+      });
+    }
+
+    function setChartStatsRange(range) {
+      chartStatsRange = range === "all" ? "all" : "today";
+      syncChartRangeButtons();
+      saveAdminUiState();
+      if (dashData) renderStats(dashData);
+    }
+
+    function wireChartRangeToggles() {
+      if (chartTogglesWired) {
+        syncChartRangeButtons();
+        return;
+      }
+      chartTogglesWired = true;
+      document.querySelectorAll(".chart-range-toggle").forEach(toggle => {
+        toggle.querySelectorAll("button[data-range]").forEach(btn => {
+          btn.addEventListener("click", () => setChartStatsRange(btn.dataset.range));
+        });
+      });
+      syncChartRangeButtons();
+    }
 
     const PLATFORM_LABEL = { web: "웹", app: "앱", mobile_web: "모바일웹" };
 
@@ -488,6 +566,7 @@
       document.getElementById("mainSub").textContent = "회원 · 활동 · 플랫폼 · 사용량";
       updateMainPanels();
       renderSidebar();
+      saveAdminUiState();
     }
 
     function updateMainPanels() {
@@ -546,6 +625,7 @@
       }
       updateMainPanels();
       renderSidebar();
+      saveAdminUiState();
       if (mode === "members") renderMembersListPanel();
       if (mode === "guests") renderGuestsListPanel();
       if (mode === "support") renderSupportList();
@@ -824,8 +904,15 @@
       if (usageEl) usageEl.innerHTML = renderUsageCompareTable(usageToday, usageAll, usageTodayTotal, usageAllTotal);
       const audienceEl = document.getElementById("usageAudienceTable");
       if (audienceEl) audienceEl.innerHTML = renderUsageAudienceTable(data);
-      renderHourChart(data.usage_by_hour || {}, "hourChart", "오늘 KST");
-      renderFeatureHourCharts(data.usage_by_hour_by_feature || {}, data.quota_limits || {});
+      const hourData = chartStatsRange === "all"
+        ? (data.usage_by_hour_all_time || {})
+        : (data.usage_by_hour || {});
+      const hourLegend = chartStatsRange === "all" ? "전체 누적 (시간대)" : "오늘 KST";
+      renderHourChart(hourData, "hourChart", hourLegend);
+      const featHourData = chartStatsRange === "all"
+        ? (data.usage_by_hour_by_feature_all_time || {})
+        : (data.usage_by_hour_by_feature || {});
+      renderFeatureHourCharts(featHourData, data.quota_limits || {}, chartStatsRange);
     }
 
     const FEATURE_COLORS = {
@@ -901,9 +988,10 @@
         <div class="hour-chart-legend">${legendText || "오늘 KST"} ${total}회</div>`;
     }
 
-    function renderFeatureHourCharts(byFeature, limits) {
+    function renderFeatureHourCharts(byFeature, limits, rangeMode) {
       const el = document.getElementById("featureHourCharts");
       if (!el) return;
+      const rangeLabel = rangeMode === "all" ? "전체" : "오늘";
       const features = Object.keys(FEATURE_LABELS);
       el.innerHTML = features.map(feat => {
         const map = byFeature[feat] || {};
@@ -919,9 +1007,9 @@
           </div>`;
         }).join("");
         return `<div class="chart-panel">
-          <h3>${FEATURE_LABELS[feat]} · 오늘 AI 🪙${total}</h3>
+          <h3>${FEATURE_LABELS[feat]} · ${rangeLabel} AI 🪙${total}</h3>
           <div class="stacked-chart">${bars}</div>
-          <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별 호출</span></div>
+          <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별 호출 (${rangeLabel})</span></div>
         </div>`;
       }).join("");
     }
@@ -1419,12 +1507,14 @@
           renderMembersListPanel();
           document.getElementById("mainTitle").textContent = "회원 목록";
           document.getElementById("mainSub").textContent = "계정을 클릭하면 상세를 볼 수 있습니다";
+          saveAdminUiState();
         });
         wireQuotaAdminPanel(subject);
         startQuotaLiveRefresh(subject);
       } catch (e) {
         document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
       }
+      saveAdminUiState();
     }
 
     async function loadGuestActivity(deviceId) {
@@ -1460,12 +1550,14 @@
           renderGuestsListPanel();
           document.getElementById("mainTitle").textContent = "비회원 기기";
           document.getElementById("mainSub").textContent = "기기를 클릭하면 상세를 볼 수 있습니다";
+          saveAdminUiState();
         });
         wireQuotaAdminPanel(subject);
         startQuotaLiveRefresh(subject);
       } catch (e) {
         document.getElementById("userDetail").innerHTML = `<span class="err">${e.message}</span>`;
       }
+      saveAdminUiState();
     }
 
     function renderSupportList() {
@@ -1509,6 +1601,7 @@
       } catch (e) {
         document.getElementById("supportThread").innerHTML = `<span class="err">${e.message}</span>`;
       }
+      saveAdminUiState();
     }
 
     async function deleteSupportInquiry(id) {
@@ -1529,6 +1622,64 @@
     }
 
     let dashRefreshTimer = null;
+    let chartTogglesWired = false;
+
+    async function restoreAdminUiState() {
+      const saved = loadAdminUiState();
+      if (saved?.chartStatsRange) {
+        chartStatsRange = saved.chartStatsRange === "all" ? "all" : "today";
+      }
+      syncChartRangeButtons();
+      if (saved) {
+        activityQuery.q = saved.activityQ || "";
+        activityQuery.feature = saved.activityFeature || "";
+        const actSearch = document.getElementById("activitySearch");
+        const actFeat = document.getElementById("activityFeatureFilter");
+        if (actSearch) actSearch.value = activityQuery.q;
+        if (actFeat) actFeat.value = activityQuery.feature;
+        const sbSearch = document.getElementById("sidebarSearch");
+        if (sbSearch && saved.sidebarSearch) sbSearch.value = saved.sidebarSearch;
+      }
+
+      const mode = saved?.sidebarMode || "stats";
+      if (mode === "members") {
+        if (saved?.selectedUserId) {
+          await selectUser(saved.selectedUserId);
+          return;
+        }
+        selectedUserId = null;
+        selectedGuestId = null;
+        selectedSupportId = null;
+        showDetailView("members");
+        setActiveTab("tabMembers");
+        document.getElementById("mainTitle").textContent = "회원 목록";
+        document.getElementById("mainSub").textContent = "계정을 클릭하면 상세 · 문의 기록을 볼 수 있습니다";
+        return;
+      }
+      if (mode === "guests") {
+        if (saved?.selectedGuestId) {
+          await loadGuestActivity(saved.selectedGuestId);
+          return;
+        }
+        selectedUserId = null;
+        selectedGuestId = null;
+        selectedSupportId = null;
+        showDetailView("guests");
+        setActiveTab("tabGuests");
+        document.getElementById("mainTitle").textContent = "비회원 기기";
+        document.getElementById("mainSub").textContent = "기기를 클릭하면 상세 활동을 볼 수 있습니다";
+        return;
+      }
+      if (mode === "support") {
+        showDetailView("support");
+        setActiveTab("tabSupport");
+        document.getElementById("mainTitle").textContent = "관리자 문의";
+        document.getElementById("mainSub").textContent = "답변 대기 · 완료";
+        if (saved?.selectedSupportId) await openSupport(saved.selectedSupportId);
+        return;
+      }
+      showOverview();
+    }
 
     function startDashAutoRefresh() {
       clearInterval(dashRefreshTimer);
@@ -1554,7 +1705,8 @@
       renderUsersTable(dashData.users || []);
       renderSupportList();
       loadActivityRetentionSetting().catch(() => {});
-      showOverview();
+      wireChartRangeToggles();
+      await restoreAdminUiState();
       startDashAutoRefresh();
     }
 
@@ -1640,6 +1792,7 @@
       setActiveTab("tabMembers");
       document.getElementById("mainTitle").textContent = "회원 목록";
       document.getElementById("mainSub").textContent = "계정을 클릭하면 상세 · 문의 기록을 볼 수 있습니다";
+      saveAdminUiState();
     });
     document.getElementById("tabGuests").addEventListener("click", () => {
       selectedUserId = null;
@@ -1649,6 +1802,7 @@
       setActiveTab("tabGuests");
       document.getElementById("mainTitle").textContent = "비회원 기기";
       document.getElementById("mainSub").textContent = "기기를 클릭하면 상세 활동을 볼 수 있습니다";
+      saveAdminUiState();
     });
     document.getElementById("tabSupport").addEventListener("click", () => {
       selectedUserId = null;
@@ -1659,6 +1813,7 @@
       document.getElementById("mainTitle").textContent = "관리자 문의";
       document.getElementById("mainSub").textContent = "답변 대기 · 완료";
       document.getElementById("supportDetail").style.display = "none";
+      saveAdminUiState();
     });
     document.getElementById("sidebarSearch").addEventListener("input", () => {
       clearTimeout(searchTimer);

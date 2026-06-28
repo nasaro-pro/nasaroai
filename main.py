@@ -578,11 +578,17 @@ MODEL_CACHE_STATE = ModelCacheState()
 MODEL_CACHE_LOCK = asyncio.Lock()
 
 
+class CompareHistoryTurn(BaseModel):
+    user: str = ""
+    assistant: str = ""
+
+
 class CompareRequest(BaseModel):
     message: str
     model_name: str
     compare_session_id: str = ""
     user_id: str = ""
+    history: list[CompareHistoryTurn] = Field(default_factory=list)
 
 
 class CollabIntakeMessage(BaseModel):
@@ -1754,16 +1760,37 @@ def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
     ]
 
 
+def build_compare_messages(
+    persona: str,
+    prompt: str,
+    history: list | None = None,
+) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = [{"role": "system", "content": persona}]
+    for turn in history or []:
+        user_text = (getattr(turn, "user", None) or (turn.get("user") if isinstance(turn, dict) else "") or "").strip()
+        asst_text = (
+            getattr(turn, "assistant", None) or (turn.get("assistant") if isinstance(turn, dict) else "") or ""
+        ).strip()
+        if user_text:
+            messages.append({"role": "user", "content": user_text})
+        if asst_text:
+            messages.append({"role": "assistant", "content": asst_text})
+    messages.append({"role": "user", "content": prompt})
+    return messages
+
+
 def build_chat_payload(
     model_id: str,
     persona: str,
     prompt: str,
     stream: bool,
     max_tokens: int | None = None,
+    history: list | None = None,
 ) -> dict:
+    msg_builder = build_compare_messages if history else build_messages
     payload: dict = {
         "model": model_id,
-        "messages": build_messages(persona, prompt),
+        "messages": msg_builder(persona, prompt, history),
         "stream": stream,
     }
     if max_tokens is not None:
@@ -2689,6 +2716,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                         persona=persona,
                                         prompt=data.message,
                                         stream=True,
+                                        history=data.history or None,
                                     )
                                 },
                             ) as response:

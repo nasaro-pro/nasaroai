@@ -715,6 +715,52 @@ def get_usage_by_hour_by_feature(day_key: str | None = None) -> dict[str, dict[s
     return out
 
 
+def get_usage_by_hour_all_time() -> dict[str, int]:
+    """Aggregate AI usage by KST hour-of-day (0–23) across all history."""
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, CAST(strftime('%H', datetime(created_at, 'unixepoch', '+9 hours')) AS INTEGER) AS hr,
+                       COUNT(*) AS cnt
+                FROM usage_events
+                GROUP BY feature, hr
+                """
+            ).fetchall()
+        finally:
+            conn.close()
+    out: dict[str, int] = {}
+    for r in rows:
+        key = f"{r['feature']}:{int(r['hr']):02d}"
+        out[key] = int(r["cnt"])
+    return out
+
+
+def get_usage_by_hour_by_feature_all_time() -> dict[str, dict[str, int]]:
+    """Per-feature hourly usage aggregated across all history (KST hour-of-day)."""
+    out: dict[str, dict[str, int]] = {f: {} for f in QUOTA_LIMITS}
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT feature, CAST(strftime('%H', datetime(created_at, 'unixepoch', '+9 hours')) AS INTEGER) AS hr,
+                       COUNT(*) AS cnt
+                FROM usage_events
+                GROUP BY feature, hr
+                """
+            ).fetchall()
+        finally:
+            conn.close()
+    for r in rows:
+        feat = str(r["feature"])
+        if feat not in out:
+            out[feat] = {}
+        out[feat][f"{int(r['hr']):02d}"] = int(r["cnt"])
+    return out
+
+
 def get_login_by_hour(day_key: str | None = None) -> dict[str, int]:
     day_key = day_key or _day_key()
     with _lock:
@@ -1281,6 +1327,8 @@ def get_admin_dashboard() -> dict[str, Any]:
         "usage_all_time_guest_total": _sum_usage_map(get_usage_by_subject_prefix("device:", None)),
         "usage_by_hour": get_usage_by_hour(day_key),
         "usage_by_hour_by_feature": get_usage_by_hour_by_feature(day_key),
+        "usage_by_hour_all_time": get_usage_by_hour_all_time(),
+        "usage_by_hour_by_feature_all_time": get_usage_by_hour_by_feature_all_time(),
         "login_by_hour": get_login_by_hour(day_key),
         "member_activity_by_hour": get_member_activity_by_hour(day_key),
         "agent_activity": get_agent_activity_log(limit=500),
