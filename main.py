@@ -448,8 +448,16 @@ PERSONAS: dict[str, str] = {
 DEBATE_CORE = (
     "아래 '주제'는 사용자의 질문입니다. 형식적인 토론·역할극·절차 안내가 아닙니다.\n"
     "토론 규칙 설명, '이제 시작합니다', '양측 의견을 정리하면' 같은 메타 발언 금지.\n"
-    "주제에서 벗어난 추상론·헛소리·뜬구름 잡기 금지. 질문/주제에 직접 답하세요.\n"
+    "반드시 먼저 질문을 한 문장으로 재해석(사용자가 무엇을 알고 싶어 하는지)한 뒤, "
+    "그 재해석에 직접 답하세요. 질문과 무관한 일반론·동문서답·다른 주제로 새는 답변 금지.\n"
+    "질문에 여러 요지가 있으면 각 요지에 번호를 매겨 빠짐없이 답하세요.\n"
     "근거(사실·수치·구체 사례)를 포함하고 한국어로 작성하세요."
+)
+
+COLLAB_QUALITY_BAR = (
+    "【협업 품질 기준】단일 AI 1회 답변보다 훨씬 더 깊고, 구체적이고, 실행 가능한 산출물이어야 합니다.\n"
+    "표면적 요약·뻔한 조언·항목 나열만으로는 실패입니다. 이전 단계 산출물을 실제로 반영·확장하세요.\n"
+    "작업 유형·독자·형식·분량 요구를 지키고, 검증 단계에서 지적받을 만한 누락을 미리 메우세요.\n"
 )
 
 DEBATE_DIRECTIVE = (
@@ -464,10 +472,12 @@ DEBATE_DIRECTIVE = (
 # 1번 발언자: 주제에 대한 자기 답만
 SPEAKER1_DIRECTIVE = (
     f"{DEBATE_CORE}\n"
-    "당신은 1번 발언자입니다. 주제(질문)에 대한 자신의 답 — 핵심 주장 1개와 "
-    "근거(사실·수치·사례 2~3개)만 작성하세요.\n"
+    "당신은 1번 발언자입니다.\n"
+    "첫 문장: 사용자 질문을 '~에 대해' 형태로 재진술.\n"
+    "그다음 주제(질문)에 대한 자신의 답 — 핵심 주장 1개와 "
+    "근거(사실·수치·사례 2~3개)를 제시하세요.\n"
     "다른 발언자 입장을 대신 말하거나, 찬반 양쪽을 정리·종합하지 마세요.\n"
-    "앞선 발언에 대한 반박은 없습니다(첫 발언). 3~6문장, 200~400자."
+    "앞선 발언에 대한 반박은 없습니다(첫 발언). 4~8문장, 250~500자."
 )
 
 MODEL_MAPPING: dict[str, str] = {}
@@ -616,6 +626,15 @@ class CollabFollowupRequest(BaseModel):
     stage_outputs: list[str] = Field(default_factory=list)
     user_id: str = ""
     pre_work: bool = False
+
+
+class CollabFinalizeRequest(BaseModel):
+    task: str
+    work_type: str = ""
+    stage_outputs: list[str] = Field(default_factory=list)
+    acceptance: list[str] = Field(default_factory=list)
+    user_id: str = ""
+    finalize_model: str = ""
 
 
 class AuthSignupRequest(BaseModel):
@@ -2092,15 +2111,15 @@ def build_round_prompt(
     if speaker_index == 3:
         role_instruction = (
             "1·2번의 답을 검토해 각각 수용·비판할 점을 짚고, "
-            "주제(질문)에 대한 자신의 최종 답(입장+근거)을 제시. "
+            "사용자 질문의 각 요지에 대해 자신의 최종 답(입장+근거)을 제시. "
             "형식적 '종합'만 하지 말고 질문에 대한 실질적 답을 포함"
         )
         compress_older = False
     elif speaker_index == 2:
         role_instruction = (
-            "1번의 답을 읽고, 주제에 대해 맞는 점은 인정하고, "
-            "틀리거나 빠진 점은 근거와 함께 비판·보완한 뒤 "
-            "자신이 이 주제에 어떻게 답하는지(주장+근거) 제시 (무조건 반대만 금지)"
+            "1번의 답을 읽고, 1번이 사용자 질문을 제대로 이해했는지 먼저 평가하세요.\n"
+            "주제에 대해 맞는 점은 인정하고, 틀리거나 빠진 점·동문서답은 근거와 함께 비판·보완한 뒤 "
+            "자신이 이 질문에 어떻게 답하는지(주장+근거) 제시 (무조건 반대만 금지)"
         )
         compress_older = False
     else:
@@ -3046,29 +3065,33 @@ def _collab_stage_prompt(data: CollabStageRequest) -> str:
 
     stage_outputs = {
         0: (
-            "조사·리서치 AI로서 다음을 수행하고 **실제 조사 결과**를 작성하세요:\n"
-            "1) 작업 목표·제약·독자·성공 기준\n"
-            "2) 수집한 근거·출처·팩트·유사사례 (가능하면 출처 표기)\n"
-            "3) 핵심 인사이트·리스크·반례\n"
-            "4) 구조 단계에 넘길 근거 패키지 (목록 형태)\n"
+            "조사·리서치 AI로서 다음을 **상세히** 수행하고 실제 조사 결과를 작성하세요 (최소 800자):\n"
+            "1) 작업 목표·제약·독자·성공 기준·금지 사항\n"
+            "2) 수집한 근거·출처·팩트·유사사례·반례 (가능하면 출처 표기, 최소 5개 항목)\n"
+            "3) 핵심 인사이트·리스크·트레이드오프·실무 팁\n"
+            "4) 구조 단계에 넘길 근거 패키지 (번호 목록, 각 항목 2문장 이상)\n"
+            "5) 단일 AI가 놓치기 쉬운 숨은 요구사항·엣지 케이스\n"
         ),
         1: (
-            "구조·기획 AI로서 조사 결과를 바탕으로 **실행 가능한 구조**를 작성하세요:\n"
-            "1) 목차/와이어프레임\n"
-            "2) 섹션별 핵심 메시지·필수 포함 요소\n"
-            "3) 논리 흐름·전환\n"
-            "4) 제작 AI가 그대로 실행할 상세 지시문(프롬프트)\n"
+            "구조·기획 AI로서 조사 결과를 바탕으로 **실행 가능한 구조**를 작성하세요 (최소 700자):\n"
+            "1) 목차/와이어프레임 (섹션별 목적·분량·톤)\n"
+            "2) 섹션별 핵심 메시지·필수 포함 요소·금지 표현\n"
+            "3) 논리 흐름·전환·독자 여정\n"
+            "4) 제작 AI가 그대로 실행할 상세 지시문(프롬프트) — 섹션별 bullet\n"
+            "5) 품질 체크리스트 (검증 단계용)\n"
         ),
         2: (
-            "제작·초안 AI로서 구조·지시문에 따라 **실제 작업물 초안**을 작성하세요:\n"
-            "1) 완성형 초안 본문 (형식·분량·톤 준수)\n"
-            "2) 조사·구조 단계 반영 여부\n"
-            "3) 검증 단계에서 점검할 최종 산출물\n"
+            "제작·초안 AI로서 구조·지시문·조사 근거를 **모두 반영**해 **완성형 작업물**을 작성하세요:\n"
+            "1) 구조대로 본문/초안 전체 (형식·분량·톤·독자 준수, 단일 AI 1회 답변보다 훨씬 길고 구체적으로)\n"
+            "2) 조사 단계의 근거·출처·사례를 본문에 실제로 녹일 것\n"
+            "3) 구조 단계의 섹션별 지시를 빠짐없이 반영할 것\n"
+            "4) 검증 단계에서 점검할 최종 산출물 — 바로 제출 가능한 수준\n"
         ),
     }
     role_instruction = stage_outputs.get(data.stage_index, "단계 결과를 작성하세요.")
 
     return (
+        f"{COLLAB_QUALITY_BAR}\n"
         f"작업: {data.task}\n"
         f"작업 유형: {data.work_type}\n"
         f"현재 단계: {data.stage_name} ({data.stage_index + 1}/4) — 역할: {stage_role}\n"
@@ -3091,7 +3114,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·품질"]
     stage_role = stage_roles[data.stage_index % 4]
     prompt = _collab_stage_prompt(data)
-    max_tokens = 1200 if data.stage_index == 2 else (1000 if data.stage_index == 3 else 900)
+    max_tokens = 3800 if data.stage_index == 2 else (1400 if data.stage_index == 3 else (1600 if data.stage_index == 1 else 1400))
 
     _require_quota(request, "collab", data.user_id, action="run_stage")
     result = await call_ai_best(prompt, max_tokens=max_tokens, preferred_labels=[stage_model])
@@ -3118,6 +3141,50 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
         "success": True,
         "ai_success": result.success,
         "verify_meta": verify_meta,
+    }
+
+
+def _collab_finalize_prompt(data: CollabFinalizeRequest) -> str:
+    outputs = data.stage_outputs or ["", "", "", ""]
+    while len(outputs) < 4:
+        outputs.append("")
+    acceptance_lines = "\n".join(f"- {item}" for item in data.acceptance) or "- 작업 목표 달성"
+    return (
+        f"{COLLAB_QUALITY_BAR}\n"
+        f"작업: {data.task}\n"
+        f"작업 유형: {data.work_type}\n\n"
+        f"【1단계 조사】\n{outputs[0][:6000] or '없음'}\n\n"
+        f"【2단계 구조】\n{outputs[1][:6000] or '없음'}\n\n"
+        f"【3단계 제작 초안】\n{outputs[2][:8000] or '없음'}\n\n"
+        f"【4단계 검증 피드백】\n{outputs[3][:4000] or '없음'}\n\n"
+        f"통과 기준:\n{acceptance_lines}\n\n"
+        "당신은 수석 편집자·최종 통합 AI입니다.\n"
+        "위 4단계 협업 산출물과 검증 피드백을 모두 반영해 **최종 완성 작업물** 하나만 작성하세요.\n"
+        "단일 AI 1회 답변과 비교해 확실히 더 깊고, 구체적이고, 실행 가능해야 합니다.\n"
+        "요구사항:\n"
+        "1) 조사 근거·구조·검증 지적을 실제 본문에 반영 (메타 설명·과정 회고 금지)\n"
+        "2) 작업 유형에 맞는 형식·분량·톤·독자 준수\n"
+        "3) 누락·모순·표면적 나열 제거, 실무에서 바로 쓸 수 있는 수준\n"
+        "4) 한국어로 완성본만 출력 (단계별 설명·JSON 금지)\n"
+    )
+
+
+@app.post("/collab/finalize")
+async def collab_finalize(data: CollabFinalizeRequest, request: Request) -> dict:
+    """4단계 협업 산출물을 통합·윤색해 최종 작업물을 만든다."""
+    await ensure_model_cache_fresh()
+    _require_quota(request, "collab", data.user_id, action="finalize")
+    model = (data.finalize_model or "").strip() or "Anthropic"
+    prompt = _collab_finalize_prompt(data)
+    result = await call_ai_best(prompt, max_tokens=4500, preferred_labels=[model, "OpenAI", "Google"])
+    guidance = result.content if result.success else (
+        (data.stage_outputs[2] if len(data.stage_outputs) > 2 else "") or "최종 통합에 실패했습니다."
+    )
+    return {
+        "guidance": guidance,
+        "model_label": result.requested_label if result.success else model,
+        "success": True,
+        "ai_success": result.success,
     }
 
 
@@ -3261,19 +3328,28 @@ async def compare_summary(data: CompareSummaryRequest, request: Request) -> dict
     await _require_compare_coin(request, data.user_id)
     await ensure_model_cache_fresh()
     parts = []
+    total_models = len(data.responses or {})
     for model, body in (data.responses or {}).items():
         clean = (body or "").strip()
         if clean:
             parts.append(f"[{model}]\n{clean[:2500]}")
     if not parts:
         raise HTTPException(status_code=400, detail="비교할 답변이 없습니다.")
+    partial_note = ""
+    if total_models > len(parts):
+        partial_note = (
+            f"\n(참고: {total_models}개 AI 중 {len(parts)}개 답변만 수신됨. "
+            "수신된 답변만으로 요약하세요.)\n"
+        )
     prompt = (
         f"질문: {data.message.strip()}\n\n"
+        + partial_note
         + "\n\n".join(parts)
         + "\n\n위 AI 답변들을 비교해 JSON만 출력하세요. "
-        '{"common":"공통점 2문장(80자 내외)","diff":"차이점 2문장(80자 내외)",'
-        '"pick":"추천 AI 모델명(위 모델명 중 하나)","line":"추천 답변 핵심 2문장",'
-        '"reason":"왜 이 AI를 추천하는지 한 줄"}'
+        '{"common":"공통점 2~3문장","diff":"차이점 2~3문장",'
+        '"pick":"추천 AI 모델명(위 모델명 중 하나, 없으면 가장 나은 답)",'
+        '"line":"추천 답변 핵심 2~3문장",'
+        '"reason":"왜 이 AI를 추천하는지 2문장"}'
     )
     labels = ranked_labels()
     summary_label = labels[0] if labels else "GPT"
@@ -3299,12 +3375,15 @@ async def compare_summary(data: CompareSummaryRequest, request: Request) -> dict
         if raw:
             line = raw[:220] + ("…" if len(raw) > 220 else "")
     return {
-        "common": str(parsed.get("common", "")).strip()[:160],
-        "diff": str(parsed.get("diff", "")).strip()[:160],
+        "common": str(parsed.get("common", "")).strip()[:240],
+        "diff": str(parsed.get("diff", "")).strip()[:240],
         "pick": pick[:40] if pick else summary_label,
-        "line": line[:280],
-        "reason": str(parsed.get("reason", "")).strip()[:120],
+        "line": line[:320],
+        "reason": str(parsed.get("reason", "")).strip()[:180],
         "model": summary_label,
+        "partial": len(parts) < total_models,
+        "answered_count": len(parts),
+        "total_count": total_models,
     }
 
 
@@ -3322,20 +3401,24 @@ async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request
         if content:
             turn_lines.append(f"{idx}번: {content[:1200]}")
     prompt = (
-        f"토론 주제: {data.topic.strip()}\n"
+        f"토론 주제(사용자 질문): {data.topic.strip()}\n"
         f"{data.round_number}라운드 발언:\n"
         + "\n".join(turn_lines)
-        + "\n\n위 토론을 한 장 요약 카드용으로 정리해 JSON만 출력: "
-        '{"consensus":"합의·공통점 한 줄","dispute":"쟁점 한 줄","action":"다음 액션 한 줄",'
-        '"summary":"전체 요약 3문장 이내"}'
+        + "\n\n위 토론을 라운드 요약 카드용으로 **정확·상세**하게 정리해 JSON만 출력:\n"
+        '{"consensus":"발언자들이 동의한 핵심 (2~3문장, 질문에 대한 공통 답)",'
+        '"dispute":"구체적 쟁점·의견 차이 (2~3문장, 누가 무엇을 주장했는지)",'
+        '"action":"사용자가 다음에 할 일 (2문장)",'
+        '"answers":"1·2·3번 각각 질문에 어떻게 답했는지 (3~5문장)",'
+        '"summary":"라운드 전체 요약 (5~7문장, 질문 이해·핵심 결론 포함)"}'
     )
     labels = ranked_labels()
     summary_label = labels[0] if labels else "GPT"
-    result = await call_ai_best(prompt, max_tokens=450, preferred_labels=[summary_label])
+    result = await call_ai_best(prompt, max_tokens=900, preferred_labels=[summary_label])
     if not result.success:
         raise HTTPException(status_code=502, detail=result.error or USER_FACING_FAILURE_MSG)
     parsed = _parse_json_object(result.content)
     summary_text = str(parsed.get("summary", "")).strip()
+    answers_text = str(parsed.get("answers", "")).strip()
     if not summary_text:
         bits = [
             str(parsed.get("consensus", "")).strip(),
@@ -3343,11 +3426,14 @@ async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request
             str(parsed.get("action", "")).strip(),
         ]
         summary_text = " · ".join(b for b in bits if b)
+    if answers_text:
+        summary_text = f"{summary_text}\n\n【발언별】\n{answers_text}".strip()
     return {
-        "consensus": str(parsed.get("consensus", "")).strip()[:80],
-        "dispute": str(parsed.get("dispute", "")).strip()[:80],
-        "action": str(parsed.get("action", "")).strip()[:80],
-        "summary": summary_text[:500],
+        "consensus": str(parsed.get("consensus", "")).strip()[:200],
+        "dispute": str(parsed.get("dispute", "")).strip()[:200],
+        "action": str(parsed.get("action", "")).strip()[:160],
+        "answers": answers_text[:600],
+        "summary": summary_text[:1200],
         "model": summary_label,
     }
 

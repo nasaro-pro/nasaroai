@@ -1739,14 +1739,61 @@
         }
 
         .compare-summary-bar {
-            font-size: 12px;
-            line-height: 1.45;
-            padding: 8px 12px;
-            margin: 0 0 10px;
-            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.55;
+            padding: 12px 14px;
+            margin: 0 0 12px;
+            border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             color: #334155;
+        }
+        .compare-summary-head {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            align-items: baseline;
+            margin-bottom: 10px;
+        }
+        .compare-summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        @media (max-width: 640px) {
+            .compare-summary-grid { grid-template-columns: 1fr; }
+        }
+        .compare-summary-block {
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .compare-summary-block.common {
+            background: #ecfdf5;
+            border: 1px solid #bbf7d0;
+            color: #14532d;
+        }
+        .compare-summary-block.diff {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+        }
+        .compare-summary-block .lbl {
+            display: block;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            opacity: 0.85;
+        }
+        .compare-summary-reason {
+            font-size: 12px;
+            color: #475569;
+            padding-top: 4px;
+            border-top: 1px dashed #cbd5e1;
         }
         .compare-summary-row {
             display: flex;
@@ -1759,8 +1806,8 @@
             font-size: 11px;
             color: #64748b;
         }
-        .compare-summary-pick strong { color: #7c3aed; }
-        .compare-summary-oneline { color: #0f172a; font-weight: 600; }
+        .compare-summary-pick strong { color: #7c3aed; font-size: 13px; }
+        .compare-summary-oneline { color: #0f172a; font-weight: 600; font-size: 13px; flex: 1; min-width: 120px; }
         .compare-affinity-star { color: #f59e0b; font-weight: 800; margin-left: 4px; }
         html[data-theme="dark"] .compare-summary-bar {
             background: #1e293b;
@@ -1768,6 +1815,17 @@
             color: #cbd5e1;
         }
         html[data-theme="dark"] .compare-summary-oneline { color: #f1f5f9; }
+        html[data-theme="dark"] .compare-summary-block.common {
+            background: #14532d;
+            border-color: #166534;
+            color: #dcfce7;
+        }
+        html[data-theme="dark"] .compare-summary-block.diff {
+            background: #7c2d12;
+            border-color: #9a3412;
+            color: #ffedd5;
+        }
+        html[data-theme="dark"] .compare-summary-reason { color: #94a3b8; border-color: #475569; }
         .debate-card.summary-card {
             border-left: 4px solid #7c3aed;
             background: linear-gradient(180deg, #faf5ff 0%, #fff 100%);
@@ -1889,8 +1947,8 @@
 
         .debate-stage {
             position: relative;
-            overflow: hidden;
-            min-height: 480px;
+            overflow: visible;
+            min-height: 0;
             margin-top: 14px;
         }
 
@@ -1900,8 +1958,9 @@
             left: 50%;
             width: min(780px, 78%);
             margin-left: calc(min(780px, 78%) / -2);
-            min-height: 400px;
-            max-height: min(560px, 62vh);
+            min-height: 280px;
+            max-height: none;
+            height: auto;
             background: #fff;
             border: 1px solid #e5e7eb;
             border-left: 5px solid #9ca3af;
@@ -1996,12 +2055,11 @@
         }
 
         .debate-card-body {
-            flex: 1 1 auto;
-            min-height: 320px;
-            max-height: 440px;
-            overflow-y: auto;
+            flex: 0 0 auto;
+            min-height: 0;
+            max-height: none;
+            overflow: visible;
             overflow-x: hidden;
-            overscroll-behavior: contain;
             white-space: pre-wrap;
             word-break: break-word;
             padding: 16px 18px;
@@ -2452,13 +2510,11 @@
                 line-height: 1.65;
             }
             #debateContent {
-                flex: 1 1 auto;
+                flex: 0 0 auto;
                 min-height: 0;
                 display: flex;
                 flex-direction: column;
-                overflow-y: auto;
-                overflow-x: hidden;
-                -webkit-overflow-scrolling: touch;
+                overflow: visible;
             }
 
             .debate-stage {
@@ -2476,8 +2532,8 @@
                 top: auto;
                 width: 100% !important;
                 margin: 0 0 12px !important;
-                min-height: 280px;
-                max-height: min(520px, 58vh);
+                min-height: 0;
+                max-height: none;
                 transform: none !important;
                 opacity: 1 !important;
                 z-index: 1 !important;
@@ -2488,11 +2544,11 @@
                 flex-direction: column;
             }
             .debate-stage.debate-list-mode .debate-card-body {
-                max-height: min(380px, 42vh);
-                min-height: 200px;
+                max-height: none;
+                min-height: 0;
                 font-size: 15px;
                 padding: 14px 16px;
-                overflow-y: auto;
+                overflow: visible;
             }
             .debate-stage.debate-list-mode .debate-preview-body {
                 display: none;
@@ -4469,11 +4525,21 @@
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
                 <div id="compareSummaryBar" class="compare-summary-bar" style="display:none;" aria-live="polite">
-                    <div class="compare-summary-row">
+                    <div class="compare-summary-head">
                         <span class="compare-summary-pick" id="compareSummaryPick"></span>
                         <span class="compare-summary-oneline" id="compareSummaryLine"></span>
                     </div>
-                    <div class="compare-summary-row compare-summary-sub" id="compareSummarySub"></div>
+                    <div class="compare-summary-grid">
+                        <div class="compare-summary-block common">
+                            <span class="lbl">공통점</span>
+                            <span id="compareSummaryCommon"></span>
+                        </div>
+                        <div class="compare-summary-block diff">
+                            <span class="lbl">차이점</span>
+                            <span id="compareSummaryDiff"></span>
+                        </div>
+                    </div>
+                    <div class="compare-summary-reason" id="compareSummaryReason"></div>
                 </div>
                 <div id="compareResponses" class="compare-grid"></div>
             </section>
@@ -4903,7 +4969,7 @@
             if (mode === "collab") {
                 if (collabIntakeActive) return 1;
                 if (collabRecommendInFlight) return 3;
-                if (collabSession?.plan && !collabTaskAsked) return 4;
+                if (collabSession?.plan && !collabTaskAsked) return 5;
                 if (collabTaskAsked) return 1;
                 return 1;
             }
@@ -5163,44 +5229,69 @@
             return fallback;
         }
 
+        function filterCompareSummaryResponses(responses) {
+            const filtered = {};
+            Object.entries(responses || {}).forEach(([k, v]) => {
+                const t = String(v || "").trim();
+                if (t && t !== COMPARE_FAILURE_MSG) filtered[k] = t;
+            });
+            return filtered;
+        }
+
         async function refreshCompareSummary(message, responses) {
             const bar = document.getElementById("compareSummaryBar");
             const pickEl = document.getElementById("compareSummaryPick");
             const lineEl = document.getElementById("compareSummaryLine");
-            const subEl = document.getElementById("compareSummarySub");
-            if (!bar || !pickEl || !lineEl || !subEl) return;
-            const hasContent = Object.values(responses || {}).some(v => String(v || "").trim());
-            if (!hasContent) {
+            const commonEl = document.getElementById("compareSummaryCommon");
+            const diffEl = document.getElementById("compareSummaryDiff");
+            const reasonEl = document.getElementById("compareSummaryReason");
+            if (!bar || !pickEl || !lineEl) return;
+            const filtered = filterCompareSummaryResponses(responses);
+            const answered = Object.keys(filtered).length;
+            if (!answered) {
                 bar.style.display = "none";
                 return;
             }
             bar.style.display = "block";
             pickEl.innerHTML = "<strong>요약</strong> 생성 중…";
-            lineEl.textContent = "";
-            subEl.textContent = "";
+            lineEl.textContent = answered < Object.keys(responses || {}).length
+                ? `${answered}개 AI 답변 기준`
+                : "";
+            if (commonEl) commonEl.textContent = "";
+            if (diffEl) diffEl.textContent = "";
+            if (reasonEl) reasonEl.textContent = "";
             try {
                 const res = await apiFetch("/compare/summary", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message, responses, user_id: getDeviceId() }),
+                    body: JSON.stringify({ message, responses: filtered, user_id: getDeviceId() }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(apiErrorMessage(data, "요약 실패"));
                 pickEl.innerHTML = data.pick ? `<strong>★ ${escapeHtml(data.pick)}</strong>` : "";
                 lineEl.textContent = data.line || "";
-                const subParts = [];
-                if (data.common) subParts.push(`공통: ${data.common}`);
-                if (data.diff) subParts.push(`차이: ${data.diff}`);
-                if (data.reason) subParts.push(data.reason);
-                subEl.textContent = subParts.join(" · ");
+                if (commonEl) commonEl.textContent = data.common || "—";
+                if (diffEl) diffEl.textContent = data.diff || "—";
+                if (reasonEl) {
+                    const bits = [];
+                    if (data.reason) bits.push(data.reason);
+                    if (data.partial && data.answered_count != null) {
+                        bits.push(`(${data.answered_count}/${data.total_count || answered}개 AI)`);
+                    }
+                    reasonEl.textContent = bits.join(" · ");
+                }
                 refreshSideQuota();
             } catch (err) {
                 pickEl.innerHTML = "";
                 lineEl.textContent = "";
-                subEl.textContent = String(err.message || "").includes("429")
-                    ? "코인 부족으로 비교 요약을 건너뜁니다."
-                    : "";
-                if (!subEl.textContent) bar.style.display = "none";
+                if (commonEl) commonEl.textContent = "";
+                if (diffEl) diffEl.textContent = "";
+                if (reasonEl) {
+                    reasonEl.textContent = String(err.message || "").includes("429")
+                        ? "코인 부족으로 비교 요약을 건너뜁니다."
+                        : "";
+                }
+                if (!reasonEl?.textContent) bar.style.display = "none";
             }
         }
 
@@ -5273,11 +5364,11 @@
                 <div class="compare-q-bubble">${escapeHtml(question)}</div>
                 <div id="content-${slug}" class="compare-content"></div>
                 <div id="retry-${slug}" class="retry-row"></div>`;
-            stack.appendChild(pair);
+            stack.insertBefore(pair, stack.firstChild);
             if (opts.scroll !== false) {
                 requestAnimationFrame(() => {
-                    stack.scrollTop = stack.scrollHeight;
-                    pair.scrollIntoView({ behavior: "smooth", block: "end" });
+                    stack.scrollTop = 0;
+                    pair.scrollIntoView({ behavior: "smooth", block: "start" });
                 });
             }
             return slug;
@@ -5301,7 +5392,7 @@
             if (lastTurn) {
                 Object.keys(lastTurn.responses || {}).forEach(model => {
                     const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
-                    if (stack) stack.scrollTop = stack.scrollHeight;
+                    if (stack) stack.scrollTop = 0;
                 });
             }
         }
@@ -6939,7 +7030,7 @@
                     dockPrimaryBtn.title = collabTaskAsked
                         ? `추가 작업 · AI ${COIN}1`
                         : (collabSession?.plan
-                            ? `4단계 실행 · AI ${COIN}4 (단계당 ${COIN}1)`
+                            ? `4단계+최종통합 · AI ${COIN}5 (단계당 ${COIN}1)`
                             : `정보 수집 ${COIN}1/회 · AI 추천 ${COIN}3 (최대 ${COIN}10)`);
                 }
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
@@ -8318,6 +8409,29 @@
             }
         }
 
+        async function runCollabFinalize() {
+            if (!collabSession?.plan) return null;
+            const response = await apiFetch("/collab/finalize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    task: collabSession.task,
+                    work_type: collabSession.plan.work_type,
+                    stage_outputs: collabSession.stageOutputs,
+                    acceptance: collabSession.plan.acceptance || [],
+                    user_id: getDeviceId(),
+                    finalize_model: collabStageModels[2] || "Anthropic",
+                }),
+            });
+            if (!response.ok) {
+                const errMsg = await parseApiError(response, "최종 통합 실패");
+                throw new Error(errMsg);
+            }
+            const data = await response.json();
+            refreshSideQuota();
+            return data;
+        }
+
         async function runCollabPipeline(fromStage = 0) {
             if (collabPipelineRunning || !collabSession?.plan) return;
             collabPipelineRunning = true;
@@ -8344,8 +8458,15 @@
                         verifyData?.verify_meta
                     );
                     if (verify.pass) {
-                        collabFinalProduct = collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
-                        appendCollabLog("검증 통과 — 최종 작업물 준비 완료", "ok");
+                        appendCollabLog("검증 통과 — 최종 통합·윤색 시작", "ok");
+                        try {
+                            const finalData = await runCollabFinalize();
+                            collabFinalProduct = finalData?.guidance || collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
+                            appendCollabLog("최종 작업물 완성", "ok");
+                        } catch (finErr) {
+                            collabFinalProduct = collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
+                            appendCollabLog(`최종 통합 실패 — 제작본 사용: ${finErr.message}`, "warn");
+                        }
                         showToast("협업 작업이 완료되었습니다.", "success");
                         notifyJobComplete("Nasaro AI · 협업 완료", collabSession.task || "협업 작업");
                         break;
@@ -9203,7 +9324,12 @@
                     speaker_index: 4,
                     model: "요약",
                     role: "라운드 요약",
-                    content: data.summary || [data.consensus, data.dispute, data.action].filter(Boolean).join("\n"),
+                    content: data.summary || [
+                        data.consensus ? `【합의】 ${data.consensus}` : "",
+                        data.dispute ? `【쟁점】 ${data.dispute}` : "",
+                        data.action ? `【다음】 ${data.action}` : "",
+                        data.answers ? `【발언별】\n${data.answers}` : "",
+                    ].filter(Boolean).join("\n\n"),
                     loading: false,
                     success: true,
                 };
