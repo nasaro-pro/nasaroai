@@ -530,6 +530,16 @@
         .panel.active {
             display: block;
         }
+        #debatePanel.active {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            max-height: calc(100dvh - var(--input-dock-height, 88px) - 80px);
+        }
 
         /* 협업 초기 안내 — 요청 후 채팅 표시 */
         .collab-intro {
@@ -1948,7 +1958,7 @@
         .debate-stage {
             position: relative;
             overflow: visible;
-            min-height: 0;
+            min-height: 480px;
             margin-top: 14px;
         }
 
@@ -1958,9 +1968,8 @@
             left: 50%;
             width: min(780px, 78%);
             margin-left: calc(min(780px, 78%) / -2);
-            min-height: 280px;
-            max-height: none;
-            height: auto;
+            min-height: 400px;
+            max-height: min(560px, 62vh);
             background: #fff;
             border: 1px solid #e5e7eb;
             border-left: 5px solid #9ca3af;
@@ -2055,16 +2064,27 @@
         }
 
         .debate-card-body {
-            flex: 0 0 auto;
-            min-height: 0;
-            max-height: none;
-            overflow: visible;
+            flex: 1 1 auto;
+            min-height: 320px;
+            max-height: 440px;
+            overflow-y: auto;
             overflow-x: hidden;
+            overscroll-behavior: contain;
             white-space: pre-wrap;
             word-break: break-word;
             padding: 16px 18px;
             font-size: var(--nasaro-answer-size, 16px);
             line-height: 1.8;
+        }
+        .debate-card-body a,
+        .compare-content a {
+            color: #2563eb;
+            text-decoration: underline;
+            word-break: break-all;
+        }
+        html[data-theme="dark"] .debate-card-body a,
+        html[data-theme="dark"] .compare-content a {
+            color: #93c5fd;
         }
 
         .debate-preview-body {
@@ -2495,6 +2515,12 @@
                 min-height: 0;
                 flex: 1 1 auto;
             }
+            #debatePanel.active {
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
+                max-height: calc(100dvh - var(--input-dock-height, 88px) - 64px);
+            }
             #comparePanel.active .compare-grid {
                 flex: 0 0 auto;
                 min-height: 0;
@@ -2532,8 +2558,8 @@
                 top: auto;
                 width: 100% !important;
                 margin: 0 0 12px !important;
-                min-height: 0;
-                max-height: none;
+                min-height: 280px;
+                max-height: min(520px, 58vh);
                 transform: none !important;
                 opacity: 1 !important;
                 z-index: 1 !important;
@@ -2544,11 +2570,11 @@
                 flex-direction: column;
             }
             .debate-stage.debate-list-mode .debate-card-body {
-                max-height: none;
-                min-height: 0;
+                max-height: min(380px, 42vh);
+                min-height: 200px;
                 font-size: 15px;
                 padding: 14px 16px;
-                overflow: visible;
+                overflow-y: auto;
             }
             .debate-stage.debate-list-mode .debate-preview-body {
                 display: none;
@@ -5344,7 +5370,7 @@
                 card.querySelector(".compare-copy-btn")?.addEventListener("click", () => {
                     const stack = document.getElementById(`compare-qa-stack-${key}`);
                     const lastContent = stack?.querySelector(".compare-content:last-child");
-                    const text = lastContent?.textContent || "";
+                    const text = getAiAnswerPlainText(lastContent);
                     navigator.clipboard.writeText(text).then(() => showToast("답변을 복사했습니다.", "success")).catch(() => showToast("복사 실패", "error"));
                 });
             });
@@ -5364,12 +5390,9 @@
                 <div class="compare-q-bubble">${escapeHtml(question)}</div>
                 <div id="content-${slug}" class="compare-content"></div>
                 <div id="retry-${slug}" class="retry-row"></div>`;
-            stack.insertBefore(pair, stack.firstChild);
+            stack.appendChild(pair);
             if (opts.scroll !== false) {
-                requestAnimationFrame(() => {
-                    stack.scrollTop = 0;
-                    pair.scrollIntoView({ behavior: "smooth", block: "start" });
-                });
+                scrollComparePairIntoView(stack, pair);
             }
             return slug;
         }
@@ -5390,9 +5413,11 @@
             });
             const lastTurn = compareTurns[compareTurns.length - 1];
             if (lastTurn) {
+                const lastIndex = compareTurns.length - 1;
                 Object.keys(lastTurn.responses || {}).forEach(model => {
                     const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
-                    if (stack) stack.scrollTop = 0;
+                    const pair = document.getElementById(`compare-qa-pair-${compareContentSlug(lastIndex, model)}`);
+                    scrollComparePairIntoView(stack, pair);
                 });
             }
         }
@@ -7143,6 +7168,36 @@
                 .replace(/"/g, "&quot;");
         }
 
+        function renderAiAnswer(element, content) {
+            if (!element) return;
+            const raw = String(content ?? "");
+            if (!raw) {
+                element.textContent = "";
+                return;
+            }
+            let html = escapeHtml(raw);
+            html = html.replace(
+                /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+            );
+            html = html.replace(
+                /(^|[\s(])((https?:\/\/)[^\s<>"')\]]+)/g,
+                '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>'
+            );
+            element.innerHTML = html;
+        }
+
+        function getAiAnswerPlainText(element) {
+            return element?.innerText || element?.textContent || "";
+        }
+
+        function scrollComparePairIntoView(stack, pair) {
+            if (!stack || !pair) return;
+            requestAnimationFrame(() => {
+                stack.scrollTop = Math.max(0, pair.offsetTop - 6);
+            });
+        }
+
         // ── Android 설치 안내 모달 ────────────────────────────────────────────
         function openAndroidInstallModal() {
             const modal = document.getElementById("androidInstallModal");
@@ -8812,7 +8867,7 @@
         function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex) {
             const slug = compareContentSlug(turnIndex, model);
             const element = document.getElementById(`content-${slug}`);
-            if (element) element.textContent = content;
+            if (element) renderAiAnswer(element, content);
 
             const card = document.getElementById(`compare-card-${compareModelKey(model)}`);
             if (card) card.classList.toggle("error-card", isError);
@@ -9100,7 +9155,11 @@
                     </div>
                 ` : ""}
             `;
-            element.querySelector(listMode || isActive ? ".debate-card-body" : ".debate-preview-body").textContent = body;
+            const bodyEl = element.querySelector(listMode || isActive ? ".debate-card-body" : ".debate-preview-body");
+            if (bodyEl) {
+                if (listMode || isActive) renderAiAnswer(bodyEl, body);
+                else bodyEl.textContent = summarizeOneLine(body);
+            }
 
             if (isActive && isFailed) {
                 element.querySelector(".retry-button").addEventListener("click", event => {

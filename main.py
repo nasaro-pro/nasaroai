@@ -421,7 +421,12 @@ COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
 MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"]
 
 # 페르소나(개성) 제거: 모든 라벨은 동일한 중립 시스템 메시지를 사용한다.
-NEUTRAL_SYSTEM_PROMPT = "한국어로 명확하고 정확하게 답변하세요."
+NEUTRAL_SYSTEM_PROMPT = (
+    "한국어로 명확하고 정확하게 답변하세요. "
+    "이모지·목록·강조·마크다운·출처(URL)를 자연스럽게 포함해도 됩니다. "
+    "근거가 있으면 본문에 출처·링크를 빠짐없이 남기세요. "
+    "답변을 요약·생략하지 말고 완전한 본문을 제공하세요."
+)
 
 PERSONAS: dict[str, str] = {
     "OpenAI": (
@@ -1813,7 +1818,21 @@ def extract_content(payload: dict) -> str:
     if not choices:
         return ""
     message = choices[0].get("message") or {}
-    return str(message.get("content") or "")
+    content = message.get("content")
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    parts.append(str(block.get("text") or ""))
+                elif "text" in block:
+                    parts.append(str(block.get("text") or ""))
+            elif isinstance(block, str):
+                parts.append(block)
+        return "".join(parts)
+    if content is None:
+        return ""
+    return str(content)
 
 
 def make_failed_result(
@@ -2726,6 +2745,11 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                         return
                                     delta = (raw.get("choices") or [{}])[0].get("delta") or {}
                                     chunk = delta.get("content")
+                                    if isinstance(chunk, list):
+                                        chunk = "".join(
+                                            str(b.get("text") or b) if isinstance(b, dict) else str(b)
+                                            for b in chunk
+                                        )
                                     if chunk:
                                         yield sse(
                                             {
