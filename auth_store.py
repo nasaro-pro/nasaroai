@@ -41,19 +41,39 @@ PRESENCE_TTL_SECONDS = 120  # 온라인 = 최근 2분 내 활동
 
 _lock = threading.Lock()
 
+MEMBER_DAILY_COINS = 250.0
+GUEST_DAILY_COINS = 70.0
+POOL_FEATURE = "_pool"
+
 MEMBER_QUOTA_LIMITS: dict[str, float] = {
-    "compare": 15,
-    "debate": 10,
-    "collab": 3,
-    "agent": 7,
+    "compare": MEMBER_DAILY_COINS,
+    "debate": MEMBER_DAILY_COINS,
+    "collab": MEMBER_DAILY_COINS,
+    "agent": MEMBER_DAILY_COINS,
 }
 GUEST_QUOTA_LIMITS: dict[str, float] = {
-    "compare": 5,
-    "debate": 3,
-    "collab": 1,
-    "agent": 2,
+    "compare": GUEST_DAILY_COINS,
+    "debate": GUEST_DAILY_COINS,
+    "collab": GUEST_DAILY_COINS,
+    "agent": GUEST_DAILY_COINS,
 }
 QUOTA_LIMITS = MEMBER_QUOTA_LIMITS  # admin backward compat
+QUOTA_ADMIN_FEATURES = set(MEMBER_QUOTA_LIMITS) | {POOL_FEATURE}
+
+
+def daily_pool_limit(subject: str) -> float:
+    overrides = _load_quota_limit_overrides(subject)
+    if POOL_FEATURE in overrides:
+        return float(overrides[POOL_FEATURE])
+    return MEMBER_DAILY_COINS if (subject or "").startswith("user:") else GUEST_DAILY_COINS
+
+
+def _total_coins_used(conn: sqlite3.Connection, subject: str, day_key: str) -> float:
+    row = conn.execute(
+        "SELECT COALESCE(SUM(count), 0) AS total FROM quota_usage WHERE subject = ? AND day_key = ?",
+        (subject, day_key),
+    ).fetchone()
+    return float(row["total"]) if row else 0.0
 
 
 def _load_quota_limit_overrides(subject: str) -> dict[str, float]:
@@ -508,7 +528,7 @@ def set_user_data(user_id: int, data_key: str, payload: Any) -> None:
 
 def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     current = get_user_data(user_id)
-    skip_empty_scalar_keys = {"extension_prefs", "ai_presets"}
+    skip_empty_scalar_keys = {"extension_prefs", "ai_presets", "ai_settings"}
     replace_list_keys = {"ai_presets"}
     for key, value in payload.items():
         if key in skip_empty_scalar_keys and isinstance(value, dict) and not value:
@@ -868,7 +888,7 @@ def resolve_device_id(fingerprint: str, proposed_id: str = "") -> str:
 def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, Any]:
     clean_subject = (subject or "").strip()
     feat = (feature or "").strip()
-    if not clean_subject or feat not in MEMBER_QUOTA_LIMITS:
+    if not clean_subject or feat not in QUOTA_ADMIN_FEATURES:
         raise ValueError("invalid subject or feature")
     day_key = _day_key()
     limits = quota_limits_for_subject(clean_subject)
@@ -907,7 +927,7 @@ def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, An
 def admin_set_quota_limit(subject: str, feature: str, daily_limit: float) -> dict[str, Any]:
     clean_subject = (subject or "").strip()
     feat = (feature or "").strip()
-    if not clean_subject or feat not in MEMBER_QUOTA_LIMITS:
+    if not clean_subject or feat not in QUOTA_ADMIN_FEATURES:
         raise ValueError("invalid subject or feature")
     limit_val = max(0.0, float(daily_limit))
     now = time.time()
@@ -928,6 +948,16 @@ def admin_set_quota_limit(subject: str, feature: str, daily_limit: float) -> dic
         finally:
             conn.close()
     snap = get_quota_snapshot(clean_subject)
+    if feat == POOL_FEATURE:
+        total_snap = snap.get("total", {})
+        return {
+            "subject": clean_subject,
+            "feature": feat,
+            "limit": limit_val,
+            "used": total_snap.get("used", 0),
+            "remaining": total_snap.get("remaining", limit_val),
+            "day_key": snap.get("day_key"),
+        }
     feat_snap = snap.get("features", {}).get(feat, {})
     return {
         "subject": clean_subject,
@@ -958,22 +988,25 @@ def check_and_consume_quota(
             "banned": True,
             "guest": is_guest_subject(subject),
         }
+    pool_limit = daily_pool_limit(subject)
     with _lock:
         conn = _connect()
         try:
+            total_used = _total_coins_used(conn, subject, day_key)
+            if total_used + amt > pool_limit + 1e-9:
+                return False, {
+                    "feature": feature,
+                    "used": total_used,
+                    "limit": pool_limit,
+                    "day_key": day_key,
+                    "guest": is_guest_subject(subject),
+                    "pool": True,
+                }
             row = conn.execute(
                 "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
                 (subject, feature, day_key),
             ).fetchone()
             used = float(row["count"]) if row else 0.0
-            if used + amt > limit + 1e-9:
-                return False, {
-                    "feature": feature,
-                    "used": used,
-                    "limit": limit,
-                    "day_key": day_key,
-                    "guest": is_guest_subject(subject),
-                }
             conn.execute(
                 """
                 INSERT INTO quota_usage (subject, feature, day_key, count)
@@ -990,13 +1023,16 @@ def check_and_consume_quota(
             except Exception:
                 pass
             conn.commit()
-            new_used = used + amt
+            new_total = total_used + amt
+            new_feature_used = used + amt
             return True, {
                 "feature": feature,
-                "used": new_used,
-                "limit": limit,
+                "used": new_feature_used,
+                "limit": pool_limit,
+                "total_used": new_total,
                 "day_key": day_key,
                 "guest": is_guest_subject(subject),
+                "pool": True,
             }
         finally:
             conn.close()
@@ -1005,11 +1041,14 @@ def check_and_consume_quota(
 def get_quota_snapshot(subject: str) -> dict[str, Any]:
     day_key = _day_key()
     limits = quota_limits_for_subject(subject)
+    pool_limit = daily_pool_limit(subject)
     out = {}
     banned = is_subject_banned(subject)
     with _lock:
         conn = _connect()
         try:
+            total_used = _total_coins_used(conn, subject, day_key)
+            pool_remaining = round(max(0.0, pool_limit - total_used), 2)
             for feature, limit in limits.items():
                 row = conn.execute(
                     "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
@@ -1018,18 +1057,25 @@ def get_quota_snapshot(subject: str) -> dict[str, Any]:
                 used = float(row["count"]) if row else 0.0
                 out[feature] = {
                     "used": round(used, 2),
-                    "limit": limit,
-                    "remaining": round(max(0.0, limit - used), 2),
+                    "limit": pool_limit,
+                    "remaining": pool_remaining,
                 }
         finally:
             conn.close()
+    total = {
+        "used": round(total_used, 2),
+        "limit": pool_limit,
+        "remaining": pool_remaining,
+    }
     return {
         "day_key": day_key,
         "features": out,
         "coins": out,
+        "total": total,
         "guest": is_guest_subject(subject),
         "banned": banned,
         "limits": limits,
+        "pool_limit": pool_limit,
     }
 
 

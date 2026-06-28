@@ -232,6 +232,8 @@ def _platform(request: Request) -> str:
 
 def _quota_error_payload(feature: str, info: dict) -> dict:
     feat_label = {"compare": "비교", "debate": "토론", "collab": "협업", "agent": "에이전트"}.get(feature, feature)
+    pool_limit = int(info.get("limit", 0))
+    pool_used = int(info.get("used", 0))
     if info.get("banned"):
         return {
             "message": "이 계정 또는 기기는 사용이 제한되었습니다. 문의해 주세요.",
@@ -241,15 +243,15 @@ def _quota_error_payload(feature: str, info: dict) -> dict:
     if info.get("guest"):
         return {
             "message": (
-                f"오늘 비회원 {feat_label} 코인({int(info['limit'])}🪙)을 모두 사용했습니다. "
-                "로그인하면 더 많이 이용할 수 있습니다."
+                f"오늘 비회원 코인을 모두 사용했습니다 ({pool_used}/{pool_limit}🪙). "
+                "로그인하면 하루 250🪙까지 이용할 수 있습니다."
             ),
             "quota": info,
             "login_required": True,
         }
     return {
         "message": (
-            f"오늘 {feat_label} 코인({int(info['limit'])}🪙)을 모두 사용했습니다. "
+            f"오늘 코인을 모두 사용했습니다 ({pool_used}/{pool_limit}🪙). "
             "내일 자정(KST)에 초기화됩니다."
         ),
         "quota": info,
@@ -626,7 +628,21 @@ class UserSyncRequest(BaseModel):
     saved_works: list[dict] | None = None
     extension_prefs: dict | None = None
     ai_presets: list[dict] | None = None
+    ai_settings: dict | None = None
     session_history: list[dict] | None = None
+
+
+class CompareSummaryRequest(BaseModel):
+    message: str
+    responses: dict[str, str] = Field(default_factory=dict)
+    user_id: str = ""
+
+
+class DebateRoundSummaryRequest(BaseModel):
+    topic: str
+    round_number: int = 1
+    turns: list[dict] = Field(default_factory=list)
+    user_id: str = ""
 
 
 class ShareCreateRequest(BaseModel):
@@ -3203,6 +3219,96 @@ async def debate_continue(request: DebateRequest, http_request: Request) -> dict
         store_debate_session(request.session_id, session)
 
     return debate_response(session, turns)
+
+
+def _parse_json_object(text: str) -> dict:
+    if not text:
+        return {}
+    m = re.search(r"\{[\s\S]*\}", text)
+    if not m:
+        return {}
+    try:
+        parsed = json.loads(m.group(0))
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+@app.post("/compare/summary")
+async def compare_summary(data: CompareSummaryRequest, request: Request) -> dict:
+    await _require_compare_coin(request, data.user_id)
+    await ensure_model_cache_fresh()
+    parts = []
+    for model, body in (data.responses or {}).items():
+        clean = (body or "").strip()
+        if clean:
+            parts.append(f"[{model}]\n{clean[:2500]}")
+    if not parts:
+        raise HTTPException(status_code=400, detail="비교할 답변이 없습니다.")
+    prompt = (
+        f"질문: {data.message.strip()}\n\n"
+        + "\n\n".join(parts)
+        + "\n\n위 AI 답변들을 비교해 JSON만 출력하세요. "
+        '{"common":"공통점 한 줄(40자 이내)","diff":"차이점 한 줄(40자 이내)",'
+        '"pick":"추천 AI 모델명","line":"추천 답변 요약 한 줄(60자 이내)"}'
+    )
+    labels = ranked_labels()
+    summary_label = labels[0] if labels else "GPT"
+    result = await call_ai_best(prompt, max_tokens=350, preferred_labels=[summary_label])
+    if not result.success:
+        raise HTTPException(status_code=502, detail=result.error or USER_FACING_FAILURE_MSG)
+    parsed = _parse_json_object(result.content)
+    return {
+        "common": str(parsed.get("common", "")).strip()[:80],
+        "diff": str(parsed.get("diff", "")).strip()[:80],
+        "pick": str(parsed.get("pick", summary_label)).strip()[:40],
+        "line": str(parsed.get("line", "")).strip()[:120],
+        "model": summary_label,
+    }
+
+
+@app.post("/debate/round-summary")
+async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request) -> dict:
+    await _require_debate_coin(request, data.user_id)
+    await ensure_model_cache_fresh()
+    turns = data.turns or []
+    if len(turns) < 2:
+        raise HTTPException(status_code=400, detail="요약할 발언이 부족합니다.")
+    turn_lines = []
+    for turn in turns:
+        idx = turn.get("speaker_index", "?")
+        content = str(turn.get("content", "")).strip()
+        if content:
+            turn_lines.append(f"{idx}번: {content[:1200]}")
+    prompt = (
+        f"토론 주제: {data.topic.strip()}\n"
+        f"{data.round_number}라운드 발언:\n"
+        + "\n".join(turn_lines)
+        + "\n\n위 토론을 한 장 요약 카드용으로 정리해 JSON만 출력: "
+        '{"consensus":"합의·공통점 한 줄","dispute":"쟁점 한 줄","action":"다음 액션 한 줄",'
+        '"summary":"전체 요약 3문장 이내"}'
+    )
+    labels = ranked_labels()
+    summary_label = labels[0] if labels else "GPT"
+    result = await call_ai_best(prompt, max_tokens=450, preferred_labels=[summary_label])
+    if not result.success:
+        raise HTTPException(status_code=502, detail=result.error or USER_FACING_FAILURE_MSG)
+    parsed = _parse_json_object(result.content)
+    summary_text = str(parsed.get("summary", "")).strip()
+    if not summary_text:
+        bits = [
+            str(parsed.get("consensus", "")).strip(),
+            str(parsed.get("dispute", "")).strip(),
+            str(parsed.get("action", "")).strip(),
+        ]
+        summary_text = " · ".join(b for b in bits if b)
+    return {
+        "consensus": str(parsed.get("consensus", "")).strip()[:80],
+        "dispute": str(parsed.get("dispute", "")).strip()[:80],
+        "action": str(parsed.get("action", "")).strip()[:80],
+        "summary": summary_text[:500],
+        "model": summary_label,
+    }
 
 
 @app.get("/health")

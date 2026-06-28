@@ -1722,6 +1722,74 @@
             gap: 12px;
         }
 
+        .compare-summary-bar {
+            font-size: 12px;
+            line-height: 1.45;
+            padding: 8px 12px;
+            margin: 0 0 10px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            color: #334155;
+        }
+        .compare-summary-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 10px;
+            align-items: baseline;
+        }
+        .compare-summary-row.compare-summary-sub {
+            margin-top: 4px;
+            font-size: 11px;
+            color: #64748b;
+        }
+        .compare-summary-pick strong { color: #7c3aed; }
+        .compare-summary-oneline { color: #0f172a; font-weight: 600; }
+        .compare-affinity-star { color: #f59e0b; font-weight: 800; margin-left: 4px; }
+        html[data-theme="dark"] .compare-summary-bar {
+            background: #1e293b;
+            border-color: #334155;
+            color: #cbd5e1;
+        }
+        html[data-theme="dark"] .compare-summary-oneline { color: #f1f5f9; }
+        .debate-card.summary-card {
+            border-left: 4px solid #7c3aed;
+            background: linear-gradient(180deg, #faf5ff 0%, #fff 100%);
+        }
+        html[data-theme="dark"] .debate-card.summary-card {
+            background: #2e1065;
+            border-color: #a78bfa;
+        }
+        .result-files-filter {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .result-files-filter select,
+        .result-files-filter input {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            flex: 1;
+            min-width: 70px;
+        }
+        .result-meta-edit {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            align-items: center;
+        }
+        .result-meta-edit select,
+        .result-meta-edit input {
+            font-size: 12px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
         .compare-card {
             background: #fff;
             border: 1px solid #e5e7eb;
@@ -4185,6 +4253,16 @@
                         <button type="button" id="resultFilesToggle" class="result-files-hub-btn" data-i18n="result_files">📁 결과물 파일</button>
                         <div id="resultFilesPopover" class="result-files-popover">
                             <div id="resultFilesHint" style="font-size:11px;color:#9ca3af;margin:0 0 8px;" data-i18n="result_files_hint">「결과물 저장」 버튼으로만 추가됩니다.</div>
+                            <div class="result-files-filter">
+                                <select id="resultFolderFilter" title="폴더">
+                                    <option value="">전체 폴더</option>
+                                    <option value="기본">기본</option>
+                                    <option value="업무">업무</option>
+                                    <option value="학습">학습</option>
+                                    <option value="개인">개인</option>
+                                </select>
+                                <input id="resultTagFilter" type="search" placeholder="태그 검색" autocomplete="off">
+                            </div>
                             <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
                         </div>
                     </div>
@@ -4359,6 +4437,13 @@
                 </div>
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
+                <div id="compareSummaryBar" class="compare-summary-bar" style="display:none;" aria-live="polite">
+                    <div class="compare-summary-row">
+                        <span class="compare-summary-pick" id="compareSummaryPick"></span>
+                        <span class="compare-summary-oneline" id="compareSummaryLine"></span>
+                    </div>
+                    <div class="compare-summary-row compare-summary-sub" id="compareSummarySub"></div>
+                </div>
                 <div id="compareResponses" class="compare-grid"></div>
             </section>
 
@@ -4988,6 +5073,101 @@
             return `${compareModelKey(model)}-t${turnIndex}`;
         }
 
+        const COMPARE_AFFINITY_RULES = [
+            { re: /코드|python|javascript|typescript|프로그|버그|함수|api|sql|react|알고리즘|디버그/i, models: ["GPT", "Claude", "Gemini"] },
+            { re: /글|에세이|문장|카피|톤|문구|제목|초안|뉴스레터|블로그/i, models: ["Claude", "GPT", "Gemini"] },
+            { re: /조사|출처|근거|최신|뉴스|검색|팩트|동향|리서치|시장/i, models: ["Perplexity", "Gemini", "GPT"] },
+        ];
+
+        function getCompareAffinityModels(message) {
+            const set = new Set();
+            COMPARE_AFFINITY_RULES.forEach(rule => {
+                if (rule.re.test(message || "")) rule.models.forEach(m => set.add(m));
+            });
+            return set.size ? [...set] : ["GPT", "Claude"];
+        }
+
+        function modelMatchesAffinity(model, affinityList) {
+            const m = String(model || "").toLowerCase();
+            return affinityList.some(a => m.includes(String(a).toLowerCase()));
+        }
+
+        function updateCompareAffinityStars(message, models) {
+            const affinity = getCompareAffinityModels(message);
+            models.forEach(model => {
+                const key = compareModelKey(model);
+                const meta = document.getElementById(`model-meta-${key}`);
+                if (!meta) return;
+                meta.textContent = modelMatchesAffinity(model, affinity) ? "★" : "";
+                meta.className = "compare-model-meta" + (meta.textContent ? " compare-affinity-star" : "");
+                meta.title = meta.textContent ? "이 질문 유형에 잘 맞는 AI" : "";
+            });
+        }
+
+        async function refreshCompareSummary(message, responses) {
+            const bar = document.getElementById("compareSummaryBar");
+            const pickEl = document.getElementById("compareSummaryPick");
+            const lineEl = document.getElementById("compareSummaryLine");
+            const subEl = document.getElementById("compareSummarySub");
+            if (!bar || !pickEl || !lineEl || !subEl) return;
+            const hasContent = Object.values(responses || {}).some(v => String(v || "").trim());
+            if (!hasContent) {
+                bar.style.display = "none";
+                return;
+            }
+            bar.style.display = "block";
+            pickEl.innerHTML = "<strong>요약</strong> 생성 중…";
+            lineEl.textContent = "";
+            subEl.textContent = "";
+            try {
+                const res = await apiFetch("/compare/summary", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message, responses, user_id: getDeviceId() }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.detail?.message || data.detail || "요약 실패");
+                pickEl.innerHTML = data.pick ? `<strong>★ ${escapeHtml(data.pick)}</strong>` : "";
+                lineEl.textContent = data.line || "";
+                const subParts = [];
+                if (data.common) subParts.push(`공통: ${data.common}`);
+                if (data.diff) subParts.push(`차이: ${data.diff}`);
+                subEl.textContent = subParts.join(" · ");
+                refreshSideQuota();
+            } catch (err) {
+                pickEl.innerHTML = "";
+                lineEl.textContent = "";
+                subEl.textContent = String(err.message || "").includes("429")
+                    ? "코인 부족으로 비교 요약을 건너뜁니다."
+                    : "";
+                if (!subEl.textContent) bar.style.display = "none";
+            }
+        }
+
+        let nasaroNotifyAsked = false;
+        async function notifyJobComplete(title, body) {
+            if (!("Notification" in window)) return;
+            if (Notification.permission === "denied") return;
+            if (Notification.permission === "default" && !nasaroNotifyAsked) {
+                nasaroNotifyAsked = true;
+                const perm = await Notification.requestPermission();
+                if (perm !== "granted") return;
+            } else if (Notification.permission !== "granted") {
+                return;
+            }
+            try {
+                new Notification(title, {
+                    body: String(body || "").slice(0, 140),
+                    tag: "nasaro-" + Date.now(),
+                });
+            } catch {}
+        }
+
+        const RESULT_FOLDERS = ["기본", "업무", "학습", "개인"];
+        let resultFolderFilter = "";
+        let resultTagFilter = "";
+        let viewingResultIndex = -1;
+
         function ensureCompareModelCards(models) {
             const root = document.getElementById("compareResponses");
             if (!root) return;
@@ -5475,46 +5655,92 @@
             if (currentUser) scheduleUserSync();
         }
 
-        async function saveResultRecord({ title, sections, kind, payload }) {
+        async function saveResultRecord({ title, sections, kind, payload, folder, tags }) {
             const NF = window.NasaroFeatures;
+            if (folder === undefined) {
+                const meta = await promptResultMetaOnSave();
+                if (!meta) return;
+                folder = meta.folder;
+                tags = meta.tags;
+            }
             const record = {
                 id: Date.now().toString(),
                 title: title || "결과물",
                 kind: kind || "compare",
                 sections: sections || [],
                 payload: payload || {},
+                folder: RESULT_FOLDERS.includes(folder) ? folder : "기본",
+                tags: Array.isArray(tags) ? tags.filter(Boolean).slice(0, 8) : [],
                 saved_at: new Date().toLocaleString("ko-KR"),
             };
             savedResults.unshift(record);
             if (savedResults.length > 100) savedResults.length = 100;
             persistSavedResults();
-            if (currentUser) await NF?.saveOfflineSnapshot?.(record, true);
+            if (currentUser) {
+                scheduleUserSync();
+                await NF?.saveOfflineSnapshot?.(record, true);
+            }
             renderResultFilesList();
             showToast(NF?.t?.("save_result_done") || "결과물에 저장했습니다.", "success");
         }
 
-        function renderResultFileViewer(record) {
+        function promptResultMetaOnSave() {
+            return new Promise(resolve => {
+                const folder = window.prompt("폴더 (기본/업무/학습/개인)", "기본");
+                if (folder === null) return resolve(null);
+                const tagsRaw = window.prompt("태그 (쉼표 구분, 선택)", "") || "";
+                const tags = tagsRaw.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+                resolve({
+                    folder: RESULT_FOLDERS.includes(folder) ? folder : "기본",
+                    tags,
+                });
+            });
+        }
+
+        function renderResultFileViewer(record, idx) {
             const modal = document.getElementById("savedResultModal");
             const body = document.getElementById("savedResultModalBody");
             const titleEl = document.getElementById("savedResultModalTitle");
             if (!modal || !body) return;
             if (!record) {
                 closeSavedResultModal();
+                viewingResultIndex = -1;
                 return;
             }
+            viewingResultIndex = typeof idx === "number" ? idx : savedResults.indexOf(record);
             const NF = window.NasaroFeatures;
             const parts = (record.sections || []).map(s =>
                 `<h4 style="margin:12px 0 6px;font-size:14px;color:#6d28d9;">${escapeHtml(s.heading || "")}</h4><pre style="white-space:pre-wrap;margin:0 0 12px;font-family:inherit;line-height:1.55;">${escapeHtml(String(s.body || ""))}</pre>`
+            ).join("");
+            const folderOpts = RESULT_FOLDERS.map(f =>
+                `<option value="${escapeHtml(f)}"${(record.folder || "기본") === f ? " selected" : ""}>${escapeHtml(f)}</option>`
             ).join("");
             if (titleEl) titleEl.textContent = record.title || "저장된 결과물";
             body.innerHTML = `
                 <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;">${escapeHtml(record.saved_at || "")} · ${escapeHtml(record.kind || "")}</div>
                 ${parts || `<pre style="white-space:pre-wrap;margin:0;font-family:inherit;">${escapeHtml(JSON.stringify(record.payload || {}, null, 2))}</pre>`}
+                <div class="result-meta-edit">
+                    <label style="font-size:12px;">폴더 <select id="savedResultFolder">${folderOpts}</select></label>
+                    <label style="font-size:12px;">태그 <input id="savedResultTags" type="text" value="${escapeHtml((record.tags || []).join(", "))}" placeholder="쉼표 구분"></label>
+                    <button type="button" id="savedResultMetaSave" class="result-action-btn">분류 저장</button>
+                </div>
                 <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="button" id="savedResultExportBtn" class="result-action-btn">${NF?.t?.("export_result") || "결과물 다운로드"}</button>
                 </div>`;
             document.getElementById("savedResultExportBtn")?.addEventListener("click", (e) => {
                 NF?.showExportFormatMenu?.(e.currentTarget, record.title || "결과물", record.sections || []);
+            });
+            document.getElementById("savedResultMetaSave")?.addEventListener("click", () => {
+                if (viewingResultIndex < 0 || !savedResults[viewingResultIndex]) return;
+                const rec = savedResults[viewingResultIndex];
+                const folder = document.getElementById("savedResultFolder")?.value || "기본";
+                const tagsRaw = document.getElementById("savedResultTags")?.value || "";
+                rec.folder = RESULT_FOLDERS.includes(folder) ? folder : "기본";
+                rec.tags = tagsRaw.split(/[,，]/).map(t => t.trim()).filter(Boolean).slice(0, 8);
+                persistSavedResults();
+                if (currentUser) scheduleUserSync();
+                renderResultFilesList();
+                showToast("분류를 저장했습니다.", "success");
             });
             modal.classList.add("open");
             modal.setAttribute("aria-hidden", "false");
@@ -5541,17 +5767,33 @@
                     : (NF?.t?.("result_files_guest") || "비로그인: 이 탭에서만");
             }
             if (!list) return;
+            const filtered = savedResults.filter(rec => {
+                if (resultFolderFilter && (rec.folder || "기본") !== resultFolderFilter) return false;
+                if (resultTagFilter) {
+                    const q = resultTagFilter.toLowerCase();
+                    const tagHit = (rec.tags || []).some(t => String(t).toLowerCase().includes(q));
+                    const titleHit = String(rec.title || "").toLowerCase().includes(q);
+                    if (!tagHit && !titleHit) return false;
+                }
+                return true;
+            });
             if (!savedResults.length) {
                 list.innerHTML = '<div class="works-empty">저장된 결과물이 없습니다. 답변 옆 「결과물 저장」을 누르세요.</div>';
                 renderResultFileViewer(null);
                 return;
             }
+            if (!filtered.length) {
+                list.innerHTML = '<div class="works-empty">필터에 맞는 결과물이 없습니다.</div>';
+                return;
+            }
             list.innerHTML = "";
-            savedResults.forEach((rec, idx) => {
+            filtered.forEach(rec => {
+                const idx = savedResults.indexOf(rec);
                 const item = document.createElement("div");
                 item.className = "works-item";
-                item.innerHTML = `<div>${escapeHtml((rec.title || rec.kind || "결과물").slice(0, 40))}</div><small style="color:#9ca3af">${escapeHtml(rec.saved_at || "")} · ${escapeHtml(rec.kind || "")}</small>`;
-                item.addEventListener("click", () => renderResultFileViewer(rec));
+                const tagLine = (rec.tags || []).length ? ` · #${rec.tags.slice(0, 2).join(" #")}` : "";
+                item.innerHTML = `<div>${escapeHtml((rec.title || rec.kind || "결과물").slice(0, 40))}</div><small style="color:#9ca3af">${escapeHtml(rec.folder || "기본")} · ${escapeHtml(rec.saved_at || "")} · ${escapeHtml(rec.kind || "")}${escapeHtml(tagLine)}</small>`;
+                item.addEventListener("click", () => renderResultFileViewer(rec, idx));
                 const dl = document.createElement("button");
                 dl.className = "works-item-dl";
                 dl.type = "button";
@@ -5743,6 +5985,8 @@
             try {
                 const payload = {};
                 if (aiPresets.length) payload.ai_presets = aiPresets;
+                const aiSettings = window.NasaroFeatures?.exportAiSettings?.();
+                if (aiSettings) payload.ai_settings = aiSettings;
                 try {
                     const activeCollab = JSON.parse(userDataStore().getItem(ACTIVE_COLLAB_KEY) || "null");
                     if (activeCollab?.task) payload.active_collab = activeCollab;
@@ -5781,6 +6025,10 @@
                     const hit = aiPresets.find(p => p.id === activePresetId) || aiPresets[0];
                     if (hit) applyAiPreset(hit);
                     else renderCollabPresetSidebar();
+                }
+                if (data.ai_settings) {
+                    window.NasaroFeatures?.importAiSettings?.(data.ai_settings);
+                    updateDockUI();
                 }
             } catch {}
         }
@@ -5922,8 +6170,7 @@
                 if (sideAuth) sideAuth.style.display = "flex";
                 if (sideAccount) sideAccount.style.display = "none";
                 if (sideMenuBrand) sideMenuBrand.textContent = "Nasaro AI";
-                const sideQuota = document.getElementById("sideQuotaBrief");
-                if (sideQuota) sideQuota.textContent = "";
+                refreshSideQuota();
             }
             renderSessionHistory();
             renderResultFilesList();
@@ -5933,15 +6180,16 @@
 
         async function refreshSideQuota() {
             const el = document.getElementById("sideQuotaBrief");
-            if (!el || !currentUser) return;
+            if (!el) return;
             try {
                 const res = await apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId()));
                 if (!res.ok) return;
                 const q = await res.json();
-                const labels = { compare: "비교", debate: "토론", collab: "협업", agent: "에이전트" };
-                const parts = Object.entries(q.features || q.coins || {}).map(([k, v]) =>
-                    `${labels[k] || k} ${COIN}${Math.round(v.remaining ?? 0)}`);
-                el.textContent = parts.length ? parts.join(" · ") : "";
+                const total = q.total || {};
+                const rem = Math.round(total.remaining ?? 0);
+                const lim = Math.round(total.limit ?? (q.guest ? 70 : 250));
+                el.textContent = `${COIN}${rem}/${lim}`;
+                el.title = q.guest ? "비회원 일일 코인 (KST 자정 리셋)" : "회원 일일 코인 (KST 자정 리셋)";
             } catch {
                 el.textContent = "";
             }
@@ -6186,10 +6434,15 @@
                 if (quotaRes.ok) {
                     const q = await quotaRes.json();
                     const guest = q.guest ? " (비회원)" : " (회원)";
-                    const lines = Object.entries(q.features || q.coins || {}).map(([k, v]) =>
-                        `${k}: ${coinCost(v.used)}/${coinCost(v.limit)} (남음 ${coinCost(v.remaining)})`);
+                    const total = q.total || {};
+                    const lines = [
+                        `통합: ${coinCost(total.used)}/${coinCost(total.limit)} (남음 ${coinCost(total.remaining)})`,
+                    ];
+                    Object.entries(q.features || q.coins || {}).forEach(([k, v]) => {
+                        lines.push(`${k}: 사용 ${coinCost(v.used)}`);
+                    });
                     if (quotaEl) {
-                        quotaEl.textContent = (lines.join("\n") || "사용량 정보 없음") + guest;
+                        quotaEl.textContent = lines.join("\n") + guest;
                     }
                 }
                 if (infoRes.ok) {
@@ -6271,6 +6524,8 @@
                 lastCompareSessionId = "";
                 document.getElementById("compareResponses").innerHTML = "";
                 document.getElementById("compareResponses").className = "compare-grid";
+                const sumBar = document.getElementById("compareSummaryBar");
+                if (sumBar) sumBar.style.display = "none";
                 showNotice("compareLoading", "");
                 showNotice("compareError", "");
             } else if (mode === "debate") {
@@ -6303,6 +6558,18 @@
             pop?.classList.toggle("open", !open);
             btn?.classList.toggle("open", !open);
             if (open) renderResultFileViewer(null);
+        });
+        document.getElementById("resultFolderFilter")?.addEventListener("change", (e) => {
+            resultFolderFilter = e.target.value || "";
+            renderResultFilesList();
+        });
+        document.getElementById("resultTagFilter")?.addEventListener("input", (e) => {
+            resultTagFilter = e.target.value.trim();
+            renderResultFilesList();
+        });
+        window.addEventListener("nasaroai:ai-settings", () => {
+            updateDockUI();
+            if (currentUser) scheduleUserSync();
         });
         document.addEventListener("click", (e) => {
             const hub = document.getElementById("resultFilesHub");
@@ -7090,6 +7357,7 @@
                 appendCardLog(logEl, "임무 완료");
                 setAgentStatus("ok", "완료: " + mission);
                 showToast(`임무 완료: ${mission.length > 28 ? mission.slice(0, 28) + "…" : mission}`, "success");
+                notifyJobComplete("Nasaro AI · 에이전트 완료", mission);
                 addSessionHistory({
                     mode: "agent",
                     title: mission,
@@ -7626,12 +7894,12 @@
                 if (data.ready && data.enriched_task) {
                     appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.", collabIntakeModel);
                     collabIntakeActive = false;
-                    if (currentUser) refreshSideQuota();
+                    refreshSideQuota();
                     await runCollabRecommend(String(data.enriched_task).trim());
                 } else if (data.question) {
                     collabIntakeMessages.push({ role: "assistant", content: data.question });
                     appendCollabIntakeMessage("assistant", data.question, collabIntakeModel);
-                    if (currentUser) refreshSideQuota();
+                    refreshSideQuota();
                 } else {
                     throw new Error("질문을 받지 못했습니다.");
                 }
@@ -7686,7 +7954,7 @@
                 collabRecommendInFlight = false;
                 dockPrimaryBtn.disabled = false;
                 if (collabSession?.plan) collabTaskAsked = true;
-                if (currentUser) refreshSideQuota();
+                refreshSideQuota();
                 updateDockUI();
             }
         }
@@ -7994,6 +8262,7 @@
                         collabFinalProduct = collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
                         appendCollabLog("검증 통과 — 최종 작업물 준비 완료", "ok");
                         showToast("협업 작업이 완료되었습니다.", "success");
+                        notifyJobComplete("Nasaro AI · 협업 완료", collabSession.task || "협업 작업");
                         break;
                     }
                     const reason = verify.summary || "검증에서 보완 필요";
@@ -8457,6 +8726,8 @@
             const activeModels = getActiveModels();
             if (isFirstTurn) {
                 document.getElementById("compareResponses").innerHTML = "";
+                const sumBar = document.getElementById("compareSummaryBar");
+                if (sumBar) sumBar.style.display = "none";
             }
             ensureCompareModelCards(activeModels);
 
@@ -8468,6 +8739,7 @@
                 responses[model] = "";
                 appendCompareQaPair(model, message, turnIndex);
             });
+            updateCompareAffinityStars(message, activeModels);
 
             const failures = [];
             await Promise.all(
@@ -8488,7 +8760,7 @@
 
             showNotice("compareLoading", "");
             dockPrimaryBtn.disabled = false;
-            if (currentUser) refreshSideQuota();
+            refreshSideQuota();
 
             const sections = activeModels.map(m => ({ heading: m, body: responses[m] || "" }));
             const compareRoot = document.getElementById("compareResponses");
@@ -8502,6 +8774,7 @@
                 onSaveResult: saveResultRecord,
                 loggedIn: !!currentUser,
             });
+            refreshCompareSummary(message, responses);
             syncCompareSessionHistory();
             const answerText = activeModels.map(m => `[${m}]\n${responses[m] || ""}`).join("\n\n");
             logUserActivity("compare", message, answerText, "compare");
@@ -8562,12 +8835,14 @@
         const POSITION_CLASSES = ["active", "preview-prev", "preview-next", "hidden-left", "hidden-right"];
 
         function applyCardState(element, card, index) {
-            const label = safeLabel(card.model || card.actual_label);
-            const color = colorFor(label);
+            const isSummary = card.is_summary || card.speaker_index === 4;
+            const label = isSummary ? "요약" : safeLabel(card.model || card.actual_label);
+            const color = isSummary ? "#7c3aed" : colorFor(label);
             const isFailed = card.success === false && !card.loading;
             const listMode = isMobileCompact();
             const isActive = listMode ? true : index === activeCardIndex;
 
+            element.classList.toggle("summary-card", isSummary);
             element.style.borderLeftColor = isFailed ? "#dc2626" : color;
             element.classList.toggle("error-card", isFailed);
 
@@ -8594,13 +8869,13 @@
             element.innerHTML = `
                 <div class="debate-card-header" style="color: ${isFailed ? "#dc2626" : color};">
                     <span class="dot" style="background: ${isFailed ? "#dc2626" : color};"></span>
-                    <span>${card.round_number || "-"}라운드 · ${label}</span>
-                    ${isActive && !isFailed && !card.loading ? `<button class="debug-toggle" type="button" aria-label="디버그 정보">···</button>` : ""}
-                    <span class="debate-badge">${card.role || "발언"}</span>
+                    <span>${card.round_number || "-"}라운드 · ${isSummary ? "요약" : label}</span>
+                    ${isActive && !isFailed && !card.loading && !isSummary ? `<button class="debug-toggle" type="button" aria-label="디버그 정보">···</button>` : ""}
+                    <span class="debate-badge">${isSummary ? "라운드 요약" : (card.role || "발언")}</span>
                 </div>
                 <div class="${(listMode || isActive) ? "debate-card-body" : "debate-preview-body"}"></div>
                 ${isActive && isFailed ? `<div class="debate-retry"><button class="retry-button" type="button">다시 시도</button></div>` : ""}
-                ${isActive && !isFailed && !card.loading ? `
+                ${isActive && !isFailed && !card.loading && !isSummary ? `
                     <div class="debate-debug" id="${debugId}">
                         요청: ${card.requested_label || "-"} / 실제: ${card.actual_label || label}<br>
                         요청 모델: ${card.requested_model || "-"}<br>
@@ -8618,7 +8893,7 @@
                 });
             }
 
-            if (isActive && !isFailed && !card.loading) {
+            if (isActive && !isFailed && !card.loading && !isSummary) {
                 const toggle = element.querySelector(".debug-toggle");
                 const debug = element.querySelector(`#${CSS.escape(debugId)}`);
                 if (toggle && debug) {
@@ -8784,6 +9059,75 @@
             syncDebateSessionHistory();
         }
 
+        async function fetchDebateRoundSummary(roundNumber) {
+            if (debateCards.some(c => c.round_number === roundNumber && c.is_summary)) return;
+            const speakers = debateCards.filter(c =>
+                c.round_number === roundNumber && !c.loading && !c.is_summary &&
+                c.speaker_index >= 1 && c.speaker_index <= 3 && c.content && c.success !== false
+            );
+            if (speakers.length < 3) return;
+            const loadingId = `${roundNumber}-summary-loading`;
+            debateCards.push({
+                id: loadingId,
+                loading: true,
+                is_summary: true,
+                round_number: roundNumber,
+                speaker_index: 4,
+                model: "요약",
+                role: "라운드 요약",
+                content: "라운드 요약 생성 중…",
+            });
+            renderDebateDeck();
+            try {
+                const res = await apiFetch("/debate/round-summary", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        topic: debateTopic,
+                        round_number: roundNumber,
+                        turns: speakers.map(s => ({
+                            speaker_index: s.speaker_index,
+                            content: s.content,
+                            model: s.model,
+                        })),
+                        user_id: getDeviceId(),
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                const idx = debateCards.findIndex(c => c.id === loadingId);
+                if (idx === -1) return;
+                if (!res.ok) {
+                    debateCards.splice(idx, 1);
+                    renderDebateDeck();
+                    return;
+                }
+                debateCards[idx] = {
+                    id: `${roundNumber}-summary`,
+                    is_summary: true,
+                    round_number: roundNumber,
+                    speaker_index: 4,
+                    model: "요약",
+                    role: "라운드 요약",
+                    content: data.summary || [data.consensus, data.dispute, data.action].filter(Boolean).join("\n"),
+                    loading: false,
+                    success: true,
+                };
+                debateCards.sort((a, b) =>
+                    (a.round_number - b.round_number) ||
+                    ((a.speaker_index || 0) - (b.speaker_index || 0))
+                );
+                if (!userMovedDeck) activeCardIndex = debateCards.findIndex(c => c.id === `${roundNumber}-summary`);
+                renderDebateDeck();
+                refreshSideQuota();
+            } catch {
+                const idx = debateCards.findIndex(c => c.id === loadingId);
+                if (idx !== -1) {
+                    debateCards.splice(idx, 1);
+                    renderDebateDeck();
+                }
+            }
+        }
+
         async function runDebateRoundSequence(firstEndpoint, firstPayload, expectedRound) {
             for (let speakerIndex = 1; speakerIndex <= 3; speakerIndex += 1) {
                 const endpoint = speakerIndex === 1 ? firstEndpoint : "/debate/continue";
@@ -8800,6 +9144,8 @@
                 const turn = data.turns?.[0];
                 if (!turn || turn.success === false) break;
             }
+
+            await fetchDebateRoundSummary(expectedRound);
 
             if (queuedDuringFlight && !debateInFlight) {
                 queuedDuringFlight = false;
@@ -8931,7 +9277,10 @@
             initDebateSuggestions();
             syncDebateEmptyHint();
             bootstrapApiCheck();
-            ensureDeviceId().finally(() => startPresencePing());
+            ensureDeviceId().finally(() => {
+                startPresencePing();
+                refreshSideQuota();
+            });
         })();
 
         updateDockUI();

@@ -159,6 +159,35 @@
         else if (mode === "debate") localStorage.setItem("nasaroai_models_debate", JSON.stringify(modelsDebate));
         else if (mode === "agent") localStorage.setItem("nasaroai_models_agent", JSON.stringify(modelsAgent));
         else localStorage.setItem("nasaroai_models_compare", JSON.stringify(modelsCompare));
+        window.dispatchEvent(new CustomEvent("nasaroai:ai-settings"));
+    }
+
+    function exportAiSettings() {
+        return {
+            models_compare: modelsCompare.slice(),
+            models_debate: modelsDebate.slice(),
+            models_agent: modelsAgent.slice(),
+            model_collab: collabModel || FASTEST_MODEL,
+        };
+    }
+
+    function importAiSettings(settings) {
+        if (!settings || typeof settings !== "object") return;
+        const pickModels = (list) => {
+            if (!Array.isArray(list) || !list.length) return null;
+            const filtered = list.filter(m => MODELS.includes(m));
+            return filtered.length ? filtered : null;
+        };
+        const cmp = pickModels(settings.models_compare);
+        if (cmp) { modelsCompare = cmp; saveModels("compare"); }
+        const deb = pickModels(settings.models_debate);
+        if (deb) { modelsDebate = deb; saveModels("debate"); }
+        const ag = pickModels(settings.models_agent);
+        if (ag) { modelsAgent = [ag[0]]; saveModels("agent"); }
+        if (typeof settings.model_collab === "string" && MODELS.includes(settings.model_collab)) {
+            collabModel = settings.model_collab;
+            saveModels("collab");
+        }
     }
 
     function getModelsForMode(mode) {
@@ -758,6 +787,7 @@
         get theme() { return theme; },
         set theme(v) { theme = v; applyTheme(); },
         isPrivacyMode, setPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
+        exportAiSettings, importAiSettings,
         applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
         createShareLink, exportMarkdown, addResultActions, hideFloatingResultActions,
         showExportFormatMenu, loadShareFromUrl,
