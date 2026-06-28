@@ -1701,6 +1701,13 @@
             padding: 8px 12px 12px;
             display: flex;
             flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            max-height: min(420px, 48vh);
+            overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
         .compare-qa-pair {
             padding: 10px 0;
@@ -1708,6 +1715,7 @@
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
+            scroll-margin-bottom: 8px;
         }
         .compare-qa-pair:last-child {
             border-bottom: none;
@@ -1798,6 +1806,8 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            min-height: 280px;
+            max-height: min(520px, 58vh);
         }
 
         .compare-card-header {
@@ -1872,7 +1882,7 @@
         .debate-stage {
             position: relative;
             overflow: hidden;
-            min-height: 420px;
+            min-height: 480px;
             margin-top: 14px;
         }
 
@@ -1880,9 +1890,10 @@
             position: absolute;
             top: 0;
             left: 50%;
-            width: min(720px, 70%);
-            margin-left: calc(min(720px, 70%) / -2);
-            min-height: 320px;
+            width: min(780px, 78%);
+            margin-left: calc(min(780px, 78%) / -2);
+            min-height: 400px;
+            max-height: min(560px, 62vh);
             background: #fff;
             border: 1px solid #e5e7eb;
             border-left: 5px solid #9ca3af;
@@ -1891,6 +1902,8 @@
             transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
             will-change: transform, opacity;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .debate-card.active {
@@ -1975,13 +1988,17 @@
         }
 
         .debate-card-body {
-            max-height: 260px;
+            flex: 1 1 auto;
+            min-height: 320px;
+            max-height: 440px;
             overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: contain;
             white-space: pre-wrap;
             word-break: break-word;
-            padding: 14px;
+            padding: 16px 18px;
             font-size: var(--nasaro-answer-size, 16px);
-            line-height: 1.75;
+            line-height: 1.8;
         }
 
         .debate-preview-body {
@@ -2413,8 +2430,9 @@
                 flex: 1 1 auto;
             }
             #comparePanel.active .compare-grid {
-                flex: 1 1 auto;
+                flex: 0 0 auto;
                 min-height: 0;
+                align-content: start;
             }
             .compare-card {
                 border-radius: 14px;
@@ -2430,18 +2448,19 @@
                 min-height: 0;
                 display: flex;
                 flex-direction: column;
-                overflow: hidden;
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
             }
 
             .debate-stage {
                 min-height: 0;
-                flex: 1 1 auto;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
+                flex: 0 0 auto;
+                overflow: visible;
                 margin-top: 8px;
             }
             .debate-stage.debate-list-mode {
-                overflow-y: auto;
+                overflow: visible;
             }
             .debate-stage.debate-list-mode .debate-card {
                 position: relative;
@@ -2449,19 +2468,23 @@
                 top: auto;
                 width: 100% !important;
                 margin: 0 0 12px !important;
-                min-height: 220px;
+                min-height: 280px;
+                max-height: min(520px, 58vh);
                 transform: none !important;
                 opacity: 1 !important;
                 z-index: 1 !important;
                 pointer-events: auto !important;
                 border-radius: 14px;
                 box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+                display: flex;
+                flex-direction: column;
             }
             .debate-stage.debate-list-mode .debate-card-body {
-                max-height: none;
-                min-height: 160px;
+                max-height: min(380px, 42vh);
+                min-height: 200px;
                 font-size: 15px;
                 padding: 14px 16px;
+                overflow-y: auto;
             }
             .debate-stage.debate-list-mode .debate-preview-body {
                 display: none;
@@ -5199,24 +5222,51 @@
             });
         }
 
-        function appendCompareQaPair(model, question, turnIndex) {
+        function appendCompareQaPair(model, question, turnIndex, opts = {}) {
             const key = compareModelKey(model);
             const slug = compareContentSlug(turnIndex, model);
             const stack = document.getElementById(`compare-qa-stack-${key}`);
             if (!stack) return slug;
-            stack.innerHTML = "";
+            if (document.getElementById(`compare-qa-pair-${slug}`)) return slug;
             const pair = document.createElement("div");
             pair.className = "compare-qa-pair";
             pair.id = `compare-qa-pair-${slug}`;
+            pair.dataset.turnIndex = String(turnIndex);
             pair.innerHTML = `
                 <div class="compare-q-bubble">${escapeHtml(question)}</div>
                 <div id="content-${slug}" class="compare-content"></div>
                 <div id="retry-${slug}" class="retry-row"></div>`;
             stack.appendChild(pair);
-            requestAnimationFrame(() => {
-                pair.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            });
+            if (opts.scroll !== false) {
+                requestAnimationFrame(() => {
+                    stack.scrollTop = stack.scrollHeight;
+                    pair.scrollIntoView({ behavior: "smooth", block: "end" });
+                });
+            }
             return slug;
+        }
+
+        function rebuildCompareCardsFromTurns() {
+            const el = document.getElementById("compareResponses");
+            if (el) el.innerHTML = "";
+            const allModels = new Set();
+            compareTurns.forEach(turn => Object.keys(turn.responses || {}).forEach(m => allModels.add(m)));
+            ensureCompareModelCards([...allModels]);
+            compareTurns.forEach((turn, turnIndex) => {
+                Object.keys(turn.responses || {}).forEach(model => {
+                    appendCompareQaPair(model, turn.query, turnIndex, { scroll: false });
+                    const failed = turn.responses[model] === COMPARE_FAILURE_MSG;
+                    updateCompareCard(model, turn.responses[model] || "", failed, turnIndex);
+                });
+                if (turn.query) updateCompareAffinityStars(turn.query, Object.keys(turn.responses || {}));
+            });
+            const lastTurn = compareTurns[compareTurns.length - 1];
+            if (lastTurn) {
+                Object.keys(lastTurn.responses || {}).forEach(model => {
+                    const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
+                    if (stack) stack.scrollTop = stack.scrollHeight;
+                });
+            }
         }
 
         function syncCompareSessionHistory() {
@@ -5258,22 +5308,12 @@
             mainInput.value = "";
             autoResizeInput();
             const el = document.getElementById("compareResponses");
-            el.innerHTML = "";
             showNotice("compareLoading", "");
             showNotice("compareError", "");
             const compareHint = document.getElementById("compareEmptyHint");
             if (compareHint) compareHint.style.display = compareTurns.length ? "none" : "flex";
-            const allModels = new Set();
-            compareTurns.forEach(turn => Object.keys(turn.responses || {}).forEach(m => allModels.add(m)));
-            ensureCompareModelCards([...allModels]);
-            const lastTurnIdx = compareCurrentTurnIndex;
-            if (lastTurn) {
-                Object.keys(lastTurn.responses || {}).forEach(model => {
-                    appendCompareQaPair(model, lastTurn.query, lastTurnIdx);
-                    updateCompareCard(model, lastTurn.responses[model] || "", lastTurn.responses[model] === COMPARE_FAILURE_MSG, lastTurnIdx);
-                });
-            }
-            if (lastTurn) {
+            rebuildCompareCardsFromTurns();
+            const lastTurn = compareTurns[compareCurrentTurnIndex];
                 const sections = Object.keys(lastTurn.responses).map(m => ({ heading: m, body: lastTurn.responses[m] || "" }));
                 if (sections.length) {
                     window.NasaroFeatures?.addResultActions?.(el, {
@@ -6189,7 +6229,7 @@
                 const rem = Math.round(total.remaining ?? 0);
                 const lim = Math.round(total.limit ?? (q.guest ? 70 : 250));
                 el.textContent = `${COIN}${rem}/${lim}`;
-                el.title = q.guest ? "비회원 일일 코인 (KST 자정 리셋)" : "회원 일일 코인 (KST 자정 리셋)";
+                el.title = (q.guest ? "비회원" : "회원") + ` 통합 코인 · AI 1회=🪙1 · KST 자정 리셋`;
             } catch {
                 el.textContent = "";
             }
@@ -6436,10 +6476,11 @@
                     const guest = q.guest ? " (비회원)" : " (회원)";
                     const total = q.total || {};
                     const lines = [
-                        `통합: ${coinCost(total.used)}/${coinCost(total.limit)} (남음 ${coinCost(total.remaining)})`,
+                        `통합 코인 ${coinCost(total.used)}/${coinCost(total.limit)} (남음 ${coinCost(total.remaining)})`,
+                        `AI 1회 = 🪙1 · 비교·토론·협업·에이전트 공통`,
                     ];
                     Object.entries(q.features || q.coins || {}).forEach(([k, v]) => {
-                        lines.push(`${k}: 사용 ${coinCost(v.used)}`);
+                        if (Number(v.used) > 0) lines.push(`${k} AI호출 ${coinCost(v.used)}`);
                     });
                     if (quotaEl) {
                         quotaEl.textContent = lines.join("\n") + guest;
@@ -8590,7 +8631,17 @@
         function updateCompareModelMeta(model, actualModel, turnIndex = compareCurrentTurnIndex) {
             const key = compareModelKey(model);
             const meta = document.getElementById(`model-meta-${key}`);
-            if (meta && actualModel) meta.textContent = actualModel;
+            if (!meta) return;
+            const msg = compareTurns[turnIndex]?.query || lastCompareMessage || "";
+            const affinity = getCompareAffinityModels(msg);
+            const star = modelMatchesAffinity(model, affinity) ? "★ " : "";
+            if (actualModel) {
+                meta.textContent = star + actualModel;
+                meta.className = "compare-model-meta" + (star ? " compare-affinity-star" : "");
+            } else if (star) {
+                meta.textContent = "★";
+                meta.className = "compare-model-meta compare-affinity-star";
+            }
         }
 
         function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex) {

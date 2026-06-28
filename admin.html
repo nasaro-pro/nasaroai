@@ -555,31 +555,49 @@
 
     function fmtQuota(q) {
       if (!q || typeof q !== "object") return "-";
-      return Object.entries(q).filter(([k]) => !k.startsWith("_")).map(([k, v]) => {
-        if (v && typeof v === "object") return `${FEATURE_LABELS[k] || k}:🪙${v.used}/🪙${v.limit}`;
-        return `${k}:🪙${v}`;
-      }).join(" ");
+      const feats = ["compare", "debate", "collab", "agent"];
+      const total = feats.reduce((s, f) => s + Number(q[f] || 0), 0);
+      const parts = feats.filter(f => Number(q[f] || 0) > 0).map(f => `${FEATURE_LABELS[f] || f}:${Math.round(q[f])}`);
+      return parts.length ? `🪙${Math.round(total)} (${parts.join(" · ")})` : `🪙${Math.round(total)}`;
+    }
+
+    function fmtQuotaSnapshot(snap) {
+      if (!snap || typeof snap !== "object") return "-";
+      const total = snap.total || {};
+      const used = Math.round(total.used ?? 0);
+      const limit = Math.round(total.limit ?? 0);
+      const rem = Math.round(total.remaining ?? Math.max(0, limit - used));
+      return `🪙${used}/${limit} (남음 🪙${rem})`;
     }
 
     function renderQuotaAdminPanel(subject, snapshot, limits, banned) {
-      const feats = Object.keys(limits || snapshot || {});
-      const rows = feats.map(f => {
-        const v = (snapshot && snapshot[f]) || {};
+      const snap = snapshot || {};
+      const total = snap.total || {};
+      const poolUsed = Math.round(total.used ?? 0);
+      const poolLimit = Math.round(total.limit ?? limits?._pool ?? limits?.compare ?? 250);
+      const poolRem = Math.round(total.remaining ?? Math.max(0, poolLimit - poolUsed));
+      const feats = ["compare", "debate", "collab", "agent"];
+      const features = snap.features || snap;
+      const breakdown = feats.map(f => {
+        const v = features[f] || {};
         const used = Math.round(v.used ?? 0);
-        const limit = Math.round(v.limit ?? limits?.[f] ?? 0);
-        const rem = Math.round(v.remaining ?? Math.max(0, Number(limit) - Number(used)));
         return `<div class="quota-row" data-feature="${f}">
           <span class="quota-feat">${FEATURE_LABELS[f] || f}</span>
-          <span class="quota-val" data-qval="${f}">🪙${used}/🪙${limit} (남음 🪙${rem})</span>
-          <input type="number" class="q-limit-inp" data-feature="${f}" value="${limit}" min="0" max="9999" step="1" style="width:54px" title="일일 코인 한도">
-          <button type="button" class="secondary q-save-limit" data-feature="${f}">한도 저장</button>
+          <span class="quota-val" data-qval="${f}">AI 호출 🪙${used}</span>
           <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-1">-🪙1</button>
           <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="1">+🪙1</button>
         </div>`;
       }).join("");
       return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
-        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">오늘 코인 (실시간) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
-        ${rows || "<div class='empty'>없음</div>"}
+        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">오늘 통합 코인 (AI 1회=🪙1) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
+        <div class="quota-row" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #334155;">
+          <span class="quota-feat">통합</span>
+          <span class="quota-val" id="quotaPoolVal" data-qval="_pool">🪙${poolUsed}/🪙${poolLimit} (남음 🪙${poolRem})</span>
+          <input type="number" class="q-limit-inp" data-feature="_pool" value="${poolLimit}" min="0" max="9999" step="1" style="width:54px" title="일일 통합 한도">
+          <button type="button" class="secondary q-save-limit" data-feature="_pool">한도 저장</button>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin:0 0 6px;">기능별 AI 호출 (같은 코인 풀에서 차감)</div>
+        ${breakdown || "<div class='empty'>없음</div>"}
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="secondary" id="quotaRefreshBtn">새로고침</button>
           <button type="button" class="${banned ? "" : "secondary"}" id="banToggleBtn">${banned ? "차단 해제" : "사용 금지"}</button>
@@ -593,13 +611,19 @@
         const snap = await api("/admin/quota?subject=" + encodeURIComponent(subject));
         const box = document.getElementById("quotaAdminBox");
         if (!box) return;
-        const limits = snap.limits || {};
-        Object.keys(limits).forEach(f => {
+        const total = snap.total || {};
+        const poolEl = document.getElementById("quotaPoolVal");
+        if (poolEl) {
+          poolEl.textContent = `🪙${Math.round(total.used ?? 0)}/🪙${Math.round(total.limit ?? 0)} (남음 🪙${Math.round(total.remaining ?? 0)})`;
+        }
+        const poolInp = box.querySelector('.q-limit-inp[data-feature="_pool"]');
+        if (poolInp && document.activeElement !== poolInp) {
+          poolInp.value = String(Math.round(total.limit ?? poolInp.value ?? 0));
+        }
+        ["compare", "debate", "collab", "agent"].forEach(f => {
           const el = box.querySelector(`[data-qval="${f}"]`);
           const v = snap.features?.[f] || {};
-          if (el) el.textContent = `🪙${Math.round(v.used ?? 0)}/🪙${Math.round(v.limit ?? limits[f])} (남음 🪙${Math.round(v.remaining ?? 0)})`;
-          const inp = box.querySelector(`.q-limit-inp[data-feature="${f}"]`);
-          if (inp && document.activeElement !== inp) inp.value = String(Math.round(v.limit ?? limits[f] ?? 0));
+          if (el) el.textContent = `AI 호출 🪙${Math.round(v.used ?? 0)}`;
         });
         box.dataset.banned = snap.banned ? "1" : "0";
         const banBtn = document.getElementById("banToggleBtn");
@@ -683,6 +707,9 @@
       const onlineTotal = data.online_total ?? (onlineUsers + onlineGuests);
       const usageAll = data.usage_all_time || {};
       const usageToday = data.usage_today || {};
+      const usageTodayTotal = data.usage_today_total ?? Object.values(usageToday).reduce((s, v) => s + Number(v || 0), 0);
+      const poolMember = data.quota_limits?.pool_member ?? 250;
+      const poolGuest = data.quota_limits?.pool_guest ?? 70;
       document.getElementById("statsRow").innerHTML = `
         <div class="stat"><b>${data.total_users}</b><span>전체 회원</span></div>
         <div class="stat"><b>${onlineTotal}</b><span>실시간 접속 (2분)</span></div>
@@ -691,8 +718,8 @@
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageToday)}</b><span>오늘 코인 사용</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageAll)}</b><span>전체 누적 코인</span></div>`;
+        <div class="stat"><b style="font-size:13px;">🪙${Math.round(usageTodayTotal)}</b><span>오늘 AI 호출(전체)</span></div>
+        <div class="stat"><b style="font-size:12px;">회원🪙${poolMember} · 비회원🪙${poolGuest}</b><span>일일 통합 한도</span></div>`;
       document.getElementById("platformStats").innerHTML = Object.keys(ps).length
         ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
         : "<span class='empty'>오늘 활동 기록 없음</span>";
@@ -784,7 +811,6 @@
         const hours = hourArrayFromMap(map);
         const max = Math.max(...hours, 1);
         const total = hours.reduce((a, b) => a + b, 0);
-        const limit = limits[feat] ?? "-";
         const bars = hours.map((v, hr) => {
           const pct = Math.max(1, Math.round((v / max) * 100));
           const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
@@ -794,9 +820,9 @@
           </div>`;
         }).join("");
         return `<div class="chart-panel">
-          <h3>${FEATURE_LABELS[feat]} · ${total}/${limit}회</h3>
+          <h3>${FEATURE_LABELS[feat]} · 오늘 AI 🪙${total}</h3>
           <div class="stacked-chart">${bars}</div>
-          <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별</span></div>
+          <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별 호출</span></div>
         </div>`;
       }).join("");
     }
@@ -1046,13 +1072,15 @@
       return items;
     }
 
-    function renderFeatureStatCards(map, limits, prefix) {
+    function renderFeatureStatCards(map, prefix, showLimit) {
       const feats = ["compare", "debate", "collab", "agent"];
-      return feats.map(f => {
+      const total = feats.reduce((s, f) => s + Number(map?.[f] || 0), 0);
+      const cards = feats.map(f => {
         const used = Number(map?.[f] || 0);
-        const limit = limits?.[f] ?? "-";
-        return `<div class="stat"><b>${used}</b><span>${prefix}${FEATURE_LABELS[f] || f} · 한도 🪙${limit}</span></div>`;
+        return `<div class="stat"><b>${used}</b><span>${prefix}${FEATURE_LABELS[f] || f} AI호출</span></div>`;
       }).join("");
+      const limitNote = showLimit ? ` · 한도 🪙${showLimit}` : "";
+      return `<div class="stat"><b>🪙${Math.round(total)}</b><span>${prefix}통합${limitNote}</span></div>${cards}`;
     }
 
     function renderMemberStatsBlock() {
@@ -1069,23 +1097,23 @@
       });
       const actToday = dashData?.member_activity_by_feature || {};
       const actAll = dashData?.member_activity_all_time || {};
-      const limits = dashData?.quota_limits?.member || {};
+      const poolLimit = dashData?.quota_limits?.pool_member ?? 250;
       el.innerHTML = `
-        <h4>회원 통계 — 오늘 quota 사용</h4>
+        <h4>회원 — 오늘 AI 코인 (통합 풀 🪙${poolLimit}/人·日)</h4>
         <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(quotaTotals, limits, "사용 ")}
+          ${renderFeatureStatCards(quotaTotals, "오늘 ", poolLimit)}
         </div>
-        <h4 style="margin-top:10px;">회원 통계 — 전체 누적 quota</h4>
+        <h4 style="margin-top:10px;">회원 — 전체 누적 AI 호출</h4>
         <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(quotaAllTotals, limits, "누적 ")}
+          ${renderFeatureStatCards(quotaAllTotals, "누적 ", null)}
         </div>
         <h4 style="margin-top:10px;">회원 활동 기록 — 오늘</h4>
         <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(actToday, null, "")}
+          ${renderFeatureStatCards(actToday, "", null)}
         </div>
         <h4 style="margin-top:10px;">회원 활동 기록 — 전체</h4>
         <div class="entity-summary">
-          ${renderFeatureStatCards(actAll, null, "")}
+          ${renderFeatureStatCards(actAll, "", null)}
         </div>`;
     }
 
@@ -1100,6 +1128,8 @@
       });
       const actToday = dashData?.guest_activity_by_feature || {};
       const actAll = dashData?.guest_activity_all_time || {};
+      const usageToday = dashData?.usage_today || {};
+      const guestPool = dashData?.quota_limits?.pool_guest ?? 70;
       const platText = Object.entries(platforms).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
       el.innerHTML = `
         <h4>비회원 통계</h4>
@@ -1108,14 +1138,19 @@
           <div class="stat"><b>${items.length}</b><span>등록 기기</span></div>
           <div class="stat"><b>${items.reduce((s, g) => s + (g.activity_count || 0), 0)}</b><span>누적 활동</span></div>
           <div class="stat"><b style="font-size:12px;">${platText}</b><span>플랫폼 분포</span></div>
+          <div class="stat"><b>🪙${guestPool}</b><span>기기당 일일 통합 한도</span></div>
+        </div>
+        <h4 style="margin-top:10px;">비회원 AI 호출 — 오늘 (전체)</h4>
+        <div class="entity-summary" style="margin-bottom:8px;">
+          ${renderFeatureStatCards(usageToday, "전체 ", null)}
         </div>
         <h4 style="margin-top:10px;">비회원 활동 기록 — 오늘</h4>
         <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(actToday, dashData?.quota_limits?.guest || {}, "")}
+          ${renderFeatureStatCards(actToday, "", null)}
         </div>
         <h4 style="margin-top:10px;">비회원 활동 기록 — 전체</h4>
         <div class="entity-summary">
-          ${renderFeatureStatCards(actAll, dashData?.quota_limits?.guest || {}, "")}
+          ${renderFeatureStatCards(actAll, "", null)}
         </div>`;
     }
 
@@ -1336,7 +1371,7 @@
         document.getElementById("userDetail").innerHTML = `
           <p><button type="button" class="secondary" id="guestDetailBackBtn">← 기기 목록</button></p>
           <p>기기 ID: <code>${deviceId}</code></p>
-          ${renderQuotaAdminPanel(subject, snap.features, snap.limits, snap.banned)}
+          ${renderQuotaAdminPanel(subject, snap, snap.limits, snap.banned)}
           <h3 style="font-size:13px;color:#c4b5fd;margin:12px 0 6px;">활동 기록 <span style="font-size:11px;color:#94a3b8;font-weight:400;">· 항목 클릭 시 상세</span></h3>
           <div class="activity-list" id="guestActivityList">${renderDetailActivityHtml(data.activity || [], 500)}</div>`;
         wireDetailActivityList(document.getElementById("guestActivityList"));

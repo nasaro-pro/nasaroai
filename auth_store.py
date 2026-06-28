@@ -1275,7 +1275,12 @@ def get_admin_dashboard() -> dict[str, Any]:
         "quota_limits": {
             "member": dict(MEMBER_QUOTA_LIMITS),
             "guest": dict(GUEST_QUOTA_LIMITS),
+            "pool_member": MEMBER_DAILY_COINS,
+            "pool_guest": GUEST_DAILY_COINS,
         },
+        "usage_today_total": round(
+            sum(float(r["total"]) for r in today_usage), 2
+        ) if today_usage else 0.0,
         "users": enriched,
         "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),
@@ -1974,6 +1979,7 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
         })
     subject = f"user:{user_id}"
     snap = get_quota_snapshot(subject)
+    pool_limit = daily_pool_limit(subject)
     return {
         **user,
         "subject": subject,
@@ -1987,8 +1993,10 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
             "%Y-%m-%d %H:%M", time.localtime(login_stats["last_login_at"])
         ) if login_stats.get("last_login_at") else "-",
         "quota_today": {k: round(float(quotas.get(k, 0)), 2) for k in MEMBER_QUOTA_LIMITS},
-        "quota_snapshot": snap.get("features", {}),
-        "quota_limits": snap.get("limits", MEMBER_QUOTA_LIMITS),
+        "quota_today_total": round(sum(float(quotas.get(k, 0)) for k in MEMBER_QUOTA_LIMITS), 2),
+        "quota_snapshot": snap,
+        "quota_limits": {"_pool": pool_limit, **snap.get("limits", MEMBER_QUOTA_LIMITS)},
+        "pool_limit": pool_limit,
         "quota_all_time": quotas.get("_all_time", {}),
         "saved_results_count": len(data.get("saved_works") or []),
         "activity": activity,
