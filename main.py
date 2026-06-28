@@ -622,6 +622,7 @@ class CollabStageRequest(BaseModel):
     verification_feedback: str = ""
     is_rework: bool = False
     artifact_under_review: str = ""
+    previous_artifact: str = ""
 
 
 class CollabFollowupRequest(BaseModel):
@@ -629,6 +630,7 @@ class CollabFollowupRequest(BaseModel):
     original_task: str = ""
     work_type: str = ""
     stage_outputs: list[str] = Field(default_factory=list)
+    final_product: str = ""
     user_id: str = ""
     pre_work: bool = False
 
@@ -2807,6 +2809,31 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
 COLLAB_INTAKE_MAX_COINS = 10
 
 
+def _build_intake_enriched_task(messages: list, task: str) -> str:
+    """원래 요청 + AI 질문·사용자 답변 전체를 하나의 작업 지시문으로 통합."""
+    lines = [f"【원래 요청】\n{task.strip()}"]
+    pending_q: str | None = None
+    qa_blocks: list[str] = []
+    for m in messages:
+        role = (getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else "") or "").strip().lower()
+        content = (getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else "") or "").strip()
+        if not content or content.startswith("질문을 준비") or content.startswith("수집한 정보"):
+            continue
+        if role == "assistant":
+            pending_q = content
+        elif role == "user":
+            if content == task.strip():
+                continue
+            if pending_q:
+                qa_blocks.append(f"Q: {pending_q}\nA: {content}")
+                pending_q = None
+            else:
+                qa_blocks.append(f"추가 입력: {content}")
+    if qa_blocks:
+        lines.append("【수집 대화】\n" + "\n\n".join(qa_blocks))
+    return "\n\n".join(lines)
+
+
 @app.post("/collab/intake")
 async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
     """AI 추천 전 작업 세부사항을 채팅으로 수집한다 (1 coin/질문, 최대 10 coin)."""
@@ -2867,7 +2894,7 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
         "- 「더 알려주세요」「어떤 작업인가요」「목표가 무엇인가요」 같은 **빈 질문 금지**.\n"
         "- 질문은 실행 가능하게 (예: '자기소개서 분량이 몇 자인가요?' / '타깃 연령대는?' / '사용할 프레임워크는?').\n"
         "- 핵심 정보가 충분하면 ready=true (보통 4~8회 질문).\n"
-        "- ready=true일 때 enriched_task에 수집한 모든 정보를 통합한 완전한 작업 지시문을 작성하세요.\n\n"
+        "- ready=true일 때 enriched_task에 **원래 요청 + 위 대화의 모든 Q&A**를 반영한 완전한 작업 지시문을 작성하세요.\n\n"
         'JSON만 출력: {"ready": false, "question": "..."} 또는 '
         '{"ready": true, "enriched_task": "통합 작업 설명..."}'
     )
@@ -2901,10 +2928,7 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
 
     ai_calls_done = len(asked_questions)
     if ai_calls_done >= COLLAB_INTAKE_MAX_COINS:
-        merged = f"{task}\n\n[추가 정보]\n" + "\n".join(
-            u for u in user_facts if u != task
-        )
-        return {"ready": True, "enriched_task": merged.strip(), "question": ""}
+        return {"ready": True, "enriched_task": _build_intake_enriched_task(data.messages, task), "question": ""}
 
     _require_quota(request, "collab", data.user_id, amount=1.0, action="intake")
 
@@ -2943,15 +2967,11 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
                 pass
 
     if user_turns >= len(fallback_questions):
-        merged = f"{task}\n\n[추가 정보]\n" + "\n".join(
-            u for u in user_facts if u != task
-        )
-        return {"ready": True, "enriched_task": merged.strip(), "question": ""}
+        return {"ready": True, "enriched_task": _build_intake_enriched_task(data.messages, task), "question": ""}
     alt = _next_fallback_question()
     if alt:
         return {"ready": False, "question": alt, "enriched_task": ""}
-    merged = f"{task}\n\n[추가 정보]\n" + "\n".join(u for u in user_facts if u != task)
-    return {"ready": True, "enriched_task": merged.strip(), "question": ""}
+    return {"ready": True, "enriched_task": _build_intake_enriched_task(data.messages, task), "question": ""}
 
 
 @app.post("/collab/recommend")
@@ -3067,6 +3087,12 @@ def _collab_stage_prompt(data: CollabStageRequest) -> str:
     if data.is_rework and data.verification_feedback:
         rework_note = (
             f"\n\n[검증 AI 피드백 — 반드시 반영하여 이 단계 산출물을 수정]\n{data.verification_feedback}\n"
+        )
+    if data.is_rework and data.previous_artifact:
+        rework_note += (
+            f"\n\n[이전 {stage_role} 산출물 — **반드시 이 내용을 기반으로 개선·확장**. "
+            f"처음부터 새로 쓰지 말고 이전보다 분명히 나은 결과를 만드세요]\n"
+            f"{data.previous_artifact[:8000]}\n"
         )
 
     if data.stage_index == 3 and not data.is_rework:
@@ -3246,18 +3272,23 @@ async def collab_followup_route(data: CollabFollowupRequest, request: Request) -
             "success": True,
         }
 
-    outputs_summary = "\n".join(
-        f"[{i + 1}단계] {(t or '')[:400]}" for i, t in enumerate(data.stage_outputs[:3])
+    outputs_summary = "\n\n".join(
+        f"=== {i + 1}단계 ===\n{(t or '')[:2500]}" for i, t in enumerate(data.stage_outputs[:4])
     )
+    final_snip = (data.final_product or data.stage_outputs[2] if len(data.stage_outputs) > 2 else "")[:3500]
     prompt = (
-        f"원래 작업: {data.original_task}\n"
+        f"원래 작업:\n{data.original_task}\n"
         f"작업 유형: {data.work_type}\n"
-        f"추가 요청: {data.task}\n\n"
-        f"현재 단계별 산출물 요약:\n{outputs_summary or '없음'}\n\n"
+        f"추가 요청:\n{data.task}\n\n"
+        f"현재 단계별 산출물:\n{outputs_summary or '없음'}\n\n"
+        f"현재 최종 작업물(제작본):\n{final_snip or '없음'}\n\n"
+        "추가 요청은 **기존 작업·산출물을 이어서** 수정·확장해야 합니다. "
+        "완전히 다른 새 작업으로 시작하지 마세요.\n"
         "추가 요청을 반영하려면 어느 단계부터 다시 해야 하는지 판단하세요.\n"
         "1=조사, 2=구조, 3=제작. 논리·구조 수정이면 2, 사실·근거면 1, 문장·초안만이면 3.\n"
         "재작업 후 반드시 4단계 검증을 다시 거쳐야 합니다.\n"
-        'JSON만 출력: {"start_stage": 1, "reason": "한국어 설명", "merged_task": "반영된 전체 작업 설명"}'
+        'JSON만 출력: {"start_stage": 1, "reason": "한국어 설명", '
+        '"merged_task": "원래+추가를 모두 반영한 전체 작업 설명"}'
     )
     result = await call_ai_best(prompt, max_tokens=300)
     start_stage = 1

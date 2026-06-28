@@ -530,16 +530,6 @@
         .panel.active {
             display: block;
         }
-        #debatePanel.active {
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            flex: 1 1 auto;
-            overflow-y: auto;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-            max-height: calc(100dvh - var(--input-dock-height, 88px) - 80px);
-        }
 
         /* 협업 초기 안내 — 요청 후 채팅 표시 */
         .collab-intro {
@@ -1702,6 +1692,9 @@
             margin-bottom: 8px;
             line-height: 1.45;
             word-break: break-word;
+            position: sticky;
+            top: 0;
+            z-index: 2;
         }
         .compare-affinity-badge {
             display: inline-block;
@@ -2514,12 +2507,6 @@
                 flex-direction: column;
                 min-height: 0;
                 flex: 1 1 auto;
-            }
-            #debatePanel.active {
-                overflow-y: auto;
-                overflow-x: hidden;
-                -webkit-overflow-scrolling: touch;
-                max-height: calc(100dvh - var(--input-dock-height, 88px) - 64px);
             }
             #comparePanel.active .compare-grid {
                 flex: 0 0 auto;
@@ -3777,17 +3764,24 @@
 
         .result-action-row { display: none; }
         .dock-result-actions-slot {
-            display: none;
+            display: flex;
             flex-wrap: wrap;
             align-items: stretch;
             justify-content: stretch;
             gap: 6px;
             width: 100%;
+            min-height: 46px;
             padding: 0 0 6px;
-            border-bottom: 1px solid #ede9fe;
+            border-bottom: 1px solid transparent;
             margin-bottom: 2px;
+            visibility: hidden;
+            pointer-events: none;
         }
-        .dock-result-actions-slot.has-actions { display: flex; }
+        .dock-result-actions-slot.has-actions {
+            visibility: visible;
+            pointer-events: auto;
+            border-bottom-color: #ede9fe;
+        }
         .dock-result-actions-slot .result-action-btn {
             flex: 1 1 0;
             min-width: 0;
@@ -7194,8 +7188,37 @@
         function scrollComparePairIntoView(stack, pair) {
             if (!stack || !pair) return;
             requestAnimationFrame(() => {
-                stack.scrollTop = Math.max(0, pair.offsetTop - 6);
+                const bubble = pair.querySelector(".compare-q-bubble");
+                const targetTop = bubble ? bubble.offsetTop : pair.offsetTop;
+                stack.scrollTop = Math.max(0, targetTop - 4);
             });
+        }
+
+        function confirmCollabRework(verify) {
+            const stages = (verify.reworkStages || []).map(s => s + 1).join(", ");
+            const summary = verify.summary || "검증에서 보완이 필요합니다.";
+            const msg = [
+                "검증 결과 보완이 필요합니다.",
+                summary,
+                stages ? `\n재작업 단계: ${stages}단계` : "",
+                "\n재작업 시 AI 호출마다 코인(🪙1)이 차감됩니다.",
+                "재작업하시겠습니까? (취소하면 현재 작업물을 사용합니다)",
+            ].filter(Boolean).join("\n");
+            return Promise.resolve(window.confirm(msg));
+        }
+
+        async function finishCollabWithCurrentProduct(reason) {
+            appendCollabLog(reason || "현재 작업물로 완료", "info");
+            try {
+                const finalData = await runCollabFinalize();
+                collabFinalProduct = finalData?.guidance || collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
+                appendCollabLog("최종 작업물 완성", "ok");
+            } catch (finErr) {
+                collabFinalProduct = collabSession.stageOutputs[2] || collabSession.stageOutputs[3] || "";
+                appendCollabLog(`최종 통합 실패 — 제작본 사용: ${finErr.message}`, "warn");
+            }
+            showToast("협업 작업이 완료되었습니다.", "success");
+            notifyJobComplete("Nasaro AI · 협업 완료", collabSession.task || "협업 작업");
         }
 
         // ── Android 설치 안내 모달 ────────────────────────────────────────────
@@ -8066,13 +8089,23 @@
         }
 
         function buildCollabIntakeBrief() {
-            const parts = [collabIntakeTask];
-            collabIntakeMessages.forEach(m => {
-                if (m.role === "user" && m.content?.trim() && m.content.trim() !== collabIntakeTask) {
-                    parts.push(m.content.trim());
+            const lines = [`【원래 요청】\n${collabIntakeTask}`];
+            let pendingQ = null;
+            for (const m of collabIntakeMessages) {
+                const content = (m.content || "").trim();
+                if (!content || content.startsWith("수집한 정보")) continue;
+                if (m.role === "assistant") {
+                    pendingQ = content;
+                } else if (m.role === "user" && content !== collabIntakeTask) {
+                    if (pendingQ) {
+                        lines.push(`Q: ${pendingQ}\nA: ${content}`);
+                        pendingQ = null;
+                    } else {
+                        lines.push(`추가: ${content}`);
+                    }
                 }
-            });
-            return parts.filter(Boolean).join("\n\n");
+            }
+            return lines.join("\n\n");
         }
 
         async function skipCollabIntakeToRecommend() {
@@ -8411,10 +8444,11 @@
                 .join("\n\n");
         }
 
-        async function runCollabStageInternal(stageIndex, isRework = false, verificationFeedback = "") {
+        async function runCollabStageInternal(stageIndex, isRework = false, verificationFeedback = "", opts = {}) {
             if (!collabSession?.plan) return null;
             const stage = collabSession.plan.stages[stageIndex];
             if (!stage) return null;
+            const previousArtifact = opts.previousArtifact ?? (isRework ? (collabSession.stageOutputs[stageIndex] || "") : "");
             collabSession.stageStates[stageIndex] = "running";
             collabSelectedStage = stageIndex;
             renderCollabRunner(document.getElementById("collabRecommendResult"));
@@ -8434,6 +8468,7 @@
                 is_rework: isRework,
                 verification_feedback: verificationFeedback,
                 artifact_under_review: stageIndex === 3 ? (collabSession.stageOutputs[2] || "") : "",
+                previous_artifact: previousArtifact,
             };
 
             try {
@@ -8487,19 +8522,21 @@
             return data;
         }
 
-        async function runCollabPipeline(fromStage = 0) {
+        async function runCollabPipeline(fromStage = 0, opts = {}) {
             if (collabPipelineRunning || !collabSession?.plan) return;
             collabPipelineRunning = true;
             collabFinalProduct = "";
+            const snapshot = opts.previousOutputs || collabSession.stageOutputs.slice();
+            const followNote = opts.followUpNote || "";
             const startBtn = document.getElementById("collabStartBtn");
             if (startBtn) startBtn.disabled = true;
-            appendCollabLog(fromStage === 0 ? "협업 파이프라인 시작 (단계별 순차 실행)" : `${fromStage + 1}단계부터 재실행`, "info");
+            appendCollabLog(fromStage === 0 && !followNote ? "협업 파이프라인 시작 (단계별 순차 실행)" : `${fromStage + 1}단계부터 재실행`, "info");
 
             try {
                 for (let i = fromStage; i < 3; i++) {
-                    collabSession.stageStates[i] = "idle";
-                    collabSession.stageOutputs[i] = "";
-                    await runCollabStageInternal(i, fromStage > 0 && i >= fromStage, "");
+                    const prev = snapshot[i] || collabSession.stageOutputs[i] || "";
+                    const fb = (i === fromStage && followNote) ? followNote : "";
+                    await runCollabStageInternal(i, !!prev, fb, { previousArtifact: prev });
                 }
 
                 let loops = 0;
@@ -8514,33 +8551,29 @@
                     );
                     if (verify.pass) {
                         appendCollabLog("검증 통과 — 최종 통합·윤색 시작", "ok");
-                        try {
-                            const finalData = await runCollabFinalize();
-                            collabFinalProduct = finalData?.guidance || collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
-                            appendCollabLog("최종 작업물 완성", "ok");
-                        } catch (finErr) {
-                            collabFinalProduct = collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
-                            appendCollabLog(`최종 통합 실패 — 제작본 사용: ${finErr.message}`, "warn");
-                        }
-                        showToast("협업 작업이 완료되었습니다.", "success");
-                        notifyJobComplete("Nasaro AI · 협업 완료", collabSession.task || "협업 작업");
+                        await finishCollabWithCurrentProduct();
                         break;
                     }
                     const reason = verify.summary || "검증에서 보완 필요";
                     appendCollabLog(`검증 미통과: ${reason}`, "warn");
+                    const accepted = await confirmCollabRework(verify);
+                    if (!accepted) {
+                        await finishCollabWithCurrentProduct("재작업 거절 — 현재 작업물 사용");
+                        break;
+                    }
                     let reworkStages = verify.reworkStages.length ? verify.reworkStages : [1];
                     appendCollabLog(
-                        `재작업 → ${reworkStages.map(s => s + 1).join(", ")}단계 (이후 다시 검증)`,
+                        `재작업 동의 → ${reworkStages.map(s => s + 1).join(", ")}단계 (이후 다시 검증)`,
                         "warn"
                     );
                     for (const s of reworkStages) {
+                        const prevS = collabSession.stageOutputs[s] || "";
                         const fb = verify.instructions[s] || reason;
                         appendCollabLog(`${s + 1}단계 재작업 — ${fb.slice(0, 120)}`, "warn");
-                        collabSession.stageOutputs[s] = "";
-                        await runCollabStageInternal(s, true, fb);
+                        await runCollabStageInternal(s, true, fb, { previousArtifact: prevS });
                         for (let j = s + 1; j < 3; j++) {
-                            collabSession.stageOutputs[j] = "";
-                            await runCollabStageInternal(j, true, verify.instructions[j] || "");
+                            const prevJ = collabSession.stageOutputs[j] || "";
+                            await runCollabStageInternal(j, true, verify.instructions[j] || "", { previousArtifact: prevJ });
                         }
                     }
                     loops++;
@@ -8562,6 +8595,8 @@
         async function handleCollabFollowUp(additionalTask) {
             if (!collabSession?.plan || collabPipelineRunning) return;
             const preWork = !collabWorkHasStarted();
+            const outputSnapshot = collabSession.stageOutputs.slice();
+            const prevFinal = collabFinalProduct || collabSession.stageOutputs[2] || "";
             try {
                 const response = await apiFetch("/collab/followup-route", {
                     method: "POST",
@@ -8571,13 +8606,14 @@
                         original_task: collabSession.task,
                         work_type: collabSession.plan.work_type,
                         stage_outputs: collabSession.stageOutputs,
+                        final_product: prevFinal,
                         user_id: getDeviceId(),
                         pre_work: preWork,
                     }),
                 });
                 if (!response.ok) throw new Error(`분석 실패 (${response.status})`);
                 const data = await response.json();
-                collabSession.task = data.merged_task || `${collabSession.task}. 추가: ${additionalTask}`;
+                collabSession.task = data.merged_task || `${collabSession.task}\n\n[추가] ${additionalTask}`;
                 if (data.pre_work || preWork) {
                     appendCollabLog(`요청 반영: ${data.reason || "추가 요청을 요청사항에 반영했습니다."}`, "info");
                     persistActiveCollab();
@@ -8585,11 +8621,11 @@
                     showToast("추가 요청을 요청사항에 반영했습니다.", "success");
                     return;
                 }
-                appendCollabLog(`추가 작업 분석: ${data.reason || ""} → ${(data.start_stage ?? 0) + 1}단계부터`, "info");
-                for (let i = data.start_stage ?? 0; i < 4; i++) {
-                    collabSession.stageStates[i] = "idle";
-                }
-                await runCollabPipeline(data.start_stage ?? 0);
+                appendCollabLog(`추가 작업: ${data.reason || ""} → ${(data.start_stage ?? 0) + 1}단계부터 (기존 산출물 연동)`, "info");
+                await runCollabPipeline(data.start_stage ?? 0, {
+                    previousOutputs: outputSnapshot,
+                    followUpNote: `【추가 요청】 ${additionalTask}\n기존 요청·산출물·최종본을 이어서 수정·확장하세요. 새 작업으로 시작하지 마세요.`,
+                });
             } catch (err) {
                 showToast(err.message, "error");
             }
@@ -9046,6 +9082,11 @@
                 loggedIn: !!currentUser,
             });
             refreshCompareSummary(message, responses);
+            activeModels.forEach(model => {
+                const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
+                const pair = document.getElementById(`compare-qa-pair-${compareContentSlug(turnIndex, model)}`);
+                scrollComparePairIntoView(stack, pair);
+            });
             syncCompareSessionHistory();
             const answerText = activeModels.map(m => `[${m}]\n${responses[m] || ""}`).join("\n\n");
             logUserActivity("compare", message, answerText, "compare");
