@@ -1,6 +1,7 @@
 /** Nasaro AI — UI helpers (i18n, AI pick, voice, share, agent schedule) */
 (function () {
     const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
+    const COIN = "🪙";
     const FASTEST_MODEL = "DeepSeek";
 
     const I18N = {
@@ -219,8 +220,22 @@
                     ? (lang === "en" ? "AI All" : "AI 전체")
                     : (current.length === 1 ? current[0] : current.join(" · ")));
             const short = label.length > 24 ? label.slice(0, 24) + "…" : label;
-            pickerBtn.textContent = allSelected ? short : `🤖 ${short}`;
-            pickerBtn.title = singleSelect ? current[0] : (allSelected ? (lang === "en" ? "AI All" : "AI 전체") : current.join(", "));
+            if (!singleSelect && mode === "compare") {
+                const shortBase = allSelected
+                    ? (lang === "en" ? "AI All" : "AI 전체")
+                    : (current.length === 1 ? current[0] : current.join(" · "));
+                const shortCmp = shortBase.length > 20 ? shortBase.slice(0, 20) + "…" : shortBase;
+                pickerBtn.textContent = `🤖 ${shortCmp} ${COIN}${current.length}`;
+            } else if (singleSelect) {
+                pickerBtn.textContent = `🤖 ${short} ${COIN}1`;
+            } else {
+                pickerBtn.textContent = allSelected ? short : `🤖 ${short}`;
+            }
+            pickerBtn.title = singleSelect
+                ? `${current[0]} · ${COIN}1/호출`
+                : (allSelected
+                    ? (lang === "en" ? "AI All" : "AI 전체") + ` · ${current.length}${COIN}/회`
+                    : `${current.join(", ")} · ${current.length}${COIN}/회`);
         };
 
         const sync = () => {

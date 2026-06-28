@@ -556,8 +556,8 @@
     function fmtQuota(q) {
       if (!q || typeof q !== "object") return "-";
       return Object.entries(q).filter(([k]) => !k.startsWith("_")).map(([k, v]) => {
-        if (v && typeof v === "object") return `${k}:${v.used}/${v.limit}`;
-        return `${k}:${v}`;
+        if (v && typeof v === "object") return `${FEATURE_LABELS[k] || k}:🪙${v.used}/🪙${v.limit}`;
+        return `${k}:🪙${v}`;
       }).join(" ");
     }
 
@@ -565,20 +565,20 @@
       const feats = Object.keys(limits || snapshot || {});
       const rows = feats.map(f => {
         const v = (snapshot && snapshot[f]) || {};
-        const used = v.used ?? 0;
-        const limit = v.limit ?? limits?.[f] ?? "-";
-        const rem = v.remaining ?? Math.max(0, Number(limit) - Number(used));
+        const used = Math.round(v.used ?? 0);
+        const limit = Math.round(v.limit ?? limits?.[f] ?? 0);
+        const rem = Math.round(v.remaining ?? Math.max(0, Number(limit) - Number(used)));
         return `<div class="quota-row" data-feature="${f}">
-          <span class="quota-feat">${f}</span>
-          <span class="quota-val" data-qval="${f}">${used}/${limit} (남음 ${rem})</span>
-          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-1">-1</button>
-          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-0.5">-0.5</button>
-          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="0.5">+0.5</button>
-          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="1">+1</button>
+          <span class="quota-feat">${FEATURE_LABELS[f] || f}</span>
+          <span class="quota-val" data-qval="${f}">🪙${used}/🪙${limit} (남음 🪙${rem})</span>
+          <input type="number" class="q-limit-inp" data-feature="${f}" value="${limit}" min="0" max="9999" step="1" style="width:54px" title="일일 코인 한도">
+          <button type="button" class="secondary q-save-limit" data-feature="${f}">한도 저장</button>
+          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-1">-🪙1</button>
+          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="1">+🪙1</button>
         </div>`;
       }).join("");
       return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
-        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">오늘 사용량 (실시간) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
+        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">오늘 코인 (실시간) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
         ${rows || "<div class='empty'>없음</div>"}
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="secondary" id="quotaRefreshBtn">새로고침</button>
@@ -597,7 +597,9 @@
         Object.keys(limits).forEach(f => {
           const el = box.querySelector(`[data-qval="${f}"]`);
           const v = snap.features?.[f] || {};
-          if (el) el.textContent = `${v.used ?? 0}/${v.limit ?? limits[f]} (남음 ${v.remaining ?? 0})`;
+          if (el) el.textContent = `🪙${Math.round(v.used ?? 0)}/🪙${Math.round(v.limit ?? limits[f])} (남음 🪙${Math.round(v.remaining ?? 0)})`;
+          const inp = box.querySelector(`.q-limit-inp[data-feature="${f}"]`);
+          if (inp && document.activeElement !== inp) inp.value = String(Math.round(v.limit ?? limits[f] ?? 0));
         });
         box.dataset.banned = snap.banned ? "1" : "0";
         const banBtn = document.getElementById("banToggleBtn");
@@ -621,6 +623,24 @@
               body: JSON.stringify({ subject, feature, delta }),
             });
             await refreshQuotaAdminPanel(subject);
+            if (selectedUserId) selectUser(selectedUserId);
+          } catch (err) { alert(err.message); }
+          return;
+        }
+        const saveLim = e.target.closest(".q-save-limit");
+        if (saveLim) {
+          const feature = saveLim.dataset.feature;
+          const boxEl = document.getElementById("quotaAdminBox");
+          const inp = boxEl?.querySelector(`.q-limit-inp[data-feature="${feature}"]`);
+          const daily_limit = Math.max(0, parseInt(inp?.value || "0", 10) || 0);
+          try {
+            await api("/admin/quota/limit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subject, feature, daily_limit }),
+            });
+            await refreshQuotaAdminPanel(subject);
+            if (selectedUserId) selectUser(selectedUserId);
           } catch (err) { alert(err.message); }
           return;
         }
@@ -671,8 +691,8 @@
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
         <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageToday)}</b><span>오늘 기능 사용 (quota)</span></div>
-        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageAll)}</b><span>전체 누적 기능 사용 (quota)</span></div>`;
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageToday)}</b><span>오늘 코인 사용</span></div>
+        <div class="stat"><b style="font-size:13px;">${fmtQuota(usageAll)}</b><span>전체 누적 코인</span></div>`;
       document.getElementById("platformStats").innerHTML = Object.keys(ps).length
         ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
         : "<span class='empty'>오늘 활동 기록 없음</span>";
@@ -796,7 +816,9 @@
       if (!items?.length) return "<div class='empty'>기록 없음</div>";
       return items.map(a => {
         const who = a.user_id ? `#${a.user_id}` : (a.device_id || "guest").slice(0, 12);
-        const detail = a.is_secret ? "🔒 시크릿 (프라이버시)" : [who, a.detail || ""].filter(Boolean).join(" · ");
+        const detail = a.is_secret ? "🔒 시크릿 (프라이버시)" : (
+          (a.question || a.detail || a.action || "").trim() || [who, a.feature].filter(Boolean).join(" · ")
+        );
         const checked = selectedActivityIds.has(a.id) ? " checked" : "";
         return `<div class="activity-row-compact${a.is_secret ? " secret-row" : ""}" data-activity-id="${a.id}">
           <input class="act-check" type="checkbox" data-activity-id="${a.id}"${checked} aria-label="선택">
@@ -846,8 +868,23 @@
           document.getElementById("activityDetailQuestion").textContent = "🔒 시크릿 (프라이버시 모드)";
           document.getElementById("activityDetailAnswer").textContent = "관리자에게 내용이 표시되지 않습니다.";
         } else {
-          document.getElementById("activityDetailQuestion").textContent = a.question || a.detail || "(질문 없음)";
-          document.getElementById("activityDetailAnswer").textContent = a.answer || "(답변 없음)";
+          let qText = (a.question || "").trim();
+          let aText = (a.answer || "").trim();
+          if (!qText && !aText) {
+            qText = (a.detail || "").trim() || `${a.feature || "activity"} · ${a.action || "호출"}`;
+            aText = a.subject
+              ? `기록 주체: ${a.subject}\n(AI 호출 이벤트 — 상세 본문은 저장되지 않았습니다.)`
+              : "AI 호출 이벤트 (상세 본문 미저장)";
+          } else {
+            if (!qText) qText = (a.detail || a.action || "").trim() || "(내용 없음)";
+            if (!aText) {
+              aText = (a.detail && a.detail !== qText)
+                ? a.detail
+                : "(답변/결과 본문 미저장)";
+            }
+          }
+          document.getElementById("activityDetailQuestion").textContent = qText;
+          document.getElementById("activityDetailAnswer").textContent = aText;
         }
       } catch (e) {
         document.getElementById("activityDetailMeta").textContent = e.message || "불러오기 실패";
@@ -1014,7 +1051,7 @@
       return feats.map(f => {
         const used = Number(map?.[f] || 0);
         const limit = limits?.[f] ?? "-";
-        return `<div class="stat"><b>${used}</b><span>${prefix}${FEATURE_LABELS[f] || f} · 한도 ${limit}</span></div>`;
+        return `<div class="stat"><b>${used}</b><span>${prefix}${FEATURE_LABELS[f] || f} · 한도 🪙${limit}</span></div>`;
       }).join("");
     }
 

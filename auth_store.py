@@ -56,10 +56,30 @@ GUEST_QUOTA_LIMITS: dict[str, float] = {
 QUOTA_LIMITS = MEMBER_QUOTA_LIMITS  # admin backward compat
 
 
+def _load_quota_limit_overrides(subject: str) -> dict[str, float]:
+    clean = (subject or "").strip()
+    if not clean:
+        return {}
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT feature, daily_limit FROM quota_limit_overrides WHERE subject = ?",
+                (clean,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {str(r["feature"]): float(r["daily_limit"]) for r in rows}
+
+
 def quota_limits_for_subject(subject: str) -> dict[str, float]:
-    if (subject or "").startswith("user:"):
-        return MEMBER_QUOTA_LIMITS
-    return GUEST_QUOTA_LIMITS
+    base = MEMBER_QUOTA_LIMITS if (subject or "").startswith("user:") else GUEST_QUOTA_LIMITS
+    overrides = _load_quota_limit_overrides(subject)
+    if not overrides:
+        return dict(base)
+    merged = dict(base)
+    merged.update(overrides)
+    return merged
 
 
 def is_guest_subject(subject: str) -> bool:
@@ -221,6 +241,17 @@ def init_db() -> None:
                 CREATE TABLE IF NOT EXISTS admin_settings (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS quota_limit_overrides (
+                    subject TEXT NOT NULL,
+                    feature TEXT NOT NULL,
+                    daily_limit REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY(subject, feature)
                 )
                 """
             )
@@ -842,6 +873,7 @@ def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, An
     day_key = _day_key()
     limits = quota_limits_for_subject(clean_subject)
     limit = float(limits.get(feat, 9999))
+    delta_val = float(delta)
     with _lock:
         conn = _connect()
         try:
@@ -850,7 +882,7 @@ def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, An
                 (clean_subject, feat, day_key),
             ).fetchone()
             used = float(row["count"]) if row else 0.0
-            new_used = max(0.0, used + float(delta))
+            new_used = max(0.0, used + delta_val)
             conn.execute(
                 """
                 INSERT INTO quota_usage (subject, feature, day_key, count)
@@ -865,10 +897,45 @@ def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, An
     return {
         "subject": clean_subject,
         "feature": feat,
-        "used": new_used,
+        "used": round(new_used, 2),
         "limit": limit,
-        "remaining": max(0.0, limit - new_used),
+        "remaining": round(max(0.0, limit - new_used), 2),
         "day_key": day_key,
+    }
+
+
+def admin_set_quota_limit(subject: str, feature: str, daily_limit: float) -> dict[str, Any]:
+    clean_subject = (subject or "").strip()
+    feat = (feature or "").strip()
+    if not clean_subject or feat not in MEMBER_QUOTA_LIMITS:
+        raise ValueError("invalid subject or feature")
+    limit_val = max(0.0, float(daily_limit))
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                """
+                INSERT INTO quota_limit_overrides (subject, feature, daily_limit, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(subject, feature) DO UPDATE SET
+                    daily_limit = excluded.daily_limit,
+                    updated_at = excluded.updated_at
+                """,
+                (clean_subject, feat, limit_val, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    snap = get_quota_snapshot(clean_subject)
+    feat_snap = snap.get("features", {}).get(feat, {})
+    return {
+        "subject": clean_subject,
+        "feature": feat,
+        "limit": limit_val,
+        "used": feat_snap.get("used", 0),
+        "remaining": feat_snap.get("remaining", limit_val),
+        "day_key": snap.get("day_key"),
     }
 
 
@@ -959,6 +1026,7 @@ def get_quota_snapshot(subject: str) -> dict[str, Any]:
     return {
         "day_key": day_key,
         "features": out,
+        "coins": out,
         "guest": is_guest_subject(subject),
         "banned": banned,
         "limits": limits,

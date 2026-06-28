@@ -531,19 +531,23 @@
             display: block;
         }
 
-        /* 협업 — 채팅 우선 (히어로 문구 숨김) */
+        /* 협업 초기 안내 — 요청 후 채팅 표시 */
         .collab-intro {
             display: flex;
             flex-direction: column;
-            align-items: stretch;
-            min-height: calc(100dvh - var(--input-dock-height, 140px) - 80px);
-            text-align: left;
-            gap: 0;
-            padding: 8px 12px 12px;
+            align-items: center;
+            justify-content: center;
+            min-height: 40dvh;
+            text-align: center;
+            gap: 12px;
+            padding: 32px 16px;
         }
-        .collab-intro-hero {
-            display: none !important;
-        }
+        .coin-icon, .coin-cost { font-style: normal; letter-spacing: 0; }
+        .coin-cost { display: inline-flex; align-items: center; gap: 1px; font-size: 12px; font-weight: 800; color: #b45309; white-space: nowrap; }
+        html[data-theme="dark"] .coin-cost { color: #fbbf24; }
+        .dock-coin-hint { font-size: 11px; font-weight: 800; color: #b45309; margin-left: 2px; }
+        html[data-theme="dark"] .dock-coin-hint { color: #fbbf24; }
+        .side-quota-brief .coin-cost { font-size: 10px; }
 
         .collab-intro-icon {
             font-size: 48px;
@@ -564,19 +568,21 @@
 
         .collab-intake-panel {
             width: 100%;
-            flex: 1 1 auto;
-            display: flex;
+            max-width: 640px;
+            margin-top: 16px;
+            display: none;
             flex-direction: column;
-            min-height: 0;
-            margin: 0;
             text-align: left;
         }
         .collab-intake-head {
-            display: none;
+            font-size: 13px;
+            font-weight: 700;
+            color: #6d28d9;
+            margin-bottom: 8px;
         }
         .collab-intake-chat {
-            flex: 1 1 auto;
-            min-height: 240px;
+            max-height: min(420px, 52vh);
+            min-height: 200px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -4217,7 +4223,7 @@
                 <div id="settingsDiagMeta" class="settings-meta" style="margin-top:8px;">설정을 열면 진단 정보를 불러옵니다.</div>
             </div>
             <div class="settings-row">
-                <div class="settings-row-label">오늘 사용량</div>
+                <div class="settings-row-label">오늘 코인</div>
                 <div id="settingsQuotaMeta" class="settings-meta">불러오는 중…</div>
             </div>
             <div class="settings-row">
@@ -4384,7 +4390,7 @@
                         </p>
                         <div id="collabTemplateRow" class="collab-template-row"></div>
                     </div>
-                    <div id="collabIntakePanel" class="collab-intake-panel">
+                    <div id="collabIntakePanel" class="collab-intake-panel" style="display:none;">
                         <div class="collab-intake-head">작업 세부 정보 수집</div>
                         <div id="collabIntakeChat" class="collab-intake-chat"></div>
                         <div id="collabIntakeActions" class="collab-intake-actions" style="display:none;">
@@ -4733,7 +4739,7 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
-    <script src="/static/nasaro-features.js?v=20260627n"></script>
+    <script src="/static/nasaro-features.js?v=20260627p"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -4759,6 +4765,30 @@
             Unknown: "#6b7280",
         };
         const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
+        const COIN = "🪙";
+        function coinCost(n) {
+            const v = Math.max(0, Number(n) || 0);
+            return `${COIN}${v}`;
+        }
+        function dockBtnLabel(text, coins) {
+            const c = Math.max(1, Number(coins) || 1);
+            return `${text} ${coinCost(c)}`;
+        }
+        function getModeCoinCost(mode) {
+            const NF = window.NasaroFeatures;
+            if (mode === "compare") return (NF?.getSelectedModels?.("compare") || getActiveModels()).length || 1;
+            if (mode === "debate") return 1;
+            if (mode === "collab") {
+                if (collabIntakeActive) return 1;
+                if (collabTaskAsked) return 1;
+                return 1;
+            }
+            return 1;
+        }
+        function updateDockCoinHint() {
+            /* 코인은 dockPrimaryBtn 텍스트에 표시 */
+        }
+
         function getActiveModels() {
             return window.NasaroFeatures?.getSelectedModels?.(currentMode) || MODELS;
         }
@@ -5242,6 +5272,7 @@
                 showToast,
                 isLoggedIn: () => !!currentUser,
                 onLoginRequired: () => openAuthModal("login"),
+                onModelsChange: () => updateDockUI(),
             };
             const parts = NF.buildDockToolbarParts?.(mainInput, toolbarOpts);
             if (!parts) return;
@@ -5299,6 +5330,7 @@
         let collabIntakeActive = false;
         let collabIntakeTask = "";
         let collabIntakeMessages = [];
+        let collabIntakeModel = "Claude";
         let collabSession = null;
         let collabSelectedStage = 0;
         let collabPipelineRunning = false;
@@ -5907,9 +5939,9 @@
                 if (!res.ok) return;
                 const q = await res.json();
                 const labels = { compare: "비교", debate: "토론", collab: "협업", agent: "에이전트" };
-                const parts = Object.entries(q.features || {}).map(([k, v]) =>
-                    `${labels[k] || k} ${v.remaining ?? "?"}`);
-                el.textContent = parts.length ? "남은 " + parts.join(" · ") : "";
+                const parts = Object.entries(q.features || q.coins || {}).map(([k, v]) =>
+                    `${labels[k] || k} ${COIN}${Math.round(v.remaining ?? 0)}`);
+                el.textContent = parts.length ? parts.join(" · ") : "";
             } catch {
                 el.textContent = "";
             }
@@ -6119,7 +6151,7 @@
 
         function classifyFetchError(err, resStatus) {
             if (err?.name === "AbortError") return { kind: "aborted", retryable: true, message: "사용자가 중단했습니다." };
-            if (resStatus === 429) return { kind: "quota", retryable: false, message: "오늘 사용 한도를 모두 사용했습니다." };
+            if (resStatus === 429) return { kind: "quota", retryable: false, message: "오늘 코인을 모두 사용했습니다." };
             if (resStatus === 503) return { kind: "server_busy", retryable: true, message: "서버가 바쁩니다. 잠시 후 재시도하세요." };
             const msg = String(err?.message || err || "");
             if (/failed to fetch|network|timeout/i.test(msg)) return { kind: "network", retryable: true, message: "네트워크 오류입니다." };
@@ -6154,8 +6186,8 @@
                 if (quotaRes.ok) {
                     const q = await quotaRes.json();
                     const guest = q.guest ? " (비회원)" : " (회원)";
-                    const lines = Object.entries(q.features || {}).map(([k, v]) =>
-                        `${k}: ${v.used}/${v.limit} (남음 ${v.remaining})`);
+                    const lines = Object.entries(q.features || q.coins || {}).map(([k, v]) =>
+                        `${k}: ${coinCost(v.used)}/${coinCost(v.limit)} (남음 ${coinCost(v.remaining)})`);
                     if (quotaEl) {
                         quotaEl.textContent = (lines.join("\n") || "사용량 정보 없음") + guest;
                     }
@@ -6533,12 +6565,14 @@
             }
             if (currentMode === "compare") {
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
-                dockPrimaryBtn.textContent = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
-                dockPrimaryBtn.title = NF?.t?.("btn_compare") || "비교";
+                const cmpLabel = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
+                dockPrimaryBtn.textContent = dockBtnLabel(cmpLabel.replace(/\s*🪙\d+$/, ""), getModeCoinCost("compare"));
+                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · AI ${getModeCoinCost("compare")}${COIN}/회`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = false;
                 mainInput.disabled = false;
                 autoResizeInput();
+                updateDockCoinHint();
                 return;
             }
 
@@ -6547,39 +6581,41 @@
                     mainInput.placeholder = "질문에 답변…";
                     dockPrimaryBtn.textContent = collabRecommendInFlight
                         ? "…"
-                        : (mob ? "답변 ▶" : "답변 ▶");
-                    dockPrimaryBtn.title = "답변 전송";
+                        : dockBtnLabel("답변 ▶", 1);
+                    dockPrimaryBtn.title = `답변 전송 · ${COIN}1`;
                 } else {
                     mainInput.placeholder = collabTaskAsked
                         ? (NF?.t?.("ph_collab_done") || "추가 수정·요청…")
                         : (NF?.t?.("ph_collab") || "작업 설명…");
                     dockPrimaryBtn.textContent = collabRecommendInFlight
                         ? "…"
-                        : (collabTaskAsked ? "추가 ▶" : "시작 ▶");
-                    dockPrimaryBtn.title = collabTaskAsked ? "추가 작업" : "작업 시작";
+                        : dockBtnLabel(collabTaskAsked ? "추가 ▶" : "시작 ▶", 1);
+                    dockPrimaryBtn.title = collabTaskAsked ? "추가 작업 · 🪙1" : "작업 시작 · 정보 수집 🪙1/회 (최대 🪙10)";
                 }
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = collabRecommendInFlight;
                 mainInput.disabled = false;
                 autoResizeInput();
+                updateDockCoinHint();
                 return;
             }
 
             mainInput.disabled = false;
             if (!debateStarted) {
                 mainInput.placeholder = NF?.t?.("ph_debate") || "토론 주제…";
-                dockPrimaryBtn.textContent = mob ? "토론 ▶" : (NF?.t?.("btn_debate") || "토론 ▶");
-                dockPrimaryBtn.title = NF?.t?.("btn_debate") || "토론";
+                dockPrimaryBtn.textContent = dockBtnLabel(mob ? "토론 ▶" : (NF?.t?.("btn_debate") || "토론 ▶"), 1);
+                dockPrimaryBtn.title = `${NF?.t?.("btn_debate") || "토론"} · ${COIN}1/발언`;
                 dockPrimaryBtn.className = "dock-btn secondary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             } else {
                 mainInput.placeholder = NF?.t?.("ph_debate_cont") || "의견 추가…";
-                dockPrimaryBtn.textContent = mob ? "다음 ▶" : (NF?.t?.("btn_debate_next") || "다음 ▶");
-                dockPrimaryBtn.title = NF?.t?.("btn_debate_next") || "다음";
+                dockPrimaryBtn.textContent = dockBtnLabel(mob ? "다음 ▶" : (NF?.t?.("btn_debate_next") || "다음 ▶"), 1);
+                dockPrimaryBtn.title = `${NF?.t?.("btn_debate_next") || "다음"} · ${COIN}1/발언`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             }
             autoResizeInput();
+            updateDockCoinHint();
         }
 
         function switchMode(mode) {
@@ -7507,15 +7543,27 @@
             collabIntakeActive = false;
             collabIntakeTask = "";
             collabIntakeMessages = [];
+            collabIntakeModel = window.NasaroFeatures?.getPrimaryModel?.("collab") || "Claude";
+            const panel = document.getElementById("collabIntakePanel");
             const chat = document.getElementById("collabIntakeChat");
             const actions = document.getElementById("collabIntakeActions");
+            const hero = document.querySelector(".collab-intro-hero");
+            if (panel) panel.style.display = "none";
+            if (hero) hero.style.display = "";
             if (chat) chat.innerHTML = "";
             if (actions) actions.style.display = "none";
         }
 
         function showCollabIntakePanel() {
+            const panel = document.getElementById("collabIntakePanel");
             const actions = document.getElementById("collabIntakeActions");
+            const hero = document.querySelector(".collab-intro-hero");
+            collabIntakeModel = window.NasaroFeatures?.getPrimaryModel?.("collab") || "Claude";
+            if (hero) hero.style.display = "none";
+            if (panel) panel.style.display = "flex";
             if (actions) actions.style.display = "flex";
+            const skipBtn = document.getElementById("collabIntakeSkipBtn");
+            if (skipBtn) skipBtn.textContent = `수집한 정보로 AI 추천 시작 ▶ ${coinCost(3)}`;
         }
 
         function buildCollabIntakeBrief() {
@@ -7531,17 +7579,21 @@
         async function skipCollabIntakeToRecommend() {
             if (collabRecommendInFlight || collabPipelineRunning) return;
             const brief = buildCollabIntakeBrief();
-            appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.");
+            appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.", collabIntakeModel);
             collabIntakeActive = false;
             await runCollabRecommend(brief);
         }
 
-        function appendCollabIntakeMessage(role, text) {
+        function appendCollabIntakeMessage(role, text, speaker) {
             const chat = document.getElementById("collabIntakeChat");
             if (!chat) return null;
             const el = document.createElement("div");
             el.className = `collab-intake-msg ${role}`;
-            el.textContent = text;
+            if (role === "assistant" && speaker) {
+                el.innerHTML = `<strong>${escapeHtml(speaker)}</strong>\n${escapeHtml(text)}`;
+            } else {
+                el.textContent = text;
+            }
             chat.appendChild(el);
             chat.scrollTop = chat.scrollHeight;
             return el;
@@ -7550,7 +7602,9 @@
         async function runCollabIntakeStep() {
             collabRecommendInFlight = true;
             dockPrimaryBtn.disabled = true;
-            const thinking = appendCollabIntakeMessage("assistant", "질문을 준비하는 중…");
+            const intakeModel = window.NasaroFeatures?.getPrimaryModel?.("collab") || collabIntakeModel || "Claude";
+            collabIntakeModel = intakeModel;
+            const thinking = appendCollabIntakeMessage("assistant", "질문을 준비하는 중…", intakeModel);
             try {
                 const response = await apiFetch("/collab/intake", {
                     method: "POST",
@@ -7559,6 +7613,7 @@
                         task: collabIntakeTask,
                         messages: collabIntakeMessages,
                         user_id: getDeviceId(),
+                        intake_model: intakeModel,
                     }),
                 });
                 if (!response.ok) {
@@ -7567,19 +7622,22 @@
                 }
                 const data = await response.json();
                 thinking?.remove();
+                if (data.intake_model) collabIntakeModel = data.intake_model;
                 if (data.ready && data.enriched_task) {
-                    appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.");
+                    appendCollabIntakeMessage("assistant", "수집한 정보로 AI 추천을 시작합니다.", collabIntakeModel);
                     collabIntakeActive = false;
+                    if (currentUser) refreshSideQuota();
                     await runCollabRecommend(String(data.enriched_task).trim());
                 } else if (data.question) {
                     collabIntakeMessages.push({ role: "assistant", content: data.question });
-                    appendCollabIntakeMessage("assistant", data.question);
+                    appendCollabIntakeMessage("assistant", data.question, collabIntakeModel);
+                    if (currentUser) refreshSideQuota();
                 } else {
                     throw new Error("질문을 받지 못했습니다.");
                 }
             } catch (err) {
                 thinking?.remove();
-                appendCollabIntakeMessage("assistant", `오류: ${err.message}`);
+                appendCollabIntakeMessage("assistant", `오류: ${err.message}`, collabIntakeModel);
                 showToast(err.message || "정보 수집 실패", "error", 5000);
             } finally {
                 collabRecommendInFlight = false;

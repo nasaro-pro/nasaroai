@@ -26,6 +26,7 @@ from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db
 from auth_store import (
     add_support_reply,
     admin_adjust_quota,
+    admin_set_quota_limit,
     admin_logout,
     check_and_consume_quota,
     count_activity_log,
@@ -230,6 +231,7 @@ def _platform(request: Request) -> str:
 
 
 def _quota_error_payload(feature: str, info: dict) -> dict:
+    feat_label = {"compare": "비교", "debate": "토론", "collab": "협업", "agent": "에이전트"}.get(feature, feature)
     if info.get("banned"):
         return {
             "message": "이 계정 또는 기기는 사용이 제한되었습니다. 문의해 주세요.",
@@ -239,14 +241,17 @@ def _quota_error_payload(feature: str, info: dict) -> dict:
     if info.get("guest"):
         return {
             "message": (
-                f"오늘 비회원 {feature} 한도({info['limit']}회)를 모두 사용했습니다. "
+                f"오늘 비회원 {feat_label} 코인({int(info['limit'])}🪙)을 모두 사용했습니다. "
                 "로그인하면 더 많이 이용할 수 있습니다."
             ),
             "quota": info,
             "login_required": True,
         }
     return {
-        "message": f"오늘 {feature} 사용 한도({info['limit']}회)를 모두 사용했습니다. 내일 자정(KST)에 초기화됩니다.",
+        "message": (
+            f"오늘 {feat_label} 코인({int(info['limit'])}🪙)을 모두 사용했습니다. "
+            "내일 자정(KST)에 초기화됩니다."
+        ),
         "quota": info,
     }
 
@@ -295,26 +300,18 @@ def _compare_quota_key(subject: str, session_id: str) -> str:
     return f"{subject}:{sid}" if sid else subject
 
 
-async def _require_compare_quota_once(
+async def _require_compare_coin(
     request: Request,
-    session_id: str,
     device_id: str | None = None,
 ) -> dict | None:
-    """Charge compare quota once per compare session, not once per model stream."""
+    """Charge 1 coin per compare model stream (1 AI call = 1 coin)."""
     subject, user = _resolve_subject(request, device_id)
-    charge_key = _compare_quota_key(subject, session_id)
-
-    async with COMPARE_QUOTA_LOCK:
-        if charge_key in COMPARE_QUOTA_CHARGED:
-            return user
-        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "compare", 1.0)
-        if not ok:
-            raise HTTPException(
-                status_code=429,
-                detail=_quota_error_payload("compare", info),
-            )
-        COMPARE_QUOTA_CHARGED.add(charge_key)
-
+    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "compare", 1.0)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=_quota_error_payload("compare", info),
+        )
     dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
     log_activity(
         subject,
@@ -323,6 +320,7 @@ async def _require_compare_quota_once(
         device_id=dev,
         platform=_platform(request),
         action="compare",
+        detail="compare AI call",
     )
     return user
 
@@ -336,29 +334,21 @@ def _agent_mission_key(subject: str, mission_id: str) -> str:
     return f"{subject}:{mid}" if mid else subject
 
 
-async def _require_agent_mission_quota_once(
+async def _require_agent_coin(
     request: Request,
-    mission_id: str,
     device_id: str | None = None,
     *,
-    action: str = "mission",
+    action: str = "agent",
     detail: str = "",
 ) -> dict | None:
-    """Charge agent quota once per mission (task), not once per step."""
+    """Charge 1 coin per agent AI call."""
     subject, user = _resolve_subject(request, device_id)
-    charge_key = _agent_mission_key(subject, mission_id)
-
-    async with AGENT_MISSION_LOCK:
-        if charge_key in AGENT_MISSION_CHARGED:
-            return user
-        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "agent", 1.0)
-        if not ok:
-            raise HTTPException(
-                status_code=429,
-                detail=_quota_error_payload("agent", info),
-            )
-        AGENT_MISSION_CHARGED.add(charge_key)
-
+    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "agent", 1.0)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=_quota_error_payload("agent", info),
+        )
     dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
     log_activity(
         subject,
@@ -367,40 +357,23 @@ async def _require_agent_mission_quota_once(
         device_id=dev,
         platform=_platform(request),
         action=action,
-        detail=(detail or "")[:500],
+        detail=(detail or action)[:500],
     )
     return user
 
 
-DEBATE_QUOTA_CHARGED: set[str] = set()
-DEBATE_QUOTA_LOCK = asyncio.Lock()
-
-
-def _debate_quota_key(subject: str, session_id: str) -> str:
-    sid = (session_id or "").strip()
-    return f"{subject}:{sid}" if sid else subject
-
-
-async def _require_debate_quota_once(
+async def _require_debate_coin(
     request: Request,
-    session_id: str,
     device_id: str | None = None,
 ) -> dict | None:
-    """Charge debate quota once per debate session (topic), not per round."""
+    """Charge 1 coin per debate AI speaker call."""
     subject, user = _resolve_subject(request, device_id)
-    charge_key = _debate_quota_key(subject, session_id)
-
-    async with DEBATE_QUOTA_LOCK:
-        if charge_key in DEBATE_QUOTA_CHARGED:
-            return user
-        ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "debate", 1.0)
-        if not ok:
-            raise HTTPException(
-                status_code=429,
-                detail=_quota_error_payload("debate", info),
-            )
-        DEBATE_QUOTA_CHARGED.add(charge_key)
-
+    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "debate", 1.0)
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=_quota_error_payload("debate", info),
+        )
     dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
     log_activity(
         subject,
@@ -408,7 +381,8 @@ async def _require_debate_quota_once(
         user_id=user["id"] if user else None,
         device_id=dev,
         platform=_platform(request),
-        action="debate_start",
+        action="debate",
+        detail="debate AI call",
     )
     return user
 
@@ -594,6 +568,13 @@ class CollabIntakeRequest(BaseModel):
     task: str
     messages: list[CollabIntakeMessage] = Field(default_factory=list)
     user_id: str = ""
+    intake_model: str = "Claude"
+
+
+class AdminQuotaLimitRequest(BaseModel):
+    subject: str
+    feature: str
+    daily_limit: float
 
 
 class CollabRecommendRequest(BaseModel):
@@ -1055,6 +1036,9 @@ COLLAB_INTAKE_GUIDES: dict[str, list[str]] = {
         "강조하고 싶은 **경력·성과·프로젝트**를 구체적 수치와 함께 적어주세요.",
         "**회사/직무에 맞춰 꼭 넣을 키워드**나 차별화 포인트가 있나요?",
         "피해야 할 표현, 참고할 **톤·샘플**, 면접관이 보는 포인트가 있다면 알려주세요.",
+        "**학력·자격·어학·수상** 중 반드시 넣을 항목이 있나요?",
+        "경력 기술 시 **STAR(상황·과제·행동·결과)** 로 쓸 에피소드 2~3개를 적어주세요.",
+        "다른 지원서·포트폴리오와 **중복되면 안 되는** 경험이 있나요?",
     ],
     "동영상 제작": [
         "**플랫폼**(유튜브·릴스·틱톡 등)과 **목표 길이**는 어떻게 되나요?",
@@ -1062,6 +1046,8 @@ COLLAB_INTAKE_GUIDES: dict[str, list[str]] = {
         "원하는 **톤·스타일·레퍼런스 영상** 링크가 있나요?",
         "**촬영/편집 가능 범위**(본인 촬영, AI 생성, 스톡 등)와 **마감**은?",
         "필수로 들어갈 **대사·브랜드 요소·금지 사항**이 있나요?",
+        "**썸네일·제목·설명란**까지 함께 만들까요? 키워드가 있다면 알려주세요.",
+        "저작권·음원·얼굴 초상권 등 **법적 제약**이 있나요?",
     ],
     "문서 제작": [
         "문서 **목적·독자·용도**(제출처)와 **분량·형식**을 알려주세요.",
@@ -1076,6 +1062,8 @@ COLLAB_INTAKE_GUIDES: dict[str, list[str]] = {
         "**배포 환경**(웹/앱, URL, 서버)과 **우선순위 기능**은?",
         "기존 **코드·레포·API**가 있다면 공유 가능한 범위를 알려주세요.",
         "**마감**과 **완료 기준**(어떤 상태면 끝인지)을 정해 주세요.",
+        "**디자인/UI** 요구(와이어프레임, 참고 앱)가 있나요?",
+        "**로그인·결제·푸시** 등 필수/제외 기능을 구분해 주세요.",
     ],
     "PPT·발표자료": [
         "**청중·발표 장소·발표 시간**을 알려주세요.",
@@ -2572,7 +2560,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
         stream_started = False
         try:
             try:
-                await _require_compare_quota_once(request, session_id, data.user_id)
+                await _require_compare_coin(request, data.user_id)
             except HTTPException as exc:
                 yield sse(
                     {
@@ -2737,14 +2725,18 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
     )
 
 
+COLLAB_INTAKE_MAX_COINS = 10
+
+
 @app.post("/collab/intake")
 async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
-    """AI 추천 전 작업 세부사항을 채팅으로 수집한다 (쿼터 미차감)."""
+    """AI 추천 전 작업 세부사항을 채팅으로 수집한다 (1 coin/질문, 최대 10 coin)."""
     await ensure_model_cache_fresh()
     task = data.task.strip()
     if not task:
         raise HTTPException(status_code=400, detail="작업 내용을 입력하세요.")
 
+    intake_model = (data.intake_model or "Claude").strip() or "Claude"
     user_turns = sum(1 for m in data.messages if (m.role or "").strip() == "user")
     asked_questions = [
         (m.content or "").strip()
@@ -2776,25 +2768,26 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
     acceptance_hint = ", ".join(selected_rule.get("acceptance", [])[:4])
 
     prompt = (
-        f"당신은 Nasaro AI 협업 기획 도우미입니다. 실무에서 이 작업을 끝내려면 필요한 정보를 "
-        f"대화로 수집합니다. 형식적인 인사나 빈 질문은 금지합니다.\n\n"
+        f"당신은 **{intake_model}** AI 협업 기획 파트너입니다. "
+        f"사용자와 대화하며 「{work_type}」 작업을 실제로 끝내기 위해 필요한 정보를 수집합니다. "
+        f"형식적인 인사·빈 질문·같은 질문 반복은 금지입니다.\n\n"
         f"[추정 작업 유형] {work_type}\n"
         f"[완료 기준 참고] {acceptance_hint}\n\n"
         f"[초기 요청]\n{task}\n\n"
         f"[지금까지 대화]\n{history_text}\n\n"
-        f"[이미 물어본 질문 — 절대 반복 금지]\n{asked_block}\n\n"
-        f"[사용자가 이미 말한 내용]\n{facts_block}\n\n"
-        f"[{work_type} 유형에서 아직 안 물어본 후보 질문 — 참고만, 그대로 복붙 금지]\n"
+        f"[이미 물어본 질문 — 절대 반복·유사 질문 금지]\n{asked_block}\n\n"
+        f"[사용자가 이미 말한 사실]\n{facts_block}\n\n"
+        f"[{work_type}에서 아직 다루지 않은 정보 영역 — 참고용, 그대로 복붙 금지]\n"
         f"{type_q_block}\n\n"
         "지침:\n"
-        "- 한국어로 **실무자처럼** 대화하세요. 사용자 요청을 1문장으로 짧게 인지한 뒤, "
-        "**한 번에 하나의 구체적 질문**만 하세요.\n"
-        "- 위 후보 질문과 **의미가 겹치거나 비슷한 질문은 금지**. 사용자 답변을 반영해 "
-        f"**{work_type}**에 맞는 **새 각도** 질문을 하세요.\n"
-        "- 「더 알려주세요」「어떤 작업인가요」 같은 **빈 질문·가짜 대화 금지**.\n"
-        "- 사용자가 이미 준 정보는 다시 묻지 말고 **아직 없는 핵심**만 물으세요.\n"
-        "- 질문은 실행 가능하게 (예: '분량이 몇 자인가요?' not '자세히 설명해주세요').\n"
-        "- 핵심 정보가 충분하면 ready=true (보통 3~6회 질문).\n"
+        f"- {intake_model} AI처럼 말하세요. 사용자 요청을 1문장으로 짧게 인지한 뒤 "
+        "**한 번에 하나의 구체적·실무적 질문**만 하세요.\n"
+        f"- **{work_type}**에 실제로 필요한 정보(목적·대상·분량·마감·제약·레퍼런스·톤·기술스택 등)를 "
+        "**서로 다른 각도**에서 순서대로 수집하세요.\n"
+        "- 이미 답한 내용·위 질문과 **의미가 겹치면 절대 금지**. 다음으로 아직 없는 핵심만 물으세요.\n"
+        "- 「더 알려주세요」「어떤 작업인가요」「목표가 무엇인가요」 같은 **빈 질문 금지**.\n"
+        "- 질문은 실행 가능하게 (예: '자기소개서 분량이 몇 자인가요?' / '타깃 연령대는?' / '사용할 프레임워크는?').\n"
+        "- 핵심 정보가 충분하면 ready=true (보통 4~8회 질문).\n"
         "- ready=true일 때 enriched_task에 수집한 모든 정보를 통합한 완전한 작업 지시문을 작성하세요.\n\n"
         'JSON만 출력: {"ready": false, "question": "..."} 또는 '
         '{"ready": true, "enriched_task": "통합 작업 설명..."}'
@@ -2827,7 +2820,18 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
                 return q
         return None
 
-    result = await call_ai_best(prompt, max_tokens=900)
+    ai_calls_done = len(asked_questions)
+    if ai_calls_done >= COLLAB_INTAKE_MAX_COINS:
+        merged = f"{task}\n\n[추가 정보]\n" + "\n".join(
+            u for u in user_facts if u != task
+        )
+        return {"ready": True, "enriched_task": merged.strip(), "question": ""}
+
+    _require_quota(request, "collab", data.user_id, amount=1.0, action="intake")
+
+    result = await call_ai_best(
+        prompt, max_tokens=900, preferred_labels=[intake_model],
+    )
     if result.success:
         m = re.search(r"\{[\s\S]*\}", result.content)
         if m:
@@ -2841,11 +2845,21 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
                     }
                 question = str(parsed.get("question", "")).strip()
                 if question and not _is_repeat_question(question, asked_questions):
-                    return {"ready": False, "question": question, "enriched_task": ""}
+                    return {
+                        "ready": False,
+                        "question": question,
+                        "enriched_task": "",
+                        "intake_model": intake_model,
+                    }
                 if question and _is_repeat_question(question, asked_questions):
                     alt = _next_fallback_question()
                     if alt:
-                        return {"ready": False, "question": alt, "enriched_task": ""}
+                        return {
+                        "ready": False,
+                        "question": alt,
+                        "enriched_task": "",
+                        "intake_model": intake_model,
+                    }
             except (json.JSONDecodeError, TypeError, ValueError):
                 pass
 
@@ -2864,7 +2878,6 @@ async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
 @app.post("/collab/recommend")
 async def collab_recommend(data: CollabRecommendRequest, request: Request) -> dict:
     """사용자 작업 설명을 작업 유형별 협업 알고리즘으로 변환한다."""
-    _require_quota(request, "collab", data.user_id)
     await ensure_model_cache_fresh()
     task = data.task.strip()
     plan = build_collab_plan(task)
@@ -2875,6 +2888,7 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
         f"가능한 작업 유형: {type_names}\n\n"
         "요청 내용에 가장 정확히 맞는 유형 이름 하나만 출력하세요. 다른 설명 없이 유형명만."
     )
+    _require_quota(request, "collab", data.user_id, action="recommend_cls")
     cls_result = await call_ai_best(cls_prompt, max_tokens=80)
     if cls_result.success:
         picked = cls_result.content.strip().strip('"').strip("'")
@@ -2890,6 +2904,7 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
         "처음 실행할 구체적 액션 3개를 한국어로 짧게 제안하세요."
     )
 
+    _require_quota(request, "collab", data.user_id, action="recommend_tips")
     result = await call_ai_best(prompt, max_tokens=500)
     recommendation = result.content if result.success else (
         "AI 보완 코멘트 생성은 실패했지만, 아래 작업 유형별 협업 알고리즘은 바로 사용할 수 있습니다."
@@ -2904,6 +2919,7 @@ async def collab_recommend(data: CollabRecommendRequest, request: Request) -> di
         "각 단계(1~4)에 가장 적합한 AI 1개, 선택 이유(한국어 1~2문장), 대안 AI 2개를 정하세요.\n"
         'JSON만: {"stages":[{"index":1,"model":"Perplexity","reason":"...","alternatives":["xAI","Google"]}, ...]}'
     )
+    _require_quota(request, "collab", data.user_id, action="recommend_stages")
     stage_rec_result = await call_ai_best(stage_rec_prompt, max_tokens=700)
     if stage_rec_result.success:
         import re
@@ -3041,6 +3057,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     prompt = _collab_stage_prompt(data)
     max_tokens = 1200 if data.stage_index == 2 else (1000 if data.stage_index == 3 else 900)
 
+    _require_quota(request, "collab", data.user_id, action="run_stage")
     result = await call_ai_best(prompt, max_tokens=max_tokens, preferred_labels=[stage_model])
     guidance = result.content if result.success else (
         f"{data.stage_name} 단계를 진행하세요.\n\n{prompt[:500]}..."
@@ -3071,7 +3088,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
 @app.post("/collab/followup-route")
 async def collab_followup_route(data: CollabFollowupRequest, request: Request) -> dict:
     """추가 작업 요청을 분석해 재시작할 단계를 결정하거나(작업 중), 요청사항만 병합(작업 전)."""
-    _require_quota(request, "collab", data.user_id, amount=0.5)
+    _require_quota(request, "collab", data.user_id, amount=1.0, action="followup")
     await ensure_model_cache_fresh()
     if data.pre_work:
         prompt = (
@@ -3140,7 +3157,7 @@ def collab_templates() -> dict:
 
 @app.post("/debate/start")
 async def debate_start(request: DebateRequest, http_request: Request) -> dict:
-    await _require_debate_quota_once(http_request, request.session_id, request.user_id)
+    await _require_debate_coin(http_request, request.user_id)
     await ensure_model_cache_fresh()
     session = DebateSession(topic=request.topic)
     store_debate_session(request.session_id, session)
@@ -3160,6 +3177,7 @@ async def debate_continue(request: DebateRequest, http_request: Request) -> dict
     lock = get_debate_lock(request.session_id)
 
     if request.retry_speaker_index is not None:
+        await _require_debate_coin(http_request, request.user_id)
         async with lock:
             session = load_debate_session(request.session_id)
             if session is None:
@@ -3180,6 +3198,7 @@ async def debate_continue(request: DebateRequest, http_request: Request) -> dict
 
         if request.user_input:
             append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
+        await _require_debate_coin(http_request, request.user_id)
         turns = await run_debate_step(session)
         store_debate_session(request.session_id, session)
 
@@ -3355,9 +3374,8 @@ async def agent_step(request: AgentStepRequest, http_request: Request):
             status_code=400,
             content={"status": "error", "message": "작업 내용을 입력해주세요."},
         )
-    await _require_agent_mission_quota_once(
+    await _require_agent_coin(
         http_request,
-        request.mission_id or request.task[:64],
         request.user_id,
         action="mission",
         detail=task[:200],
@@ -3393,9 +3411,8 @@ async def agent_task(request: AgentRequest, http_request: Request):
             status_code=400,
             content={"status": "error", "message": "작업 내용을 입력해주세요."},
         )
-    await _require_agent_mission_quota_once(
+    await _require_agent_coin(
         http_request,
-        str(uuid.uuid4()),
         request.user_id,
         action="task",
         detail=query[:200],
@@ -3488,9 +3505,8 @@ async def agent_ask(request: AgentAskRequest, http_request: Request):
             status_code=400,
             content={"status": "error", "message": "임무를 입력해주세요."},
         )
-    await _require_agent_mission_quota_once(
+    await _require_agent_coin(
         http_request,
-        str(uuid.uuid4()),
         request.user_id,
         action="ask",
         detail=query[:200],
@@ -3909,6 +3925,15 @@ def admin_quota_adjust(body: AdminQuotaAdjustRequest, request: Request) -> dict:
     _require_admin(request)
     try:
         return admin_adjust_quota(body.subject, body.feature, body.delta)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/admin/quota/limit")
+def admin_quota_set_limit(body: AdminQuotaLimitRequest, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return admin_set_quota_limit(body.subject, body.feature, body.daily_limit)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
