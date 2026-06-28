@@ -2338,6 +2338,15 @@ def pick_speaker_labels_avoiding_repeat(previous_labels: list[str]) -> list[str]
     return random.sample(COMPANY_LABELS, 3)
 
 
+def debate_ai_calls_for_next_step(session: DebateSession) -> int:
+    """OpenRouter calls run_debate_step will perform next (summarize + speaker)."""
+    if session.round_number == 0:
+        return 1
+    if len(session.current_round_turns) < 3:
+        return 1
+    return 2
+
+
 async def prepare_next_round_if_needed(session: DebateSession) -> str | None:
     if session.round_number == 0:
         session.round_number = 1
@@ -3225,7 +3234,9 @@ async def debate_continue(request: DebateRequest, http_request: Request) -> dict
 
         if request.user_input:
             append_pending_user_input(session, request.user_input, target_round=session.round_number + 1)
-        await _require_debate_coin(http_request, request.user_id)
+        ai_calls = debate_ai_calls_for_next_step(session)
+        for _ in range(ai_calls):
+            await _require_debate_coin(http_request, request.user_id)
         turns = await run_debate_step(session)
         store_debate_session(request.session_id, session)
 
@@ -3260,20 +3271,39 @@ async def compare_summary(data: CompareSummaryRequest, request: Request) -> dict
         f"질문: {data.message.strip()}\n\n"
         + "\n\n".join(parts)
         + "\n\n위 AI 답변들을 비교해 JSON만 출력하세요. "
-        '{"common":"공통점 한 줄(40자 이내)","diff":"차이점 한 줄(40자 이내)",'
-        '"pick":"추천 AI 모델명","line":"추천 답변 요약 한 줄(60자 이내)"}'
+        '{"common":"공통점 2문장(80자 내외)","diff":"차이점 2문장(80자 내외)",'
+        '"pick":"추천 AI 모델명(위 모델명 중 하나)","line":"추천 답변 핵심 2문장",'
+        '"reason":"왜 이 AI를 추천하는지 한 줄"}'
     )
     labels = ranked_labels()
     summary_label = labels[0] if labels else "GPT"
-    result = await call_ai_best(prompt, max_tokens=350, preferred_labels=[summary_label])
+    result = await call_ai_best(prompt, max_tokens=650, preferred_labels=[summary_label])
     if not result.success:
         raise HTTPException(status_code=502, detail=result.error or USER_FACING_FAILURE_MSG)
     parsed = _parse_json_object(result.content)
+    pick = str(parsed.get("pick", "")).strip()
+    responses_map = data.responses or {}
+    pick_key = pick
+    if pick_key not in responses_map:
+        for k in responses_map:
+            if pick.lower() in k.lower() or k.lower() in pick.lower():
+                pick_key = k
+                pick = k
+                break
+    if not pick_key and responses_map:
+        pick_key = next(iter(responses_map))
+        pick = pick_key
+    line = str(parsed.get("line", "")).strip()
+    if not line and pick_key:
+        raw = str(responses_map.get(pick_key, "")).strip()
+        if raw:
+            line = raw[:220] + ("…" if len(raw) > 220 else "")
     return {
-        "common": str(parsed.get("common", "")).strip()[:80],
-        "diff": str(parsed.get("diff", "")).strip()[:80],
-        "pick": str(parsed.get("pick", summary_label)).strip()[:40],
-        "line": str(parsed.get("line", "")).strip()[:120],
+        "common": str(parsed.get("common", "")).strip()[:160],
+        "diff": str(parsed.get("diff", "")).strip()[:160],
+        "pick": pick[:40] if pick else summary_label,
+        "line": line[:280],
+        "reason": str(parsed.get("reason", "")).strip()[:120],
         "model": summary_label,
     }
 

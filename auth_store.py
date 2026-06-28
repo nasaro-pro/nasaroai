@@ -1267,6 +1267,18 @@ def get_admin_dashboard() -> dict[str, Any]:
         "share_links": int(share_count),
         "usage_today": {r["feature"]: round(float(r["total"]), 2) for r in today_usage},
         "usage_all_time": get_usage_totals_all_time(),
+        "usage_today_total": round(
+            sum(float(r["total"]) for r in today_usage), 2
+        ) if today_usage else 0.0,
+        "usage_all_time_total": _sum_usage_map(get_usage_totals_all_time()),
+        "usage_today_member": get_usage_by_subject_prefix("user:", day_key),
+        "usage_today_guest": get_usage_by_subject_prefix("device:", day_key),
+        "usage_all_time_member": get_usage_by_subject_prefix("user:", None),
+        "usage_all_time_guest": get_usage_by_subject_prefix("device:", None),
+        "usage_today_member_total": _sum_usage_map(get_usage_by_subject_prefix("user:", day_key)),
+        "usage_today_guest_total": _sum_usage_map(get_usage_by_subject_prefix("device:", day_key)),
+        "usage_all_time_member_total": _sum_usage_map(get_usage_by_subject_prefix("user:", None)),
+        "usage_all_time_guest_total": _sum_usage_map(get_usage_by_subject_prefix("device:", None)),
         "usage_by_hour": get_usage_by_hour(day_key),
         "usage_by_hour_by_feature": get_usage_by_hour_by_feature(day_key),
         "login_by_hour": get_login_by_hour(day_key),
@@ -1278,13 +1290,11 @@ def get_admin_dashboard() -> dict[str, Any]:
             "pool_member": MEMBER_DAILY_COINS,
             "pool_guest": GUEST_DAILY_COINS,
         },
-        "usage_today_total": round(
-            sum(float(r["total"]) for r in today_usage), 2
-        ) if today_usage else 0.0,
         "users": enriched,
         "recent_activity": get_activity_log(limit=10000),
         "open_support_count": count_open_support(),
         "platform_stats": get_platform_stats(day_key),
+        "platform_stats_detailed": get_platform_stats_detailed(day_key),
         "member_activity_by_feature": get_member_activity_by_feature(day_key),
         "member_activity_all_time": get_member_activity_by_feature_all_time(),
         "guest_activity_by_feature": get_guest_activity_by_feature(day_key),
@@ -1585,13 +1595,22 @@ def delete_activity_records(
 
 
 def get_platform_stats(day_key: str | None = None) -> dict[str, int]:
+    detailed = get_platform_stats_detailed(day_key)
+    return {k: int(v.get("events", 0)) for k, v in detailed.items()}
+
+
+def get_platform_stats_detailed(day_key: str | None = None) -> dict[str, dict[str, int]]:
     day_key = day_key or _day_key()
     with _lock:
         conn = _connect()
         try:
             rows = conn.execute(
                 """
-                SELECT platform, COUNT(*) AS cnt FROM activity_log
+                SELECT platform,
+                       COUNT(*) AS events,
+                       COUNT(DISTINCT user_id) AS member_accounts,
+                       COUNT(DISTINCT CASE WHEN user_id IS NULL AND device_id != '' THEN device_id END) AS guest_devices
+                FROM activity_log
                 WHERE strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', '+9 hours')) = ?
                 GROUP BY platform
                 """,
@@ -1599,7 +1618,18 @@ def get_platform_stats(day_key: str | None = None) -> dict[str, int]:
             ).fetchall()
         finally:
             conn.close()
-    return {r["platform"]: int(r["cnt"]) for r in rows}
+    return {
+        str(r["platform"] or "web"): {
+            "events": int(r["events"]),
+            "member_accounts": int(r["member_accounts"] or 0),
+            "guest_devices": int(r["guest_devices"] or 0),
+        }
+        for r in rows
+    }
+
+
+def _sum_usage_map(values: dict[str, float] | dict[str, int]) -> float:
+    return round(sum(float(v) for v in (values or {}).values()), 2)
 
 
 def get_guest_activity_by_feature(day_key: str | None = None) -> dict[str, int]:
@@ -1647,6 +1677,38 @@ def get_usage_totals_all_time() -> dict[str, float]:
             rows = conn.execute(
                 "SELECT feature, SUM(count) AS total FROM quota_usage GROUP BY feature",
             ).fetchall()
+        finally:
+            conn.close()
+    return {r["feature"]: round(float(r["total"]), 2) for r in rows}
+
+
+def get_usage_by_subject_prefix(
+    prefix: str,
+    day_key: str | None = None,
+) -> dict[str, float]:
+    day_key = day_key or _day_key()
+    like = f"{prefix}%"
+    with _lock:
+        conn = _connect()
+        try:
+            if day_key:
+                rows = conn.execute(
+                    """
+                    SELECT feature, SUM(count) AS total FROM quota_usage
+                    WHERE day_key = ? AND subject LIKE ?
+                    GROUP BY feature
+                    """,
+                    (day_key, like),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT feature, SUM(count) AS total FROM quota_usage
+                    WHERE subject LIKE ?
+                    GROUP BY feature
+                    """,
+                    (like,),
+                ).fetchall()
         finally:
             conn.close()
     return {r["feature"]: round(float(r["total"]), 2) for r in rows}

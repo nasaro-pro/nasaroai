@@ -1693,6 +1693,14 @@
             line-height: 1.45;
             word-break: break-word;
         }
+        .compare-affinity-badge {
+            display: inline-block;
+            margin-right: 6px;
+            color: #f59e0b;
+            font-weight: 800;
+            font-size: 11px;
+            vertical-align: middle;
+        }
         html[data-theme="dark"] .compare-q-bubble {
             background: #312e81;
             color: #e9d5ff;
@@ -4882,12 +4890,20 @@
             const c = Math.max(1, Number(coins) || 1);
             return `${text} ${coinCost(c)}`;
         }
+        function getDebateRoundCoinCost(isFirstRound) {
+            return isFirstRound ? 4 : 5;
+        }
         function getModeCoinCost(mode) {
             const NF = window.NasaroFeatures;
             if (mode === "compare") return (NF?.getSelectedModels?.("compare") || getActiveModels()).length || 1;
-            if (mode === "debate") return 1;
+            if (mode === "debate") {
+                if (!debateStarted) return getDebateRoundCoinCost(true);
+                return getDebateRoundCoinCost(false);
+            }
             if (mode === "collab") {
                 if (collabIntakeActive) return 1;
+                if (collabRecommendInFlight) return 3;
+                if (collabSession?.plan && !collabTaskAsked) return 4;
                 if (collabTaskAsked) return 1;
                 return 1;
             }
@@ -5115,16 +5131,36 @@
             return affinityList.some(a => m.includes(String(a).toLowerCase()));
         }
 
-        function updateCompareAffinityStars(message, models) {
+        function updateCompareAffinityStars(message, models, turnIndex = compareCurrentTurnIndex) {
             const affinity = getCompareAffinityModels(message);
             models.forEach(model => {
                 const key = compareModelKey(model);
                 const meta = document.getElementById(`model-meta-${key}`);
-                if (!meta) return;
-                meta.textContent = modelMatchesAffinity(model, affinity) ? "★" : "";
-                meta.className = "compare-model-meta" + (meta.textContent ? " compare-affinity-star" : "");
-                meta.title = meta.textContent ? "이 질문 유형에 잘 맞는 AI" : "";
+                if (meta) {
+                    meta.textContent = "";
+                    meta.className = "compare-model-meta";
+                    meta.title = "";
+                }
+                const slug = compareContentSlug(turnIndex, model);
+                const pair = document.getElementById(`compare-qa-pair-${slug}`);
+                const bubble = pair?.querySelector(".compare-q-bubble");
+                if (!bubble) return;
+                bubble.querySelectorAll(".compare-affinity-badge").forEach(el => el.remove());
+                if (modelMatchesAffinity(model, affinity)) {
+                    const badge = document.createElement("span");
+                    badge.className = "compare-affinity-badge";
+                    badge.textContent = "★ 추천";
+                    badge.title = "이 질문 유형에 잘 맞는 AI";
+                    bubble.insertBefore(badge, bubble.firstChild);
+                }
             });
+        }
+
+        function apiErrorMessage(data, fallback) {
+            const d = data?.detail;
+            if (typeof d === "string") return d;
+            if (d && typeof d === "object") return d.message || fallback;
+            return fallback;
         }
 
         async function refreshCompareSummary(message, responses) {
@@ -5149,12 +5185,13 @@
                     body: JSON.stringify({ message, responses, user_id: getDeviceId() }),
                 });
                 const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.detail?.message || data.detail || "요약 실패");
+                if (!res.ok) throw new Error(apiErrorMessage(data, "요약 실패"));
                 pickEl.innerHTML = data.pick ? `<strong>★ ${escapeHtml(data.pick)}</strong>` : "";
                 lineEl.textContent = data.line || "";
                 const subParts = [];
                 if (data.common) subParts.push(`공통: ${data.common}`);
                 if (data.diff) subParts.push(`차이: ${data.diff}`);
+                if (data.reason) subParts.push(data.reason);
                 subEl.textContent = subParts.join(" · ");
                 refreshSideQuota();
             } catch (err) {
@@ -5258,7 +5295,7 @@
                     const failed = turn.responses[model] === COMPARE_FAILURE_MSG;
                     updateCompareCard(model, turn.responses[model] || "", failed, turnIndex);
                 });
-                if (turn.query) updateCompareAffinityStars(turn.query, Object.keys(turn.responses || {}));
+                if (turn.query) updateCompareAffinityStars(turn.query, Object.keys(turn.responses || {}), turnIndex);
             });
             const lastTurn = compareTurns[compareTurns.length - 1];
             if (lastTurn) {
@@ -6895,10 +6932,15 @@
                     mainInput.placeholder = collabTaskAsked
                         ? (NF?.t?.("ph_collab_done") || "추가 수정·요청…")
                         : (NF?.t?.("ph_collab") || "작업 설명…");
+                    const collabCost = getModeCoinCost("collab");
                     dockPrimaryBtn.textContent = collabRecommendInFlight
                         ? "…"
-                        : dockBtnLabel(collabTaskAsked ? "추가 ▶" : "시작 ▶", 1);
-                    dockPrimaryBtn.title = collabTaskAsked ? "추가 작업 · 🪙1" : "작업 시작 · 정보 수집 🪙1/회 (최대 🪙10)";
+                        : dockBtnLabel(collabTaskAsked ? "추가 ▶" : "시작 ▶", collabCost);
+                    dockPrimaryBtn.title = collabTaskAsked
+                        ? `추가 작업 · AI ${COIN}1`
+                        : (collabSession?.plan
+                            ? `4단계 실행 · AI ${COIN}4 (단계당 ${COIN}1)`
+                            : `정보 수집 ${COIN}1/회 · AI 추천 ${COIN}3 (최대 ${COIN}10)`);
                 }
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = collabRecommendInFlight;
@@ -6911,14 +6953,16 @@
             mainInput.disabled = false;
             if (!debateStarted) {
                 mainInput.placeholder = NF?.t?.("ph_debate") || "토론 주제…";
-                dockPrimaryBtn.textContent = dockBtnLabel(mob ? "토론 ▶" : (NF?.t?.("btn_debate") || "토론 ▶"), 1);
-                dockPrimaryBtn.title = `${NF?.t?.("btn_debate") || "토론"} · ${COIN}1/발언`;
+                const debateCost = getDebateRoundCoinCost(true);
+                dockPrimaryBtn.textContent = dockBtnLabel(mob ? "토론 ▶" : (NF?.t?.("btn_debate") || "토론 ▶"), debateCost);
+                dockPrimaryBtn.title = `${NF?.t?.("btn_debate") || "토론"} · 1라운드 AI ${debateCost}${COIN} (발언 3 + 요약 1)`;
                 dockPrimaryBtn.className = "dock-btn secondary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             } else {
                 mainInput.placeholder = NF?.t?.("ph_debate_cont") || "의견 추가…";
-                dockPrimaryBtn.textContent = dockBtnLabel(mob ? "다음 ▶" : (NF?.t?.("btn_debate_next") || "다음 ▶"), 1);
-                dockPrimaryBtn.title = `${NF?.t?.("btn_debate_next") || "다음"} · ${COIN}1/발언`;
+                const nextCost = getDebateRoundCoinCost(false);
+                dockPrimaryBtn.textContent = dockBtnLabel(mob ? "다음 ▶" : (NF?.t?.("btn_debate_next") || "다음 ▶"), nextCost);
+                dockPrimaryBtn.title = `${NF?.t?.("btn_debate_next") || "다음"} · 1라운드 AI ${nextCost}${COIN} (발언 3 + 요약 1)`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             }
@@ -8790,7 +8834,7 @@
                 responses[model] = "";
                 appendCompareQaPair(model, message, turnIndex);
             });
-            updateCompareAffinityStars(message, activeModels);
+            updateCompareAffinityStars(message, activeModels, turnIndex);
 
             const failures = [];
             await Promise.all(

@@ -210,6 +210,12 @@
     .entity-stats-block h4 {
       margin: 0 0 8px; font-size: 12px; color: #c4b5fd; font-weight: 700;
     }
+    .stat-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; }
+    .stat-table th, .stat-table td { border-bottom: 1px solid #334155; padding: 7px 6px; text-align: left; }
+    .stat-table th { color: #94a3b8; font-weight: 600; white-space: nowrap; }
+    .stat-table tr.totals td { border-top: 1px solid #475569; color: #e2e8f0; }
+    .stat-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .stat-hint { font-size: 10px; color: #64748b; margin: 6px 0 0; }
     .support-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .support-actions .danger { background: #b91c1c; }
     .sidebar-foot {
@@ -291,23 +297,25 @@
       <div class="panels" id="overviewPanels">
         <section class="panel">
           <h2>플랫폼별 사용 (오늘)</h2>
+          <p class="stat-hint">활동 건수 · 해당 플랫폼에서 활동한 회원 계정 수 · 비회원 기기 수</p>
           <div id="platformStats" class="empty">불러오는 중…</div>
         </section>
         <section class="panel">
-          <h2>시간대별 사용 (KST · 전체)</h2>
+          <h2>AI 사용량 · 오늘 vs 전체</h2>
+          <p class="stat-hint">AI 1회 호출 = 🪙1 · 통합 코인 풀에서 차감</p>
+          <div id="usageCompareTable"></div>
+        </section>
+        <section class="panel">
+          <h2>시간대별 AI 호출 (KST · 오늘)</h2>
           <div id="hourChart" class="hour-chart"></div>
         </section>
+        <section class="panel">
+          <h2>회원 · 비회원 AI 사용 (오늘)</h2>
+          <div id="usageAudienceTable"></div>
+        </section>
         <section class="panel full">
-          <h2>기능별 · 시간대별 사용량 (오늘)</h2>
+          <h2>기능별 · 시간대별 AI 호출 (오늘)</h2>
           <div id="featureHourCharts" class="chart-grid"></div>
-        </section>
-        <section class="panel">
-          <h2>회원 로그인 시간대 (KST)</h2>
-          <div id="loginHourChart" class="hour-chart"></div>
-        </section>
-        <section class="panel">
-          <h2>회원 접속 활동 시간대 (KST)</h2>
-          <div id="memberHourChart" class="hour-chart"></div>
         </section>
         <section class="panel full activity-dual-panel">
           <div class="activity-dual-head">
@@ -583,9 +591,7 @@
         const used = Math.round(v.used ?? 0);
         return `<div class="quota-row" data-feature="${f}">
           <span class="quota-feat">${FEATURE_LABELS[f] || f}</span>
-          <span class="quota-val" data-qval="${f}">AI 호출 🪙${used}</span>
-          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="-1">-🪙1</button>
-          <button type="button" class="secondary q-adj" data-feature="${f}" data-delta="1">+🪙1</button>
+          <span class="quota-val" data-qval="${f}">오늘 AI 호출 🪙${used}</span>
         </div>`;
       }).join("");
       return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
@@ -596,7 +602,7 @@
           <input type="number" class="q-limit-inp" data-feature="_pool" value="${poolLimit}" min="0" max="9999" step="1" style="width:54px" title="일일 통합 한도">
           <button type="button" class="secondary q-save-limit" data-feature="_pool">한도 저장</button>
         </div>
-        <div style="font-size:11px;color:#94a3b8;margin:0 0 6px;">기능별 AI 호출 (같은 코인 풀에서 차감)</div>
+        <div style="font-size:11px;color:#94a3b8;margin:0 0 6px;">기능별 통계 (같은 코인 풀 · 조정 불가)</div>
         ${breakdown || "<div class='empty'>없음</div>"}
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="secondary" id="quotaRefreshBtn">새로고침</button>
@@ -623,7 +629,7 @@
         ["compare", "debate", "collab", "agent"].forEach(f => {
           const el = box.querySelector(`[data-qval="${f}"]`);
           const v = snap.features?.[f] || {};
-          if (el) el.textContent = `AI 호출 🪙${Math.round(v.used ?? 0)}`;
+          if (el) el.textContent = `오늘 AI 호출 🪙${Math.round(v.used ?? 0)}`;
         });
         box.dataset.banned = snap.banned ? "1" : "0";
         const banBtn = document.getElementById("banToggleBtn");
@@ -636,21 +642,6 @@
 
     function wireQuotaAdminPanel(subject) {
       document.getElementById("quotaAdminBox")?.addEventListener("click", async e => {
-        const adj = e.target.closest(".q-adj");
-        if (adj) {
-          const feature = adj.dataset.feature;
-          const delta = Number(adj.dataset.delta);
-          try {
-            await api("/admin/quota/adjust", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ subject, feature, delta }),
-            });
-            await refreshQuotaAdminPanel(subject);
-            if (selectedUserId) selectUser(selectedUserId);
-          } catch (err) { alert(err.message); }
-          return;
-        }
         const saveLim = e.target.closest(".q-save-limit");
         if (saveLim) {
           const feature = saveLim.dataset.feature;
@@ -700,14 +691,119 @@
       return `<span class="badge ${cls}">${PLATFORM_LABEL[p] || p || "web"}</span>`;
     }
 
+    function renderUsageCompareTable(todayMap, allMap, todayTotal, allTotal) {
+      const feats = ["compare", "debate", "collab", "agent"];
+      const rows = feats.map(f => {
+        const t = Math.round(Number(todayMap?.[f] || 0));
+        const a = Math.round(Number(allMap?.[f] || 0));
+        const share = a > 0 ? Math.round((t / a) * 100) : (t > 0 ? 100 : 0);
+        return `<tr>
+          <td>${FEATURE_LABELS[f] || f}</td>
+          <td class="num">🪙${t}</td>
+          <td class="num">🪙${a}</td>
+          <td class="num">${share}%</td>
+        </tr>`;
+      }).join("");
+      return `<table class="stat-table">
+        <thead><tr><th>기능</th><th>오늘</th><th>전체 누적</th><th>오늘/누적</th></tr></thead>
+        <tbody>${rows}
+        <tr class="totals">
+          <td><strong>합계</strong></td>
+          <td class="num"><strong>🪙${Math.round(todayTotal || 0)}</strong></td>
+          <td class="num"><strong>🪙${Math.round(allTotal || 0)}</strong></td>
+          <td class="num"></td>
+        </tr></tbody></table>`;
+    }
+
+    function renderUsageAudienceTable(data) {
+      const memberToday = data.usage_today_member || {};
+      const guestToday = data.usage_today_guest || {};
+      const memberAll = data.usage_all_time_member || {};
+      const guestAll = data.usage_all_time_guest || {};
+      const feats = ["compare", "debate", "collab", "agent"];
+      const rows = feats.map(f => {
+        const mt = Math.round(Number(memberToday[f] || 0));
+        const gt = Math.round(Number(guestToday[f] || 0));
+        const ma = Math.round(Number(memberAll[f] || 0));
+        const ga = Math.round(Number(guestAll[f] || 0));
+        return `<tr>
+          <td>${FEATURE_LABELS[f] || f}</td>
+          <td class="num">🪙${mt}</td>
+          <td class="num">🪙${gt}</td>
+          <td class="num">🪙${ma}</td>
+          <td class="num">🪙${ga}</td>
+        </tr>`;
+      }).join("");
+      return `<table class="stat-table">
+        <thead><tr><th>기능</th><th>회원·오늘</th><th>비회원·오늘</th><th>회원·누적</th><th>비회원·누적</th></tr></thead>
+        <tbody>${rows}
+        <tr class="totals">
+          <td><strong>합계</strong></td>
+          <td class="num"><strong>🪙${Math.round(data.usage_today_member_total || 0)}</strong></td>
+          <td class="num"><strong>🪙${Math.round(data.usage_today_guest_total || 0)}</strong></td>
+          <td class="num"><strong>🪙${Math.round(data.usage_all_time_member_total || 0)}</strong></td>
+          <td class="num"><strong>🪙${Math.round(data.usage_all_time_guest_total || 0)}</strong></td>
+        </tr></tbody></table>`;
+    }
+
+    function renderPlatformDetailed(detailed) {
+      const entries = Object.entries(detailed || {});
+      if (!entries.length) return "<span class='empty'>오늘 활동 없음</span>";
+      const rows = entries.map(([k, v]) => {
+        const d = v || {};
+        return `<tr>
+          <td>${platformBadge(k)}</td>
+          <td class="num">${d.events ?? 0}</td>
+          <td class="num">${d.member_accounts ?? 0}</td>
+          <td class="num">${d.guest_devices ?? 0}</td>
+        </tr>`;
+      }).join("");
+      return `<table class="stat-table">
+        <thead><tr><th>플랫폼</th><th>활동</th><th>회원 계정</th><th>비회원 기기</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    }
+
+    function renderFeatureStatsTable(aiToday, aiAll, actToday, actAll, title) {
+      const feats = ["compare", "debate", "collab", "agent"];
+      const rows = feats.map(f => {
+        const at = Math.round(Number(aiToday?.[f] || 0));
+        const aa = Math.round(Number(aiAll?.[f] || 0));
+        const ct = Math.round(Number(actToday?.[f] || 0));
+        const ca = Math.round(Number(actAll?.[f] || 0));
+        return `<tr>
+          <td>${FEATURE_LABELS[f] || f}</td>
+          <td class="num">🪙${at}</td>
+          <td class="num">🪙${aa}</td>
+          <td class="num">${ct}</td>
+          <td class="num">${ca}</td>
+        </tr>`;
+      }).join("");
+      const sumAiToday = feats.reduce((s, f) => s + Number(aiToday?.[f] || 0), 0);
+      const sumAiAll = feats.reduce((s, f) => s + Number(aiAll?.[f] || 0), 0);
+      const sumActToday = feats.reduce((s, f) => s + Number(actToday?.[f] || 0), 0);
+      const sumActAll = feats.reduce((s, f) => s + Number(actAll?.[f] || 0), 0);
+      return `<h4>${title}</h4>
+        <table class="stat-table">
+          <thead><tr><th>기능</th><th>AI·오늘</th><th>AI·누적</th><th>활동·오늘</th><th>활동·누적</th></tr></thead>
+          <tbody>${rows}
+          <tr class="totals">
+            <td><strong>합계</strong></td>
+            <td class="num"><strong>🪙${Math.round(sumAiToday)}</strong></td>
+            <td class="num"><strong>🪙${Math.round(sumAiAll)}</strong></td>
+            <td class="num"><strong>${sumActToday}</strong></td>
+            <td class="num"><strong>${sumActAll}</strong></td>
+          </tr></tbody>
+        </table>`;
+    }
+
     function renderStats(data) {
-      const ps = data.platform_stats || {};
       const onlineUsers = data.online_users ?? data.active_sessions ?? 0;
       const onlineGuests = data.online_guests ?? 0;
       const onlineTotal = data.online_total ?? (onlineUsers + onlineGuests);
       const usageAll = data.usage_all_time || {};
       const usageToday = data.usage_today || {};
       const usageTodayTotal = data.usage_today_total ?? Object.values(usageToday).reduce((s, v) => s + Number(v || 0), 0);
+      const usageAllTotal = data.usage_all_time_total ?? Object.values(usageAll).reduce((s, v) => s + Number(v || 0), 0);
       const poolMember = data.quota_limits?.pool_member ?? 250;
       const poolGuest = data.quota_limits?.pool_guest ?? 70;
       document.getElementById("statsRow").innerHTML = `
@@ -717,16 +813,17 @@
         <div class="stat"><b>${onlineGuests}</b><span>비회원 접속</span></div>
         <div class="stat"><b>${data.open_support_count ?? 0}</b><span>미답변 문의</span></div>
         <div class="stat"><b>${guests.length}</b><span>비회원 기기(누적)</span></div>
-        <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>
-        <div class="stat"><b style="font-size:13px;">🪙${Math.round(usageTodayTotal)}</b><span>오늘 AI 호출(전체)</span></div>
-        <div class="stat"><b style="font-size:12px;">회원🪙${poolMember} · 비회원🪙${poolGuest}</b><span>일일 통합 한도</span></div>`;
-      document.getElementById("platformStats").innerHTML = Object.keys(ps).length
-        ? Object.entries(ps).map(([k, v]) => `<div>${platformBadge(k)} <strong>${v}</strong>회</div>`).join("")
-        : "<span class='empty'>오늘 활동 기록 없음</span>";
-      renderHourChart(data.usage_by_hour || {}, "hourChart", "오늘 KST 시간대별 API 사용");
+        <div class="stat"><b style="font-size:13px;">🪙${Math.round(usageTodayTotal)}</b><span>오늘 AI 호출</span></div>
+        <div class="stat"><b style="font-size:13px;">🪙${Math.round(usageAllTotal)}</b><span>전체 AI 호출</span></div>
+        <div class="stat"><b style="font-size:12px;">회원🪙${poolMember} · 비회원🪙${poolGuest}</b><span>일일 통합 한도</span></div>
+        <div class="stat"><b>${data.day_key}</b><span>오늘 KST</span></div>`;
+      document.getElementById("platformStats").innerHTML = renderPlatformDetailed(data.platform_stats_detailed || {});
+      const usageEl = document.getElementById("usageCompareTable");
+      if (usageEl) usageEl.innerHTML = renderUsageCompareTable(usageToday, usageAll, usageTodayTotal, usageAllTotal);
+      const audienceEl = document.getElementById("usageAudienceTable");
+      if (audienceEl) audienceEl.innerHTML = renderUsageAudienceTable(data);
+      renderHourChart(data.usage_by_hour || {}, "hourChart", "오늘 KST");
       renderFeatureHourCharts(data.usage_by_hour_by_feature || {}, data.quota_limits || {});
-      renderSimpleHourChart(data.login_by_hour || {}, "loginHourChart", "#38bdf8", "로그인");
-      renderSimpleHourChart(data.member_activity_by_hour || {}, "memberHourChart", "#86efac", "세션 활동");
     }
 
     const FEATURE_COLORS = {
@@ -1072,17 +1169,6 @@
       return items;
     }
 
-    function renderFeatureStatCards(map, prefix, showLimit) {
-      const feats = ["compare", "debate", "collab", "agent"];
-      const total = feats.reduce((s, f) => s + Number(map?.[f] || 0), 0);
-      const cards = feats.map(f => {
-        const used = Number(map?.[f] || 0);
-        return `<div class="stat"><b>${used}</b><span>${prefix}${FEATURE_LABELS[f] || f} AI호출</span></div>`;
-      }).join("");
-      const limitNote = showLimit ? ` · 한도 🪙${showLimit}` : "";
-      return `<div class="stat"><b>🪙${Math.round(total)}</b><span>${prefix}통합${limitNote}</span></div>${cards}`;
-    }
-
     function renderMemberStatsBlock() {
       const el = document.getElementById("membersStatsBlock");
       if (!el) return;
@@ -1098,60 +1184,50 @@
       const actToday = dashData?.member_activity_by_feature || {};
       const actAll = dashData?.member_activity_all_time || {};
       const poolLimit = dashData?.quota_limits?.pool_member ?? 250;
+      const online = users.filter(u => u.is_online).length;
+      const collab = users.filter(u => u.has_active_collab).length;
+      const aiTodaySum = Object.values(quotaTotals).reduce((s, v) => s + v, 0);
       el.innerHTML = `
-        <h4>회원 — 오늘 AI 코인 (통합 풀 🪙${poolLimit}/人·日)</h4>
-        <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(quotaTotals, "오늘 ", poolLimit)}
+        <div class="entity-summary" style="margin-bottom:10px;">
+          <div class="stat"><b>${users.length}</b><span>전체 회원</span></div>
+          <div class="stat"><b>${online}</b><span>접속 중</span></div>
+          <div class="stat"><b>${collab}</b><span>협업 진행</span></div>
+          <div class="stat"><b>🪙${Math.round(aiTodaySum)}</b><span>오늘 AI 합계</span></div>
+          <div class="stat"><b>🪙${poolLimit}</b><span>1人·日 통합 한도</span></div>
         </div>
-        <h4 style="margin-top:10px;">회원 — 전체 누적 AI 호출</h4>
-        <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(quotaAllTotals, "누적 ", null)}
-        </div>
-        <h4 style="margin-top:10px;">회원 활동 기록 — 오늘</h4>
-        <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(actToday, "", null)}
-        </div>
-        <h4 style="margin-top:10px;">회원 활동 기록 — 전체</h4>
-        <div class="entity-summary">
-          ${renderFeatureStatCards(actAll, "", null)}
-        </div>`;
+        ${renderFeatureStatsTable(quotaTotals, quotaAllTotals, actToday, actAll, "회원 · 기능별 AI 호출 & 활동 기록")}`;
     }
 
     function renderGuestStatsBlock() {
       const el = document.getElementById("guestsStatsBlock");
       if (!el) return;
       const items = guests || [];
+      const aiToday = dashData?.usage_today_guest || {};
+      const aiAll = dashData?.usage_all_time_guest || {};
+      const actToday = dashData?.guest_activity_by_feature || {};
+      const actAll = dashData?.guest_activity_all_time || {};
+      const guestPool = dashData?.quota_limits?.pool_guest ?? 70;
       const platforms = {};
       items.forEach(g => {
         const p = g.platform || "web";
         platforms[p] = (platforms[p] || 0) + 1;
       });
-      const actToday = dashData?.guest_activity_by_feature || {};
-      const actAll = dashData?.guest_activity_all_time || {};
-      const usageToday = dashData?.usage_today || {};
-      const guestPool = dashData?.quota_limits?.pool_guest ?? 70;
-      const platText = Object.entries(platforms).map(([k, v]) => `${PLATFORM_LABEL[k] || k}:${v}`).join(" · ") || "-";
+      const platRows = Object.entries(platforms).map(([k, v]) =>
+        `<tr><td>${platformBadge(k)}</td><td class="num">${v}</td><td class="num">${items.filter(g => (g.platform || "web") === k && g.is_online).length}</td></tr>`
+      ).join("") || `<tr><td colspan="3" class="empty">기기 없음</td></tr>`;
       el.innerHTML = `
-        <h4>비회원 통계</h4>
-        <div class="entity-summary" style="margin-bottom:8px;">
+        <div class="entity-summary" style="margin-bottom:10px;">
           <div class="stat"><b>${items.filter(g => g.is_online).length}</b><span>접속 중</span></div>
           <div class="stat"><b>${items.length}</b><span>등록 기기</span></div>
-          <div class="stat"><b>${items.reduce((s, g) => s + (g.activity_count || 0), 0)}</b><span>누적 활동</span></div>
-          <div class="stat"><b style="font-size:12px;">${platText}</b><span>플랫폼 분포</span></div>
-          <div class="stat"><b>🪙${guestPool}</b><span>기기당 일일 통합 한도</span></div>
+          <div class="stat"><b>🪙${Math.round(dashData?.usage_today_guest_total || 0)}</b><span>오늘 AI 합계</span></div>
+          <div class="stat"><b>🪙${guestPool}</b><span>기기당 일일 한도</span></div>
         </div>
-        <h4 style="margin-top:10px;">비회원 AI 호출 — 오늘 (전체)</h4>
-        <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(usageToday, "전체 ", null)}
-        </div>
-        <h4 style="margin-top:10px;">비회원 활동 기록 — 오늘</h4>
-        <div class="entity-summary" style="margin-bottom:8px;">
-          ${renderFeatureStatCards(actToday, "", null)}
-        </div>
-        <h4 style="margin-top:10px;">비회원 활동 기록 — 전체</h4>
-        <div class="entity-summary">
-          ${renderFeatureStatCards(actAll, "", null)}
-        </div>`;
+        <h4>플랫폼별 기기</h4>
+        <table class="stat-table" style="margin-bottom:12px;">
+          <thead><tr><th>플랫폼</th><th>기기 수</th><th>접속 중</th></tr></thead>
+          <tbody>${platRows}</tbody>
+        </table>
+        ${renderFeatureStatsTable(aiToday, aiAll, actToday, actAll, "비회원 · 기능별 AI 호출 & 활동 기록")}`;
     }
 
     function renderDetailActivityHtml(items, limit = 80) {

@@ -124,78 +124,28 @@
 
     <section>
       <h2>앞으로 더 좋아질 기능 · 아이디어 20</h2>
-      <p style="color:#64748b;font-size:14px;margin:0 0 8px;">사용자 의견과 실제 사용 패턴을 반영해 순서대로 보완합니다. <span class="idea-tag ok">완료</span>는 이미 쓸 수 있는 기능입니다.</p>
+      <p style="color:#64748b;font-size:14px;margin:0 0 8px;">사용자 의견과 실제 사용 패턴을 반영해 순서대로 보완합니다. 모두 <span class="idea-tag plan">예정</span> 기능입니다.</p>
       <div class="ideas-grid">
-        <div class="idea-item done"><span class="idea-num">1</span><div><strong>답변 복사 버튼</strong><span class="idea-tag ok">완료</span><br>비교·토론 각 답변 옆에서 한 번에 복사</div></div>
-        <div class="idea-item done"><span class="idea-num">2</span><div><strong>내보내기 형식 선택</strong><span class="idea-tag ok">완료</span><br>md · txt · html · pdf(인쇄) 중 선택</div></div>
-        <div class="idea-item done"><span class="idea-num">3</span><div><strong>협업 4단계 순차 실행</strong><span class="idea-tag ok">완료</span><br>조사→구조→제작→검증, 단계별 실시간 확인</div></div>
-        <div class="idea-item done"><span class="idea-num">4</span><div><strong>검증 AI 피드백 루프</strong><span class="idea-tag ok">완료</span><br>검증은 지적만, 조사·구조·제작 AI가 수정</div></div>
-        <div class="idea-item done"><span class="idea-num">5</span><div><strong>작업 유형 자동 분류</strong><span class="idea-tag ok">완료</span><br>자소서·문서·영상 등 요청 내용에 맞게 협업 분류</div></div>
-        <div class="idea-item done"><span class="idea-num">6</span><div><strong>에이전트 예약 임무</strong><span class="idea-tag ok">완료</span><br>「5분 뒤 ○○해줘」→ 활동 임무에 예약 표시</div></div>
-        <div class="idea-item done"><span class="idea-num">7</span><div><strong>계정 로그인·결과물 동기화</strong><span class="idea-tag ok">완료</span><br>아이디 로그인 시 기기 간 결과물 이어하기</div></div>
-        <div class="idea-item done"><span class="idea-num">8</span><div><strong>빈 화면 질문 추천</strong><span class="idea-tag ok">완료</span><br>비교 모드에서 예시 질문 칩으로 바로 시작</div></div>
-
-        <div class="idea-item"><span class="idea-num">9</span><div><strong>메일·SNS·카톡 초안 변환</strong><span class="idea-tag plan">예정</span><br>비교·협업 결과를 채널별 톤·길이에 맞게 변환
-          <details class="idea-expand"><summary>구현 계획 (상세)</summary>
-            <div class="idea-detail">
-              <ol>
-                <li><strong>입력</strong>: 결과물 sections[] + kind를 <code>POST /convert/channel</code>로 전송.</li>
-                <li><strong>채널</strong>: mail_formal, mail_casual, kakao_short, sns_thread — 글자 수·말투 규칙을 prompt에 고정.</li>
-                <li><strong>UI</strong>: 「채널 변환」→ 채널 선택 → 미리보기 + 복사 (🪙1).</li>
-                <li><strong>저장</strong>: kind=convert, payload.original_id 로 원본 연결.</li>
-              </ol>
-            </div>
-          </details>
-        </div></div>
-
-        <div class="idea-item done"><span class="idea-num">10</span><div><strong>즐겨찾는 AI 고정</strong><span class="idea-tag ok">완료</span><br>비교·토론·협업·에이전트 AI 조합 저장. 로그인=서버 동기화, 비회원=기기만. 협업 단계별 추천 AI는 작업마다 달라 저장하지 않음.</div></div>
-        <div class="idea-item done"><span class="idea-num">11</span><div><strong>비교 요약 칸</strong><span class="idea-tag ok">완료</span><br>비교창 상단 공통점·차이점·AI 추천 한 줄 (컴팩트, 🪙1)</div></div>
-        <div class="idea-item done"><span class="idea-num">12</span><div><strong>비교 요약 + Diff 통합</strong><span class="idea-tag ok">완료</span><br>11번 요약 칸에 공통/차이 통합 — 별도 Diff 화면 없음</div></div>
-        <div class="idea-item done"><span class="idea-num">13</span><div><strong>질문 맞춤 AI 표시</strong><span class="idea-tag ok">완료</span><br>질문 유형에 잘 맞는 비교 AI 카드에 ★ 표시</div></div>
-        <div class="idea-item done"><span class="idea-num">14</span><div><strong>토론 라운드 요약 카드</strong><span class="idea-tag ok">완료</span><br>3번 발언 다음 4번째 카드로 합의·쟁점·다음 액션 요약</div></div>
-        <div class="idea-item done"><span class="idea-num">15</span><div><strong>결과물 폴더·태그</strong><span class="idea-tag ok">완료</span><br>저장 시 폴더·태그, 결과물 파일에서 필터·분류 수정</div></div>
-        <div class="idea-item done"><span class="idea-num">16</span><div><strong>협업·에이전트 완료 알림</strong><span class="idea-tag ok">완료</span><br>작업 완료 시 브라우저 알림 (권한 허용 시)</div></div>
-
-        <div class="idea-item"><span class="idea-num">17</span><div><strong>Android 홈 위젯</strong><span class="idea-tag plan">예정</span><br>홈 화면에서 질문·에이전트 바로 실행
-          <details class="idea-expand"><summary>구현 계획 (상세)</summary>
-            <div class="idea-detail">
-              <ol>
-                <li>App Widget Provider + <code>nasaro://ask</code> deep link로 앱 compare/agent 모드 오픈.</li>
-                <li>device_id·auth token으로 /quota 확인 후 실행.</li>
-                <li>접근성 연결 시 위젯에서 에이전트 단축 실행.</li>
-                <li>1차: 질문 입력+앱 열기. 2차: 위젯 답변 미리보기.</li>
-              </ol>
-            </div>
-          </details>
-        </div></div>
-
-        <div class="idea-item"><span class="idea-num">18</span><div><strong>초보 모드</strong><span class="idea-tag plan">예정</span><br>기능 하나씩 크게 보이는 단순 UI
-          <details class="idea-expand"><summary>구현 계획 (상세)</summary>
-            <div class="idea-detail">
-              <ol>
-                <li>설정 토글 → <code>html[data-beginner="1"]</code> CSS, 고급 메뉴 접기.</li>
-                <li>모드 3개만 크게, 「추천 AI 조합」1버튼.</li>
-                <li>첫 방문 3단계 coach mark (비교→저장→가이드).</li>
-              </ol>
-            </div>
-          </details>
-        </div></div>
-
-        <div class="idea-item"><span class="idea-num">19</span><div><strong>팀·가족 공유 보관함</strong><span class="idea-tag plan">예정</span><br>지정 사용자와 결과물 공유
-          <details class="idea-expand"><summary>기능 설계 (상세)</summary>
-            <div class="idea-detail">
-              <ol>
-                <li><strong>그룹</strong>: share_groups + share_members (role: view/edit).</li>
-                <li><strong>초대</strong>: 아이디 검색 또는 24시간 invite_code.</li>
-                <li><strong>공유</strong>: saved_works snapshot 또는 share_to_group_id (원본과 분리).</li>
-                <li><strong>API</strong>: /share/group CRUD, /share/group/{id}/works.</li>
-                <li><strong>UI</strong>: 저장 시 「나만/가족/팀」 + 사이드 공유함 탭. 프라이버시 모드 OFF일 때만.</li>
-              </ol>
-            </div>
-          </details>
-        </div></div>
-
-        <div class="idea-item"><span class="idea-num">20</span><div><strong>음성으로 질문하기</strong><span class="idea-tag plan">예정</span><br>마이크로 질문 입력 → 비교·토론 바로 실행 (다국어 STT)</div></div>
+        <div class="idea-item"><span class="idea-num">1</span><div><strong>메일·SNS·카톡 초안 변환</strong><span class="idea-tag plan">예정</span><br>비교·협업 결과를 채널별 톤·길이에 맞게 변환 (🪙1)</div></div>
+        <div class="idea-item"><span class="idea-num">2</span><div><strong>Android 홈 위젯</strong><span class="idea-tag plan">예정</span><br>홈 화면에서 질문·에이전트 바로 실행</div></div>
+        <div class="idea-item"><span class="idea-num">3</span><div><strong>초보 모드</strong><span class="idea-tag plan">예정</span><br>기능 하나씩 크게 보이는 단순 UI + 3단계 안내</div></div>
+        <div class="idea-item"><span class="idea-num">4</span><div><strong>팀·가족 공유 보관함</strong><span class="idea-tag plan">예정</span><br>지정 사용자와 결과물 공유 · 읽기/편집 권한</div></div>
+        <div class="idea-item"><span class="idea-num">5</span><div><strong>음성으로 질문하기</strong><span class="idea-tag plan">예정</span><br>마이크 입력 → 비교·토론 바로 실행 (다국어 STT)</div></div>
+        <div class="idea-item"><span class="idea-num">6</span><div><strong>비교 대화 이어쓰기 내보내기</strong><span class="idea-tag plan">예정</span><br>여러 턴 Q&A를 하나의 문서·PDF로 묶어 저장</div></div>
+        <div class="idea-item"><span class="idea-num">7</span><div><strong>토론 라운드 타임라인</strong><span class="idea-tag plan">예정</span><br>라운드별 합의·쟁점을 한눈에 보는 세로 타임라인</div></div>
+        <div class="idea-item"><span class="idea-num">8</span><div><strong>협업 단계 되돌리기</strong><span class="idea-tag plan">예정</span><br>특정 단계만 다시 실행하고 이후 결과 자동 갱신</div></div>
+        <div class="idea-item"><span class="idea-num">9</span><div><strong>에이전트 임무 템플릿</strong><span class="idea-tag plan">예정</span><br>자주 쓰는 예약·반복 임무를 이름 붙여 저장</div></div>
+        <div class="idea-item"><span class="idea-num">10</span><div><strong>질문 품질 코치</strong><span class="idea-tag plan">예정</span><br>입력 직전 질문을 더 구체적으로 다듬는 1줄 제안</div></div>
+        <div class="idea-item"><span class="idea-num">11</span><div><strong>다크·라이트 자동 전환</strong><span class="idea-tag plan">예정</span><br>시스템 설정 또는 일몰 시간에 맞춰 테마 변경</div></div>
+        <div class="idea-item"><span class="idea-num">12</span><div><strong>결과물 버전 기록</strong><span class="idea-tag plan">예정</span><br>같은 제목 저장 시 이전 버전 diff·복원</div></div>
+        <div class="idea-item"><span class="idea-num">13</span><div><strong>오프라인 초안 작성</strong><span class="idea-tag plan">예정</span><br>네트워크 없을 때 질문·메모 작성 후 연결 시 전송</div></div>
+        <div class="idea-item"><span class="idea-num">14</span><div><strong>키보드 단축키</strong><span class="idea-tag plan">예정</span><br>모드 전환·전송·새 질문을 키보드만으로 실행</div></div>
+        <div class="idea-item"><span class="idea-num">15</span><div><strong>비교 답변 하이라이트</strong><span class="idea-tag plan">예정</span><br>모델 간 겹치는 문장·다른 문장 색으로 표시</div></div>
+        <div class="idea-item"><span class="idea-num">16</span><div><strong>협업 산출물 미리보기</strong><span class="idea-tag plan">예정</span><br>마크다운·표·코드를 단계 완료 전에 렌더링 미리보기</div></div>
+        <div class="idea-item"><span class="idea-num">17</span><div><strong>사용량 대시보드 (사용자)</strong><span class="idea-tag plan">예정</span><br>오늘·이번 주 기능별 AI 호출과 남은 코인 그래프</div></div>
+        <div class="idea-item"><span class="idea-num">18</span><div><strong>2단계 로그인 (선택)</strong><span class="idea-tag plan">예정</span><br>이메일 OTP 또는 패스키로 계정 보안 강화</div></div>
+        <div class="idea-item"><span class="idea-num">19</span><div><strong>공유 링크 만료·비밀번호</strong><span class="idea-tag plan">예정</span><br>결과 공유 링크에 기한·암호·조회 횟수 제한</div></div>
+        <div class="idea-item"><span class="idea-num">20</span><div><strong>접근성 읽어주기</strong><span class="idea-tag plan">예정</span><br>비교·토론 답변을 TTS로 듣기 (속도·목소리 선택)</div></div>
       </div>
       <div class="tip" style="margin-top:14px;">원하는 기능 번호를 알려주시면 우선순위에 반영합니다.</div>
     </section>
