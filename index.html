@@ -5313,7 +5313,7 @@
             const compareHint = document.getElementById("compareEmptyHint");
             if (compareHint) compareHint.style.display = compareTurns.length ? "none" : "flex";
             rebuildCompareCardsFromTurns();
-            const lastTurn = compareTurns[compareCurrentTurnIndex];
+            if (lastTurn?.responses) {
                 const sections = Object.keys(lastTurn.responses).map(m => ({ heading: m, body: lastTurn.responses[m] || "" }));
                 if (sections.length) {
                     window.NasaroFeatures?.addResultActions?.(el, {
