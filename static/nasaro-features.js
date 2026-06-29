@@ -250,32 +250,26 @@
                     : (current.length === 1 ? current[0] : current.join(" · ")));
             const short = label.length > 24 ? label.slice(0, 24) + "…" : label;
             const compact = opts.compactMobile || (typeof window !== "undefined" && window.innerWidth <= 640);
-            if (compact) {
-                if (!singleSelect && mode === "compare") {
-                    if (allSelected) pickerBtn.textContent = lang === "en" ? "All" : "전체";
-                    else if (current.length === 1) {
-                        const n = current[0];
-                        pickerBtn.textContent = n.length > 9 ? n.slice(0, 9) + "…" : n;
-                    } else {
-                        pickerBtn.textContent = current.length + (lang === "en" ? "" : "개");
-                    }
-                } else if (singleSelect) {
-                    pickerBtn.textContent = short.length > 10 ? short.slice(0, 10) + "…" : short;
+            const trim = (t, max) => (t.length > max ? t.slice(0, max) + "…" : t);
+
+            pickerBtn.classList.toggle("ai-all-active", allSelected && !singleSelect);
+
+            if (!singleSelect && mode === "compare") {
+                if (allSelected) {
+                    pickerBtn.textContent = lang === "en" ? "AI All" : "AI 전체";
+                } else if (current.length === 1) {
+                    pickerBtn.textContent = trim(current[0], compact ? 9 : 16);
                 } else {
-                    pickerBtn.textContent = allSelected
-                        ? (lang === "en" ? "All" : "전체")
-                        : (short.length > 10 ? short.slice(0, 10) + "…" : short);
+                    pickerBtn.textContent = compact
+                        ? (current.length + (lang === "en" ? "" : "개"))
+                        : (current.length + (lang === "en" ? " AIs" : "개 AI"));
                 }
-            } else if (!singleSelect && mode === "compare") {
-                const shortBase = allSelected
-                    ? (lang === "en" ? "AI All" : "AI 전체")
-                    : (current.length === 1 ? current[0] : current.join(" · "));
-                const shortCmp = shortBase.length > 20 ? shortBase.slice(0, 20) + "…" : shortBase;
-                pickerBtn.textContent = `🤖 ${shortCmp} ${COIN}${current.length}`;
             } else if (singleSelect) {
-                pickerBtn.textContent = `🤖 ${short} ${COIN}1`;
+                pickerBtn.textContent = trim(short, compact ? 10 : 16);
+            } else if (allSelected) {
+                pickerBtn.textContent = lang === "en" ? "AI All" : "AI 전체";
             } else {
-                pickerBtn.textContent = allSelected ? short : `🤖 ${short}`;
+                pickerBtn.textContent = trim(short, compact ? 10 : 16);
             }
             pickerBtn.title = singleSelect
                 ? `${current[0]} · ${COIN}1/호출`

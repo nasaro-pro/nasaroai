@@ -80,7 +80,10 @@
                 z-index: 1;
                 box-shadow: none;
                 border-left: 2px solid #d1d5db;
-                border-right: none;
+                border-right: 2px solid #d1d5db;
+            }
+            .desktop-chrome:not(.sidebar-open) .side-menu {
+                display: none;
             }
             .desktop-chrome .app-rail--desktop {
                 border-right: 2px solid #d1d5db;
@@ -107,6 +110,66 @@
             .desktop-chrome {
                 display: contents;
             }
+            .side-menu {
+                transform: none;
+                width: auto;
+                background: transparent;
+                box-shadow: none;
+                border: none;
+                pointer-events: none;
+                overflow: visible;
+            }
+            .side-menu-header {
+                position: fixed;
+                left: 10px;
+                top: max(10px, env(safe-area-inset-top));
+                z-index: 420;
+                pointer-events: auto;
+                background: rgba(255,255,255,0.96);
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                padding: 6px 8px;
+                box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+            }
+            html[data-theme="dark"] .side-menu-header {
+                background: rgba(20,20,20,0.96);
+                border-color: #333;
+            }
+            .side-menu:not(.open) .side-menu-brand,
+            .side-menu:not(.open) .side-menu-admin-btn,
+            .side-menu:not(.open) .side-menu-drawer {
+                display: none !important;
+            }
+            .side-menu.open {
+                pointer-events: auto;
+                position: fixed;
+                inset: 0 auto 0 0;
+                width: min(var(--side-menu-width), 88vw);
+                background: #fff;
+                box-shadow: 4px 0 28px rgba(15,23,42,0.15);
+                z-index: 410;
+            }
+            .side-menu.open .side-menu-header {
+                position: relative;
+                left: auto;
+                top: auto;
+                border: none;
+                border-radius: 0;
+                box-shadow: none;
+                background: #fff;
+                padding: 14px 14px 12px;
+            }
+            html[data-theme="dark"] .side-menu.open .side-menu-header {
+                background: #141824;
+            }
+            .side-menu.open .side-menu-drawer {
+                display: flex !important;
+            }
+            .site-header .header-left-actions { display: none; }
+            .site-header .header-inner { padding-left: 56px; }
+        }
+        @media (min-width: 768px) {
+            .site-header .header-left-actions { display: none; }
         }
 
         .site-header {
@@ -247,18 +310,44 @@
             display: flex;
             align-items: center;
             justify-content: flex-start;
-            gap: 10px;
-            padding: 18px 18px 14px;
+            gap: 8px;
+            padding: 14px 14px 12px;
             border-bottom: 1px solid #f3f4f6;
             flex-shrink: 0;
         }
+        .side-menu-header .menu-toggle-btn {
+            position: static;
+            transform: none;
+            flex-shrink: 0;
+        }
+        .side-menu-admin-btn {
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .side-menu-drawer {
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .app-rail-menu-open {
+            display: none;
+            margin-top: auto;
+        }
+        .desktop-chrome:not(.sidebar-open) .app-rail-menu-open {
+            display: flex;
+        }
 
         .side-menu-brand {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 900;
             letter-spacing: -0.02em;
             flex: 1;
             min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .side-menu-close {
@@ -2503,6 +2592,11 @@
             background: #ede9fe;
             border-color: #a78bfa;
         }
+        .input-tool-btn.ai-pick-trigger-btn.ai-all-active {
+            background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%) !important;
+            border-color: #6d28d9 !important;
+            color: #fff !important;
+        }
         .dock-compose-tools-left .model-picker-wrap {
             display: flex;
             align-items: center;
@@ -4123,6 +4217,19 @@
 
         /* ===== 모바일: 앱형 레이아웃 + 키보드 시 본문 고정 ===== */
         @media (max-width: 640px) {
+            html.keyboard-open .dock-btn-row,
+            html.keyboard-open .app-rail--mobile,
+            html.keyboard-open .dock-result-actions-slot,
+            html.keyboard-open .dock-agent-row {
+                display: none !important;
+            }
+            html.keyboard-open .dock-inner {
+                padding: 4px 8px 6px;
+                gap: 0;
+            }
+            html.keyboard-open .dock-shell {
+                border-radius: 12px 12px 0 0;
+            }
             html.keyboard-open,
             html.keyboard-open body {
                 overflow: hidden;
@@ -4377,10 +4484,12 @@
                 border-radius: 10px;
             }
             .dock-extra-btns {
-                flex: 1 1 100%;
-                min-width: 0;
-                flex-wrap: nowrap;
-                gap: 6px;
+                display: none !important;
+            }
+            .dock-compose-row .input-tool-btn.ai-pick-trigger-btn.ai-all-active {
+                background: linear-gradient(135deg, #7c3aed, #5b21b6) !important;
+                border-color: #6d28d9 !important;
+                color: #fff !important;
             }
             .dock-extra-btns .dock-btn.muted.is-hidden {
                 display: none;
@@ -4654,141 +4763,231 @@
             color: #6b7280;
             margin: 0;
         }
-        .chat-layout {
+        /* ── Discord 스타일 채팅 ── */
+        .discord-workspace {
+            max-width: none;
+            padding: 0;
+            height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 0px));
+            min-height: 420px;
+        }
+        .discord-workspace.active { display: flex; flex-direction: column; }
+        .discord-layout {
             display: grid;
-            grid-template-columns: 140px 1fr;
-            gap: 10px;
-            min-height: 360px;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
+            grid-template-columns: 220px 1fr;
+            flex: 1;
+            min-height: 0;
+            border: 1px solid #1e1f22;
+            border-radius: 12px;
             overflow: hidden;
-            background: #fff;
+            background: #313338;
+            margin: 0 12px 12px;
         }
         @media (min-width: 768px) {
-            .chat-layout.chat-sidebar-mode { grid-template-columns: 1fr; }
-            .chat-layout.chat-sidebar-mode .chat-user-list { display: none; }
+            .discord-layout.chat-sidebar-mode { grid-template-columns: 1fr; }
+            .discord-layout.chat-sidebar-mode .discord-sidebar { display: none; }
         }
-        @media (max-width: 600px) {
-            .chat-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+        @media (max-width: 640px) {
+            .discord-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; margin: 0 8px 8px; }
+            .discord-sidebar { max-height: 120px; }
         }
-        .chat-user-list {
-            border-right: 1px solid #e5e7eb;
-            overflow-y: auto;
-            max-height: 480px;
-        }
-        .chat-user-btn {
-            display: block;
-            width: 100%;
-            text-align: left;
-            padding: 10px 12px;
-            border: none;
-            border-bottom: 1px solid #f3f4f6;
-            background: transparent;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .chat-user-btn.active, .chat-user-btn:hover { background: #eef2ff; color: #4338ca; }
-        .chat-main { display: flex; flex-direction: column; min-height: 280px; }
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
+        .discord-sidebar {
+            background: #2b2d31;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            min-height: 200px;
-            max-height: 420px;
+            min-height: 0;
+            border-right: 1px solid #1e1f22;
         }
-        .chat-bubble {
-            max-width: 85%;
-            padding: 8px 12px;
-            border-radius: 12px;
-            font-size: 13px;
-            line-height: 1.45;
+        .discord-sidebar-head {
+            padding: 12px 14px 8px;
+            border-bottom: 1px solid #1e1f22;
         }
-        .chat-bubble.mine {
-            align-self: flex-end;
-            background: #7c3aed;
-            color: #fff;
-            border-bottom-right-radius: 4px;
+        .discord-sidebar-title {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #949ba4;
         }
-        .chat-bubble.theirs {
-            align-self: flex-start;
-            background: #f3f4f6;
-            color: #111827;
-            border-bottom-left-radius: 4px;
-        }
-        .chat-bubble .chat-meta { font-size: 10px; opacity: .75; margin-top: 4px; }
-        .chat-compose {
-            display: flex;
-            gap: 8px;
-            padding: 10px;
-            border-top: 1px solid #e5e7eb;
-        }
-        .chat-compose input {
+        .discord-member-list {
+            overflow-y: auto;
             flex: 1;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            padding: 8px 12px;
-            font-size: 13px;
+            padding: 6px 8px;
         }
-        .chat-compose button {
-            border: none;
-            background: #7c3aed;
-            color: #fff;
-            font-weight: 700;
-            font-size: 13px;
-            padding: 8px 14px;
-            border-radius: 10px;
-            cursor: pointer;
-        }
-        .works-compose-card {
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px;
-            margin-bottom: 16px;
-        }
-        .works-compose-card input,
-        .works-compose-card textarea {
-            width: 100%;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            padding: 10px 12px;
-            font-size: 13px;
-            margin-bottom: 8px;
-            font-family: inherit;
-        }
-        .works-compose-card textarea { min-height: 88px; resize: vertical; }
-        .works-compose-card button {
-            border: none;
-            background: #7c3aed;
-            color: #fff;
-            font-weight: 700;
-            padding: 10px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .works-feed { display: flex; flex-direction: column; gap: 12px; }
-        .works-card {
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px 16px;
-        }
-        .works-card-head {
+        .chat-user-btn, .discord-member-btn {
             display: flex;
             align-items: center;
             gap: 10px;
+            width: 100%;
+            text-align: left;
+            padding: 8px 10px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 600;
+            color: #949ba4;
+            cursor: pointer;
+        }
+        .chat-user-btn:hover, .discord-member-btn:hover { background: #35373c; color: #dbdee1; }
+        .chat-user-btn.active, .discord-member-btn.active { background: #404249; color: #fff; }
+        .discord-member-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #5865f2, #7289da);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .discord-main {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            background: #313338;
+        }
+        .discord-channel-bar {
+            padding: 12px 16px;
+            border-bottom: 1px solid #1e1f22;
+            font-size: 15px;
+            font-weight: 700;
+            color: #f2f3f5;
+            background: #313338;
+        }
+        .discord-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-height: 200px;
+        }
+        .discord-msg-row {
+            display: flex;
+            gap: 12px;
+            padding: 4px 0;
+            align-items: flex-start;
+        }
+        .discord-msg-row .discord-member-avatar { width: 40px; height: 40px; font-size: 15px; }
+        .discord-msg-body { flex: 1; min-width: 0; }
+        .discord-msg-head {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 2px;
+        }
+        .discord-msg-name { font-size: 14px; font-weight: 700; color: #f2f3f5; }
+        .discord-msg-time { font-size: 11px; color: #949ba4; }
+        .discord-msg-text { font-size: 14px; line-height: 1.45; color: #dbdee1; white-space: pre-wrap; word-break: break-word; }
+        .discord-msg-row.mine .discord-msg-name { color: #5865f2; }
+        .discord-compose {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px 16px;
+            background: #313338;
+        }
+        .discord-compose input {
+            flex: 1;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            background: #383a40;
+            color: #dbdee1;
+        }
+        .discord-compose input::placeholder { color: #6d6f78; }
+        .discord-compose button {
+            border: none;
+            background: #5865f2;
+            color: #fff;
+            font-weight: 700;
+            font-size: 16px;
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .discord-compose button:hover { background: #4752c4; }
+
+        /* ── Instagram 스타일 작업 피드 ── */
+        .insta-workspace {
+            max-width: 640px;
+            padding: 0 0 24px;
+        }
+        .insta-top-bar {
+            padding: 12px 16px 8px;
+            border-bottom: 1px solid #efefef;
+            margin-bottom: 12px;
+        }
+        .insta-top-title { font-size: 20px; font-weight: 800; margin: 0 0 2px; }
+        .insta-top-desc { font-size: 13px; color: #737373; margin: 0; }
+        .insta-compose-card {
+            margin: 0 12px 16px;
+            background: #fff;
+            border: 1px solid #dbdbdb;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .insta-compose-row {
+            display: flex;
+            gap: 8px;
             margin-bottom: 8px;
         }
-        .works-avatar {
+        .insta-compose-row input {
+            flex: 1;
+            border: 1px solid #dbdbdb;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .insta-compose-row button {
+            border: none;
+            background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+            color: #fff;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .insta-compose-card textarea {
+            width: 100%;
+            border: 1px solid #dbdbdb;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            min-height: 72px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        .insta-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 0 12px;
+        }
+        .insta-card {
+            background: #fff;
+            border: 1px solid #dbdbdb;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .insta-card-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+        }
+        .insta-avatar {
             width: 36px;
             height: 36px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #7c3aed, #2563eb);
+            border-radius: 50%;
+            background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
             color: #fff;
             font-weight: 800;
             font-size: 14px;
@@ -4796,35 +4995,52 @@
             align-items: center;
             justify-content: center;
         }
-        .works-card-author { font-weight: 700; font-size: 14px; }
-        .works-card-time { font-size: 11px; color: #9ca3af; }
-        .works-card-title { font-weight: 800; font-size: 15px; margin: 0 0 6px; }
-        .works-card-body {
-            font-size: 13px;
-            line-height: 1.55;
-            color: #374151;
-            white-space: pre-wrap;
-            margin-bottom: 10px;
-        }
-        .works-card-actions {
+        .insta-author { font-weight: 700; font-size: 14px; }
+        .insta-time { font-size: 11px; color: #8e8e8e; }
+        .insta-media {
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
-            gap: 12px;
-            padding-top: 8px;
-            border-top: 1px solid #f3f4f6;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
         }
-        .works-like-btn, .works-comment-toggle {
+        .insta-media-inner { max-width: 100%; }
+        .insta-media-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0 0 8px; text-shadow: 0 1px 4px rgba(0,0,0,.2); }
+        .insta-media-body { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.92); white-space: pre-wrap; max-height: 120px; overflow: hidden; }
+        .insta-actions {
+            display: flex;
+            gap: 16px;
+            padding: 10px 14px;
+            border-top: 1px solid #efefef;
+        }
+        .insta-actions button {
             border: none;
             background: transparent;
-            font-size: 13px;
+            font-size: 22px;
             cursor: pointer;
-            color: #6b7280;
-            font-weight: 600;
+            padding: 0;
+            line-height: 1;
         }
-        .works-like-btn.liked { color: #dc2626; }
+        .insta-actions .insta-like-count,
+        .insta-actions .insta-comment-count {
+            font-size: 13px;
+            font-weight: 700;
+            color: #262626;
+            align-self: center;
+        }
+        .insta-caption {
+            padding: 0 14px 12px;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #262626;
+        }
+        .insta-caption strong { margin-right: 6px; }
         .works-comments {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #e5e7eb;
+            margin: 0 14px 12px;
+            padding-top: 8px;
+            border-top: 1px dashed #efefef;
         }
         .works-comment-item {
             font-size: 12px;
@@ -4939,6 +5155,52 @@
         html[data-theme="dark"] .beginner-tooltip p { color: #cbd5e1; }
         html[data-theme="dark"] .beginner-skip { background: #374151; color: #e5e7eb; }
 
+        html[data-theme="dark"] .side-menu-section + .side-menu-section {
+            border-top-color: var(--dm-border-soft);
+        }
+        html[data-theme="dark"] .discord-layout,
+        html[data-theme="dark"] .discord-sidebar,
+        html[data-theme="dark"] .discord-main,
+        html[data-theme="dark"] .discord-channel-bar { background: #1e1f22; border-color: #111; }
+        html[data-theme="dark"] .discord-compose input { background: #111214; color: #dbdee1; }
+        html[data-theme="dark"] .insta-top-bar { border-color: #333; }
+        html[data-theme="dark"] .insta-top-title { color: #f5f5f5; }
+        html[data-theme="dark"] .insta-top-desc { color: #a3a3a3; }
+        html[data-theme="dark"] .insta-card,
+        html[data-theme="dark"] .insta-compose-card { background: #141414; border-color: #333; }
+        html[data-theme="dark"] .insta-compose-row input,
+        html[data-theme="dark"] .insta-compose-card textarea { background: #1a1a1a; border-color: #333; color: #e5e5e5; }
+        html[data-theme="dark"] .insta-caption,
+        html[data-theme="dark"] .insta-actions .insta-like-count,
+        html[data-theme="dark"] .insta-actions .insta-comment-count { color: #e5e5e5; }
+        html[data-theme="dark"] .insta-actions { border-color: #333; }
+        html[data-theme="dark"] .dock-mode-group { background: #171717; border-color: #333; }
+        html[data-theme="dark"] .dock-mode-group .mode-btn.active { background: #262626; color: #c4b5fd; }
+        html[data-theme="dark"] .dock-result-actions-slot.has-actions { background: rgba(30,27,46,.96); border-color: #4c1d95; }
+        html[data-theme="dark"] .mode-btn,
+        html[data-theme="dark"] .dock-btn.muted,
+        html[data-theme="dark"] .result-action-btn,
+        html[data-theme="dark"] .session-history-item,
+        html[data-theme="dark"] .side-menu-works-item,
+        html[data-theme="dark"] .works-empty,
+        html[data-theme="dark"] .input-tool-btn:not(.ai-all-active) {
+            background: #1a1a1a;
+            border-color: #333;
+            color: #e5e5e5;
+        }
+        html[data-theme="dark"] .compare-card,
+        html[data-theme="dark"] .collab-intro,
+        html[data-theme="dark"] .notice,
+        html[data-theme="dark"] .settings-panel,
+        html[data-theme="dark"] .auth-modal-box {
+            background: #141414;
+            border-color: #333;
+            color: #e5e5e5;
+        }
+        html[data-theme="dark"] .site-header { background: rgba(10,10,10,.96); border-color: #262626; }
+        html[data-theme="dark"] .header-brand h1 { color: #f5f5f5; }
+        html[data-theme="dark"] .header-brand p { color: #a3a3a3; }
+
         /* 데스크톱 좌측 chrome — 아래 일반 규칙(fixed 레일 등)보다 반드시 우선 */
         @media (min-width: 768px) {
             .desktop-chrome .app-rail--desktop {
@@ -4975,11 +5237,17 @@
             <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
             <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
             <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
+            <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtn" title="메뉴 열기" aria-label="메뉴 열기">☰</button>
         </nav>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
+                <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴">
+                    <span></span><span></span><span></span>
+                </button>
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
+                <button id="adminEntryBtn" class="header-admin-btn side-menu-admin-btn" type="button" title="관리자 페이지">관리</button>
             </div>
+            <div class="side-menu-drawer">
             <div id="sideAccountBox" class="side-account-box" style="display:none;">
                 <div class="side-account-top">
                     <span id="sideAccountName" class="side-account-name"></span>
@@ -5042,6 +5310,7 @@
                     <button id="guideBtn" class="side-menu-guide-btn" type="button" title="초보 모드"><span>📘</span><span>가이드</span></button>
                     <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
                 </div>
+            </div>
             </div>
         </aside>
         </div>
@@ -5142,12 +5411,6 @@
 
         <header class="site-header">
             <div class="header-inner">
-                <div class="header-left-actions">
-                    <button id="adminEntryBtn" class="header-admin-btn" type="button" title="관리자 페이지">관리</button>
-                    <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴 열기">
-                        <span></span><span></span><span></span>
-                    </button>
-                </div>
                 <div class="header-brand">
                     <h1>Nasaro AI</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
@@ -5374,36 +5637,40 @@
                 </div>
             </section>
 
-            <section id="chatWorkspace" class="app-workspace-panel" aria-label="계정 채팅">
-                <div class="workspace-head">
-                    <h2>💬 계정 채팅</h2>
-                    <p>다른 Nasaro AI 계정과 1:1로 대화합니다. 로그인 후 이용할 수 있습니다.</p>
-                </div>
+            <section id="chatWorkspace" class="app-workspace-panel discord-workspace" aria-label="계정 채팅">
                 <div id="chatLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 다른 계정과 채팅할 수 있습니다.</div>
-                <div id="chatLayout" class="chat-layout" style="display:none;">
-                    <div id="chatUserList" class="chat-user-list"></div>
-                    <div class="chat-main">
-                        <div id="chatMessages" class="chat-messages"></div>
-                        <div class="chat-compose">
-                            <input id="chatInput" type="text" placeholder="메시지 입력…" autocomplete="off">
-                            <button id="chatSendBtn" type="button">전송</button>
+                <div id="chatLayout" class="discord-layout" style="display:none;">
+                    <aside class="discord-sidebar">
+                        <div class="discord-sidebar-head">
+                            <span class="discord-sidebar-title">💬 다이렉트 메시지</span>
+                        </div>
+                        <div id="chatUserList" class="discord-member-list"></div>
+                    </aside>
+                    <div class="discord-main">
+                        <div class="discord-channel-bar" id="chatChannelTitle">대화 상대를 선택하세요</div>
+                        <div id="chatMessages" class="discord-messages"></div>
+                        <div class="discord-compose">
+                            <input id="chatInput" type="text" placeholder="#general 에 메시지 보내기…" autocomplete="off">
+                            <button id="chatSendBtn" type="button" aria-label="전송">➤</button>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <section id="worksWorkspace" class="app-workspace-panel" aria-label="작업 공유">
-                <div class="workspace-head">
-                    <h2>📋 작업 공유</h2>
-                    <p>완성한 작업물을 올리면 다른 계정도 볼 수 있습니다. 좋아요와 댓글을 남길 수 있어요.</p>
-                </div>
+            <section id="worksWorkspace" class="app-workspace-panel insta-workspace" aria-label="작업 공유">
                 <div id="worksLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 작업물을 등록할 수 있습니다.</div>
-                <div id="worksCompose" class="works-compose-card" style="display:none;">
-                    <input id="worksTitleInput" type="text" placeholder="제목 (선택)">
-                    <textarea id="worksBodyInput" placeholder="작업 내용을 입력하세요…"></textarea>
-                    <button id="worksPostBtn" type="button">공개 등록</button>
+                <div class="insta-top-bar">
+                    <h2 class="insta-top-title">📋 작업 피드</h2>
+                    <p class="insta-top-desc">완성한 작업물을 공유하고 좋아요·댓글을 남겨보세요</p>
                 </div>
-                <div id="worksFeed" class="works-feed"></div>
+                <div id="worksCompose" class="insta-compose-card" style="display:none;">
+                    <div class="insta-compose-row">
+                        <input id="worksTitleInput" type="text" placeholder="제목 (선택)">
+                        <button id="worksPostBtn" type="button">공유</button>
+                    </div>
+                    <textarea id="worksBodyInput" placeholder="작업 내용을 입력하세요…"></textarea>
+                </div>
+                <div id="worksFeed" class="insta-feed"></div>
             </section>
         </main>
 
@@ -6369,11 +6636,15 @@
             if (!parts) return;
             if (isMobileCompact()) {
                 leftCompose.appendChild(parts.ai);
-                if (mobileTools) mobileTools.append(parts.privacy, parts.voice);
             } else {
                 leftDock.appendChild(parts.ai);
-                rightDock.append(parts.privacy, parts.voice);
+                rightDock.append(parts.voice);
             }
+            const newChatBtn = document.getElementById("newChatBtn");
+            if (newChatBtn) newChatBtn.classList.toggle("is-hidden", isMobileCompact());
+            const dockExtra = document.getElementById("dockExtraBtns");
+            if (dockExtra && isMobileCompact()) dockExtra.classList.add("mobile-compact");
+            else if (dockExtra) dockExtra.classList.remove("mobile-compact");
         }
 
         function rebuildAgentToolbar() {
@@ -6468,7 +6739,24 @@
         }
 
         menuToggleBtn?.addEventListener("click", () => setSideMenuOpen(!sideMenu?.classList.contains("open")));
+        document.getElementById("menuRailOpenBtn")?.addEventListener("click", () => setSideMenuOpen(true));
         sideMenuOverlay?.addEventListener("click", () => setSideMenuOpen(false));
+
+        let swipeStartX = 0;
+        let swipeStartY = 0;
+        document.addEventListener("touchstart", e => {
+            if (window.innerWidth >= 768) return;
+            swipeStartX = e.touches[0].clientX;
+            swipeStartY = e.touches[0].clientY;
+        }, { passive: true });
+        document.addEventListener("touchend", e => {
+            if (window.innerWidth >= 768) return;
+            const dx = e.changedTouches[0].clientX - swipeStartX;
+            const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
+            if (dy > 40) return;
+            if (swipeStartX < 36 && dx > 55) setSideMenuOpen(true);
+            else if (dx < -55 && sideMenu?.classList.contains("open")) setSideMenuOpen(false);
+        }, { passive: true });
 
         // ── 대화 기록 (localStorage — 기기별 독립 저장) ──────────────────────
         // 기기 고유 ID: 처음 방문 시 생성, 이후 동일 브라우저에서만 유효
@@ -7689,7 +7977,7 @@
         function renderChatUserLists(users) {
             const emptyMsg = users.length
                 ? null
-                : "<div style='padding:10px;font-size:11px;color:#9ca3af;'>다른 계정이 없습니다.</div>";
+                : "<div style='padding:10px;font-size:11px;color:#949ba4;'>다른 계정이 없습니다.</div>";
             ["chatUserList", "sideMenuChatList"].forEach(id => {
                 const list = document.getElementById(id);
                 if (!list) return;
@@ -7698,9 +7986,15 @@
                 users.forEach(u => {
                     const btn = document.createElement("button");
                     btn.type = "button";
-                    btn.className = "chat-user-btn" + (chatPeerId === u.id ? " active" : "");
+                    btn.className = "chat-user-btn discord-member-btn" + (chatPeerId === u.id ? " active" : "");
                     btn.dataset.peerId = u.id;
-                    btn.textContent = u.display_name || ("user" + u.id);
+                    const name = u.display_name || ("user" + u.id);
+                    const initial = name.charAt(0).toUpperCase();
+                    if (id === "chatUserList") {
+                        btn.innerHTML = `<span class="discord-member-avatar">${escapeHtml(initial)}</span><span>${escapeHtml(name)}</span>`;
+                    } else {
+                        btn.textContent = name;
+                    }
                     btn.addEventListener("click", () => {
                         selectChatPeer(u.id, u.display_name);
                         if (window.innerWidth < 768) setSideMenuOpen(false);
@@ -7738,9 +8032,13 @@
 
         async function selectChatPeer(peerId, name) {
             chatPeerId = peerId;
-            document.querySelectorAll(".chat-user-btn").forEach(btn => {
+            document.querySelectorAll(".chat-user-btn, .discord-member-btn").forEach(btn => {
                 btn.classList.toggle("active", String(btn.dataset.peerId) === String(peerId));
             });
+            const titleEl = document.getElementById("chatChannelTitle");
+            if (titleEl) titleEl.textContent = name ? ("# " + name) : "대화 상대를 선택하세요";
+            const chatInput = document.getElementById("chatInput");
+            if (chatInput) chatInput.placeholder = name ? ("@" + name + " 에게 메시지…") : "메시지 입력…";
             await loadChatMessages();
         }
 
@@ -7753,10 +8051,19 @@
                 const data = await res.json();
                 box.innerHTML = "";
                 (data.messages || []).forEach(m => {
-                    const div = document.createElement("div");
-                    div.className = "chat-bubble " + (m.is_mine ? "mine" : "theirs");
-                    div.innerHTML = escapeHtml(m.body) + `<div class="chat-meta">${escapeHtml(m.sender_name || "")} · ${escapeHtml(m.created_at_iso || "")}</div>`;
-                    box.appendChild(div);
+                    const row = document.createElement("div");
+                    row.className = "discord-msg-row" + (m.is_mine ? " mine" : "");
+                    const initial = (m.sender_name || "?").charAt(0).toUpperCase();
+                    row.innerHTML = `
+                        <span class="discord-member-avatar">${escapeHtml(initial)}</span>
+                        <div class="discord-msg-body">
+                            <div class="discord-msg-head">
+                                <span class="discord-msg-name">${escapeHtml(m.sender_name || "")}</span>
+                                <span class="discord-msg-time">${escapeHtml(m.created_at_iso || "")}</span>
+                            </div>
+                            <div class="discord-msg-text">${escapeHtml(m.body || "")}</div>
+                        </div>`;
+                    box.appendChild(row);
                 });
                 box.scrollTop = box.scrollHeight;
             } catch {}
@@ -7844,23 +8151,32 @@
             feed.innerHTML = "";
             works.forEach(w => {
                 const card = document.createElement("article");
-                card.className = "works-card";
+                card.className = "insta-card works-card";
                 card.dataset.workId = w.id;
                 const initial = (w.author_name || "?").charAt(0).toUpperCase();
+                const title = w.title || "제목 없음";
+                const bodyPreview = (w.body || "").slice(0, 180) + ((w.body || "").length > 180 ? "…" : "");
                 card.innerHTML = `
-                    <div class="works-card-head">
-                        <div class="works-avatar">${escapeHtml(initial)}</div>
+                    <div class="insta-card-head">
+                        <div class="insta-avatar">${escapeHtml(initial)}</div>
                         <div>
-                            <div class="works-card-author">${escapeHtml(w.author_name || "사용자")}</div>
-                            <div class="works-card-time">${escapeHtml(w.created_at_iso || "")}</div>
+                            <div class="insta-author">${escapeHtml(w.author_name || "사용자")}</div>
+                            <div class="insta-time">${escapeHtml(w.created_at_iso || "")}</div>
                         </div>
                     </div>
-                    <h3 class="works-card-title">${escapeHtml(w.title || "")}</h3>
-                    <div class="works-card-body">${escapeHtml(w.body || "")}</div>
-                    <div class="works-card-actions">
-                        <button type="button" class="works-like-btn${w.liked_by_me ? " liked" : ""}" data-like="${w.id}">❤ ${w.like_count || 0}</button>
-                        <button type="button" class="works-comment-toggle" data-comments="${w.id}">💬 댓글 ${w.comment_count || 0}</button>
+                    <div class="insta-media">
+                        <div class="insta-media-inner">
+                            <h3 class="insta-media-title">${escapeHtml(title)}</h3>
+                            <p class="insta-media-body">${escapeHtml(bodyPreview)}</p>
+                        </div>
                     </div>
+                    <div class="insta-actions">
+                        <button type="button" class="works-like-btn${w.liked_by_me ? " liked" : ""}" data-like="${w.id}" aria-label="좋아요">❤️</button>
+                        <span class="insta-like-count">${w.like_count || 0}</span>
+                        <button type="button" class="works-comment-toggle" data-comments="${w.id}" aria-label="댓글">💬</button>
+                        <span class="insta-comment-count">${w.comment_count || 0}</span>
+                    </div>
+                    <div class="insta-caption"><strong>${escapeHtml(w.author_name || "사용자")}</strong>${escapeHtml(w.body || "")}</div>
                     <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
                 feed.appendChild(card);
             });
@@ -7880,7 +8196,9 @@
                 const data = await res.json();
                 if (btnEl) {
                     btnEl.classList.toggle("liked", !!data.liked_by_me);
-                    btnEl.textContent = "❤ " + (data.like_count || 0);
+                    const card = btnEl.closest(".insta-card, .works-card");
+                    const countEl = card?.querySelector(".insta-like-count");
+                    if (countEl) countEl.textContent = String(data.like_count || 0);
                 }
             } catch {}
         }
@@ -7965,24 +8283,115 @@
         let beginnerSteps = [];
 
         function buildBeginnerSteps() {
-            const aiBtn = document.querySelector('.input-tool-btn.ai-pick-trigger-btn, .dock-btn-left .input-tool-btn');
+            const mob = window.innerWidth <= 640;
+            const total = mob ? 9 : 10;
+            let n = 0;
+            const stepNum = () => `${++n} / ${total}`;
+            const aiBtn = document.querySelector(".input-tool-btn.ai-pick-trigger-btn");
             const steps = [
-                { el: () => document.getElementById("mainInput"), title: "질문 입력", desc: "하고 싶은 일·궁금한 점을 여기에 적으세요. 비교·토론·협업 모두 이 칸에서 시작합니다.", step: "1 / 6" },
-                { el: () => document.querySelector('.mode-btn[data-mode="compare"]')?.closest(".dock-mode-group"), title: "모드 선택", desc: "비교는 여러 AI 답변을 나란히, 토론은 AI들이 주제로 대화, 협업은 4단계로 작업물을 만듭니다.", step: "2 / 6" },
-                { el: () => aiBtn || document.getElementById("mainInputToolsLeft"), title: "AI 선택", desc: "🤖 버튼으로 사용할 AI 모델을 고릅니다. 비교 모드에서는 여러 개를 선택할 수 있어요.", step: "3 / 6" },
-                { el: () => document.getElementById("dockPrimaryBtn"), title: "실행", desc: "▶ 버튼 또는 Enter로 질문을 보냅니다. 코인(🪙)이 1회 차감됩니다.", step: "4 / 6" },
-                { el: () => document.getElementById("appRailDesktop") || document.getElementById("appRailMobile"), title: "앱 메뉴", desc: "왼쪽(모바일은 아래) 버튼으로 AI 질문 · 계정 채팅 · 작업 공유 화면을 전환합니다.", step: "5 / 6" },
-                { el: () => document.getElementById("menuToggleBtn"), title: "기록·설정", desc: "햄버거 메뉴에서 질문 기록, 결과물 파일, 설정을 열 수 있습니다. 언제든 다시 📘 가이드를 눌러 이 안내를 볼 수 있어요.", step: "6 / 6" },
+                {
+                    el: () => document.getElementById("mainInput"),
+                    title: "질문 입력",
+                    desc: mob
+                        ? "궁금한 점·하고 싶은 작업을 적으세요. 키보드가 올라오면 질문창만 따라 올라갑니다."
+                        : "비교·토론·협업 모두 이 입력창에서 시작합니다. 넓은 화면에서는 답변을 편하게 스크롤하며 볼 수 있어요.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => document.querySelector('.mode-btn[data-mode="compare"]')?.closest(".dock-mode-group"),
+                    title: "모드 선택",
+                    desc: mob
+                        ? "비교·토론·협업 탭을 눌러 모드를 바꿉니다. 모드별로 ▶ 버튼 문구가 달라집니다."
+                        : "비교는 여러 AI 답변을 나란히, 토론은 라운드별 토의, 협업은 4단계 작업물 생성에 적합합니다.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => aiBtn || document.getElementById("mainInputToolsLeft"),
+                    title: "AI 선택",
+                    desc: mob
+                        ? "AI 버튼으로 모델을 고릅니다. 「AI 전체」는 보라색으로 표시됩니다."
+                        : "AI 버튼으로 사용할 모델을 고릅니다. 비교 모드에서 여러 AI를 동시에 선택할 수 있어요.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => document.getElementById("dockPrimaryBtn"),
+                    title: "실행",
+                    desc: mob ? "▶ 버튼으로 질문을 보냅니다. Enter 키로도 전송할 수 있어요." : "▶ 버튼 또는 Enter로 실행합니다. 모드마다 코인(🪙)이 차감됩니다.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => document.getElementById("dockResultActionsSlot"),
+                    title: "결과물 저장",
+                    desc: "답변이 나오면 질문창 위에 「저장 · 내보내기 · 공유」 버튼이 뜹니다. 마음에 드는 결과만 골라 보관하세요.",
+                    step: stepNum(),
+                    optional: true,
+                },
+                {
+                    el: () => document.getElementById("appRailDesktop") || document.getElementById("appRailMobile"),
+                    title: "앱 메뉴",
+                    desc: mob
+                        ? "하단 🤖 AI · 💬 채팅 · 📋 작업 버튼으로 화면을 전환합니다."
+                        : "왼쪽 레일에서 AI 질문 · 계정 채팅 · 작업 공유 화면을 전환합니다.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => mob ? document.getElementById("menuToggleBtn") : document.getElementById("sideMenuBrand")?.closest(".side-menu-header"),
+                    title: mob ? "메뉴 · 기록" : "사이드 메뉴",
+                    desc: mob
+                        ? "☰ 버튼 또는 화면 왼쪽 가장자리에서 오른쪽으로 스와이프하면 기록·설정 메뉴가 열립니다."
+                        : "사이드 메뉴에서 질문 기록, 협업 중 작업, 결과물 파일, 설정을 관리합니다. ☰ 로 접을 수 있어요.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => document.querySelector('.app-rail-btn[data-workspace="chat"]'),
+                    title: "채팅 (Discord 스타일)",
+                    workspace: "chat",
+                    desc: mob
+                        ? "💬 탭에서 다른 계정과 1:1 채팅합니다. 디스코드처럼 채널·메시지 형태로 대화해요."
+                        : "채팅 탭: 왼쪽 목록에서 상대를 고르고, Discord처럼 메시지를 주고받습니다. 메뉴에도 채팅 목록이 표시됩니다.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => document.querySelector('.app-rail-btn[data-workspace="works"]'),
+                    title: "작업 공유 (Instagram 스타일)",
+                    workspace: "works",
+                    desc: mob
+                        ? "📋 탭에서 작업물을 카드 피드로 올리고 좋아요·댓글을 남길 수 있어요."
+                        : "작업 탭: Instagram 피드처럼 작업물을 공유합니다. 사이드 메뉴에서 목록을 빠르게 탐색할 수 있어요.",
+                    step: stepNum(),
+                },
             ];
-            return steps.filter(s => s.el());
+            if (!mob) {
+                steps.push({
+                    el: () => document.getElementById("guideBtn"),
+                    title: "가이드 · 설정",
+                    desc: "메뉴 하단 📘 가이드로 이 안내를 다시 볼 수 있고, ⚙️ 설정에서 다크모드·글씨 크기·계정을 바꿀 수 있습니다.",
+                    step: stepNum(),
+                });
+            } else {
+                steps.push({
+                    el: () => document.getElementById("settingsBtn"),
+                    title: "설정",
+                    desc: "메뉴 하단 ⚙️에서 다크모드, 글씨 크기, 로그인을 설정하세요.",
+                    step: stepNum(),
+                });
+            }
+            return steps.filter(s => {
+                if (s.optional && s.el && !s.el()) return false;
+                return s.el && s.el();
+            });
         }
 
         function positionBeginnerStep() {
             const step = beginnerSteps[beginnerStepIndex];
             if (!step) { endBeginnerMode(); return; }
-            setAppWorkspace("ai");
+            setAppWorkspace(step.workspace || "ai");
             closeGuideBar();
-            setSideMenuOpen(false);
+            if (step.workspace === "chat" || step.workspace === "works") {
+                setSideMenuOpen(window.innerWidth >= 768);
+            } else {
+                setSideMenuOpen(false);
+            }
 
             const target = step.el();
             if (!target) { beginnerStepIndex++; positionBeginnerStep(); return; }
