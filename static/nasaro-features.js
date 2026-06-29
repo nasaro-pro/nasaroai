@@ -249,7 +249,24 @@
                     ? (lang === "en" ? "AI All" : "AI 전체")
                     : (current.length === 1 ? current[0] : current.join(" · ")));
             const short = label.length > 24 ? label.slice(0, 24) + "…" : label;
-            if (!singleSelect && mode === "compare") {
+            const compact = opts.compactMobile || (typeof window !== "undefined" && window.innerWidth <= 640);
+            if (compact) {
+                if (!singleSelect && mode === "compare") {
+                    if (allSelected) pickerBtn.textContent = lang === "en" ? "All" : "전체";
+                    else if (current.length === 1) {
+                        const n = current[0];
+                        pickerBtn.textContent = n.length > 9 ? n.slice(0, 9) + "…" : n;
+                    } else {
+                        pickerBtn.textContent = current.length + (lang === "en" ? "" : "개");
+                    }
+                } else if (singleSelect) {
+                    pickerBtn.textContent = short.length > 10 ? short.slice(0, 10) + "…" : short;
+                } else {
+                    pickerBtn.textContent = allSelected
+                        ? (lang === "en" ? "All" : "전체")
+                        : (short.length > 10 ? short.slice(0, 10) + "…" : short);
+                }
+            } else if (!singleSelect && mode === "compare") {
                 const shortBase = allSelected
                     ? (lang === "en" ? "AI All" : "AI 전체")
                     : (current.length === 1 ? current[0] : current.join(" · "));

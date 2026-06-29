@@ -79,8 +79,11 @@
                 transform: none;
                 z-index: 1;
                 box-shadow: none;
-                border-left: 1px solid #e5e7eb;
+                border-left: 2px solid #d1d5db;
                 border-right: none;
+            }
+            .desktop-chrome .app-rail--desktop {
+                border-right: 2px solid #d1d5db;
             }
             .side-menu-overlay {
                 display: none;
@@ -367,6 +370,28 @@
             flex-direction: column;
             gap: 4px;
         }
+        .side-menu-panel { display: none; }
+        .side-menu-panel.active { display: block; }
+        .side-menu-section + .side-menu-section {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+        html[data-theme="dark"] .side-menu-section + .side-menu-section {
+            border-top-color: var(--dm-border-soft);
+        }
+        .side-menu-works-item {
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            cursor: pointer;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+        .side-menu-works-item:hover { background: #eef2ff; border-color: #c7d2fe; }
+        .side-menu-works-item strong { display: block; font-size: 12px; margin-bottom: 2px; }
+        .side-menu-works-item span { font-size: 10px; color: #9ca3af; }
 
         /* ── 설정 · 가이드 (사이드 메뉴 하단) ── */
         .side-menu-footer {
@@ -2342,7 +2367,7 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
-            min-height: 108px;
+            min-height: 0;
         }
 
         .dock-compose-row {
@@ -3930,24 +3955,30 @@
 
         .result-action-row { display: none; }
         .dock-result-actions-slot {
-            display: flex;
+            display: none;
             flex-wrap: wrap;
             align-items: stretch;
             justify-content: stretch;
             gap: 6px;
             width: 100%;
-            min-height: 46px;
-            padding: 0 0 6px;
-            border-bottom: 1px solid transparent;
-            margin-bottom: 2px;
-            visibility: hidden;
-            pointer-events: none;
+            padding: 0 0 4px;
+            order: 2;
         }
         .dock-result-actions-slot.has-actions {
-            visibility: visible;
+            display: flex;
             pointer-events: auto;
-            border-bottom-color: #ede9fe;
+            padding: 6px 4px;
+            border-radius: 10px;
+            background: rgba(245, 243, 255, 0.96);
+            border: 1px solid #ddd6fe;
+            box-shadow: 0 2px 12px rgba(91, 33, 182, 0.08);
         }
+        html[data-theme="dark"] .dock-result-actions-slot.has-actions {
+            background: rgba(30, 27, 46, 0.96);
+            border-color: #4c1d95;
+        }
+        .dock-btn-row { order: 1; }
+        .dock-compose-row { order: 3; }
         .dock-result-actions-slot .result-action-btn {
             flex: 1 1 0;
             min-width: 0;
@@ -4189,8 +4220,20 @@
             }
             .dock-inner {
                 min-height: 0;
-                padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0));
-                gap: 8px;
+                padding: 4px 8px 2px;
+                gap: 4px;
+            }
+            .input-dock {
+                position: relative;
+            }
+            .dock-result-actions-slot.has-actions {
+                padding: 4px 0 2px;
+                margin: 0;
+            }
+            html[data-theme="dark"] .dock-result-actions-slot.has-actions {
+                border: none;
+                box-shadow: none;
+                background: transparent;
             }
             .dock-compose-row {
                 flex-direction: row;
@@ -4201,7 +4244,7 @@
             .dock-compose-tools-left {
                 display: flex;
                 flex: 0 0 auto;
-                max-width: 70px;
+                max-width: 52px;
                 min-width: 0;
             }
             .dock-compose-tools-right {
@@ -4251,13 +4294,24 @@
                 border-radius: 14px;
             }
             .dock-compose-row .input-tool-btn.ai-pick-trigger-btn {
-                width: 68px;
-                max-width: 68px;
+                width: auto;
+                min-width: 44px;
+                max-width: 52px;
                 min-height: 48px;
                 height: 48px;
-                padding: 0 4px;
+                padding: 0 6px;
                 font-size: 11px;
+                font-weight: 700;
                 border-radius: 12px;
+                border: 1px solid #e2e8f0;
+                background: #f1f5f9;
+                color: #374151;
+                box-shadow: none;
+            }
+            html[data-theme="dark"] .dock-compose-row .input-tool-btn.ai-pick-trigger-btn {
+                background: #171717;
+                border-color: #333;
+                color: #e5e7eb;
             }
             .dock-mobile-tools .input-tool-btn.privacy-btn-compact,
             .dock-mobile-tools .input-tool-btn.icon-tool-btn {
@@ -4342,13 +4396,13 @@
                 border-radius: 10px;
             }
             .dock-result-actions-slot {
-                padding-bottom: 8px;
-                margin-bottom: 4px;
+                padding-bottom: 0;
+                margin-bottom: 0;
             }
             .dock-result-actions-slot .result-action-btn {
-                min-height: 42px;
-                font-size: 12px;
-                padding: 8px 4px;
+                min-height: 38px;
+                font-size: 11px;
+                padding: 6px 4px;
             }
             .compare-card {
                 border: 1px solid #e2e8f0;
@@ -4609,6 +4663,10 @@
             border-radius: 14px;
             overflow: hidden;
             background: #fff;
+        }
+        @media (min-width: 768px) {
+            .chat-layout.chat-sidebar-mode { grid-template-columns: 1fr; }
+            .chat-layout.chat-sidebar-mode .chat-user-list { display: none; }
         }
         @media (max-width: 600px) {
             .chat-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -4936,14 +4994,30 @@
                 <button id="signupBtn" class="side-menu-btn outline" type="button" data-i18n="signup">회원가입</button>
             </div>
             <div class="side-menu-scroll">
-            <div class="side-menu-section" id="sessionHistorySection">
-                <div class="works-section-title" data-i18n="session_history">기록</div>
-                <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">질문·답변 기록 (로그인 시 서버에 저장)</div>
-                <div id="sessionHistoryList"><div class="works-empty" data-i18n="session_empty">아직 기록이 없습니다.</div></div>
+            <div id="sideMenuPanelAi" class="side-menu-panel active">
+                <div class="side-menu-section" id="sessionHistorySection">
+                    <div class="works-section-title" data-i18n="session_history">기록</div>
+                    <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">질문·답변 기록 (로그인 시 서버에 저장)</div>
+                    <div id="sessionHistoryList"><div class="works-empty" data-i18n="session_empty">아직 기록이 없습니다.</div></div>
+                </div>
+                <div class="side-menu-section works-section" id="activeCollabSection">
+                    <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
+                    <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
+                </div>
             </div>
-            <div class="side-menu-section works-section" id="activeCollabSection">
-                <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
-                <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
+            <div id="sideMenuPanelChat" class="side-menu-panel">
+                <div class="side-menu-section">
+                    <div class="works-section-title">채팅 목록</div>
+                    <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">대화할 계정을 선택하세요</div>
+                    <div id="sideMenuChatList" class="chat-history-list"><div class="works-empty">로그인 후 채팅 목록이 표시됩니다.</div></div>
+                </div>
+            </div>
+            <div id="sideMenuPanelWorks" class="side-menu-panel">
+                <div class="side-menu-section">
+                    <div class="works-section-title">작업물 목록</div>
+                    <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">공개된 작업물 · 클릭하면 본문으로 이동</div>
+                    <div id="sideMenuWorksList"><div class="works-empty">작업물을 불러오는 중…</div></div>
+                </div>
             </div>
             </div>
             <div class="side-menu-footer">
@@ -5516,12 +5590,6 @@
             </div>
             <footer class="input-dock" id="inputDock">
                 <div class="dock-inner">
-                    <div class="dock-compose-row">
-                        <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
-                        <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
-                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
-                    </div>
-                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-btn-row">
                         <div class="dock-btn-left" id="dockBtnToolsLeft"></div>
                         <div class="dock-btn-center">
@@ -5536,6 +5604,12 @@
                             </div>
                         </div>
                         <div class="dock-btn-right" id="dockBtnToolsRight"></div>
+                    </div>
+                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
+                    <div class="dock-compose-row">
+                        <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
+                        <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                        <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
                 </div>
                 <nav id="appRailMobile" class="app-rail app-rail--mobile" aria-label="앱 메뉴">
@@ -6289,6 +6363,7 @@
                 isLoggedIn: () => !!currentUser,
                 onLoginRequired: () => openAuthModal("login"),
                 onModelsChange: () => updateDockUI(),
+                compactMobile: isMobileCompact(),
             };
             const parts = NF.buildDockToolbarParts?.(mainInput, toolbarOpts);
             if (!parts) return;
@@ -7546,11 +7621,23 @@
 
         const AI_PANEL_IDS = ["comparePanel", "debatePanel", "collabPanel"];
 
+        function updateSideMenuForWorkspace(ws) {
+            document.getElementById("sideMenuPanelAi")?.classList.toggle("active", ws === "ai");
+            document.getElementById("sideMenuPanelChat")?.classList.toggle("active", ws === "chat");
+            document.getElementById("sideMenuPanelWorks")?.classList.toggle("active", ws === "works");
+            const brand = document.getElementById("sideMenuBrand");
+            const titles = { ai: "Nasaro AI", chat: "💬 채팅", works: "📋 작업 공유" };
+            if (brand) brand.textContent = titles[ws] || titles.ai;
+            const chatLayout = document.getElementById("chatLayout");
+            if (chatLayout) chatLayout.classList.toggle("chat-sidebar-mode", ws === "chat" && window.innerWidth >= 768);
+        }
+
         function setAppWorkspace(ws) {
             currentAppWorkspace = ws || "ai";
             document.querySelectorAll(".app-rail-btn").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.workspace === currentAppWorkspace);
             });
+            updateSideMenuForWorkspace(currentAppWorkspace);
             const dockInner = document.querySelector(".dock-inner");
             const dockAgentRow = document.querySelector(".dock-agent-row");
             const dockShell = document.getElementById("dockShell");
@@ -7599,19 +7686,14 @@
             if (currentAppWorkspace === "works") loadWorksFeed();
         }
 
-        async function loadChatUsers() {
-            const list = document.getElementById("chatUserList");
-            if (!list || !currentUser) return;
-            list.innerHTML = "<div style='padding:10px;font-size:11px;color:#9ca3af;'>불러오는 중…</div>";
-            try {
-                const res = await apiFetch("/social/users");
-                if (!res.ok) throw new Error("fail");
-                const data = await res.json();
-                const users = data.users || [];
-                if (!users.length) {
-                    list.innerHTML = "<div style='padding:10px;font-size:11px;color:#9ca3af;'>다른 계정이 없습니다.</div>";
-                    return;
-                }
+        function renderChatUserLists(users) {
+            const emptyMsg = users.length
+                ? null
+                : "<div style='padding:10px;font-size:11px;color:#9ca3af;'>다른 계정이 없습니다.</div>";
+            ["chatUserList", "sideMenuChatList"].forEach(id => {
+                const list = document.getElementById(id);
+                if (!list) return;
+                if (emptyMsg) { list.innerHTML = emptyMsg; return; }
                 list.innerHTML = "";
                 users.forEach(u => {
                     const btn = document.createElement("button");
@@ -7619,12 +7701,38 @@
                     btn.className = "chat-user-btn" + (chatPeerId === u.id ? " active" : "");
                     btn.dataset.peerId = u.id;
                     btn.textContent = u.display_name || ("user" + u.id);
-                    btn.addEventListener("click", () => selectChatPeer(u.id, u.display_name));
+                    btn.addEventListener("click", () => {
+                        selectChatPeer(u.id, u.display_name);
+                        if (window.innerWidth < 768) setSideMenuOpen(false);
+                    });
                     list.appendChild(btn);
                 });
-                if (!chatPeerId && users[0]) selectChatPeer(users[0].id, users[0].display_name);
+            });
+        }
+
+        async function loadChatUsers() {
+            const sideList = document.getElementById("sideMenuChatList");
+            const mainList = document.getElementById("chatUserList");
+            if (!sideList && !mainList) return;
+            const loading = "<div style='padding:10px;font-size:11px;color:#9ca3af;'>불러오는 중…</div>";
+            if (sideList) sideList.innerHTML = loading;
+            if (mainList) mainList.innerHTML = loading;
+            if (!currentUser) {
+                const hint = "<div class='works-empty'>로그인 후 채팅 목록이 표시됩니다.</div>";
+                if (sideList) sideList.innerHTML = hint;
+                if (mainList) mainList.innerHTML = hint;
+                return;
+            }
+            try {
+                const res = await apiFetch("/social/users");
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                renderChatUserLists(data.users || []);
+                if (!chatPeerId && (data.users || [])[0]) selectChatPeer(data.users[0].id, data.users[0].display_name);
             } catch {
-                list.innerHTML = "<div style='padding:10px;font-size:11px;color:#dc2626;'>목록을 불러오지 못했습니다.</div>";
+                const err = "<div style='padding:10px;font-size:11px;color:#dc2626;'>목록을 불러오지 못했습니다.</div>";
+                if (sideList) sideList.innerHTML = err;
+                if (mainList) mainList.innerHTML = err;
             }
         }
 
@@ -7689,6 +7797,8 @@
 
         async function loadWorksFeed() {
             const feed = document.getElementById("worksFeed");
+            const sideList = document.getElementById("sideMenuWorksList");
+            if (sideList) sideList.innerHTML = "<div class='works-empty'>불러오는 중…</div>";
             if (!feed) return;
             feed.innerHTML = "<div class='works-empty' style='text-align:center;color:#9ca3af;padding:20px;'>불러오는 중…</div>";
             try {
@@ -7698,10 +7808,33 @@
                 renderWorksFeed(data.works || []);
             } catch {
                 feed.innerHTML = "<div style='text-align:center;color:#dc2626;padding:20px;'>피드를 불러오지 못했습니다.</div>";
+                if (sideList) sideList.innerHTML = "<div class='works-empty' style='color:#dc2626;'>불러오지 못했습니다.</div>";
             }
         }
 
+        function renderWorksSidebar(works) {
+            const list = document.getElementById("sideMenuWorksList");
+            if (!list) return;
+            if (!works.length) {
+                list.innerHTML = "<div class='works-empty'>등록된 작업물이 없습니다.</div>";
+                return;
+            }
+            list.innerHTML = "";
+            works.forEach(w => {
+                const item = document.createElement("div");
+                item.className = "side-menu-works-item";
+                item.innerHTML = `<strong>${escapeHtml(w.title || "제목 없음")}</strong><span>${escapeHtml(w.author_name || "사용자")} · ${escapeHtml(w.created_at_iso || "")}</span>`;
+                item.addEventListener("click", () => {
+                    const card = document.querySelector(`.works-card[data-work-id="${w.id}"]`);
+                    card?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    if (window.innerWidth < 768) setSideMenuOpen(false);
+                });
+                list.appendChild(item);
+            });
+        }
+
         function renderWorksFeed(works) {
+            renderWorksSidebar(works);
             const feed = document.getElementById("worksFeed");
             if (!feed) return;
             if (!works.length) {
@@ -8194,6 +8327,7 @@
             rebuildMainToolbar();
             updateDockUI();
             updateCollabActionBar();
+            if (typeof updateSideMenuForWorkspace === "function") updateSideMenuForWorkspace(currentAppWorkspace);
         });
         autoResizeInput();
 
