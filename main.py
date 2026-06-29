@@ -4434,10 +4434,17 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
 
 
 @app.get("/social/works")
-def social_works_list(request: Request, limit: int = 50, friends_only: int = 0) -> dict:
+def social_works_list(request: Request, limit: int = 50, friends_only: int = 0, mine: int = 0) -> dict:
     user = get_user_by_token(_bearer_token(request))
     viewer_id = user["id"] if user else None
-    works = list_public_works(limit=limit, viewer_id=viewer_id, friends_only=bool(friends_only))
+    if mine and not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    works = list_public_works(
+        limit=limit,
+        viewer_id=viewer_id,
+        friends_only=bool(friends_only),
+        mine=bool(mine),
+    )
     return {"works": works}
 
 

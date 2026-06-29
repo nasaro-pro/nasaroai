@@ -120,23 +120,23 @@
                 overflow: visible;
             }
             .side-menu-header {
-                position: fixed;
-                left: 10px;
-                top: max(10px, env(safe-area-inset-top));
-                z-index: 420;
+                display: none;
+            }
+            .side-menu.open .side-menu-header {
+                display: flex;
+                position: relative;
+                left: auto;
+                top: auto;
+                border: none;
+                border-radius: 0;
+                box-shadow: none;
+                background: #fff;
+                padding: 14px 14px 12px;
                 pointer-events: auto;
-                background: rgba(255,255,255,0.96);
-                border: 1px solid #e5e7eb;
-                border-radius: 12px;
-                padding: 6px 8px;
-                box-shadow: 0 2px 12px rgba(15,23,42,0.08);
             }
-            html[data-theme="dark"] .side-menu-header {
-                background: rgba(20,20,20,0.96);
-                border-color: #333;
+            html[data-theme="dark"] .side-menu.open .side-menu-header {
+                background: #141824;
             }
-            .side-menu:not(.open) .side-menu-brand,
-            .side-menu:not(.open) .side-menu-admin-btn,
             .side-menu:not(.open) .side-menu-drawer {
                 display: none !important;
             }
@@ -149,24 +149,11 @@
                 box-shadow: 4px 0 28px rgba(15,23,42,0.15);
                 z-index: 410;
             }
-            .side-menu.open .side-menu-header {
-                position: relative;
-                left: auto;
-                top: auto;
-                border: none;
-                border-radius: 0;
-                box-shadow: none;
-                background: #fff;
-                padding: 14px 14px 12px;
-            }
-            html[data-theme="dark"] .side-menu.open .side-menu-header {
-                background: #141824;
-            }
             .side-menu.open .side-menu-drawer {
                 display: flex !important;
             }
             .site-header .header-left-actions { display: none; }
-            .site-header .header-inner { padding-left: 56px; }
+            .site-header .header-inner { padding-left: 16px; }
         }
         @media (min-width: 768px) {
             .site-header .header-left-actions { display: none; }
@@ -219,21 +206,23 @@
             align-items: center;
             gap: 6px;
         }
-        .menu-toggle-btn {
-            position: static;
-            transform: none;
-            width: 40px;
-            height: 40px;
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            background: #fff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
+        .menu-toggle-btn { display: none !important; }
+        .side-menu-close-btn {
+            border: none;
+            background: #f3f4f6;
+            color: #374151;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-size: 16px;
             cursor: pointer;
             flex-shrink: 0;
+        }
+        .side-menu-close-btn:hover { background: #e5e7eb; }
+        .side-menu-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .header-admin-btn {
             height: 32px;
@@ -4776,11 +4765,12 @@
             grid-template-columns: 220px 1fr;
             flex: 1;
             min-height: 0;
-            border: 1px solid #1e1f22;
+            border: 1px solid #e5e7eb;
             border-radius: 12px;
             overflow: hidden;
-            background: #313338;
+            background: #fff;
             margin: 0 12px 12px;
+            box-shadow: 0 2px 12px rgba(15,23,42,0.06);
         }
         @media (min-width: 768px) {
             .discord-layout.chat-sidebar-mode { grid-template-columns: 1fr; }
@@ -4791,22 +4781,22 @@
             .discord-sidebar { max-height: 120px; }
         }
         .discord-sidebar {
-            background: #2b2d31;
+            background: #f9fafb;
             display: flex;
             flex-direction: column;
             min-height: 0;
-            border-right: 1px solid #1e1f22;
+            border-right: 1px solid #e5e7eb;
         }
         .discord-sidebar-head {
             padding: 12px 14px 8px;
-            border-bottom: 1px solid #1e1f22;
+            border-bottom: 1px solid #e5e7eb;
         }
         .discord-sidebar-title {
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            color: #949ba4;
+            color: #6b7280;
         }
         .discord-member-list {
             overflow-y: auto;
@@ -4825,11 +4815,11 @@
             background: transparent;
             font-size: 14px;
             font-weight: 600;
-            color: #949ba4;
+            color: #4b5563;
             cursor: pointer;
         }
-        .chat-user-btn:hover, .discord-member-btn:hover { background: #35373c; color: #dbdee1; }
-        .chat-user-btn.active, .discord-member-btn.active { background: #404249; color: #fff; }
+        .chat-user-btn:hover, .discord-member-btn:hover { background: #eef2ff; color: #111827; }
+        .chat-user-btn.active, .discord-member-btn.active { background: #ede9fe; color: #5b21b6; }
         .discord-member-avatar {
             width: 32px;
             height: 32px;
@@ -4847,15 +4837,15 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            background: #313338;
+            background: #fff;
         }
         .discord-channel-bar {
             padding: 12px 16px;
-            border-bottom: 1px solid #1e1f22;
+            border-bottom: 1px solid #e5e7eb;
             font-size: 15px;
             font-weight: 700;
-            color: #f2f3f5;
-            background: #313338;
+            color: #111827;
+            background: #fff;
         }
         .discord-messages {
             flex: 1;
@@ -4880,26 +4870,27 @@
             gap: 8px;
             margin-bottom: 2px;
         }
-        .discord-msg-name { font-size: 14px; font-weight: 700; color: #f2f3f5; }
-        .discord-msg-time { font-size: 11px; color: #949ba4; }
-        .discord-msg-text { font-size: 14px; line-height: 1.45; color: #dbdee1; white-space: pre-wrap; word-break: break-word; }
+        .discord-msg-name { font-size: 14px; font-weight: 700; color: #111827; }
+        .discord-msg-time { font-size: 11px; color: #9ca3af; }
+        .discord-msg-text { font-size: 14px; line-height: 1.45; color: #374151; white-space: pre-wrap; word-break: break-word; }
         .discord-msg-row.mine .discord-msg-name { color: #5865f2; }
         .discord-compose {
             display: flex;
             gap: 8px;
             padding: 12px 16px 16px;
-            background: #313338;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
         }
         .discord-compose input {
             flex: 1;
-            border: none;
+            border: 1px solid #e5e7eb;
             border-radius: 8px;
             padding: 10px 14px;
             font-size: 14px;
-            background: #383a40;
-            color: #dbdee1;
+            background: #fff;
+            color: #111827;
         }
-        .discord-compose input::placeholder { color: #6d6f78; }
+        .discord-compose input::placeholder { color: #9ca3af; }
         .discord-compose button {
             border: none;
             background: #5865f2;
@@ -4917,16 +4908,16 @@
             display: flex;
             gap: 6px;
             padding: 8px 10px;
-            border-bottom: 1px solid #1e1f22;
+            border-bottom: 1px solid #e5e7eb;
         }
         .chat-sidebar-tools input {
             flex: 1;
-            border: none;
+            border: 1px solid #e5e7eb;
             border-radius: 6px;
             padding: 6px 8px;
             font-size: 12px;
-            background: #1e1f22;
-            color: #dbdee1;
+            background: #fff;
+            color: #111827;
         }
         .chat-sidebar-tools button {
             border: none;
@@ -4940,8 +4931,9 @@
         }
         .chat-friend-requests, .chat-search-results {
             padding: 6px 10px;
-            border-bottom: 1px solid #1e1f22;
+            border-bottom: 1px solid #e5e7eb;
             font-size: 11px;
+            background: #fff;
         }
         .chat-friend-req, .chat-search-item {
             display: flex;
@@ -4980,6 +4972,307 @@
         .works-coin-btn.tipped { background: #374151; cursor: default; }
         .works-coin-btn.pending { background: #dc2626; }
         html[data-theme="dark"] .works-search-row input { background: #1a1a1a; border-color: #333; color: #e5e5e5; }
+
+        /* 홈 · 플로팅 에이전트 · 미니 채팅 */
+        .home-workspace {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 0 12px 24px;
+            flex-direction: column;
+        }
+        .home-profile-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            margin: 12px 0;
+            background: #fff;
+            border: 1px solid #dbdbdb;
+            border-radius: 14px;
+        }
+        .home-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #833ab4, #fd1d1d);
+            color: #fff;
+            font-size: 26px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .home-profile-meta h2 { margin: 0 0 4px; font-size: 20px; }
+        .home-profile-meta p { margin: 0; font-size: 13px; color: #737373; }
+        .home-tab-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .home-tab-btn {
+            flex: 1;
+            border: 1px solid #dbdbdb;
+            background: #fafafa;
+            border-radius: 10px;
+            padding: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .home-tab-btn.active {
+            background: #ede9fe;
+            border-color: #7c3aed;
+            color: #5b21b6;
+        }
+        .home-compose-card {
+            background: #fff;
+            border: 1px solid #dbdbdb;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        .home-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .home-saved-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+        }
+        .home-saved-item button {
+            margin-top: 8px;
+            border: none;
+            background: #7c3aed;
+            color: #fff;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .insta-stories-bar {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 8px 4px 12px;
+            margin-bottom: 4px;
+        }
+        .insta-story {
+            flex: 0 0 auto;
+            width: 62px;
+            text-align: center;
+            font-size: 10px;
+            color: #525252;
+        }
+        .insta-story-ring {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            padding: 2px;
+            background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+            margin: 0 auto 4px;
+        }
+        .insta-story-ring span {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #fff;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 18px;
+        }
+        .workspace-agent-fab {
+            position: fixed;
+            right: 16px;
+            bottom: calc(var(--bottom-offset, 72px) + 12px);
+            z-index: 360;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            min-width: 48px;
+            height: 48px;
+            padding: 0 14px;
+            border-radius: 24px;
+            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+            color: #5b21b6;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(91,33,182,0.22);
+        }
+        .workspace-agent-fab.visible { display: inline-flex; }
+        .workspace-agent-fab.active {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            color: #fff;
+            border-color: #6d28d9;
+        }
+        .float-chats-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 340;
+        }
+        .float-chat-win {
+            position: absolute;
+            width: min(300px, calc(100vw - 24px));
+            height: 320px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(15,23,42,0.18);
+            display: flex;
+            flex-direction: column;
+            pointer-events: auto;
+            overflow: hidden;
+        }
+        .float-chat-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: move;
+            user-select: none;
+        }
+        .float-chat-head span { flex: 1; font-size: 13px; font-weight: 700; }
+        .float-chat-head button {
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 2px 4px;
+        }
+        .float-chat-msgs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        .float-chat-compose {
+            display: flex;
+            gap: 6px;
+            padding: 8px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .float-chat-compose input {
+            flex: 1;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+        .float-chat-compose button {
+            border: none;
+            background: #5865f2;
+            color: #fff;
+            border-radius: 8px;
+            padding: 0 10px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .chat-group-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.45);
+            z-index: 5000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .chat-group-modal-overlay.open { display: flex; }
+        .chat-group-modal {
+            width: min(400px, 100%);
+            background: #fff;
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        }
+        .chat-group-modal h3 { margin: 0 0 10px; font-size: 17px; }
+        .chat-group-modal input[type="text"] {
+            width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .chat-group-friend-list {
+            max-height: 180px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 6px;
+            margin-bottom: 12px;
+        }
+        .chat-group-friend-list label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 4px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .chat-group-modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .chat-group-modal-actions button {
+            border: none;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .chat-group-modal-actions .primary { background: #5865f2; color: #fff; }
+        .chat-group-modal-actions .muted { background: #f3f4f6; color: #374151; }
+        .works-cowork-btn {
+            border: 1px solid #c4b5fd;
+            background: #f5f3ff;
+            color: #5b21b6;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .side-menu-friend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .side-menu-friend-item:hover { background: #f3f4f6; }
+        .side-menu-friend-item button {
+            border: none;
+            background: #5865f2;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .beginner-next { display: none !important; }
+        .beginner-tap-hint {
+            font-size: 11px;
+            color: #9ca3af;
+            margin: 0;
+        }
 
         /* ── Instagram 스타일 작업 피드 ── */
         .insta-workspace {
@@ -5304,13 +5597,12 @@
             <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
             <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
             <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
-            <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtn" title="메뉴 열기" aria-label="메뉴 열기">☰</button>
+            <button type="button" class="app-rail-btn" data-workspace="home" title="홈">🏠</button>
+            <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtn" title="메뉴" aria-label="메뉴">☰</button>
         </nav>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
-                <button id="menuToggleBtn" class="menu-toggle-btn" type="button" aria-label="메뉴">
-                    <span></span><span></span><span></span>
-                </button>
+                <button id="sideMenuCloseBtn" class="side-menu-close-btn" type="button" aria-label="메뉴 닫기">✕</button>
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
                 <button id="adminEntryBtn" class="header-admin-btn side-menu-admin-btn" type="button" title="관리자 페이지">관리</button>
             </div>
@@ -5349,9 +5641,9 @@
             </div>
             <div id="sideMenuPanelWorks" class="side-menu-panel">
                 <div class="side-menu-section">
-                    <div class="works-section-title">작업물 목록</div>
-                    <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">공개된 작업물 · 클릭하면 본문으로 이동</div>
-                    <div id="sideMenuWorksList"><div class="works-empty">작업물을 불러오는 중…</div></div>
+                    <div class="works-section-title">친구 목록</div>
+                    <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">친구와 채팅 · 공동작업 · 작업 피드</div>
+                    <div id="sideMenuFriendsList"><div class="works-empty">로그인 후 친구 목록이 표시됩니다.</div></div>
                 </div>
             </div>
             </div>
@@ -5734,7 +6026,8 @@
                 <div id="worksLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 작업물을 등록할 수 있습니다.</div>
                 <div class="insta-top-bar">
                     <h2 class="insta-top-title">📋 작업 피드</h2>
-                    <p class="insta-top-desc">친구 작업물 · 🪙1 코인으로 응원 (5초 내 취소 가능)</p>
+                    <p class="insta-top-desc">친구 작업물 · 🪙1 코인으로 응원 · 공동작업 초대</p>
+                    <div id="worksStoriesBar" class="insta-stories-bar"></div>
                     <div class="works-search-row">
                         <input id="worksUserSearch" type="search" placeholder="계정 검색 · 친구 추가…" autocomplete="off">
                     </div>
@@ -5749,6 +6042,32 @@
                     <textarea id="worksBodyInput" placeholder="작업 내용을 입력하세요…"></textarea>
                 </div>
                 <div id="worksFeed" class="insta-feed"></div>
+            </section>
+
+            <section id="homeWorkspace" class="app-workspace-panel home-workspace" aria-label="홈">
+                <div id="homeLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 내 프로필과 작업물을 관리할 수 있습니다.</div>
+                <div id="homeLayout" style="display:none;">
+                    <div class="home-profile-card">
+                        <div class="home-avatar" id="homeAvatar">?</div>
+                        <div class="home-profile-meta">
+                            <h2 id="homeUsername">내 계정</h2>
+                            <p id="homeMeta">코인 · 작업물</p>
+                        </div>
+                    </div>
+                    <div class="home-tab-row">
+                        <button type="button" class="home-tab-btn active" data-home-tab="works">내 작업물</button>
+                        <button type="button" class="home-tab-btn" data-home-tab="saved">저장물</button>
+                    </div>
+                    <div id="homeComposeWorks" class="home-compose-card">
+                        <div class="insta-compose-row">
+                            <input id="homeWorksTitleInput" type="text" placeholder="제목 (선택)">
+                            <button id="homeWorksPostBtn" type="button">등록</button>
+                        </div>
+                        <textarea id="homeWorksBodyInput" placeholder="작업 내용을 입력하세요…"></textarea>
+                    </div>
+                    <div id="homeWorksGrid" class="home-grid"></div>
+                    <div id="homeSavedGrid" class="home-grid" style="display:none;"></div>
+                </div>
             </section>
         </main>
 
@@ -5899,6 +6218,21 @@
             </div>
         </div>
 
+        <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
+        <div id="floatChatsLayer" class="float-chats-layer" aria-live="polite"></div>
+
+        <div id="chatGroupModalOverlay" class="chat-group-modal-overlay" aria-hidden="true">
+            <div class="chat-group-modal" role="dialog" aria-label="단체방 만들기">
+                <h3>단체 대화방 만들기</h3>
+                <input id="chatGroupNameInput" type="text" placeholder="방 이름" maxlength="80">
+                <div id="chatGroupFriendList" class="chat-group-friend-list"></div>
+                <div class="chat-group-modal-actions">
+                    <button type="button" class="muted" id="chatGroupModalCancel">취소</button>
+                    <button type="button" class="primary" id="chatGroupModalCreate">만들기</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 에이전트 플로팅 런처 (패널 닫혔을 때만 표시, 드래그 가능) -->
         <button id="agentFloatLauncher" class="agent-float-launcher" title="에이전트 패널 열기" aria-label="에이전트 열기">
             <div class="ax-logo">
@@ -5961,6 +6295,8 @@
                     <button type="button" class="app-rail-btn active" data-workspace="ai"><span>🤖</span><span class="rail-label">AI</span></button>
                     <button type="button" class="app-rail-btn" data-workspace="chat"><span>💬</span><span class="rail-label">채팅</span></button>
                     <button type="button" class="app-rail-btn" data-workspace="works"><span>📋</span><span class="rail-label">작업</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="home"><span>🏠</span><span class="rail-label">홈</span></button>
+                    <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtnMobile" aria-label="메뉴"><span>☰</span><span class="rail-label">메뉴</span></button>
                 </nav>
             </footer>
         </div>
@@ -5999,6 +6335,7 @@
                     <button type="button" id="beginnerSkipBtn" class="beginner-skip">건너뛰기</button>
                     <button type="button" id="beginnerNextBtn" class="beginner-next">다음</button>
                 </div>
+                <p class="beginner-tap-hint">화면 아무 곳이나 탭하면 다음으로 넘어갑니다</p>
             </div>
         </div>
     </div>
@@ -6792,7 +7129,7 @@
 
         const sideMenu = document.getElementById("sideMenu");
         const sideMenuOverlay = document.getElementById("sideMenuOverlay");
-        const menuToggleBtn = document.getElementById("menuToggleBtn");
+        const sideMenuCloseBtn = document.getElementById("sideMenuCloseBtn");
         const appShell = document.querySelector(".app");
         const desktopChrome = document.getElementById("desktopChrome");
         const newChatBtn = document.getElementById("newChatBtn");
@@ -6816,8 +7153,12 @@
             }
         }
 
-        menuToggleBtn?.addEventListener("click", () => setSideMenuOpen(!sideMenu?.classList.contains("open")));
-        document.getElementById("menuRailOpenBtn")?.addEventListener("click", () => setSideMenuOpen(true));
+        function toggleSideMenu() {
+            setSideMenuOpen(!sideMenu?.classList.contains("open"));
+        }
+        sideMenuCloseBtn?.addEventListener("click", () => setSideMenuOpen(false));
+        document.getElementById("menuRailOpenBtn")?.addEventListener("click", toggleSideMenu);
+        document.getElementById("menuRailOpenBtnMobile")?.addEventListener("click", toggleSideMenu);
         sideMenuOverlay?.addEventListener("click", () => setSideMenuOpen(false));
 
         let swipeStartX = 0;
@@ -7111,6 +7452,7 @@
         const REMEMBER_LOGIN_KEY = "nasaroai_remember_login";
         let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || "";
         let currentUser = null;
+        let authBootstrapDone = false;
         let authModalMode = "login";
         let syncTimer = null;
         const ACTIVE_COLLAB_KEY = "nasaroai_active_collab";
@@ -7220,7 +7562,7 @@
                 const data = await response.json();
                 if (typeof data.detail === "string") return data.detail;
                 if (data.detail?.message) {
-                    if (data.detail.login_required && !currentUser) {
+                    if (data.detail.login_required && authBootstrapDone && !currentUser) {
                         setTimeout(() => openAuthModal("login"), 400);
                     }
                     return data.detail.message;
@@ -7574,7 +7916,15 @@
             }
         }
 
+        function requireLogin() {
+            if (currentUser && authToken) return true;
+            if (!authBootstrapDone) return false;
+            openAuthModal("login");
+            return false;
+        }
+
         function openAuthModal(mode = "login") {
+            if (mode === "login" && currentUser && authToken) return;
             const NF = window.NasaroFeatures;
             authModalMode = mode;
             document.getElementById("authModalTitle").textContent = mode === "signup"
@@ -7692,7 +8042,11 @@
         }
 
         async function bootstrapAuth() {
-            if (!authToken) { updateAuthUI(); return; }
+            if (!authToken) {
+                authBootstrapDone = true;
+                updateAuthUI();
+                return;
+            }
             try {
                 const res = await apiFetch("/auth/me");
                 if (!res.ok) throw new Error("invalid");
@@ -7705,6 +8059,7 @@
                 currentUser = null;
                 localStorage.removeItem(AUTH_TOKEN_KEY);
             }
+            authBootstrapDone = true;
             updateAuthUI();
             notifyExtensionAuth();
         }
@@ -7990,25 +8345,36 @@
         function updateSideMenuForWorkspace(ws) {
             document.getElementById("sideMenuPanelAi")?.classList.toggle("active", ws === "ai");
             document.getElementById("sideMenuPanelChat")?.classList.toggle("active", ws === "chat");
-            document.getElementById("sideMenuPanelWorks")?.classList.toggle("active", ws === "works");
+            document.getElementById("sideMenuPanelWorks")?.classList.toggle("active", ws === "works" || ws === "home");
             const brand = document.getElementById("sideMenuBrand");
-            const titles = { ai: "Nasaro AI", chat: "💬 채팅", works: "📋 작업 공유" };
+            const titles = { ai: "Nasaro AI", chat: "💬 채팅", works: "📋 작업 공유", home: "🏠 홈" };
             if (brand) brand.textContent = titles[ws] || titles.ai;
             const chatLayout = document.getElementById("chatLayout");
             if (chatLayout) chatLayout.classList.toggle("chat-sidebar-mode", ws === "chat" && window.innerWidth >= 768);
+            if (ws === "works" || ws === "home") loadSideMenuFriends();
+        }
+
+        function updateWorkspaceAgentFab(ws) {
+            const fab = document.getElementById("workspaceAgentFab");
+            if (!fab) return;
+            const show = ws === "chat" || ws === "works" || ws === "home";
+            fab.classList.toggle("visible", show);
+            fab.classList.toggle("active", !!agentActive);
         }
 
         function setAppWorkspace(ws) {
             currentAppWorkspace = ws || "ai";
-            document.querySelectorAll(".app-rail-btn").forEach(btn => {
+            document.querySelectorAll(".app-rail-btn[data-workspace]").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.workspace === currentAppWorkspace);
             });
             updateSideMenuForWorkspace(currentAppWorkspace);
+            updateWorkspaceAgentFab(currentAppWorkspace);
             const dockInner = document.querySelector(".dock-inner");
             const dockAgentRow = document.querySelector(".dock-agent-row");
             const dockShell = document.getElementById("dockShell");
             const chatWs = document.getElementById("chatWorkspace");
             const worksWs = document.getElementById("worksWorkspace");
+            const homeWs = document.getElementById("homeWorkspace");
             const isAi = currentAppWorkspace === "ai";
 
             AI_PANEL_IDS.forEach(id => {
@@ -8017,6 +8383,7 @@
             });
             if (chatWs) chatWs.classList.toggle("active", currentAppWorkspace === "chat");
             if (worksWs) worksWs.classList.toggle("active", currentAppWorkspace === "works");
+            if (homeWs) homeWs.classList.toggle("active", currentAppWorkspace === "home");
 
             if (dockInner) dockInner.style.display = isAi ? "" : "none";
             if (dockAgentRow) dockAgentRow.style.display = isAi ? "" : "none";
@@ -8029,12 +8396,14 @@
                 stopChatPoll();
             }
             if (currentAppWorkspace === "works") loadWorksFeed();
+            if (currentAppWorkspace === "home") refreshHomeWorkspace();
+            renderFloatChats();
 
             try { localStorage.setItem("nasaroai_app_workspace", currentAppWorkspace); } catch {}
             if (isAi) updateDockUI();
         }
 
-        document.querySelectorAll(".app-rail-btn").forEach(btn => {
+        document.querySelectorAll(".app-rail-btn[data-workspace]").forEach(btn => {
             btn.addEventListener("click", () => setAppWorkspace(btn.dataset.workspace));
         });
 
@@ -8044,10 +8413,14 @@
             const chatLayout = document.getElementById("chatLayout");
             const worksHint = document.getElementById("worksLoginHint");
             const worksCompose = document.getElementById("worksCompose");
+            const homeHint = document.getElementById("homeLoginHint");
+            const homeLayout = document.getElementById("homeLayout");
             if (chatHint) chatHint.style.display = loggedIn ? "none" : "block";
             if (chatLayout) chatLayout.style.display = loggedIn ? "grid" : "none";
             if (worksHint) worksHint.style.display = loggedIn ? "none" : "block";
             if (worksCompose) worksCompose.style.display = loggedIn ? "block" : "none";
+            if (homeHint) homeHint.style.display = loggedIn ? "none" : "block";
+            if (homeLayout) homeLayout.style.display = loggedIn ? "block" : "none";
             if (loggedIn && currentAppWorkspace === "chat") {
                 loadChatRooms();
                 loadFriendRequests();
@@ -8055,6 +8428,9 @@
             if (currentAppWorkspace === "works") {
                 loadWorksFeed();
                 loadFriendRequests("works");
+            }
+            if (loggedIn && (currentAppWorkspace === "works" || currentAppWorkspace === "home")) {
+                loadSideMenuFriends();
             }
         }
 
@@ -8102,6 +8478,7 @@
                 loadFriendRequests("chat");
                 loadFriendRequests("works");
                 loadChatRooms();
+                loadSideMenuFriends();
             } catch { showToast("처리 실패"); }
         }
 
@@ -8159,6 +8536,7 @@
                 if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "요청 실패"); return; }
                 showToast(data.auto_accepted ? "친구가 되었습니다!" : "친구 요청을 보냈습니다.");
                 loadChatRooms();
+                loadSideMenuFriends();
                 loadFriendRequests("chat");
                 loadFriendRequests("works");
             } catch { showToast("요청 실패"); }
@@ -8253,7 +8631,7 @@
         }
 
         async function sendChatMessage() {
-            if (!currentUser || !chatRoomId) { openAuthModal("login"); return; }
+            if (!requireLogin() || !chatRoomId) return;
             const input = document.getElementById("chatInput");
             const body = (input?.value || "").trim();
             if (!body) return;
@@ -8297,12 +8675,238 @@
             clearTimeout(chatSearchTimer);
             chatSearchTimer = setTimeout(() => searchSocialUsers(e.target.value, "worksUserSearchResults"), 300);
         });
-        document.getElementById("chatGroupCreateBtn")?.addEventListener("click", async () => {
-            if (!currentUser) { openAuthModal("login"); return; }
-            const name = prompt("단체방 이름");
-            if (!name) return;
-            const idsRaw = prompt("초대할 친구 ID (쉼표로 구분, 본인 제외)", "");
-            const member_ids = (idsRaw || "").split(",").map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+        document.getElementById("chatGroupCreateBtn")?.addEventListener("click", () => openChatGroupModal());
+
+        const FLOAT_CHAT_KEY = "nasaro_float_chats_v1";
+        const MAX_FLOAT_CHATS = 3;
+        let floatChats = [];
+        let floatChatPollTimer = null;
+
+        function loadFloatChatsState() {
+            try { floatChats = JSON.parse(sessionStorage.getItem(FLOAT_CHAT_KEY) || "[]"); } catch { floatChats = []; }
+        }
+        function saveFloatChatsState() {
+            try { sessionStorage.setItem(FLOAT_CHAT_KEY, JSON.stringify(floatChats)); } catch {}
+        }
+
+        function dmRoomIdForFriend(friendId) {
+            if (!currentUser?.id) return "";
+            const lo = Math.min(currentUser.id, friendId);
+            const hi = Math.max(currentUser.id, friendId);
+            return `${lo}:${hi}`;
+        }
+
+        function openFloatChat(roomId, name, roomType) {
+            if (!requireLogin() || !roomId) return;
+            loadFloatChatsState();
+            const existing = floatChats.find(c => c.roomId === roomId);
+            if (existing) {
+                existing.minimized = false;
+                saveFloatChatsState();
+                renderFloatChats();
+                return;
+            }
+            if (floatChats.length >= MAX_FLOAT_CHATS) {
+                showToast("채팅창은 최대 3개까지 열 수 있습니다.");
+                return;
+            }
+            floatChats.push({
+                roomId,
+                name: name || "채팅",
+                roomType: roomType || "dm",
+                x: Math.min(window.innerWidth - 320, 16 + floatChats.length * 28),
+                y: Math.min(window.innerHeight - 360, 72 + floatChats.length * 28),
+                minimized: false,
+            });
+            saveFloatChatsState();
+            renderFloatChats();
+            startFloatChatPoll();
+        }
+
+        function closeFloatChat(roomId) {
+            loadFloatChatsState();
+            floatChats = floatChats.filter(c => c.roomId !== roomId);
+            saveFloatChatsState();
+            renderFloatChats();
+            if (!floatChats.length) stopFloatChatPoll();
+        }
+
+        async function loadFloatChatMessages(roomId, box) {
+            if (!box || !roomId) return;
+            try {
+                const res = await apiFetch("/social/chat/room/" + encodeURIComponent(roomId));
+                if (!res.ok) return;
+                const data = await res.json();
+                const msgs = data.messages || [];
+                box.innerHTML = msgs.map(m => {
+                    const mine = m.sender_id === currentUser?.id;
+                    return `<div style="margin:4px 0;${mine ? "text-align:right;" : ""}"><span style="font-weight:700;font-size:11px;">${escapeHtml(m.sender_name || "")}</span><div style="background:${mine ? "#ede9fe" : "#f3f4f6"};display:inline-block;padding:4px 8px;border-radius:8px;margin-top:2px;">${escapeHtml(m.body || "")}</div></div>`;
+                }).join("") || "<div style='color:#9ca3af;'>메시지 없음</div>";
+                box.scrollTop = box.scrollHeight;
+            } catch {}
+        }
+
+        async function sendFloatChatMessage(roomId, input) {
+            if (!requireLogin() || !roomId) return;
+            const body = (input?.value || "").trim();
+            if (!body) return;
+            try {
+                const res = await apiFetch("/social/chat/room/" + encodeURIComponent(roomId), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body }),
+                });
+                if (!res.ok) { showToast("전송 실패"); return; }
+                input.value = "";
+                const box = document.querySelector(`.float-chat-win[data-room-id="${CSS.escape(roomId)}"] .float-chat-msgs`);
+                if (box) await loadFloatChatMessages(roomId, box);
+            } catch { showToast("전송 실패"); }
+        }
+
+        function makeFloatChatDraggable(win, chat) {
+            const head = win.querySelector(".float-chat-head");
+            if (!head) return;
+            let active = false, ox = 0, oy = 0, sx = 0, sy = 0;
+            const getXY = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
+            head.addEventListener("mousedown", e => {
+                if (e.target.closest("button")) return;
+                const [cx, cy] = getXY(e);
+                ox = cx; oy = cy; sx = chat.x; sy = chat.y; active = true;
+            });
+            head.addEventListener("touchstart", e => {
+                if (e.target.closest("button")) return;
+                const [cx, cy] = getXY(e);
+                ox = cx; oy = cy; sx = chat.x; sy = chat.y; active = true;
+            }, { passive: true });
+            const onMove = e => {
+                if (!active) return;
+                const [cx, cy] = getXY(e);
+                chat.x = Math.max(8, Math.min(window.innerWidth - 280, sx + cx - ox));
+                chat.y = Math.max(8, Math.min(window.innerHeight - 200, sy + cy - oy));
+                win.style.left = chat.x + "px";
+                win.style.top = chat.y + "px";
+            };
+            const onEnd = () => {
+                if (active) { active = false; saveFloatChatsState(); }
+            };
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("touchmove", onMove, { passive: true });
+            window.addEventListener("mouseup", onEnd);
+            window.addEventListener("touchend", onEnd);
+        }
+
+        function renderFloatChats() {
+            const layer = document.getElementById("floatChatsLayer");
+            if (!layer) return;
+            loadFloatChatsState();
+            layer.innerHTML = "";
+            if (!floatChats.length) return;
+            floatChats.forEach(chat => {
+                const win = document.createElement("div");
+                win.className = "float-chat-win";
+                win.dataset.roomId = chat.roomId;
+                win.style.left = (chat.x || 16) + "px";
+                win.style.top = (chat.y || 80) + "px";
+                if (chat.minimized) win.style.height = "40px";
+                win.innerHTML = `
+                    <div class="float-chat-head">
+                        <span>${escapeHtml(chat.name || "채팅")}</span>
+                        <button type="button" data-minimize title="접기">−</button>
+                        <button type="button" data-close title="닫기">✕</button>
+                    </div>
+                    <div class="float-chat-msgs"></div>
+                    <div class="float-chat-compose">
+                        <input type="text" placeholder="메시지…" autocomplete="off">
+                        <button type="button">➤</button>
+                    </div>`;
+                if (chat.minimized) {
+                    win.querySelector(".float-chat-msgs")?.remove();
+                    win.querySelector(".float-chat-compose")?.remove();
+                }
+                layer.appendChild(win);
+                makeFloatChatDraggable(win, chat);
+                win.querySelector("[data-close]")?.addEventListener("click", () => closeFloatChat(chat.roomId));
+                win.querySelector("[data-minimize]")?.addEventListener("click", () => {
+                    chat.minimized = !chat.minimized;
+                    saveFloatChatsState();
+                    renderFloatChats();
+                });
+                if (!chat.minimized) {
+                    const msgs = win.querySelector(".float-chat-msgs");
+                    loadFloatChatMessages(chat.roomId, msgs);
+                    const input = win.querySelector(".float-chat-compose input");
+                    const sendBtn = win.querySelector(".float-chat-compose button");
+                    sendBtn?.addEventListener("click", () => sendFloatChatMessage(chat.roomId, input));
+                    input?.addEventListener("keydown", e => {
+                        if (e.key === "Enter") { e.preventDefault(); sendFloatChatMessage(chat.roomId, input); }
+                    });
+                }
+            });
+            if (floatChats.length) startFloatChatPoll();
+        }
+
+        function startFloatChatPoll() {
+            if (floatChatPollTimer) return;
+            floatChatPollTimer = setInterval(() => {
+                loadFloatChatsState();
+                floatChats.forEach(chat => {
+                    if (chat.minimized) return;
+                    const box = document.querySelector(`.float-chat-win[data-room-id="${CSS.escape(chat.roomId)}"] .float-chat-msgs`);
+                    if (box) loadFloatChatMessages(chat.roomId, box);
+                });
+            }, 5000);
+        }
+        function stopFloatChatPoll() {
+            if (floatChatPollTimer) { clearInterval(floatChatPollTimer); floatChatPollTimer = null; }
+        }
+
+        async function openChatGroupModal() {
+            if (!requireLogin()) return;
+            const overlay = document.getElementById("chatGroupModalOverlay");
+            const list = document.getElementById("chatGroupFriendList");
+            const nameInput = document.getElementById("chatGroupNameInput");
+            if (!overlay || !list) return;
+            list.innerHTML = "<div style='padding:8px;color:#9ca3af;'>불러오는 중…</div>";
+            overlay.classList.add("open");
+            overlay.setAttribute("aria-hidden", "false");
+            if (nameInput) nameInput.value = "";
+            try {
+                const res = await apiFetch("/social/friends");
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                const friends = data.friends || [];
+                if (!friends.length) {
+                    list.innerHTML = "<div style='padding:8px;color:#9ca3af;'>친구를 먼저 추가하세요.</div>";
+                    return;
+                }
+                list.innerHTML = "";
+                friends.forEach(f => {
+                    const label = document.createElement("label");
+                    label.innerHTML = `<input type="checkbox" value="${f.id}"> ${escapeHtml(f.display_name)}`;
+                    list.appendChild(label);
+                });
+            } catch {
+                list.innerHTML = "<div style='padding:8px;color:#dc2626;'>친구 목록을 불러오지 못했습니다.</div>";
+            }
+        }
+
+        function closeChatGroupModal() {
+            const overlay = document.getElementById("chatGroupModalOverlay");
+            overlay?.classList.remove("open");
+            overlay?.setAttribute("aria-hidden", "true");
+        }
+
+        document.getElementById("chatGroupModalCancel")?.addEventListener("click", closeChatGroupModal);
+        document.getElementById("chatGroupModalOverlay")?.addEventListener("click", e => {
+            if (e.target.id === "chatGroupModalOverlay") closeChatGroupModal();
+        });
+        document.getElementById("chatGroupModalCreate")?.addEventListener("click", async () => {
+            if (!requireLogin()) return;
+            const name = document.getElementById("chatGroupNameInput")?.value?.trim();
+            const checks = document.querySelectorAll("#chatGroupFriendList input:checked");
+            const member_ids = Array.from(checks).map(c => parseInt(c.value, 10)).filter(n => n > 0);
+            if (!name) { showToast("방 이름을 입력하세요."); return; }
+            if (member_ids.length < 1) { showToast("친구 1명 이상 선택하세요."); return; }
             try {
                 const res = await apiFetch("/social/chat/groups", {
                     method: "POST",
@@ -8312,16 +8916,222 @@
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "생성 실패"); return; }
                 showToast("단체방이 생성되었습니다.");
+                closeChatGroupModal();
                 await loadChatRooms();
                 if (data.group?.room_id) selectChatRoom(data.group.room_id, data.group.name, "group");
             } catch { showToast("생성 실패"); }
         });
 
+        async function loadSideMenuFriends() {
+            const list = document.getElementById("sideMenuFriendsList");
+            if (!list) return;
+            if (!currentUser) {
+                list.innerHTML = "<div class='works-empty'>로그인 후 친구 목록이 표시됩니다.</div>";
+                return;
+            }
+            list.innerHTML = "<div class='works-empty'>불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/social/friends");
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                renderFriendsSidebar(data.friends || []);
+            } catch {
+                list.innerHTML = "<div class='works-empty' style='color:#dc2626;'>불러오지 못했습니다.</div>";
+            }
+        }
+
+        function renderFriendsSidebar(friends) {
+            const list = document.getElementById("sideMenuFriendsList");
+            if (!list) return;
+            if (!friends.length) {
+                list.innerHTML = "<div class='works-empty'>친구를 추가하면 여기에 표시됩니다.</div>";
+                renderWorksStories([]);
+                return;
+            }
+            list.innerHTML = "";
+            friends.forEach(f => {
+                const row = document.createElement("div");
+                row.className = "side-menu-friend-item";
+                row.innerHTML = `<span>${escapeHtml(f.display_name)}</span>`;
+                const chatBtn = document.createElement("button");
+                chatBtn.type = "button";
+                chatBtn.textContent = "채팅";
+                chatBtn.addEventListener("click", e => {
+                    e.stopPropagation();
+                    const roomId = dmRoomIdForFriend(f.id);
+                    openFloatChat(roomId, f.display_name, "dm");
+                });
+                row.appendChild(chatBtn);
+                row.addEventListener("click", () => {
+                    setAppWorkspace("chat");
+                    const roomId = dmRoomIdForFriend(f.id);
+                    selectChatRoom(roomId, f.display_name, "dm");
+                });
+                list.appendChild(row);
+            });
+            renderWorksStories(friends);
+        }
+
+        function renderWorksStories(friends) {
+            const bar = document.getElementById("worksStoriesBar");
+            if (!bar) return;
+            if (!friends?.length) { bar.innerHTML = ""; return; }
+            bar.innerHTML = friends.slice(0, 12).map(f => {
+                const initial = (f.display_name || "?").charAt(0).toUpperCase();
+                return `<div class="insta-story" data-friend-id="${f.id}"><div class="insta-story-ring"><span>${escapeHtml(initial)}</span></div>${escapeHtml((f.display_name || "").slice(0, 6))}</div>`;
+            }).join("");
+            bar.querySelectorAll(".insta-story").forEach(el => {
+                el.addEventListener("click", () => {
+                    const fid = parseInt(el.dataset.friendId, 10);
+                    const f = friends.find(x => x.id === fid);
+                    if (f) openFloatChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
+                });
+            });
+        }
+
+        async function refreshHomeWorkspace() {
+            if (!currentUser) return;
+            const name = currentUser.username || currentUser.email || "내 계정";
+            const avatar = document.getElementById("homeAvatar");
+            const userEl = document.getElementById("homeUsername");
+            const metaEl = document.getElementById("homeMeta");
+            if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+            if (userEl) userEl.textContent = name;
+            try {
+                const qRes = await apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId()));
+                const q = qRes.ok ? await qRes.json() : {};
+                const rem = Math.round(q.total?.remaining ?? q.balance ?? 0);
+                if (metaEl) metaEl.textContent = `보유 ${COIN}${rem} · 작업물 · 저장물 관리`;
+            } catch {}
+            loadHomeWorks();
+            renderHomeSaved();
+        }
+
+        async function loadHomeWorks() {
+            const grid = document.getElementById("homeWorksGrid");
+            if (!grid || !currentUser) return;
+            grid.innerHTML = "<div class='works-empty'>불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/social/works?mine=1");
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                const works = data.works || [];
+                if (!works.length) {
+                    grid.innerHTML = "<div class='works-empty'>아직 등록한 작업물이 없습니다.</div>";
+                    return;
+                }
+                grid.innerHTML = "";
+                works.forEach(w => {
+                    const card = document.createElement("article");
+                    card.className = "insta-card";
+                    card.innerHTML = `
+                        <div class="insta-card-head"><div class="insta-author">${escapeHtml(w.title || "제목 없음")}</div></div>
+                        <div class="insta-caption">${escapeHtml(w.body || "")}</div>
+                        <div style="font-size:11px;color:#9ca3af;margin-top:6px;">${escapeHtml(w.created_at_iso || "")} · 🪙 ${w.coin_total || 0}</div>`;
+                    grid.appendChild(card);
+                });
+            } catch {
+                grid.innerHTML = "<div class='works-empty' style='color:#dc2626;'>불러오지 못했습니다.</div>";
+            }
+        }
+
+        function renderHomeSaved() {
+            const grid = document.getElementById("homeSavedGrid");
+            if (!grid) return;
+            loadSavedResults();
+            const items = savedResults || [];
+            if (!items.length) {
+                grid.innerHTML = "<div class='works-empty'>저장된 결과물이 없습니다. AI 답변에서 「저장」을 사용하세요.</div>";
+                return;
+            }
+            grid.innerHTML = "";
+            items.slice(0, 30).forEach((item, idx) => {
+                const div = document.createElement("div");
+                div.className = "home-saved-item";
+                const title = item.title || item.question?.slice(0, 40) || "저장물";
+                const preview = (item.answer || item.body || "").slice(0, 120);
+                div.innerHTML = `<strong>${escapeHtml(title)}</strong><p style="font-size:12px;color:#6b7280;margin:6px 0 0;">${escapeHtml(preview)}</p>`;
+                const postBtn = document.createElement("button");
+                postBtn.type = "button";
+                postBtn.textContent = "작업물로 등록";
+                postBtn.addEventListener("click", () => postSavedAsWork(title, item.answer || item.body || ""));
+                div.appendChild(postBtn);
+                grid.appendChild(div);
+            });
+        }
+
+        async function postSavedAsWork(title, body) {
+            if (!requireLogin() || !body.trim()) return;
+            try {
+                const res = await apiFetch("/social/works", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title, body }),
+                });
+                if (!res.ok) { showToast("등록 실패"); return; }
+                showToast("작업물로 등록했습니다.");
+                loadHomeWorks();
+                loadWorksFeed();
+            } catch { showToast("등록 실패"); }
+        }
+
+        document.querySelectorAll(".home-tab-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".home-tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+                const tab = btn.dataset.homeTab;
+                document.getElementById("homeComposeWorks").style.display = tab === "works" ? "" : "none";
+                document.getElementById("homeWorksGrid").style.display = tab === "works" ? "" : "none";
+                document.getElementById("homeSavedGrid").style.display = tab === "saved" ? "" : "none";
+                if (tab === "saved") renderHomeSaved();
+            });
+        });
+
+        document.getElementById("homeWorksPostBtn")?.addEventListener("click", async () => {
+            if (!requireLogin()) return;
+            const title = document.getElementById("homeWorksTitleInput")?.value || "";
+            const body = document.getElementById("homeWorksBodyInput")?.value || "";
+            if (!body.trim()) { showToast("작업 내용을 입력하세요."); return; }
+            try {
+                const res = await apiFetch("/social/works", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title, body }),
+                });
+                if (!res.ok) { showToast("등록 실패"); return; }
+                document.getElementById("homeWorksTitleInput").value = "";
+                document.getElementById("homeWorksBodyInput").value = "";
+                showToast("작업물이 등록되었습니다.");
+                loadHomeWorks();
+                loadWorksFeed();
+            } catch { showToast("등록 실패"); }
+        });
+
+        async function startWorkCowork(work) {
+            if (!requireLogin()) return;
+            const msg = `「${work.title || "작업"}」 공동작업 하실래요?\n${(work.body || "").slice(0, 200)}`;
+            if (work.user_id && work.user_id !== currentUser.id) {
+                openFloatChat(dmRoomIdForFriend(work.user_id), work.author_name || "친구", "dm");
+                setTimeout(async () => {
+                    try {
+                        await apiFetch("/social/chat/room/" + encodeURIComponent(dmRoomIdForFriend(work.user_id)), {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ body: msg }),
+                        });
+                    } catch {}
+                }, 400);
+                showToast("공동작업 초대 메시지를 보냈습니다.");
+                return;
+            }
+            setAppWorkspace("ai");
+            if (mainInput) mainInput.value = `다음 작업물을 함께 발전시켜 주세요:\n${work.title || ""}\n${work.body || ""}`;
+            showToast("AI 협업 모드로 이동했습니다. 협업 탭에서 진행하세요.");
+        }
+
         async function loadWorksFeed() {
             const feed = document.getElementById("worksFeed");
-            const sideList = document.getElementById("sideMenuWorksList");
-            if (sideList) sideList.innerHTML = "<div class='works-empty'>불러오는 중…</div>";
             if (!feed) return;
+            loadSideMenuFriends();
             feed.innerHTML = "<div class='works-empty' style='text-align:center;color:#9ca3af;padding:20px;'>불러오는 중…</div>";
             try {
                 const res = await apiFetch("/social/works?friends_only=1");
@@ -8330,37 +9140,14 @@
                 renderWorksFeed(data.works || []);
             } catch {
                 feed.innerHTML = "<div style='text-align:center;color:#dc2626;padding:20px;'>피드를 불러오지 못했습니다.</div>";
-                if (sideList) sideList.innerHTML = "<div class='works-empty' style='color:#dc2626;'>불러오지 못했습니다.</div>";
             }
-        }
-
-        function renderWorksSidebar(works) {
-            const list = document.getElementById("sideMenuWorksList");
-            if (!list) return;
-            if (!works.length) {
-                list.innerHTML = "<div class='works-empty'>등록된 작업물이 없습니다.</div>";
-                return;
-            }
-            list.innerHTML = "";
-            works.forEach(w => {
-                const item = document.createElement("div");
-                item.className = "side-menu-works-item";
-                item.innerHTML = `<strong>${escapeHtml(w.title || "제목 없음")}</strong><span>${escapeHtml(w.author_name || "사용자")} · ${escapeHtml(w.created_at_iso || "")}</span>`;
-                item.addEventListener("click", () => {
-                    const card = document.querySelector(`.works-card[data-work-id="${w.id}"]`);
-                    card?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    if (window.innerWidth < 768) setSideMenuOpen(false);
-                });
-                list.appendChild(item);
-            });
         }
 
         function renderWorksFeed(works) {
-            renderWorksSidebar(works);
             const feed = document.getElementById("worksFeed");
             if (!feed) return;
             if (!works.length) {
-                feed.innerHTML = "<div style='text-align:center;color:#9ca3af;padding:32px;'>아직 등록된 작업물이 없습니다.<br>첫 번째 작업물을 올려보세요!</div>";
+                feed.innerHTML = "<div style='text-align:center;color:#9ca3af;padding:32px;'>아직 등록된 작업물이 없습니다.<br>친구를 추가하고 첫 작업물을 올려보세요!</div>";
                 return;
             }
             feed.innerHTML = "";
@@ -8399,12 +9186,14 @@
                     <div class="insta-actions">
                         ${coinBtnHtml}
                         <span class="insta-like-count">🪙 ${coinTotal}</span>
+                        <button type="button" class="works-cowork-btn" data-cowork="${w.id}">🤝 공동작업</button>
                         <button type="button" class="works-comment-toggle" data-comments="${w.id}" aria-label="댓글">💬</button>
                         <span class="insta-comment-count">${w.comment_count || 0}</span>
                     </div>
                     <div class="insta-caption"><strong>${escapeHtml(w.author_name || "사용자")}</strong>${escapeHtml(w.body || "")}</div>
                     <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
                 feed.appendChild(card);
+                card.querySelector(".works-cowork-btn")?.addEventListener("click", () => startWorkCowork(w));
                 if (tipPending) scheduleWorkTipCountdown(w.id, w.tip_seconds_left || 5);
             });
             feed.querySelectorAll(".works-coin-btn[data-tip]").forEach(btn => {
@@ -8435,7 +9224,7 @@
         }
 
         async function sendWorkCoinTip(workId, btnEl) {
-            if (!currentUser) { openAuthModal("login"); return; }
+            if (!requireLogin()) return;
             try {
                 const res = await apiFetch("/social/works/" + workId + "/tip", { method: "POST" });
                 const data = await res.json().catch(() => ({}));
@@ -8511,7 +9300,7 @@
         }
 
         document.getElementById("worksPostBtn")?.addEventListener("click", async () => {
-            if (!currentUser) { openAuthModal("login"); return; }
+            if (!requireLogin()) return;
             const title = document.getElementById("worksTitleInput")?.value || "";
             const body = document.getElementById("worksBodyInput")?.value || "";
             if (!body.trim()) { showToast("작업 내용을 입력하세요."); return; }
@@ -8543,7 +9332,7 @@
 
         function buildBeginnerSteps() {
             const mob = window.innerWidth <= 640;
-            const total = mob ? 9 : 10;
+            const total = mob ? 11 : 12;
             let n = 0;
             const stepNum = () => `${++n} / ${total}`;
             const aiBtn = document.querySelector(".input-tool-btn.ai-pick-trigger-btn");
@@ -8589,34 +9378,51 @@
                     el: () => document.getElementById("appRailDesktop") || document.getElementById("appRailMobile"),
                     title: "앱 메뉴",
                     desc: mob
-                        ? "하단 🤖 AI · 💬 채팅 · 📋 작업 버튼으로 화면을 전환합니다."
-                        : "왼쪽 레일에서 AI 질문 · 계정 채팅 · 작업 공유 화면을 전환합니다.",
+                        ? "하단 🤖 AI · 💬 채팅 · 📋 작업 · 🏠 홈 · ☰ 메뉴로 화면을 전환합니다."
+                        : "왼쪽 레일: AI · 채팅 · 작업 공유 · 홈 · ☰ 사이드 메뉴를 열고 닫습니다.",
                     step: stepNum(),
                 },
                 {
-                    el: () => mob ? document.getElementById("menuToggleBtn") : document.getElementById("sideMenuBrand")?.closest(".side-menu-header"),
-                    title: mob ? "메뉴 · 기록" : "사이드 메뉴",
+                    el: () => document.getElementById("menuRailOpenBtn") || document.getElementById("menuRailOpenBtnMobile"),
+                    title: "사이드 메뉴",
+                    openMenu: true,
                     desc: mob
-                        ? "☰ 버튼 또는 화면 왼쪽 가장자리에서 오른쪽으로 스와이프하면 기록·설정 메뉴가 열립니다."
-                        : "사이드 메뉴에서 질문 기록, 협업 중 작업, 결과물 파일, 설정을 관리합니다. ☰ 로 접을 수 있어요.",
+                        ? "☰ 버튼 또는 왼쪽 가장자리 스와이프로 메뉴를 엽니다. 가이드 중에도 메뉴가 닫히지 않습니다."
+                        : "☰ 로 사이드 메뉴를 열고 닫습니다. 질문 기록·친구·결과물·설정을 여기서 관리해요.",
                     step: stepNum(),
                 },
                 {
                     el: () => document.querySelector('.app-rail-btn[data-workspace="chat"]'),
-                    title: "채팅 (Discord 스타일)",
+                    title: "채팅 (Discord 레이아웃)",
                     workspace: "chat",
                     desc: mob
-                        ? "💬 탭에서 다른 계정과 1:1 채팅합니다. 디스코드처럼 채널·메시지 형태로 대화해요."
-                        : "채팅 탭: 왼쪽 목록에서 상대를 고르고, Discord처럼 메시지를 주고받습니다. 메뉴에도 채팅 목록이 표시됩니다.",
+                        ? "💬 탭: 친구 검색·친구 추가·＋방 단체방 생성. 흰색 Discord식 채널·메시지 UI입니다."
+                        : "채팅: 왼쪽 대화방 목록, 오른쪽 메시지. 친구만 1:1 채팅 가능, ＋방으로 단체방을 만듭니다.",
                     step: stepNum(),
                 },
                 {
+                    el: () => document.getElementById("workspaceAgentFab"),
+                    title: "에이전트 (채팅·작업·홈)",
+                    workspace: "chat",
+                    desc: "채팅·작업·홈 화면 우측 하단 🌐 에이전트 버튼으로 웹 자동 실행 임무를 시작합니다.",
+                    step: stepNum(),
+                    optional: true,
+                },
+                {
                     el: () => document.querySelector('.app-rail-btn[data-workspace="works"]'),
-                    title: "작업 공유 (Instagram 스타일)",
+                    title: "작업 공유 (Instagram 피드)",
                     workspace: "works",
+                    openMenu: true,
                     desc: mob
-                        ? "📋 탭에서 작업물을 카드 피드로 올리고 좋아요·댓글을 남길 수 있어요."
-                        : "작업 탭: Instagram 피드처럼 작업물을 공유합니다. 사이드 메뉴에서 목록을 빠르게 탐색할 수 있어요.",
+                        ? "📋 탭: 친구 작업물 피드, 스토리 링, 🪙 코인 응원, 🤝 공동작업, 댓글. 미니 채팅창 최대 3개."
+                        : "작업 피드: Instagram 카드·스토리·코인 팁·공동작업. 사이드 메뉴에는 친구 목록이 표시됩니다.",
+                    step: stepNum(),
+                },
+                {
+                    el: () => document.querySelector('.app-rail-btn[data-workspace="home"]'),
+                    title: "홈 · 내 프로필",
+                    workspace: "home",
+                    desc: "🏠 홈: 내 계정 정보, 작업물 등록, AI에서 저장한 결과물을 작업물로 올릴 수 있습니다.",
                     step: stepNum(),
                 },
             ];
@@ -8646,11 +9452,7 @@
             if (!step) { endBeginnerMode(); return; }
             setAppWorkspace(step.workspace || "ai");
             closeGuideBar();
-            if (step.workspace === "chat" || step.workspace === "works") {
-                setSideMenuOpen(window.innerWidth >= 768);
-            } else {
-                setSideMenuOpen(false);
-            }
+            if (step.openMenu) setSideMenuOpen(true);
 
             const target = step.el();
             if (!target) { beginnerStepIndex++; positionBeginnerStep(); return; }
@@ -8701,12 +9503,14 @@
             try { localStorage.setItem("nasaroai_beginner_done", "1"); } catch {}
         }
 
-        document.getElementById("beginnerNextBtn")?.addEventListener("click", () => {
+        document.getElementById("beginnerSkipBtn")?.addEventListener("click", endBeginnerMode);
+        beginnerOverlay?.addEventListener("click", e => {
+            if (!beginnerOverlay?.classList.contains("active")) return;
+            if (beginnerTooltip?.contains(e.target)) return;
             beginnerStepIndex++;
             if (beginnerStepIndex >= beginnerSteps.length) endBeginnerMode();
             else positionBeginnerStep();
         });
-        document.getElementById("beginnerSkipBtn")?.addEventListener("click", endBeginnerMode);
         window.addEventListener("resize", () => {
             if (beginnerOverlay?.classList.contains("active")) positionBeginnerStep();
         });
@@ -8791,7 +9595,10 @@
         loadSavedResults();
         renderResultFilesList();
         renderSessionHistory();
-        bootstrapAuth();
+        bootstrapAuth().then(() => {
+            renderFloatChats();
+            updateWorkspaceAgentFab(currentAppWorkspace);
+        });
         wireCollabActionBar();
         loadCollabTemplates();
 
@@ -9386,11 +10193,29 @@
             }
         }
 
+        function syncAgentToggleUI(active) {
+            agentToggleBtn?.classList.toggle("active", active);
+            if (agentToggleBtn) agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
+            const fab = document.getElementById("workspaceAgentFab");
+            if (fab) {
+                fab.classList.toggle("active", active);
+                fab.textContent = active ? "● 에이전트" : "🌐 에이전트";
+            }
+        }
+
+        function getAgentAnchorButton() {
+            const fab = document.getElementById("workspaceAgentFab");
+            if (fab?.classList.contains("visible")) return fab;
+            if (agentFloatLauncher?.classList.contains("visible")) return agentFloatLauncher;
+            return agentToggleBtn;
+        }
+
         // ── 에이전트 ON/OFF ────────────────────────────────────────────────────
         function setAgentActive(active) {
             if (useExtensionAgent()) {
                 if (active) {
-                    const r = agentToggleBtn.getBoundingClientRect();
+                    const anchor = getAgentAnchorButton();
+                    const r = anchor.getBoundingClientRect();
                     window.postMessage({
                         __nasaroai: "agent",
                         type: "OPEN",
@@ -9400,15 +10225,13 @@
                     window.postMessage({ __nasaroai: "agent", type: "CLOSE" }, "*");
                 }
                 agentActive = active;
-                agentToggleBtn.classList.toggle("active", active);
-                agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
+                syncAgentToggleUI(active);
                 if (agentPanel) agentPanel.style.display = "none";
                 hideLauncher();
                 return;
             }
             agentActive = active;
-            agentToggleBtn.classList.toggle("active", active);
-            agentToggleBtn.textContent = active ? "● 에이전트 ON" : "🌐 에이전트";
+            syncAgentToggleUI(active);
             if (active) {
                 rebuildAgentToolbar();
                 openAgentPanel(false);
@@ -9968,7 +10791,8 @@
             openAgentPanel(false);
         }
 
-        // ── 에이전트 토글 버튼 (dock) ──────────────────────────────────────────
+        // ── 에이전트 토글 버튼 (dock + workspace FAB) ──────────────────────────
+        document.getElementById("workspaceAgentFab")?.addEventListener("click", () => agentToggleBtn?.click());
         agentToggleBtn.addEventListener("click", () => {
             const NF = window.NasaroFeatures;
             if (hasNativeAndroidAgent && !isAgentOverlay) {

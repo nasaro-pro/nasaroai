@@ -2342,13 +2342,32 @@ def _chat_room_id(user_a: int, user_b: int) -> str:
     return f"{lo}:{hi}"
 
 
-def list_public_works(limit: int = 50, viewer_id: int | None = None, friends_only: bool = False) -> list[dict[str, Any]]:
+def list_public_works(
+    limit: int = 50,
+    viewer_id: int | None = None,
+    friends_only: bool = False,
+    mine: bool = False,
+) -> list[dict[str, Any]]:
     confirm_pending_work_tips()
     limit = max(1, min(int(limit or 50), 100))
     with _lock:
         conn = _connect()
         try:
-            if friends_only and viewer_id is not None:
+            if mine and viewer_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
+                            WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
+                           (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
+                    FROM public_works w
+                    WHERE w.user_id = ?
+                    ORDER BY w.created_at DESC
+                    LIMIT ?
+                    """,
+                    (viewer_id, limit),
+                ).fetchall()
+            elif friends_only and viewer_id is not None:
                 rows = conn.execute(
                     """
                     SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
