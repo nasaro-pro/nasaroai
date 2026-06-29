@@ -202,12 +202,39 @@ async def _start_self_ping_loop() -> None:
         pass
 
 
+def public_app_url() -> str:
+    """Public site URL (Railway, Render, or PUBLIC_APP_URL)."""
+    explicit = (os.environ.get("PUBLIC_APP_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit if explicit.startswith("http") else f"https://{explicit}"
+    railway = (os.environ.get("RAILWAY_PUBLIC_DOMAIN") or "").strip()
+    if railway:
+        return f"https://{railway}".rstrip("/")
+    render = (os.environ.get("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+    if render:
+        return render
+    return "https://nasaroai.onrender.com"
+
+
+def deploy_git_ref() -> str:
+    return (
+        os.environ.get("RAILWAY_GIT_COMMIT_SHA")
+        or os.environ.get("RENDER_GIT_COMMIT")
+        or os.environ.get("GIT_COMMIT")
+        or "local"
+    )
+
+
 async def _self_ping_loop() -> None:
     try:
         await asyncio.sleep(60)
-        self_url = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
-        if not self_url:
+        if not (
+            os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+            or os.environ.get("RENDER_EXTERNAL_URL")
+            or os.environ.get("PUBLIC_APP_URL")
+        ):
             return
+        self_url = public_app_url()
         while True:
             try:
                 async with httpx.AsyncClient(timeout=10) as client:
@@ -1406,7 +1433,7 @@ def require_openrouter_key() -> str:
     if not key:
         raise HTTPException(
             status_code=503,
-            detail="OPENROUTER_API_KEY가 설정되지 않았습니다. Render에 OpenRouter 키(sk-or-v1-…)를 등록하세요.",
+            detail="OPENROUTER_API_KEY가 설정되지 않았습니다. Railway Variables에 OpenRouter 키(sk-or-v1-…)를 등록하세요.",
         )
     return key
 
@@ -1424,7 +1451,7 @@ def classify_api_key(key: str) -> str:
 
 
 OPENROUTER_AUTH_ERROR_MSG = (
-    "OpenRouter 인증 실패입니다. Render에 OPENROUTER_API_KEY(openrouter.ai/keys)를 설정하세요. "
+    "OpenRouter 인증 실패입니다. Railway Variables에 OPENROUTER_API_KEY(openrouter.ai/keys)를 설정하세요. "
     "OPENAI_API_KEY만 있고 OpenAI 전용 키(sk-…)라면 Nasaro AI가 동작하지 않습니다."
 )
 
@@ -1462,7 +1489,7 @@ def build_openrouter_headers() -> dict[str, str]:
     api_key = require_openrouter_key()
     return {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": os.environ.get("OPENROUTER_HTTP_REFERER", "https://nasaroai.onrender.com"),
+        "HTTP-Referer": os.environ.get("OPENROUTER_HTTP_REFERER", public_app_url()),
         "X-Title": os.environ.get("OPENROUTER_APP_TITLE", "Nasaro AI"),
         "Content-Type": "application/json",
     }
@@ -4439,7 +4466,11 @@ def system_info() -> dict:
     )
     return {
         "server": "nasaroai",
-        "deploy_ref": os.environ.get("RENDER_GIT_COMMIT", os.environ.get("GIT_COMMIT", "local")),
+        "deploy_ref": deploy_git_ref(),
+        "public_url": public_app_url(),
+        "hosting": "railway" if os.environ.get("RAILWAY_PUBLIC_DOMAIN") else (
+            "render" if os.environ.get("RENDER_EXTERNAL_URL") else "unknown"
+        ),
         "extension_version": ext_ver,
         "apk_version": apk_ver,
         "guide_path": "/guide",
@@ -5128,7 +5159,7 @@ def extension_update(request: Request):
         " status='ok'"
         f" version='{ext_ver}'"
         " prodversionmin='88.0'"
-        " codebase='https://nasaroai.onrender.com/static/nasaroai-extension.zip'"
+        f" codebase='{public_app_url()}/static/nasaroai-extension.zip'"
         "/>"
         "</app>"
         "</gupdate>"
