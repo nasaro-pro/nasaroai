@@ -31,17 +31,23 @@
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
+            --content-inset: 0px;
             transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 데스크톱: 앱 레일만 본문 여백, 메뉴는 오버레이(밀지 않음) */
+        /* 데스크톱: 앱 레일 + 사이드메뉴가 본문·질문창을 같은 만큼만 밀음 */
         @media (min-width: 768px) {
             .app {
-                padding-left: var(--app-rail-width);
+                --content-inset: var(--app-rail-width);
+                padding-left: var(--content-inset);
+            }
+            .app.sidebar-open {
+                --content-inset: calc(var(--app-rail-width) + var(--side-menu-width));
             }
             .side-menu {
                 left: var(--app-rail-width);
                 width: var(--side-menu-width);
+                z-index: 440;
             }
             .side-menu.open {
                 transform: translateX(0);
@@ -50,9 +56,7 @@
                 transform: translateX(calc(-1 * var(--side-menu-width)));
             }
             .side-menu-overlay {
-                display: block;
-                left: var(--app-rail-width);
-                z-index: 405;
+                display: none;
             }
             .settings-panel {
                 left: calc(var(--app-rail-width) + var(--side-menu-width));
@@ -67,9 +71,8 @@
                 left: 0;
                 right: 0;
             }
-            .dock-shell {
-                left: var(--app-rail-width);
-                right: 0;
+            .app-rail--desktop {
+                z-index: 430;
             }
         }
 
@@ -177,6 +180,13 @@
         .side-menu-overlay.open {
             opacity: 1;
             pointer-events: auto;
+        }
+
+        /* 데스크톱: 메뉴가 본문을 밀므로 오버레이 불필요 */
+        @media (min-width: 768px) {
+            .side-menu-overlay {
+                display: none;
+            }
         }
 
         .side-menu {
@@ -2278,18 +2288,11 @@
         .dock-shell {
             position: fixed;
             bottom: 0;
-            left: 0;
+            left: var(--content-inset, 0);
             right: 0;
             z-index: 200;
             padding-bottom: env(safe-area-inset-bottom, 0);
             transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @media (min-width: 768px) {
-            .dock-shell {
-                left: var(--app-rail-width);
-                right: 0;
-            }
         }
 
         .dock-agent-row {
@@ -4070,6 +4073,8 @@
                 height: 100dvh;
                 max-height: 100dvh;
                 overflow: hidden;
+                --content-inset: 0px;
+                padding-left: 0;
             }
             #mainContent {
                 flex: 1 1 auto;
@@ -6316,6 +6321,7 @@
         function setSideMenuOpen(open) {
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
+            appShell.classList.toggle("sidebar-open", open);
             if (settingsPanel?.classList.contains("open")) positionSettingsPanel();
             if (!open) {
                 const sp = document.getElementById("settingsPanel");
@@ -7918,8 +7924,8 @@
         document.getElementById("fontIncBtn")?.addEventListener("click", () => applyFontSize(currentFontSize + 1));
         document.getElementById("fontDecBtn")?.addEventListener("click", () => applyFontSize(currentFontSize - 1));
 
-        // 메뉴는 기본 닫힘 — 열면 본문·질문창을 밀지 않고 위에 겹침
-        setSideMenuOpen(false);
+        // 데스크톱에서는 사이드바를 펼친 상태로 시작
+        setSideMenuOpen(window.innerWidth >= 768);
 
         // 저장된 대화 기록 로드
         loadSavedResults();
