@@ -24,6 +24,7 @@
             background: #f6f7f9;
             color: #111827;
             --app-rail-width: 56px;
+            --side-menu-width: 280px;
         }
 
         .app {
@@ -39,10 +40,30 @@
                 padding-left: var(--app-rail-width);
             }
             .app.sidebar-open {
-                padding-left: calc(280px + var(--app-rail-width));
+                padding-left: calc(var(--side-menu-width) + var(--app-rail-width));
             }
             .side-menu {
                 left: var(--app-rail-width);
+                width: var(--side-menu-width);
+            }
+            .side-menu.open {
+                transform: translateX(0);
+            }
+            .side-menu:not(.open) {
+                transform: translateX(calc(-1 * var(--side-menu-width)));
+            }
+            .settings-panel {
+                left: calc(var(--app-rail-width) + var(--side-menu-width));
+                width: min(300px, calc(100vw - var(--app-rail-width) - var(--side-menu-width) - 20px));
+                bottom: 12px;
+                border-radius: 14px;
+                max-height: min(88dvh, calc(100dvh - 24px));
+            }
+            .result-files-popover {
+                min-width: 0;
+                width: 100%;
+                left: 0;
+                right: 0;
             }
         }
 
@@ -164,15 +185,16 @@
             top: 0;
             left: 0;
             height: 100dvh;
-            width: min(280px, 82vw);
+            width: min(var(--side-menu-width), 82vw);
             background: #fff;
             border-right: 1px solid #e5e7eb;
             box-shadow: 4px 0 24px rgba(15, 23, 42, 0.08);
             transform: translateX(-100%);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 400;
+            z-index: 410;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
 
         .side-menu.open {
@@ -186,6 +208,7 @@
             gap: 10px;
             padding: 18px 18px 14px;
             border-bottom: 1px solid #f3f4f6;
+            flex-shrink: 0;
         }
 
         .side-menu-brand {
@@ -218,6 +241,7 @@
             gap: 8px;
             padding: 16px 18px;
             border-bottom: 1px solid #f3f4f6;
+            flex-shrink: 0;
         }
 
         .side-menu-btn {
@@ -252,22 +276,29 @@
 
         #sessionHistorySection {
             flex: 1 1 auto;
-            min-height: 100px;
+            min-height: 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
         }
         #sessionHistoryList {
-            flex: 1;
+            flex: 1 1 auto;
+            min-height: 0;
             overflow-y: auto;
-            max-height: min(52vh, 460px);
+            -webkit-overflow-scrolling: touch;
         }
         #activeCollabSection {
             flex: 0 0 auto;
-            overflow: visible;
+            overflow: hidden;
             padding-top: 10px;
             padding-bottom: 10px;
             border-top: 1px solid #f3f4f6;
+            max-height: 38%;
+        }
+        #activeCollabList {
+            max-height: 140px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         .side-menu-section#activeCollabSection {
             flex: 0 0 auto;
@@ -298,17 +329,15 @@
 
         /* ── 설정 · 가이드 (사이드 메뉴 하단) ── */
         .side-menu-footer {
-            padding: 8px 14px 12px;
+            padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0));
             border-top: 1px solid #f3f4f6;
             flex-shrink: 0;
-            display: flex;
-            gap: 4px;
-            align-items: center;
-            justify-content: flex-end;
+            background: #fff;
         }
         .side-menu-guide-btn {
-            width: 34px;
-            min-height: 34px;
+            width: 36px;
+            height: 36px;
+            min-height: 36px;
             flex: 0 0 auto;
             padding: 0;
             border-radius: 8px;
@@ -327,8 +356,9 @@
         .side-menu-guide-btn span:last-child { display: none; }
         .side-menu-guide-btn:hover { background: #e0e7ff; color: #3730a3; }
         .side-menu-settings-btn {
-            width: 44px;
-            min-height: 44px;
+            width: 40px;
+            height: 40px;
+            min-height: 40px;
             flex-shrink: 0;
             padding: 0;
             border-radius: 10px;
@@ -351,7 +381,7 @@
         /* ── 설정 팝오버 ── */
         .settings-panel {
             position: fixed;
-            left: min(280px, 82vw);
+            left: 0;
             bottom: 0;
             right: auto;
             top: auto;
@@ -361,7 +391,7 @@
             border: 1px solid #e5e7eb;
             border-radius: 14px 14px 0 0;
             box-shadow: 0 -8px 32px rgba(15,23,42,.14);
-            z-index: 401;
+            z-index: 420;
             display: none;
             flex-direction: column;
             overflow: hidden;
@@ -1497,7 +1527,7 @@
         }
         html[data-theme="dark"] .side-menu-header,
         html[data-theme="dark"] .side-menu-auth,
-        html[data-theme="dark"] .side-menu-footer { border-color: var(--dm-border-soft); }
+        html[data-theme="dark"] .side-menu-footer { border-color: var(--dm-border-soft); background: #141824; }
         html[data-theme="dark"] .side-menu-brand,
         html[data-theme="dark"] h1, html[data-theme="dark"] h2,
         html[data-theme="dark"] .header-brand p { color: #f3f4f8; }
@@ -2256,7 +2286,7 @@
 
         @media (min-width: 768px) {
             .app.sidebar-open .dock-shell {
-                left: calc(280px + var(--app-rail-width));
+                left: calc(var(--side-menu-width) + var(--app-rail-width));
             }
             .dock-shell {
                 left: var(--app-rail-width);
@@ -3810,6 +3840,7 @@
         .side-account-box {
             display: flex; flex-direction: column; gap: 6px;
             padding: 10px 14px; margin: 0 12px 8px; border-radius: 10px; background: #f3f4f6;
+            flex-shrink: 0;
         }
         .side-account-top {
             display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -3933,21 +3964,21 @@
         .export-format-option:hover { background: #ede9fe; border-color: #c4b5fd; }
 
         .footer-actions {
-            display: flex;
-            width: 100%;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 36px 40px;
             gap: 6px;
-            align-items: flex-end;
+            align-items: center;
+            width: 100%;
         }
         .result-files-hub {
             position: relative;
-            flex: 1 1 auto;
             min-width: 0;
         }
         .result-files-hub-btn {
             width: 100%;
-            min-height: 44px;
-            padding: 8px 12px;
-            font-size: 13px;
+            min-height: 40px;
+            padding: 8px 10px;
+            font-size: 12px;
             font-weight: 700;
             border-radius: 10px;
             border: 1px solid #ddd6fe;
@@ -3955,6 +3986,9 @@
             color: #6d28d9;
             cursor: pointer;
             text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .result-files-hub-btn.open,
         .result-files-hub-btn:hover { background: #ede9fe; }
@@ -3964,8 +3998,8 @@
             bottom: calc(100% + 8px);
             left: 0;
             right: 0;
-            min-width: min(320px, 88vw);
-            max-height: min(60vh, 480px);
+            min-width: 0;
+            max-height: min(55vh, 420px);
             overflow: auto;
             background: #fff;
             border: 1px solid #ddd6fe;
@@ -6282,6 +6316,7 @@
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
             appShell.classList.toggle("sidebar-open", open);
+            if (settingsPanel?.classList.contains("open")) positionSettingsPanel();
             if (!open) {
                 const sp = document.getElementById("settingsPanel");
                 if (sp?.classList.contains("open")) {
@@ -7356,11 +7391,23 @@
 
         function openSettings() {
             if (!settingsPanel) return;
+            positionSettingsPanel();
             settingsPanel.style.display = "flex";
             requestAnimationFrame(() => settingsPanel.classList.add("open"));
             settingsBtn?.classList.add("active");
             refreshSettingsDiagnostics();
             updateSupportUI();
+        }
+        function positionSettingsPanel() {
+            if (!settingsPanel || window.innerWidth < 768) return;
+            const menuOpen = sideMenu?.classList.contains("open");
+            if (menuOpen) {
+                settingsPanel.style.left = "calc(var(--app-rail-width) + var(--side-menu-width))";
+                settingsPanel.style.width = "min(300px, calc(100vw - var(--app-rail-width) - var(--side-menu-width) - 20px))";
+            } else {
+                settingsPanel.style.left = "var(--app-rail-width)";
+                settingsPanel.style.width = "min(300px, calc(100vw - var(--app-rail-width) - 20px))";
+            }
         }
         function closeSettings() {
             if (!settingsPanel) return;
@@ -7376,6 +7423,9 @@
             settingsPanel?.classList.contains("open") ? closeSettings() : openSettings();
         });
         settingsPanelClose?.addEventListener("click", closeSettings);
+        window.addEventListener("resize", () => {
+            if (settingsPanel?.classList.contains("open")) positionSettingsPanel();
+        });
         document.getElementById("settingsLoginBtn")?.addEventListener("click", () => openAuthModal("login"));
         document.getElementById("settingsLogoutBtn")?.addEventListener("click", logoutAccount);
         document.getElementById("permHealthBtn")?.addEventListener("click", refreshSettingsDiagnostics);
