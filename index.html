@@ -34,13 +34,10 @@
             transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 데스크톱: 앱 레일 + 사이드메뉴 */
+        /* 데스크톱: 앱 레일만 본문 여백, 메뉴는 오버레이(밀지 않음) */
         @media (min-width: 768px) {
             .app {
                 padding-left: var(--app-rail-width);
-            }
-            .app.sidebar-open {
-                padding-left: calc(var(--side-menu-width) + var(--app-rail-width));
             }
             .side-menu {
                 left: var(--app-rail-width);
@@ -51,6 +48,11 @@
             }
             .side-menu:not(.open) {
                 transform: translateX(calc(-1 * var(--side-menu-width)));
+            }
+            .side-menu-overlay {
+                display: block;
+                left: var(--app-rail-width);
+                z-index: 405;
             }
             .settings-panel {
                 left: calc(var(--app-rail-width) + var(--side-menu-width));
@@ -63,6 +65,10 @@
                 min-width: 0;
                 width: 100%;
                 left: 0;
+                right: 0;
+            }
+            .dock-shell {
+                left: var(--app-rail-width);
                 right: 0;
             }
         }
@@ -173,13 +179,6 @@
             pointer-events: auto;
         }
 
-        /* 데스크톱에서는 펼침 상태가 본문을 밀어내므로 어두운 오버레이를 숨긴다. */
-        @media (min-width: 768px) {
-            .side-menu-overlay {
-                display: none;
-            }
-        }
-
         .side-menu {
             position: fixed;
             top: 0;
@@ -274,42 +273,44 @@
             background: #eff6ff;
         }
 
-        #sessionHistorySection {
-            flex: 1 1 auto;
-            min-height: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-        #sessionHistoryList {
-            flex: 1 1 auto;
-            min-height: 0;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
+        #sessionHistorySection,
         #activeCollabSection {
             flex: 0 0 auto;
-            overflow: hidden;
-            padding-top: 10px;
-            padding-bottom: 10px;
+            overflow: visible;
+            padding: 0;
+            min-height: 0;
+        }
+        #sessionHistorySection {
+            padding-bottom: 4px;
+        }
+        #activeCollabSection {
+            padding-top: 12px;
+            padding-bottom: 4px;
             border-top: 1px solid #f3f4f6;
-            max-height: 38%;
+        }
+        .side-menu-scroll {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            padding: 12px 18px 8px;
+        }
+        #sessionHistoryList {
+            overflow: visible;
+            max-height: none;
         }
         #activeCollabList {
-            max-height: 140px;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .side-menu-section#activeCollabSection {
-            flex: 0 0 auto;
+            max-height: none;
             overflow: visible;
         }
         html[data-theme="dark"] #activeCollabSection { border-color: #141414; }
 
         .side-menu-section {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px 18px;
+            flex: 0 0 auto;
+            overflow: visible;
+            padding: 0;
         }
 
         .side-menu-section-title {
@@ -2285,11 +2286,9 @@
         }
 
         @media (min-width: 768px) {
-            .app.sidebar-open .dock-shell {
-                left: calc(var(--side-menu-width) + var(--app-rail-width));
-            }
             .dock-shell {
                 left: var(--app-rail-width);
+                right: 0;
             }
         }
 
@@ -4872,6 +4871,7 @@
                 <button id="loginBtn" class="side-menu-btn primary" type="button" data-i18n="login">로그인</button>
                 <button id="signupBtn" class="side-menu-btn outline" type="button" data-i18n="signup">회원가입</button>
             </div>
+            <div class="side-menu-scroll">
             <div class="side-menu-section" id="sessionHistorySection">
                 <div class="works-section-title" data-i18n="session_history">기록</div>
                 <div style="font-size:11px;color:#9ca3af;margin:0 0 8px;">질문·답변 기록 (로그인 시 서버에 저장)</div>
@@ -4880,6 +4880,7 @@
             <div class="side-menu-section works-section" id="activeCollabSection">
                 <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
                 <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
+            </div>
             </div>
             <div class="side-menu-footer">
                 <div class="footer-actions">
@@ -6315,7 +6316,6 @@
         function setSideMenuOpen(open) {
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
-            appShell.classList.toggle("sidebar-open", open);
             if (settingsPanel?.classList.contains("open")) positionSettingsPanel();
             if (!open) {
                 const sp = document.getElementById("settingsPanel");
@@ -7918,8 +7918,8 @@
         document.getElementById("fontIncBtn")?.addEventListener("click", () => applyFontSize(currentFontSize + 1));
         document.getElementById("fontDecBtn")?.addEventListener("click", () => applyFontSize(currentFontSize - 1));
 
-        // 데스크톱에서는 사이드바를 펼친 상태로 시작(콘텐츠를 옆으로 밀어줌).
-        setSideMenuOpen(window.innerWidth >= 768);
+        // 메뉴는 기본 닫힘 — 열면 본문·질문창을 밀지 않고 위에 겹침
+        setSideMenuOpen(false);
 
         // 저장된 대화 기록 로드
         loadSavedResults();
