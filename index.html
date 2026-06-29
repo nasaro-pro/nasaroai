@@ -219,10 +219,6 @@
             }
         }
 
-        .desktop-chrome {
-            display: none;
-        }
-
         .side-menu {
             position: fixed;
             top: 0;
@@ -6355,13 +6351,16 @@
         const newChatBtn = document.getElementById("newChatBtn");
 
         function setSideMenuOpen(open) {
+            if (!sideMenu) return;
             sideMenu.classList.toggle("open", open);
-            sideMenuOverlay.classList.toggle("open", open);
-            appShell.classList.toggle("sidebar-open", open);
+            sideMenuOverlay?.classList.toggle("open", open);
+            appShell?.classList.toggle("sidebar-open", open);
             desktopChrome?.classList.toggle("sidebar-open", open);
-            if (settingsPanel?.classList.contains("open")) positionSettingsPanel();
+            const sp = document.getElementById("settingsPanel");
+            if (sp?.classList.contains("open") && typeof positionSettingsPanel === "function") {
+                positionSettingsPanel();
+            }
             if (!open) {
-                const sp = document.getElementById("settingsPanel");
                 if (sp?.classList.contains("open")) {
                     sp.classList.remove("open");
                     document.getElementById("settingsBtn")?.classList.remove("active");
@@ -6370,8 +6369,8 @@
             }
         }
 
-        menuToggleBtn.addEventListener("click", () => setSideMenuOpen(!sideMenu.classList.contains("open")));
-        sideMenuOverlay.addEventListener("click", () => setSideMenuOpen(false));
+        menuToggleBtn?.addEventListener("click", () => setSideMenuOpen(!sideMenu?.classList.contains("open")));
+        sideMenuOverlay?.addEventListener("click", () => setSideMenuOpen(false));
 
         // ── 대화 기록 (localStorage — 기기별 독립 저장) ──────────────────────
         // 기기 고유 ID: 처음 방문 시 생성, 이후 동일 브라우저에서만 유효
