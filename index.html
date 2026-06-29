@@ -1939,6 +1939,10 @@
             border: 1px solid #e2e8f0;
             background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             color: #334155;
+            position: sticky;
+            top: 0;
+            z-index: 8;
+            box-shadow: 0 4px 14px rgba(15,23,42,0.06);
         }
         .compare-summary-head {
             display: flex;
@@ -5267,6 +5271,89 @@
             border-radius: 6px;
             cursor: pointer;
         }
+        .side-account-box { cursor: pointer; }
+        .side-account-box:hover { background: #f9fafb; border-radius: 10px; }
+        .home-profile-edit {
+            margin: 0 0 12px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #fff;
+        }
+        .home-profile-edit input, .home-profile-edit textarea {
+            width: 100%;
+            border: 1px solid #dbdbdb;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            font-family: inherit;
+        }
+        .home-profile-edit textarea { min-height: 64px; resize: vertical; }
+        .home-profile-edit button {
+            border: none;
+            background: #7c3aed;
+            color: #fff;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .home-friend-req-box {
+            margin: 0 0 12px;
+            padding: 10px 12px;
+            border: 1px solid #fde68a;
+            background: #fffbeb;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        .home-friend-req-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 6px 0;
+        }
+        .home-friend-req-row button {
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .home-friends-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .home-friend-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 13px;
+        }
+        .home-friend-row button {
+            border: none;
+            background: #f3f4f6;
+            color: #374151;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 4px;
+        }
+        .home-back-btn {
+            border: none;
+            background: #f3f4f6;
+            color: #374151;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
         .beginner-next { display: none !important; }
         .beginner-tap-hint {
             font-size: 11px;
@@ -5607,9 +5694,10 @@
                 <button id="adminEntryBtn" class="header-admin-btn side-menu-admin-btn" type="button" title="관리자 페이지">관리</button>
             </div>
             <div class="side-menu-drawer">
-            <div id="sideAccountBox" class="side-account-box" style="display:none;">
+            <div id="sideAccountBox" class="side-account-box" style="display:none;" role="button" tabindex="0" title="내 프로필">
                 <div class="side-account-top">
                     <span id="sideAccountName" class="side-account-name"></span>
+                    <span id="sideAccountBio" class="side-quota-brief" style="display:block;font-size:10px;color:#9ca3af;margin-top:2px;"></span>
                 </div>
                 <div class="side-account-foot">
                     <span id="sideQuotaBrief" class="side-quota-brief"></span>
@@ -6047,15 +6135,24 @@
             <section id="homeWorkspace" class="app-workspace-panel home-workspace" aria-label="홈">
                 <div id="homeLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 내 프로필과 작업물을 관리할 수 있습니다.</div>
                 <div id="homeLayout" style="display:none;">
+                    <button type="button" id="homeBackBtn" class="home-back-btn" style="display:none;">← 내 프로필</button>
                     <div class="home-profile-card">
                         <div class="home-avatar" id="homeAvatar">?</div>
                         <div class="home-profile-meta">
                             <h2 id="homeUsername">내 계정</h2>
+                            <p id="homeBio"></p>
                             <p id="homeMeta">코인 · 작업물</p>
                         </div>
                     </div>
+                    <div id="homeFriendRequests" class="home-friend-req-box" style="display:none;"></div>
+                    <div id="homeProfileEdit" class="home-profile-edit" style="display:none;">
+                        <input id="homeDisplayNameInput" type="text" placeholder="표시 이름" maxlength="64">
+                        <textarea id="homeBioInput" placeholder="프로필 소개 (선택)" maxlength="500"></textarea>
+                        <button type="button" id="homeProfileSaveBtn">프로필 저장</button>
+                    </div>
                     <div class="home-tab-row">
-                        <button type="button" class="home-tab-btn active" data-home-tab="works">내 작업물</button>
+                        <button type="button" class="home-tab-btn active" data-home-tab="works">작업물</button>
+                        <button type="button" class="home-tab-btn" data-home-tab="friends">친구</button>
                         <button type="button" class="home-tab-btn" data-home-tab="saved">저장물</button>
                     </div>
                     <div id="homeComposeWorks" class="home-compose-card">
@@ -6066,6 +6163,7 @@
                         <textarea id="homeWorksBodyInput" placeholder="작업 내용을 입력하세요…"></textarea>
                     </div>
                     <div id="homeWorksGrid" class="home-grid"></div>
+                    <div id="homeFriendsGrid" class="home-friends-list" style="display:none;"></div>
                     <div id="homeSavedGrid" class="home-grid" style="display:none;"></div>
                 </div>
             </section>
@@ -6706,16 +6804,20 @@
                 }
                 refreshSideQuota();
             } catch (err) {
-                pickEl.innerHTML = "";
-                lineEl.textContent = "";
-                if (commonEl) commonEl.textContent = "";
-                if (diffEl) diffEl.textContent = "";
-                if (reasonEl) {
-                    reasonEl.textContent = String(err.message || "").includes("429")
-                        ? "코인 부족으로 비교 요약을 건너뜁니다."
-                        : "";
+                const first = Object.entries(filtered)[0];
+                if (first) {
+                    pickEl.innerHTML = `<strong>★ ${escapeHtml(first[0])}</strong>`;
+                    lineEl.textContent = String(first[1]).slice(0, 220) + (first[1].length > 220 ? "…" : "");
+                    if (commonEl) commonEl.textContent = "요약 API 실패 — 첫 번째 답변 미리보기";
+                    if (diffEl) diffEl.textContent = "—";
+                    if (reasonEl) reasonEl.textContent = String(err.message || "").slice(0, 120);
+                    bar.style.display = "block";
+                } else {
+                    pickEl.innerHTML = "";
+                    lineEl.textContent = "";
+                    if (reasonEl) reasonEl.textContent = "";
+                    bar.style.display = "none";
                 }
-                if (!reasonEl?.textContent) bar.style.display = "none";
             }
         }
 
@@ -6878,6 +6980,9 @@
                         onSaveResult: saveResultRecord,
                         loggedIn: !!currentUser,
                     });
+                }
+                if (lastTurn?.query && lastTurn?.responses) {
+                    refreshCompareSummary(lastTurn.query, lastTurn.responses);
                 }
             }
         }
@@ -7805,7 +7910,7 @@
             loadSavedResults();
             if (currentUser) {
                 loadSessionHistoryFromStore();
-                const id = currentUser.username || currentUser.email || "";
+                const id = currentUser.display_name || currentUser.username || currentUser.email || "";
                 if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${id}`;
                 if (loginBtn) loginBtn.style.display = "none";
                 if (logoutBtn) logoutBtn.style.display = "";
@@ -7814,6 +7919,7 @@
                 if (sideMenuBrand) sideMenuBrand.textContent = id;
                 if (sideAccountName) sideAccountName.textContent = id;
                 refreshSideQuota();
+                loadMyProfileBrief();
             } else {
                 sessionHistory.length = 0;
                 if (meta) meta.textContent = NF?.lang === "en"
@@ -8953,6 +9059,13 @@
                 const row = document.createElement("div");
                 row.className = "side-menu-friend-item";
                 row.innerHTML = `<span>${escapeHtml(f.display_name)}</span>`;
+                const profBtn = document.createElement("button");
+                profBtn.type = "button";
+                profBtn.textContent = "프로필";
+                profBtn.addEventListener("click", e => {
+                    e.stopPropagation();
+                    openHomeProfile(f.id);
+                });
                 const chatBtn = document.createElement("button");
                 chatBtn.type = "button";
                 chatBtn.textContent = "채팅";
@@ -8961,7 +9074,7 @@
                     const roomId = dmRoomIdForFriend(f.id);
                     openFloatChat(roomId, f.display_name, "dm");
                 });
-                row.appendChild(chatBtn);
+                row.append(profBtn, chatBtn);
                 row.addEventListener("click", () => {
                     setAppWorkspace("chat");
                     const roomId = dmRoomIdForFriend(f.id);
@@ -8989,50 +9102,161 @@
             });
         }
 
+        let homeViewUserId = null;
+
+        function openHomeProfile(userId) {
+            homeViewUserId = userId || null;
+            setAppWorkspace("home");
+            refreshHomeWorkspace();
+        }
+
+        async function loadMyProfileBrief() {
+            if (!currentUser) return;
+            try {
+                const res = await apiFetch("/social/profile/" + currentUser.id);
+                if (!res.ok) return;
+                const data = await res.json();
+                const p = data.profile || {};
+                currentUser.display_name = p.display_name || currentUser.username;
+                const bioEl = document.getElementById("sideAccountBio");
+                if (bioEl) bioEl.textContent = (p.bio || "").slice(0, 60);
+            } catch {}
+        }
+
+        function renderHomeWorksGrid(works, grid) {
+            if (!grid) return;
+            if (!works.length) {
+                grid.innerHTML = "<div class='works-empty'>등록된 작업물이 없습니다.</div>";
+                return;
+            }
+            grid.innerHTML = "";
+            works.forEach(w => {
+                const card = document.createElement("article");
+                card.className = "insta-card";
+                card.innerHTML = `
+                    <div class="insta-card-head"><div class="insta-author">${escapeHtml(w.title || "제목 없음")}</div></div>
+                    <div class="insta-caption">${escapeHtml(w.body || "")}</div>
+                    <div style="font-size:11px;color:#9ca3af;margin-top:6px;">${escapeHtml(w.created_at_iso || "")} · 🪙 ${w.coin_total || 0}</div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderHomeFriendsGrid(friends, grid, isSelf) {
+            if (!grid) return;
+            if (!friends.length) {
+                grid.innerHTML = "<div class='works-empty'>친구가 없습니다.</div>";
+                return;
+            }
+            grid.innerHTML = "";
+            friends.forEach(f => {
+                const row = document.createElement("div");
+                row.className = "home-friend-row";
+                row.innerHTML = `<span>${escapeHtml(f.display_name || "사용자")}</span>`;
+                const viewBtn = document.createElement("button");
+                viewBtn.type = "button";
+                viewBtn.textContent = "프로필";
+                viewBtn.addEventListener("click", () => openHomeProfile(f.id));
+                row.appendChild(viewBtn);
+                if (isSelf) {
+                    const delBtn = document.createElement("button");
+                    delBtn.type = "button";
+                    delBtn.textContent = "삭제";
+                    delBtn.addEventListener("click", () => removeHomeFriend(f.id));
+                    row.appendChild(delBtn);
+                }
+                grid.appendChild(row);
+            });
+        }
+
+        async function removeHomeFriend(friendId) {
+            if (!requireLogin() || !confirm("친구를 삭제할까요?")) return;
+            try {
+                const res = await apiFetch("/social/friends/" + friendId, { method: "DELETE" });
+                if (!res.ok) { showToast("삭제 실패"); return; }
+                showToast("친구를 삭제했습니다.");
+                refreshHomeWorkspace();
+                loadSideMenuFriends();
+            } catch { showToast("삭제 실패"); }
+        }
+
+        async function loadHomeFriendRequests() {
+            const box = document.getElementById("homeFriendRequests");
+            if (!box || !currentUser || homeViewUserId) { if (box) box.style.display = "none"; return; }
+            try {
+                const res = await apiFetch("/social/friends");
+                if (!res.ok) return;
+                const data = await res.json();
+                const incoming = data.requests?.incoming || [];
+                if (!incoming.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+                box.style.display = "block";
+                box.innerHTML = "<strong>친구 요청</strong>";
+                incoming.forEach(r => {
+                    const row = document.createElement("div");
+                    row.className = "home-friend-req-row";
+                    row.innerHTML = `<span>${escapeHtml(r.display_name)}</span>`;
+                    const accept = document.createElement("button");
+                    accept.textContent = "수락";
+                    accept.style.background = "#5865f2";
+                    accept.style.color = "#fff";
+                    accept.addEventListener("click", () => respondFriendRequest(r.id, true).then(() => refreshHomeWorkspace()));
+                    const reject = document.createElement("button");
+                    reject.textContent = "거절";
+                    reject.addEventListener("click", () => respondFriendRequest(r.id, false).then(() => refreshHomeWorkspace()));
+                    row.append(accept, reject);
+                    box.appendChild(row);
+                });
+            } catch {}
+        }
+
         async function refreshHomeWorkspace() {
             if (!currentUser) return;
-            const name = currentUser.username || currentUser.email || "내 계정";
-            const avatar = document.getElementById("homeAvatar");
-            const userEl = document.getElementById("homeUsername");
-            const metaEl = document.getElementById("homeMeta");
-            if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
-            if (userEl) userEl.textContent = name;
+            const targetId = homeViewUserId || currentUser.id;
+            const isSelf = targetId === currentUser.id;
+            const backBtn = document.getElementById("homeBackBtn");
+            const editBox = document.getElementById("homeProfileEdit");
+            const compose = document.getElementById("homeComposeWorks");
+            if (backBtn) backBtn.style.display = isSelf ? "none" : "block";
+            if (editBox) editBox.style.display = isSelf ? "block" : "none";
+            if (compose) compose.style.display = isSelf ? "block" : "none";
+
             try {
+                const res = await apiFetch("/social/profile/" + targetId);
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                const p = data.profile || {};
+                const name = p.display_name || p.username || "사용자";
+                const avatar = document.getElementById("homeAvatar");
+                const userEl = document.getElementById("homeUsername");
+                const bioEl = document.getElementById("homeBio");
+                const metaEl = document.getElementById("homeMeta");
+                if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+                if (userEl) userEl.textContent = name;
+                if (bioEl) bioEl.textContent = p.bio || "";
+                if (isSelf) {
+                    document.getElementById("homeDisplayNameInput").value = name;
+                    document.getElementById("homeBioInput").value = p.bio || "";
+                }
                 const qRes = await apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId()));
                 const q = qRes.ok ? await qRes.json() : {};
                 const rem = Math.round(q.total?.remaining ?? q.balance ?? 0);
-                if (metaEl) metaEl.textContent = `보유 ${COIN}${rem} · 작업물 · 저장물 관리`;
-            } catch {}
-            loadHomeWorks();
-            renderHomeSaved();
+                if (metaEl) {
+                    metaEl.textContent = isSelf
+                        ? `보유 ${COIN}${rem} · 작업 ${(p.works || []).length}개 · 친구 ${(p.friends || []).length}명`
+                        : `작업 ${(p.works || []).length}개` + (p.is_friend ? ` · 친구 ${(p.friends || []).length}명` : "");
+                }
+                renderHomeWorksGrid(p.works || [], document.getElementById("homeWorksGrid"));
+                renderHomeFriendsGrid(p.friends || [], document.getElementById("homeFriendsGrid"), isSelf);
+                if (isSelf) {
+                    loadHomeFriendRequests();
+                    renderHomeSaved();
+                }
+            } catch {
+                showToast("프로필을 불러오지 못했습니다.");
+            }
         }
 
         async function loadHomeWorks() {
-            const grid = document.getElementById("homeWorksGrid");
-            if (!grid || !currentUser) return;
-            grid.innerHTML = "<div class='works-empty'>불러오는 중…</div>";
-            try {
-                const res = await apiFetch("/social/works?mine=1");
-                if (!res.ok) throw new Error("fail");
-                const data = await res.json();
-                const works = data.works || [];
-                if (!works.length) {
-                    grid.innerHTML = "<div class='works-empty'>아직 등록한 작업물이 없습니다.</div>";
-                    return;
-                }
-                grid.innerHTML = "";
-                works.forEach(w => {
-                    const card = document.createElement("article");
-                    card.className = "insta-card";
-                    card.innerHTML = `
-                        <div class="insta-card-head"><div class="insta-author">${escapeHtml(w.title || "제목 없음")}</div></div>
-                        <div class="insta-caption">${escapeHtml(w.body || "")}</div>
-                        <div style="font-size:11px;color:#9ca3af;margin-top:6px;">${escapeHtml(w.created_at_iso || "")} · 🪙 ${w.coin_total || 0}</div>`;
-                    grid.appendChild(card);
-                });
-            } catch {
-                grid.innerHTML = "<div class='works-empty' style='color:#dc2626;'>불러오지 못했습니다.</div>";
-            }
+            refreshHomeWorkspace();
         }
 
         function renderHomeSaved() {
@@ -9060,50 +9284,74 @@
             });
         }
 
-        async function postSavedAsWork(title, body) {
-            if (!requireLogin() || !body.trim()) return;
+        async function postWork(title, body) {
+            if (!requireLogin() || !body.trim()) return false;
             try {
                 const res = await apiFetch("/social/works", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ title, body }),
                 });
-                if (!res.ok) { showToast("등록 실패"); return; }
-                showToast("작업물로 등록했습니다.");
-                loadHomeWorks();
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showToast(typeof data.detail === "string" ? data.detail : "등록 실패");
+                    return false;
+                }
+                showToast("작업물이 등록되었습니다.");
                 loadWorksFeed();
-            } catch { showToast("등록 실패"); }
+                if (currentAppWorkspace === "home") refreshHomeWorkspace();
+                return true;
+            } catch {
+                showToast("등록 실패");
+                return false;
+            }
+        }
+
+        async function postSavedAsWork(title, body) {
+            if (await postWork(title, body)) renderHomeSaved();
         }
 
         document.querySelectorAll(".home-tab-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".home-tab-btn").forEach(b => b.classList.toggle("active", b === btn));
                 const tab = btn.dataset.homeTab;
-                document.getElementById("homeComposeWorks").style.display = tab === "works" ? "" : "none";
+                const isSelf = !homeViewUserId || homeViewUserId === currentUser?.id;
+                document.getElementById("homeComposeWorks").style.display = (tab === "works" && isSelf) ? "" : "none";
                 document.getElementById("homeWorksGrid").style.display = tab === "works" ? "" : "none";
-                document.getElementById("homeSavedGrid").style.display = tab === "saved" ? "" : "none";
+                document.getElementById("homeFriendsGrid").style.display = tab === "friends" ? "" : "none";
+                document.getElementById("homeSavedGrid").style.display = (tab === "saved" && isSelf) ? "" : "none";
                 if (tab === "saved") renderHomeSaved();
             });
         });
 
-        document.getElementById("homeWorksPostBtn")?.addEventListener("click", async () => {
+        document.getElementById("homeBackBtn")?.addEventListener("click", () => openHomeProfile(null));
+        document.getElementById("homeProfileSaveBtn")?.addEventListener("click", async () => {
             if (!requireLogin()) return;
+            const display_name = document.getElementById("homeDisplayNameInput")?.value?.trim();
+            const bio = document.getElementById("homeBioInput")?.value?.trim();
+            try {
+                const res = await apiFetch("/social/profile", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ display_name, bio }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "저장 실패"); return; }
+                if (data.profile?.display_name) currentUser.display_name = data.profile.display_name;
+                showToast("프로필을 저장했습니다.");
+                updateAuthUI();
+                refreshHomeWorkspace();
+            } catch { showToast("저장 실패"); }
+        });
+
+        document.getElementById("homeWorksPostBtn")?.addEventListener("click", async () => {
             const title = document.getElementById("homeWorksTitleInput")?.value || "";
             const body = document.getElementById("homeWorksBodyInput")?.value || "";
             if (!body.trim()) { showToast("작업 내용을 입력하세요."); return; }
-            try {
-                const res = await apiFetch("/social/works", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ title, body }),
-                });
-                if (!res.ok) { showToast("등록 실패"); return; }
+            if (await postWork(title, body)) {
                 document.getElementById("homeWorksTitleInput").value = "";
                 document.getElementById("homeWorksBodyInput").value = "";
-                showToast("작업물이 등록되었습니다.");
-                loadHomeWorks();
-                loadWorksFeed();
-            } catch { showToast("등록 실패"); }
+            }
         });
 
         async function startWorkCowork(work) {
@@ -9171,9 +9419,9 @@
                 }
                 card.innerHTML = `
                     <div class="insta-card-head">
-                        <div class="insta-avatar">${escapeHtml(initial)}</div>
+                        <div class="insta-avatar" style="cursor:pointer;" data-author-id="${w.user_id || ""}">${escapeHtml(initial)}</div>
                         <div>
-                            <div class="insta-author">${escapeHtml(w.author_name || "사용자")}</div>
+                            <div class="insta-author" style="cursor:pointer;" data-author-id="${w.user_id || ""}">${escapeHtml(w.author_name || "사용자")}</div>
                             <div class="insta-time">${escapeHtml(w.created_at_iso || "")}</div>
                         </div>
                     </div>
@@ -9193,6 +9441,12 @@
                     <div class="insta-caption"><strong>${escapeHtml(w.author_name || "사용자")}</strong>${escapeHtml(w.body || "")}</div>
                     <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
                 feed.appendChild(card);
+                card.querySelectorAll("[data-author-id]").forEach(el => {
+                    el.addEventListener("click", () => {
+                        const uid = parseInt(el.dataset.authorId, 10);
+                        if (uid) openHomeProfile(uid);
+                    });
+                });
                 card.querySelector(".works-cowork-btn")?.addEventListener("click", () => startWorkCowork(w));
                 if (tipPending) scheduleWorkTipCountdown(w.id, w.tip_seconds_left || 5);
             });
@@ -9300,22 +9554,13 @@
         }
 
         document.getElementById("worksPostBtn")?.addEventListener("click", async () => {
-            if (!requireLogin()) return;
             const title = document.getElementById("worksTitleInput")?.value || "";
             const body = document.getElementById("worksBodyInput")?.value || "";
             if (!body.trim()) { showToast("작업 내용을 입력하세요."); return; }
-            try {
-                const res = await apiFetch("/social/works", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ title, body }),
-                });
-                if (!res.ok) { showToast("등록 실패"); return; }
+            if (await postWork(title, body)) {
                 document.getElementById("worksTitleInput").value = "";
                 document.getElementById("worksBodyInput").value = "";
-                showToast("작업물이 등록되었습니다.");
-                loadWorksFeed();
-            } catch { showToast("등록 실패"); }
+            }
         });
 
         try {
@@ -9563,6 +9808,12 @@
         document.getElementById("loginBtn")?.addEventListener("click", () => openAuthModal("login"));
         document.getElementById("signupBtn")?.addEventListener("click", () => openAuthModal("signup"));
         document.getElementById("sideLogoutBtn")?.addEventListener("click", logoutAccount);
+        document.getElementById("sideAccountBox")?.addEventListener("click", () => {
+            if (currentUser) openHomeProfile(null);
+        });
+        document.getElementById("sideAccountBox")?.addEventListener("keydown", e => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (currentUser) openHomeProfile(null); }
+        });
         document.getElementById("authSubmitBtn")?.addEventListener("click", submitAuth);
         document.getElementById("authToggleModeBtn")?.addEventListener("click", () => openAuthModal(authModalMode === "signup" ? "login" : "signup"));
         document.getElementById("authCloseBtn")?.addEventListener("click", closeAuthModal);
@@ -9900,6 +10151,7 @@
 
         function beginCompareStreamPin() {
             compareStreamPinActive = true;
+            document.querySelectorAll(".compare-qa-stack").forEach(s => { s.dataset.userScrolled = ""; });
         }
 
         function endCompareStreamPin() {
@@ -9953,6 +10205,7 @@
 
         function maintainCompareScrollPin(stack) {
             if (!stack?.id || !compareStreamPinActive) return;
+            if (stack.dataset.userScrolled === "1") return;
             const pin = compareScrollPins.get(stack.id);
             if (pin == null) return;
             if (Math.abs(stack.scrollTop - pin) > 1) stack.scrollTop = pin;
@@ -9961,7 +10214,19 @@
         function ensureCompareStackScrollGuard(stack) {
             if (!stack || stack.dataset.scrollGuard) return;
             stack.dataset.scrollGuard = "1";
-            stack.addEventListener("scroll", () => maintainCompareScrollPin(stack), { passive: true });
+            let lastTop = stack.scrollTop;
+            stack.addEventListener("scroll", () => {
+                if (!compareStreamPinActive) return;
+                const pin = compareScrollPins.get(stack.id);
+                if (pin == null) return;
+                if (Math.abs(stack.scrollTop - lastTop) > 24 && Math.abs(stack.scrollTop - pin) > 48) {
+                    stack.dataset.userScrolled = "1";
+                    compareScrollPins.delete(stack.id);
+                    return;
+                }
+                lastTop = stack.scrollTop;
+                maintainCompareScrollPin(stack);
+            }, { passive: true });
         }
 
         function confirmCollabRework(verify) {
@@ -11828,7 +12093,9 @@
                             try {
                                 applyStreamChunk(responses, JSON.parse(line.slice(6)), compareCurrentTurnIndex);
                             } catch (error) {
-                                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG }, compareCurrentTurnIndex);
+                                if (!line.includes("[DONE]") && line.slice(6).trim()) {
+                                    console.warn("compare stream chunk skip", error);
+                                }
                             }
                         }
                     }
@@ -12256,6 +12523,7 @@
                     content: content || DEBATE_FAILURE_MSG,
                     success: false,
                 }]);
+                refreshSideQuota();
                 return { round: expectedRound, turns: [{ success: false }] };
             } finally {
                 debateInFlight = false;

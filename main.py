@@ -77,9 +77,11 @@ from auth_store import (
     cancel_work_coin_tip,
     create_chat_group,
     get_room_messages,
+    get_user_public_profile,
     list_chat_rooms,
     list_friends,
     list_friend_requests,
+    remove_friend,
     refund_coins,
     respond_friend_request,
     search_users,
@@ -87,6 +89,7 @@ from auth_store import (
     send_room_message,
     send_work_coin_tip,
     toggle_work_like,
+    update_user_profile,
     verify_admin_password,
     verify_admin_token,
 )
@@ -3599,6 +3602,9 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
     async def generate() -> AsyncIterator[str]:
         yield ": keepalive\n\n"
         lock = get_debate_lock(request.session_id)
+        debate_subject: str | None = None
+        debate_coin_charged = False
+        debate_had_success = False
 
         async with lock:
             session = load_debate_session(request.session_id)
@@ -3617,7 +3623,9 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
 
             if is_retry:
                 try:
+                    debate_subject, _ = _resolve_subject(http_request, request.user_id)
                     await _require_debate_coin(http_request, request.user_id)
+                    debate_coin_charged = True
                 except HTTPException as exc:
                     yield sse({"success": False, "error": _quota_error_message(exc.detail)})
                     return
@@ -3661,9 +3669,9 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                     )
 
                 try:
-                    ai_calls = debate_ai_calls_for_next_step(session)
-                    for _ in range(ai_calls):
-                        await _require_debate_coin(http_request, request.user_id)
+                    debate_subject, _ = _resolve_subject(http_request, request.user_id)
+                    await _require_debate_coin(http_request, request.user_id)
+                    debate_coin_charged = True
                 except HTTPException as exc:
                     yield sse({"success": False, "error": _quota_error_message(exc.detail)})
                     return
@@ -3732,9 +3740,15 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                                 "round": session.round_number,
                             }
                         )
+                        if debate_coin_charged and not debate_had_success and debate_subject:
+                            try:
+                                await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
+                            except Exception:
+                                logger.exception("debate coin refund failed subject=%s", debate_subject)
                         return
 
                     if event.get("chunk"):
+                        debate_had_success = True
                         if event.get("meta"):
                             stream_meta = event["meta"]
                         yield sse(
@@ -3776,6 +3790,11 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                         "round": session.round_number,
                     }
                 )
+                if debate_coin_charged and not debate_had_success and debate_subject:
+                    try:
+                        await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
+                    except Exception:
+                        logger.exception("debate coin refund failed subject=%s", debate_subject)
                 return
 
             turn = _commit_debate_stream_turn(
@@ -3786,12 +3805,20 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                 is_retry=is_retry,
             )
             store_debate_session(request.session_id, session)
+            if final_result.success:
+                debate_had_success = True
+            elif debate_coin_charged and not debate_had_success and debate_subject:
+                try:
+                    await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
+                except Exception:
+                    logger.exception("debate coin refund failed subject=%s", debate_subject)
             yield sse(
                 {
-                    "success": True,
+                    "success": final_result.success,
                     "done": True,
                     "turn": dump_model(turn),
                     "round": session.round_number,
+                    **({"error": final_result.error} if not final_result.success else {}),
                 }
             )
 
@@ -3821,7 +3848,7 @@ def _parse_json_object(text: str) -> dict:
 
 @app.post("/compare/summary")
 async def compare_summary(data: CompareSummaryRequest, request: Request) -> dict:
-    await _require_compare_coin(request, data.user_id)
+    """Compare AI summary — no extra coin (included in compare session)."""
     await ensure_model_cache_fresh()
     parts = []
     total_models = len(data.responses or {})
@@ -4434,7 +4461,13 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
 
 
 @app.get("/social/works")
-def social_works_list(request: Request, limit: int = 50, friends_only: int = 0, mine: int = 0) -> dict:
+def social_works_list(
+    request: Request,
+    limit: int = 50,
+    friends_only: int = 0,
+    mine: int = 0,
+    user_id: int = 0,
+) -> dict:
     user = get_user_by_token(_bearer_token(request))
     viewer_id = user["id"] if user else None
     if mine and not user:
@@ -4444,6 +4477,7 @@ def social_works_list(request: Request, limit: int = 50, friends_only: int = 0, 
         viewer_id=viewer_id,
         friends_only=bool(friends_only),
         mine=bool(mine),
+        author_id=int(user_id) if user_id else None,
     )
     return {"works": works}
 
@@ -4567,6 +4601,45 @@ def social_friend_respond(body: FriendRespondBody, request: Request) -> dict:
         return respond_friend_request(user["id"], body.user_id, body.accept)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/social/friends/{friend_id}")
+def social_friend_remove(friend_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        return remove_friend(user["id"], friend_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ProfileUpdateBody(BaseModel):
+    display_name: str | None = None
+    bio: str | None = None
+
+
+@app.patch("/social/profile")
+def social_profile_update(body: ProfileUpdateBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        profile = update_user_profile(user["id"], body.display_name, body.bio)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "profile": profile}
+
+
+@app.get("/social/profile/{user_id}")
+def social_profile_get(user_id: int, request: Request) -> dict:
+    viewer = get_user_by_token(_bearer_token(request))
+    viewer_id = viewer["id"] if viewer else None
+    try:
+        profile = get_user_public_profile(user_id, viewer_id=viewer_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"profile": profile}
 
 
 class ChatGroupCreateBody(BaseModel):

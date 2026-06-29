@@ -593,10 +593,16 @@ def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
         user_email = (row["user_email"] or "").strip()
     except (IndexError, KeyError):
         pass
+    display_name = ""
+    try:
+        display_name = (row["display_name"] or "").strip()
+    except (IndexError, KeyError):
+        pass
     return {
         "id": row["id"],
         "username": ident,
         "email": user_email,
+        "display_name": display_name or ident,
         "created_at": row["created_at"],
     }
 
@@ -2342,18 +2348,96 @@ def _chat_room_id(user_a: int, user_b: int) -> str:
     return f"{lo}:{hi}"
 
 
+def update_user_profile(user_id: int, display_name: str | None = None, bio: str | None = None) -> dict[str, Any]:
+    name = (display_name or "").strip()[:64] if display_name is not None else None
+    bio_text = (bio or "").strip()[:500] if bio is not None else None
+    with _lock:
+        conn = _connect()
+        try:
+            if name is not None:
+                conn.execute("UPDATE users SET display_name = ? WHERE id = ?", (name, user_id))
+            conn.commit()
+        finally:
+            conn.close()
+    if bio_text is not None:
+        set_user_data(user_id, "profile_bio", bio_text)
+    return get_user_public_profile(user_id, viewer_id=user_id)
+
+
+def remove_friend(user_id: int, friend_id: int) -> dict[str, Any]:
+    if user_id == friend_id:
+        raise ValueError("잘못된 요청입니다.")
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "DELETE FROM friendships WHERE user_id = ? AND friend_id = ?",
+                (user_id, friend_id),
+            )
+            conn.execute(
+                "DELETE FROM friendships WHERE user_id = ? AND friend_id = ?",
+                (friend_id, user_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"success": True}
+
+
+def get_user_public_profile(user_id: int, viewer_id: int | None = None) -> dict[str, Any]:
+    user = get_user_by_id(user_id)
+    bio = ""
+    try:
+        bio = str(get_user_data(user_id).get("profile_bio") or "").strip()
+    except Exception:
+        bio = ""
+    is_self = viewer_id is not None and int(viewer_id) == int(user_id)
+    is_friend = bool(viewer_id and _are_friends(int(viewer_id), int(user_id)))
+    can_view_friends = is_self or is_friend
+    works = list_public_works(limit=50, viewer_id=viewer_id, author_id=user_id)
+    friends: list[dict[str, Any]] = []
+    if can_view_friends:
+        friends = list_friends(user_id)
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "display_name": user.get("display_name") or user["username"],
+        "bio": bio[:500],
+        "created_at": user.get("created_at"),
+        "is_self": is_self,
+        "is_friend": is_friend,
+        "works": works,
+        "friends": friends,
+    }
+
+
 def list_public_works(
     limit: int = 50,
     viewer_id: int | None = None,
     friends_only: bool = False,
     mine: bool = False,
+    author_id: int | None = None,
 ) -> list[dict[str, Any]]:
     confirm_pending_work_tips()
     limit = max(1, min(int(limit or 50), 100))
     with _lock:
         conn = _connect()
         try:
-            if mine and viewer_id is not None:
+            if author_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
+                            WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
+                           (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
+                    FROM public_works w
+                    WHERE w.user_id = ?
+                    ORDER BY w.created_at DESC
+                    LIMIT ?
+                    """,
+                    (author_id, limit),
+                ).fetchall()
+            elif mine and viewer_id is not None:
                 rows = conn.execute(
                     """
                     SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
@@ -2375,11 +2459,12 @@ def list_public_works(
                             WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
                            (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
                     FROM public_works w
-                    INNER JOIN friendships f ON f.friend_id = w.user_id AND f.user_id = ?
+                    LEFT JOIN friendships f ON f.friend_id = w.user_id AND f.user_id = ?
+                    WHERE w.user_id = ? OR f.friend_id IS NOT NULL
                     ORDER BY w.created_at DESC
                     LIMIT ?
                     """,
-                    (viewer_id, limit),
+                    (viewer_id, viewer_id, limit),
                 ).fetchall()
             else:
                 rows = conn.execute(
@@ -2444,6 +2529,11 @@ def create_public_work(user_id: int, author_name: str, title: str, body: str) ->
         raise ValueError("작업 내용을 입력하세요.")
     if not title:
         title = body[:40] + ("…" if len(body) > 40 else "")
+    try:
+        u = get_user_by_id(user_id)
+        author_name = u.get("display_name") or author_name or u.get("username") or "사용자"
+    except ValueError:
+        author_name = (author_name or "").strip()[:64] or "사용자"
     now = time.time()
     with _lock:
         conn = _connect()
