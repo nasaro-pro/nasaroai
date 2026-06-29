@@ -23,6 +23,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
             background: #f6f7f9;
             color: #111827;
+            --app-rail-width: 56px;
         }
 
         .app {
@@ -32,10 +33,16 @@
             transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 데스크톱: 사이드바가 펼쳐지면 본문을 오른쪽으로 밀어준다. */
+        /* 데스크톱: 앱 레일 + 사이드메뉴 */
         @media (min-width: 768px) {
+            .app {
+                padding-left: var(--app-rail-width);
+            }
             .app.sidebar-open {
-                padding-left: 280px;
+                padding-left: calc(280px + var(--app-rail-width));
+            }
+            .side-menu {
+                left: var(--app-rail-width);
             }
         }
 
@@ -2249,7 +2256,10 @@
 
         @media (min-width: 768px) {
             .app.sidebar-open .dock-shell {
-                left: 280px;
+                left: calc(280px + var(--app-rail-width));
+            }
+            .dock-shell {
+                left: var(--app-rail-width);
             }
         }
 
@@ -4416,6 +4426,396 @@
             display: none; margin: 12px 18px 0; padding: 10px 14px; border-radius: 10px;
             background: #eff6ff; border: 1px solid #bfdbfe; font-size: 13px;
         }
+
+        /* ── 앱 레일 (데스크톱 좌측 / 모바일 하단) ── */
+        .app-rail {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 6px;
+            background: #fff;
+            border-right: 1px solid #e5e7eb;
+            z-index: 450;
+        }
+        .app-rail--desktop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--app-rail-width);
+            height: 100dvh;
+            padding-top: max(12px, env(safe-area-inset-top));
+        }
+        .app-rail--mobile {
+            display: none;
+            flex-direction: row;
+            justify-content: space-around;
+            width: 100%;
+            border-right: none;
+            border-top: 1px solid #e5e7eb;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(10px);
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0));
+        }
+        .app-rail-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .15s, border-color .15s, transform .1s;
+        }
+        .app-rail-btn:hover { background: #eef2ff; border-color: #c7d2fe; }
+        .app-rail-btn.active {
+            background: #ede9fe;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 2px rgba(124,58,237,.15);
+        }
+        .app-rail-btn .rail-label {
+            display: none;
+        }
+        @media (max-width: 767px) {
+            .app-rail--desktop { display: none; }
+            .app-rail--mobile { display: flex; }
+            .app-rail-btn {
+                flex: 1;
+                max-width: 88px;
+                height: 52px;
+                flex-direction: column;
+                gap: 2px;
+                font-size: 20px;
+            }
+            .app-rail-btn .rail-label {
+                display: block;
+                font-size: 10px;
+                font-weight: 700;
+                color: #6b7280;
+            }
+            .app-rail-btn.active .rail-label { color: #7c3aed; }
+        }
+        html[data-theme="dark"] .app-rail {
+            background: #141824;
+            border-color: var(--dm-border-soft);
+        }
+        html[data-theme="dark"] .app-rail-btn {
+            background: #1f2937;
+            border-color: #374151;
+            color: #e5e7eb;
+        }
+        html[data-theme="dark"] .app-rail-btn.active {
+            background: #312e81;
+            border-color: #7c3aed;
+        }
+
+        /* ── 소셜 워크스페이스 ── */
+        .app-workspace-panel {
+            display: none;
+            flex-direction: column;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 16px 18px 24px;
+            width: 100%;
+        }
+        .app-workspace-panel.active { display: flex; }
+        .workspace-head {
+            margin-bottom: 14px;
+        }
+        .workspace-head h2 {
+            font-size: 20px;
+            font-weight: 800;
+            margin: 0 0 4px;
+        }
+        .workspace-head p {
+            font-size: 13px;
+            color: #6b7280;
+            margin: 0;
+        }
+        .chat-layout {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 10px;
+            min-height: 360px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #fff;
+        }
+        @media (max-width: 600px) {
+            .chat-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+        }
+        .chat-user-list {
+            border-right: 1px solid #e5e7eb;
+            overflow-y: auto;
+            max-height: 480px;
+        }
+        .chat-user-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 10px 12px;
+            border: none;
+            border-bottom: 1px solid #f3f4f6;
+            background: transparent;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .chat-user-btn.active, .chat-user-btn:hover { background: #eef2ff; color: #4338ca; }
+        .chat-main { display: flex; flex-direction: column; min-height: 280px; }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 200px;
+            max-height: 420px;
+        }
+        .chat-bubble {
+            max-width: 85%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .chat-bubble.mine {
+            align-self: flex-end;
+            background: #7c3aed;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-bubble.theirs {
+            align-self: flex-start;
+            background: #f3f4f6;
+            color: #111827;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-bubble .chat-meta { font-size: 10px; opacity: .75; margin-top: 4px; }
+        .chat-compose {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .chat-compose input {
+            flex: 1;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .chat-compose button {
+            border: none;
+            background: #7c3aed;
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .works-compose-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 16px;
+        }
+        .works-compose-card input,
+        .works-compose-card textarea {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            font-family: inherit;
+        }
+        .works-compose-card textarea { min-height: 88px; resize: vertical; }
+        .works-compose-card button {
+            border: none;
+            background: #7c3aed;
+            color: #fff;
+            font-weight: 700;
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .works-feed { display: flex; flex-direction: column; gap: 12px; }
+        .works-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 14px 16px;
+        }
+        .works-card-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .works-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #7c3aed, #2563eb);
+            color: #fff;
+            font-weight: 800;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .works-card-author { font-weight: 700; font-size: 14px; }
+        .works-card-time { font-size: 11px; color: #9ca3af; }
+        .works-card-title { font-weight: 800; font-size: 15px; margin: 0 0 6px; }
+        .works-card-body {
+            font-size: 13px;
+            line-height: 1.55;
+            color: #374151;
+            white-space: pre-wrap;
+            margin-bottom: 10px;
+        }
+        .works-card-actions {
+            display: flex;
+            gap: 12px;
+            padding-top: 8px;
+            border-top: 1px solid #f3f4f6;
+        }
+        .works-like-btn, .works-comment-toggle {
+            border: none;
+            background: transparent;
+            font-size: 13px;
+            cursor: pointer;
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .works-like-btn.liked { color: #dc2626; }
+        .works-comments {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #e5e7eb;
+        }
+        .works-comment-item {
+            font-size: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid #f9fafb;
+        }
+        .works-comment-form {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .works-comment-form input {
+            flex: 1;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        .works-comment-form button {
+            border: none;
+            background: #eef2ff;
+            color: #4338ca;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .workspace-login-hint {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        html[data-theme="dark"] .chat-layout,
+        html[data-theme="dark"] .works-compose-card,
+        html[data-theme="dark"] .works-card {
+            background: #1f2937;
+            border-color: #374151;
+        }
+        html[data-theme="dark"] .works-card-body { color: #d1d5db; }
+        html[data-theme="dark"] .chat-bubble.theirs { background: #374151; color: #f3f4f6; }
+
+        /* ── 초보 모드 (게임 튜토리얼) ── */
+        .beginner-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 12000;
+            pointer-events: none;
+        }
+        .beginner-overlay.active { pointer-events: auto; }
+        .beginner-dim {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.55);
+            transition: opacity .25s;
+        }
+        .beginner-spotlight {
+            position: absolute;
+            border-radius: 12px;
+            box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
+            border: 2px solid #a78bfa;
+            transition: all .35s cubic-bezier(.4,0,.2,1);
+            pointer-events: none;
+        }
+        .beginner-tooltip {
+            position: fixed;
+            z-index: 12001;
+            max-width: min(320px, calc(100vw - 32px));
+            background: #fff;
+            border-radius: 14px;
+            padding: 16px 18px;
+            box-shadow: 0 20px 50px rgba(0,0,0,.25);
+            border: 1px solid #e5e7eb;
+            pointer-events: auto;
+        }
+        .beginner-tooltip-step {
+            font-size: 11px;
+            font-weight: 800;
+            color: #7c3aed;
+            margin-bottom: 6px;
+        }
+        .beginner-tooltip h4 {
+            margin: 0 0 6px;
+            font-size: 16px;
+        }
+        .beginner-tooltip p {
+            margin: 0 0 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #4b5563;
+        }
+        .beginner-tooltip-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        .beginner-tooltip-actions button {
+            border: none;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .beginner-skip { background: #f3f4f6; color: #374151; }
+        .beginner-next { background: #7c3aed; color: #fff; }
+        html[data-theme="dark"] .beginner-tooltip {
+            background: #1e293b;
+            border-color: #475569;
+        }
+        html[data-theme="dark"] .beginner-tooltip p { color: #cbd5e1; }
+        html[data-theme="dark"] .beginner-skip { background: #374151; color: #e5e7eb; }
     </style>
 </head>
 <body>
@@ -4466,11 +4866,17 @@
                             <div id="resultFilesList"><div class="works-empty">저장된 결과물이 없습니다.</div></div>
                         </div>
                     </div>
-                    <button id="guideBtn" class="side-menu-guide-btn" type="button" title="사용 가이드"><span>📘</span><span>가이드</span></button>
+                    <button id="guideBtn" class="side-menu-guide-btn" type="button" title="초보 모드"><span>📘</span><span>가이드</span></button>
                     <button id="settingsBtn" class="side-menu-settings-btn" type="button" title="설정"><span>⚙️</span><span data-i18n="settings">설정</span></button>
                 </div>
             </div>
         </aside>
+
+        <nav id="appRailDesktop" class="app-rail app-rail--desktop" aria-label="앱 메뉴">
+            <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
+            <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
+            <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
+        </nav>
 
         <!-- 설정 팝오버 패널 -->
         <div id="settingsPanel" class="settings-panel" role="dialog" aria-label="설정">
@@ -4799,6 +5205,38 @@
                     </div>
                 </div>
             </section>
+
+            <section id="chatWorkspace" class="app-workspace-panel" aria-label="계정 채팅">
+                <div class="workspace-head">
+                    <h2>💬 계정 채팅</h2>
+                    <p>다른 Nasaro AI 계정과 1:1로 대화합니다. 로그인 후 이용할 수 있습니다.</p>
+                </div>
+                <div id="chatLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 다른 계정과 채팅할 수 있습니다.</div>
+                <div id="chatLayout" class="chat-layout" style="display:none;">
+                    <div id="chatUserList" class="chat-user-list"></div>
+                    <div class="chat-main">
+                        <div id="chatMessages" class="chat-messages"></div>
+                        <div class="chat-compose">
+                            <input id="chatInput" type="text" placeholder="메시지 입력…" autocomplete="off">
+                            <button id="chatSendBtn" type="button">전송</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="worksWorkspace" class="app-workspace-panel" aria-label="작업 공유">
+                <div class="workspace-head">
+                    <h2>📋 작업 공유</h2>
+                    <p>완성한 작업물을 올리면 다른 계정도 볼 수 있습니다. 좋아요와 댓글을 남길 수 있어요.</p>
+                </div>
+                <div id="worksLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 작업물을 등록할 수 있습니다.</div>
+                <div id="worksCompose" class="works-compose-card" style="display:none;">
+                    <input id="worksTitleInput" type="text" placeholder="제목 (선택)">
+                    <textarea id="worksBodyInput" placeholder="작업 내용을 입력하세요…"></textarea>
+                    <button id="worksPostBtn" type="button">공개 등록</button>
+                </div>
+                <div id="worksFeed" class="works-feed"></div>
+            </section>
         </main>
 
         <!-- 확장/앱 미설치 안내 배너 (앱 소스에서는 숨김) -->
@@ -4984,12 +5422,12 @@
             </div>
             <footer class="input-dock" id="inputDock">
                 <div class="dock-inner">
-                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-compose-row">
                         <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
+                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-btn-row">
                         <div class="dock-btn-left" id="dockBtnToolsLeft"></div>
                         <div class="dock-btn-center">
@@ -5006,6 +5444,11 @@
                         <div class="dock-btn-right" id="dockBtnToolsRight"></div>
                     </div>
                 </div>
+                <nav id="appRailMobile" class="app-rail app-rail--mobile" aria-label="앱 메뉴">
+                    <button type="button" class="app-rail-btn active" data-workspace="ai"><span>🤖</span><span class="rail-label">AI</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="chat"><span>💬</span><span class="rail-label">채팅</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="works"><span>📋</span><span class="rail-label">작업</span></button>
+                </nav>
             </footer>
         </div>
 
@@ -5032,6 +5475,19 @@
         </div>
 
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
+
+        <div id="beginnerOverlay" class="beginner-overlay" style="display:none;" aria-hidden="true">
+            <div id="beginnerSpotlight" class="beginner-spotlight"></div>
+            <div id="beginnerTooltip" class="beginner-tooltip" style="display:none;">
+                <div id="beginnerStepLabel" class="beginner-tooltip-step"></div>
+                <h4 id="beginnerTitle"></h4>
+                <p id="beginnerDesc"></p>
+                <div class="beginner-tooltip-actions">
+                    <button type="button" id="beginnerSkipBtn" class="beginner-skip">건너뛰기</button>
+                    <button type="button" id="beginnerNextBtn" class="beginner-next">다음</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -6491,6 +6947,7 @@
             renderResultFilesList();
             notifyExtensionAuth();
             updateSupportUI();
+            refreshSocialWorkspace();
         }
 
         async function refreshSideQuota() {
@@ -6967,6 +7424,377 @@
         const guideBar = document.getElementById("guideBar");
         const guideBarBackdrop = document.getElementById("guideBarBackdrop");
 
+        // ── 앱 워크스페이스 (AI / 채팅 / 작업 공유) ─────────────────────────
+        let currentAppWorkspace = "ai";
+        let chatPeerId = null;
+        let chatPollTimer = null;
+
+        const AI_PANEL_IDS = ["comparePanel", "debatePanel", "collabPanel"];
+
+        function setAppWorkspace(ws) {
+            currentAppWorkspace = ws || "ai";
+            document.querySelectorAll(".app-rail-btn").forEach(btn => {
+                btn.classList.toggle("active", btn.dataset.workspace === currentAppWorkspace);
+            });
+            const dockInner = document.querySelector(".dock-inner");
+            const dockAgentRow = document.querySelector(".dock-agent-row");
+            const dockShell = document.getElementById("dockShell");
+            const chatWs = document.getElementById("chatWorkspace");
+            const worksWs = document.getElementById("worksWorkspace");
+            const isAi = currentAppWorkspace === "ai";
+
+            AI_PANEL_IDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = isAi ? "" : "none";
+            });
+            if (chatWs) chatWs.classList.toggle("active", currentAppWorkspace === "chat");
+            if (worksWs) worksWs.classList.toggle("active", currentAppWorkspace === "works");
+
+            if (dockInner) dockInner.style.display = isAi ? "" : "none";
+            if (dockAgentRow) dockAgentRow.style.display = isAi ? "" : "none";
+            if (dockShell) dockShell.style.display = isAi || window.innerWidth < 768 ? "" : "none";
+
+            if (currentAppWorkspace === "chat") {
+                refreshSocialWorkspace();
+                startChatPoll();
+            } else {
+                stopChatPoll();
+            }
+            if (currentAppWorkspace === "works") loadWorksFeed();
+
+            try { localStorage.setItem("nasaroai_app_workspace", currentAppWorkspace); } catch {}
+            if (isAi) updateDockUI();
+        }
+
+        document.querySelectorAll(".app-rail-btn").forEach(btn => {
+            btn.addEventListener("click", () => setAppWorkspace(btn.dataset.workspace));
+        });
+
+        function refreshSocialWorkspace() {
+            const loggedIn = !!currentUser;
+            const chatHint = document.getElementById("chatLoginHint");
+            const chatLayout = document.getElementById("chatLayout");
+            const worksHint = document.getElementById("worksLoginHint");
+            const worksCompose = document.getElementById("worksCompose");
+            if (chatHint) chatHint.style.display = loggedIn ? "none" : "block";
+            if (chatLayout) chatLayout.style.display = loggedIn ? "grid" : "none";
+            if (worksHint) worksHint.style.display = loggedIn ? "none" : "block";
+            if (worksCompose) worksCompose.style.display = loggedIn ? "block" : "none";
+            if (loggedIn && currentAppWorkspace === "chat") loadChatUsers();
+            if (currentAppWorkspace === "works") loadWorksFeed();
+        }
+
+        async function loadChatUsers() {
+            const list = document.getElementById("chatUserList");
+            if (!list || !currentUser) return;
+            list.innerHTML = "<div style='padding:10px;font-size:11px;color:#9ca3af;'>불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/social/users");
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                const users = data.users || [];
+                if (!users.length) {
+                    list.innerHTML = "<div style='padding:10px;font-size:11px;color:#9ca3af;'>다른 계정이 없습니다.</div>";
+                    return;
+                }
+                list.innerHTML = "";
+                users.forEach(u => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "chat-user-btn" + (chatPeerId === u.id ? " active" : "");
+                    btn.dataset.peerId = u.id;
+                    btn.textContent = u.display_name || ("user" + u.id);
+                    btn.addEventListener("click", () => selectChatPeer(u.id, u.display_name));
+                    list.appendChild(btn);
+                });
+                if (!chatPeerId && users[0]) selectChatPeer(users[0].id, users[0].display_name);
+            } catch {
+                list.innerHTML = "<div style='padding:10px;font-size:11px;color:#dc2626;'>목록을 불러오지 못했습니다.</div>";
+            }
+        }
+
+        async function selectChatPeer(peerId, name) {
+            chatPeerId = peerId;
+            document.querySelectorAll(".chat-user-btn").forEach(btn => {
+                btn.classList.toggle("active", String(btn.dataset.peerId) === String(peerId));
+            });
+            await loadChatMessages();
+        }
+
+        async function loadChatMessages() {
+            const box = document.getElementById("chatMessages");
+            if (!box || !chatPeerId) return;
+            try {
+                const res = await apiFetch("/social/chat/" + chatPeerId);
+                if (!res.ok) return;
+                const data = await res.json();
+                box.innerHTML = "";
+                (data.messages || []).forEach(m => {
+                    const div = document.createElement("div");
+                    div.className = "chat-bubble " + (m.is_mine ? "mine" : "theirs");
+                    div.innerHTML = escapeHtml(m.body) + `<div class="chat-meta">${escapeHtml(m.sender_name || "")} · ${escapeHtml(m.created_at_iso || "")}</div>`;
+                    box.appendChild(div);
+                });
+                box.scrollTop = box.scrollHeight;
+            } catch {}
+        }
+
+        async function sendChatMessage() {
+            if (!currentUser || !chatPeerId) { openAuthModal("login"); return; }
+            const input = document.getElementById("chatInput");
+            const body = (input?.value || "").trim();
+            if (!body) return;
+            try {
+                const res = await apiFetch("/social/chat/" + chatPeerId, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body }),
+                });
+                if (!res.ok) { showToast("전송 실패"); return; }
+                if (input) input.value = "";
+                await loadChatMessages();
+            } catch { showToast("전송 실패"); }
+        }
+
+        function startChatPoll() {
+            stopChatPoll();
+            if (!currentUser) return;
+            chatPollTimer = setInterval(() => {
+                if (currentAppWorkspace === "chat" && chatPeerId) loadChatMessages();
+            }, 5000);
+        }
+        function stopChatPoll() {
+            if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+        }
+
+        document.getElementById("chatSendBtn")?.addEventListener("click", sendChatMessage);
+        document.getElementById("chatInput")?.addEventListener("keydown", e => {
+            if (e.key === "Enter") { e.preventDefault(); sendChatMessage(); }
+        });
+
+        async function loadWorksFeed() {
+            const feed = document.getElementById("worksFeed");
+            if (!feed) return;
+            feed.innerHTML = "<div class='works-empty' style='text-align:center;color:#9ca3af;padding:20px;'>불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/social/works");
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                renderWorksFeed(data.works || []);
+            } catch {
+                feed.innerHTML = "<div style='text-align:center;color:#dc2626;padding:20px;'>피드를 불러오지 못했습니다.</div>";
+            }
+        }
+
+        function renderWorksFeed(works) {
+            const feed = document.getElementById("worksFeed");
+            if (!feed) return;
+            if (!works.length) {
+                feed.innerHTML = "<div style='text-align:center;color:#9ca3af;padding:32px;'>아직 등록된 작업물이 없습니다.<br>첫 번째 작업물을 올려보세요!</div>";
+                return;
+            }
+            feed.innerHTML = "";
+            works.forEach(w => {
+                const card = document.createElement("article");
+                card.className = "works-card";
+                card.dataset.workId = w.id;
+                const initial = (w.author_name || "?").charAt(0).toUpperCase();
+                card.innerHTML = `
+                    <div class="works-card-head">
+                        <div class="works-avatar">${escapeHtml(initial)}</div>
+                        <div>
+                            <div class="works-card-author">${escapeHtml(w.author_name || "사용자")}</div>
+                            <div class="works-card-time">${escapeHtml(w.created_at_iso || "")}</div>
+                        </div>
+                    </div>
+                    <h3 class="works-card-title">${escapeHtml(w.title || "")}</h3>
+                    <div class="works-card-body">${escapeHtml(w.body || "")}</div>
+                    <div class="works-card-actions">
+                        <button type="button" class="works-like-btn${w.liked_by_me ? " liked" : ""}" data-like="${w.id}">❤ ${w.like_count || 0}</button>
+                        <button type="button" class="works-comment-toggle" data-comments="${w.id}">💬 댓글 ${w.comment_count || 0}</button>
+                    </div>
+                    <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
+                feed.appendChild(card);
+            });
+            feed.querySelectorAll(".works-like-btn").forEach(btn => {
+                btn.addEventListener("click", () => toggleWorkLike(btn.dataset.like, btn));
+            });
+            feed.querySelectorAll(".works-comment-toggle").forEach(btn => {
+                btn.addEventListener("click", () => toggleWorkComments(btn.dataset.comments));
+            });
+        }
+
+        async function toggleWorkLike(workId, btnEl) {
+            if (!currentUser) { openAuthModal("login"); return; }
+            try {
+                const res = await apiFetch("/social/works/" + workId + "/like", { method: "POST" });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (btnEl) {
+                    btnEl.classList.toggle("liked", !!data.liked_by_me);
+                    btnEl.textContent = "❤ " + (data.like_count || 0);
+                }
+            } catch {}
+        }
+
+        async function toggleWorkComments(workId) {
+            const box = document.getElementById("worksComments" + workId);
+            if (!box) return;
+            const open = box.style.display !== "none";
+            if (open) { box.style.display = "none"; return; }
+            box.style.display = "block";
+            box.innerHTML = "<div style='font-size:11px;color:#9ca3af;'>불러오는 중…</div>";
+            try {
+                const res = await apiFetch("/social/works/" + workId + "/comments");
+                const data = await res.json();
+                const comments = data.comments || [];
+                box.innerHTML = comments.map(c =>
+                    `<div class="works-comment-item"><strong>${escapeHtml(c.author_name)}</strong> ${escapeHtml(c.body)}<br><span style="color:#9ca3af;font-size:10px;">${escapeHtml(c.created_at_iso || "")}</span></div>`
+                ).join("") || "<div style='font-size:11px;color:#9ca3af;'>댓글이 없습니다.</div>";
+                if (currentUser) {
+                    const form = document.createElement("div");
+                    form.className = "works-comment-form";
+                    form.innerHTML = `<input type="text" placeholder="댓글 입력…" id="commentInput${workId}"><button type="button">등록</button>`;
+                    form.querySelector("button").addEventListener("click", () => postWorkComment(workId));
+                    form.querySelector("input").addEventListener("keydown", e => {
+                        if (e.key === "Enter") { e.preventDefault(); postWorkComment(workId); }
+                    });
+                    box.appendChild(form);
+                }
+            } catch {
+                box.innerHTML = "<div style='color:#dc2626;font-size:11px;'>댓글을 불러오지 못했습니다.</div>";
+            }
+        }
+
+        async function postWorkComment(workId) {
+            const input = document.getElementById("commentInput" + workId);
+            const body = (input?.value || "").trim();
+            if (!body || !currentUser) return;
+            try {
+                const res = await apiFetch("/social/works/" + workId + "/comments", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body }),
+                });
+                if (res.ok) {
+                    if (input) input.value = "";
+                    toggleWorkComments(workId);
+                    toggleWorkComments(workId);
+                    loadWorksFeed();
+                }
+            } catch {}
+        }
+
+        document.getElementById("worksPostBtn")?.addEventListener("click", async () => {
+            if (!currentUser) { openAuthModal("login"); return; }
+            const title = document.getElementById("worksTitleInput")?.value || "";
+            const body = document.getElementById("worksBodyInput")?.value || "";
+            if (!body.trim()) { showToast("작업 내용을 입력하세요."); return; }
+            try {
+                const res = await apiFetch("/social/works", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title, body }),
+                });
+                if (!res.ok) { showToast("등록 실패"); return; }
+                document.getElementById("worksTitleInput").value = "";
+                document.getElementById("worksBodyInput").value = "";
+                showToast("작업물이 등록되었습니다.");
+                loadWorksFeed();
+            } catch { showToast("등록 실패"); }
+        });
+
+        try {
+            const savedWs = localStorage.getItem("nasaroai_app_workspace");
+            if (savedWs && savedWs !== "ai") setAppWorkspace(savedWs);
+        } catch {}
+
+        // ── 초보 모드 (게임 튜토리얼) ─────────────────────────────────────
+        const beginnerOverlay = document.getElementById("beginnerOverlay");
+        const beginnerSpotlight = document.getElementById("beginnerSpotlight");
+        const beginnerTooltip = document.getElementById("beginnerTooltip");
+        let beginnerStepIndex = 0;
+        let beginnerSteps = [];
+
+        function buildBeginnerSteps() {
+            const aiBtn = document.querySelector('.input-tool-btn.ai-pick-trigger-btn, .dock-btn-left .input-tool-btn');
+            const steps = [
+                { el: () => document.getElementById("mainInput"), title: "질문 입력", desc: "하고 싶은 일·궁금한 점을 여기에 적으세요. 비교·토론·협업 모두 이 칸에서 시작합니다.", step: "1 / 6" },
+                { el: () => document.querySelector('.mode-btn[data-mode="compare"]')?.closest(".dock-mode-group"), title: "모드 선택", desc: "비교는 여러 AI 답변을 나란히, 토론은 AI들이 주제로 대화, 협업은 4단계로 작업물을 만듭니다.", step: "2 / 6" },
+                { el: () => aiBtn || document.getElementById("mainInputToolsLeft"), title: "AI 선택", desc: "🤖 버튼으로 사용할 AI 모델을 고릅니다. 비교 모드에서는 여러 개를 선택할 수 있어요.", step: "3 / 6" },
+                { el: () => document.getElementById("dockPrimaryBtn"), title: "실행", desc: "▶ 버튼 또는 Enter로 질문을 보냅니다. 코인(🪙)이 1회 차감됩니다.", step: "4 / 6" },
+                { el: () => document.getElementById("appRailDesktop") || document.getElementById("appRailMobile"), title: "앱 메뉴", desc: "왼쪽(모바일은 아래) 버튼으로 AI 질문 · 계정 채팅 · 작업 공유 화면을 전환합니다.", step: "5 / 6" },
+                { el: () => document.getElementById("menuToggleBtn"), title: "기록·설정", desc: "햄버거 메뉴에서 질문 기록, 결과물 파일, 설정을 열 수 있습니다. 언제든 다시 📘 가이드를 눌러 이 안내를 볼 수 있어요.", step: "6 / 6" },
+            ];
+            return steps.filter(s => s.el());
+        }
+
+        function positionBeginnerStep() {
+            const step = beginnerSteps[beginnerStepIndex];
+            if (!step) { endBeginnerMode(); return; }
+            setAppWorkspace("ai");
+            closeGuideBar();
+            setSideMenuOpen(false);
+
+            const target = step.el();
+            if (!target) { beginnerStepIndex++; positionBeginnerStep(); return; }
+            target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+            requestAnimationFrame(() => {
+                const r = target.getBoundingClientRect();
+                const pad = 6;
+                if (beginnerSpotlight) {
+                    beginnerSpotlight.style.display = "block";
+                    beginnerSpotlight.style.top = (r.top - pad) + "px";
+                    beginnerSpotlight.style.left = (r.left - pad) + "px";
+                    beginnerSpotlight.style.width = (r.width + pad * 2) + "px";
+                    beginnerSpotlight.style.height = (r.height + pad * 2) + "px";
+                }
+                if (beginnerTooltip) {
+                    beginnerTooltip.style.display = "block";
+                    document.getElementById("beginnerStepLabel").textContent = step.step;
+                    document.getElementById("beginnerTitle").textContent = step.title;
+                    document.getElementById("beginnerDesc").textContent = step.desc;
+                    let top = r.bottom + 12;
+                    if (top + 160 > window.innerHeight) top = Math.max(12, r.top - 160);
+                    let left = Math.min(Math.max(12, r.left), window.innerWidth - 332);
+                    beginnerTooltip.style.top = top + "px";
+                    beginnerTooltip.style.left = left + "px";
+                }
+            });
+        }
+
+        function startBeginnerMode() {
+            beginnerSteps = buildBeginnerSteps();
+            if (!beginnerSteps.length || !beginnerOverlay) return;
+            beginnerStepIndex = 0;
+            beginnerOverlay.style.display = "block";
+            beginnerOverlay.classList.add("active");
+            beginnerOverlay.setAttribute("aria-hidden", "false");
+            positionBeginnerStep();
+        }
+
+        function endBeginnerMode() {
+            if (beginnerOverlay) {
+                beginnerOverlay.style.display = "none";
+                beginnerOverlay.classList.remove("active");
+                beginnerOverlay.setAttribute("aria-hidden", "true");
+            }
+            if (beginnerSpotlight) beginnerSpotlight.style.display = "none";
+            if (beginnerTooltip) beginnerTooltip.style.display = "none";
+            try { localStorage.setItem("nasaroai_beginner_done", "1"); } catch {}
+        }
+
+        document.getElementById("beginnerNextBtn")?.addEventListener("click", () => {
+            beginnerStepIndex++;
+            if (beginnerStepIndex >= beginnerSteps.length) endBeginnerMode();
+            else positionBeginnerStep();
+        });
+        document.getElementById("beginnerSkipBtn")?.addEventListener("click", endBeginnerMode);
+        window.addEventListener("resize", () => {
+            if (beginnerOverlay?.classList.contains("active")) positionBeginnerStep();
+        });
+
         function openGuideBar() {
             if (!guideBar) return;
             const btn = document.getElementById("guideBtn");
@@ -6991,7 +7819,8 @@
 
         document.getElementById("guideBtn")?.addEventListener("click", (e) => {
             e.stopPropagation();
-            guideBar?.style.display === "flex" ? closeGuideBar() : openGuideBar();
+            closeGuideBar();
+            startBeginnerMode();
         });
         document.getElementById("guideBarClose")?.addEventListener("click", closeGuideBar);
         guideBarBackdrop?.addEventListener("click", closeGuideBar);

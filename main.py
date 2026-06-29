@@ -25,6 +25,7 @@ from custom_agent import CustomWebAgent, _extract_start_url, decide_next_step
 from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db_if_changed
 from auth_store import (
     add_support_reply,
+    add_work_comment,
     admin_adjust_quota,
     admin_set_quota_limit,
     admin_logout,
@@ -32,6 +33,7 @@ from auth_store import (
     count_activity_log,
     create_admin_session,
     create_public_share,
+    create_public_work,
     create_support_inquiry,
     db_connection,
     delete_support_inquiry,
@@ -43,6 +45,7 @@ from auth_store import (
     get_activity_log,
     get_admin_dashboard,
     get_public_share,
+    get_chat_messages,
     get_quota_snapshot,
     get_support_thread,
     get_user_admin_detail,
@@ -52,6 +55,9 @@ from auth_store import (
     DB_PATH,
     is_guest_subject,
     is_subject_banned,
+    list_public_works,
+    list_chat_users,
+    list_work_comments,
     list_guest_devices,
     list_support_inquiries,
     list_user_support_inquiries,
@@ -66,7 +72,9 @@ from auth_store import (
     set_subject_ban,
     set_admin_setting,
     touch_device_presence,
+    send_chat_message,
     signup as auth_signup_fn,
+    toggle_work_like,
     verify_admin_password,
     verify_admin_token,
 )
@@ -691,6 +699,19 @@ class ShareCreateRequest(BaseModel):
     kind: str = "compare"
     title: str = ""
     payload: dict = Field(default_factory=dict)
+
+
+class PublicWorkCreateRequest(BaseModel):
+    title: str = ""
+    body: str = ""
+
+
+class WorkCommentRequest(BaseModel):
+    body: str = ""
+
+
+class ChatMessageRequest(BaseModel):
+    body: str = ""
 
 
 class AdminLoginRequest(BaseModel):
@@ -4395,6 +4416,102 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
         dump["active_collab"] = None
     merged = merge_user_data(user["id"], dump)
     return {"success": True, "data": merged}
+
+
+@app.get("/social/works")
+def social_works_list(request: Request, limit: int = 50) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    viewer_id = user["id"] if user else None
+    works = list_public_works(limit=limit, viewer_id=viewer_id)
+    return {"works": works}
+
+
+@app.post("/social/works")
+def social_works_create(body: PublicWorkCreateRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        item = create_public_work(
+            user["id"],
+            user.get("display_name") or user.get("username") or "사용자",
+            body.title,
+            body.body,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "work": item}
+
+
+@app.post("/social/works/{work_id}/like")
+def social_works_like(work_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        result = toggle_work_like(work_id, user["id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"success": True, **result}
+
+
+@app.get("/social/works/{work_id}/comments")
+def social_works_comments(work_id: int) -> dict:
+    return {"comments": list_work_comments(work_id)}
+
+
+@app.post("/social/works/{work_id}/comments")
+def social_works_comment_add(work_id: int, body: WorkCommentRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        comment = add_work_comment(
+            work_id,
+            user["id"],
+            user.get("display_name") or user.get("username") or "사용자",
+            body.body,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "comment": comment}
+
+
+@app.get("/social/users")
+def social_users_list(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {"users": list_chat_users(user["id"])}
+
+
+@app.get("/social/chat/{peer_id}")
+def social_chat_get(peer_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        messages = get_chat_messages(user["id"], peer_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"messages": messages}
+
+
+@app.post("/social/chat/{peer_id}")
+def social_chat_send(peer_id: int, body: ChatMessageRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        msg = send_chat_message(
+            user["id"],
+            user.get("display_name") or user.get("username") or "사용자",
+            peer_id,
+            body.body,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "message": msg}
 
 
 @app.post("/share/create")

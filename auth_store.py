@@ -215,6 +215,44 @@ def init_db() -> None:
                     created_at REAL NOT NULL,
                     FOREIGN KEY(inquiry_id) REFERENCES support_inquiries(id)
                 );
+                CREATE TABLE IF NOT EXISTS public_works (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    author_name TEXT NOT NULL DEFAULT '',
+                    title TEXT NOT NULL DEFAULT '',
+                    body TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_public_works_created ON public_works(created_at DESC);
+                CREATE TABLE IF NOT EXISTS work_likes (
+                    work_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at REAL NOT NULL,
+                    PRIMARY KEY(work_id, user_id),
+                    FOREIGN KEY(work_id) REFERENCES public_works(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+                CREATE TABLE IF NOT EXISTS work_comments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    work_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    author_name TEXT NOT NULL DEFAULT '',
+                    body TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(work_id) REFERENCES public_works(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_work_comments_work ON work_comments(work_id, created_at);
+                CREATE TABLE IF NOT EXISTS user_chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room_id TEXT NOT NULL,
+                    sender_id INTEGER NOT NULL,
+                    sender_name TEXT NOT NULL DEFAULT '',
+                    body TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_chat_room ON user_chat_messages(room_id, created_at);
                 """
             )
             cols = {r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
@@ -2127,4 +2165,287 @@ def get_user_admin_detail(user_id: int) -> dict[str, Any]:
         "activity": activity,
         "platform_counts": platform_counts,
         "support_inquiries": inquiries,
+    }
+
+
+def _chat_room_id(user_a: int, user_b: int) -> str:
+    lo, hi = sorted((int(user_a), int(user_b)))
+    return f"{lo}:{hi}"
+
+
+def list_public_works(limit: int = 50, viewer_id: int | None = None) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 50), 100))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                       (SELECT COUNT(*) FROM work_likes wl WHERE wl.work_id = w.id) AS like_count,
+                       (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
+                FROM public_works w
+                ORDER BY w.created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            liked_ids: set[int] = set()
+            if viewer_id is not None:
+                liked_rows = conn.execute(
+                    "SELECT work_id FROM work_likes WHERE user_id = ?",
+                    (viewer_id,),
+                ).fetchall()
+                liked_ids = {int(r["work_id"]) for r in liked_rows}
+        finally:
+            conn.close()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        out.append({
+            "id": r["id"],
+            "user_id": r["user_id"],
+            "author_name": r["author_name"],
+            "title": r["title"],
+            "body": r["body"],
+            "created_at": r["created_at"],
+            "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
+            "like_count": int(r["like_count"] or 0),
+            "comment_count": int(r["comment_count"] or 0),
+            "liked_by_me": r["id"] in liked_ids,
+        })
+    return out
+
+
+def create_public_work(user_id: int, author_name: str, title: str, body: str) -> dict[str, Any]:
+    title = (title or "").strip()[:120]
+    body = (body or "").strip()[:8000]
+    if not body:
+        raise ValueError("작업 내용을 입력하세요.")
+    if not title:
+        title = body[:40] + ("…" if len(body) > 40 else "")
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO public_works (user_id, author_name, title, body, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (user_id, (author_name or "").strip()[:64], title, body, now),
+            )
+            conn.commit()
+            work_id = int(cur.lastrowid)
+        finally:
+            conn.close()
+    items = list_public_works(limit=1, viewer_id=user_id)
+    return next((i for i in items if i["id"] == work_id), {
+        "id": work_id,
+        "user_id": user_id,
+        "author_name": author_name,
+        "title": title,
+        "body": body,
+        "created_at": now,
+        "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(now)),
+        "like_count": 0,
+        "comment_count": 0,
+        "liked_by_me": False,
+    })
+
+
+def toggle_work_like(work_id: int, user_id: int) -> dict[str, Any]:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            exists = conn.execute(
+                "SELECT 1 FROM public_works WHERE id = ?",
+                (work_id,),
+            ).fetchone()
+            if not exists:
+                raise ValueError("작업을 찾을 수 없습니다.")
+            liked = conn.execute(
+                "SELECT 1 FROM work_likes WHERE work_id = ? AND user_id = ?",
+                (work_id, user_id),
+            ).fetchone()
+            if liked:
+                conn.execute(
+                    "DELETE FROM work_likes WHERE work_id = ? AND user_id = ?",
+                    (work_id, user_id),
+                )
+                liked_by_me = False
+            else:
+                conn.execute(
+                    "INSERT INTO work_likes (work_id, user_id, created_at) VALUES (?, ?, ?)",
+                    (work_id, user_id, now),
+                )
+                liked_by_me = True
+            conn.commit()
+            count_row = conn.execute(
+                "SELECT COUNT(*) AS c FROM work_likes WHERE work_id = ?",
+                (work_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+    return {"work_id": work_id, "liked_by_me": liked_by_me, "like_count": int(count_row["c"] or 0)}
+
+
+def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 80), 200))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT id, work_id, user_id, author_name, body, created_at
+                FROM work_comments
+                WHERE work_id = ?
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                (work_id, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [{
+        "id": r["id"],
+        "work_id": r["work_id"],
+        "user_id": r["user_id"],
+        "author_name": r["author_name"],
+        "body": r["body"],
+        "created_at": r["created_at"],
+        "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
+    } for r in rows]
+
+
+def add_work_comment(work_id: int, user_id: int, author_name: str, body: str) -> dict[str, Any]:
+    body = (body or "").strip()[:2000]
+    if not body:
+        raise ValueError("댓글 내용을 입력하세요.")
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            exists = conn.execute(
+                "SELECT 1 FROM public_works WHERE id = ?",
+                (work_id,),
+            ).fetchone()
+            if not exists:
+                raise ValueError("작업을 찾을 수 없습니다.")
+            cur = conn.execute(
+                """
+                INSERT INTO work_comments (work_id, user_id, author_name, body, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (work_id, user_id, (author_name or "").strip()[:64], body, now),
+            )
+            conn.commit()
+            comment_id = int(cur.lastrowid)
+        finally:
+            conn.close()
+    return {
+        "id": comment_id,
+        "work_id": work_id,
+        "user_id": user_id,
+        "author_name": author_name,
+        "body": body,
+        "created_at": now,
+        "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(now)),
+    }
+
+
+def list_chat_users(exclude_user_id: int, limit: int = 50) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 50), 100))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT id, display_name, email, user_email, created_at
+                FROM users
+                WHERE id != ?
+                ORDER BY display_name ASC, id ASC
+                LIMIT ?
+                """,
+                (exclude_user_id, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        name = (r["display_name"] or "").strip()
+        if not name:
+            name = (r["user_email"] or r["email"] or f"user{r['id']}").split("@")[0]
+        out.append({"id": r["id"], "display_name": name})
+    return out
+
+
+def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict[str, Any]]:
+    if user_id == peer_id:
+        raise ValueError("자기 자신과는 채팅할 수 없습니다.")
+    room = _chat_room_id(user_id, peer_id)
+    limit = max(1, min(int(limit or 120), 300))
+    with _lock:
+        conn = _connect()
+        try:
+            peer = conn.execute("SELECT id FROM users WHERE id = ?", (peer_id,)).fetchone()
+            if not peer:
+                raise ValueError("상대 계정을 찾을 수 없습니다.")
+            rows = conn.execute(
+                """
+                SELECT id, room_id, sender_id, sender_name, body, created_at
+                FROM user_chat_messages
+                WHERE room_id = ?
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                (room, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [{
+        "id": r["id"],
+        "room_id": r["room_id"],
+        "sender_id": r["sender_id"],
+        "sender_name": r["sender_name"],
+        "body": r["body"],
+        "created_at": r["created_at"],
+        "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
+        "is_mine": r["sender_id"] == user_id,
+    } for r in rows]
+
+
+def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -> dict[str, Any]:
+    body = (body or "").strip()[:4000]
+    if not body:
+        raise ValueError("메시지를 입력하세요.")
+    if user_id == peer_id:
+        raise ValueError("자기 자신에게는 보낼 수 없습니다.")
+    room = _chat_room_id(user_id, peer_id)
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            peer = conn.execute("SELECT id FROM users WHERE id = ?", (peer_id,)).fetchone()
+            if not peer:
+                raise ValueError("상대 계정을 찾을 수 없습니다.")
+            cur = conn.execute(
+                """
+                INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (room, user_id, (sender_name or "").strip()[:64], body, now),
+            )
+            conn.commit()
+            msg_id = int(cur.lastrowid)
+        finally:
+            conn.close()
+    return {
+        "id": msg_id,
+        "room_id": room,
+        "sender_id": user_id,
+        "sender_name": sender_name,
+        "body": body,
+        "created_at": now,
+        "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
+        "is_mine": True,
     }
