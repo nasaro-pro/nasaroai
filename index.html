@@ -1722,10 +1722,10 @@
             flex-direction: column;
             flex: 1 1 auto;
             min-height: 0;
-            max-height: min(420px, 48vh);
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: contain;
+            overflow-anchor: none;
             -webkit-overflow-scrolling: touch;
         }
         .compare-qa-pair {
@@ -1734,7 +1734,7 @@
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
-            scroll-margin-bottom: 8px;
+            scroll-margin-top: 4px;
         }
         .compare-qa-pair:last-child {
             border-bottom: none;
@@ -1884,7 +1884,11 @@
             display: flex;
             flex-direction: column;
             min-height: 280px;
-            max-height: min(520px, 58vh);
+            max-height: min(calc(100dvh - var(--bottom-offset, 150px) - 96px), 620px);
+        }
+
+        #comparePanel.active .compare-grid:not(:empty) {
+            align-items: stretch;
         }
 
         .compare-card-header {
@@ -1932,20 +1936,24 @@
         }
 
         .retry-row {
-            padding: 0 12px 12px;
+            padding: 4px 0 0;
         }
 
         .retry-row:empty {
             padding: 0;
         }
 
+        .compare-qa-pair-error .compare-content {
+            color: #991b1b;
+        }
+
         .retry-button {
             width: auto;
-            min-height: 40px;
-            padding: 10px 18px;
+            min-height: 34px;
+            padding: 6px 14px;
             background: #dc2626;
             color: #fff;
-            font-size: 15px;
+            font-size: 13px;
             border: 0;
             border-radius: 6px;
             font-weight: 700;
@@ -2087,6 +2095,83 @@
         html[data-theme="dark"] .compare-content a {
             color: #93c5fd;
         }
+
+        .ai-answer-rich {
+            white-space: normal;
+        }
+        .ai-answer-rich p { margin: 0 0 0.75em; }
+        .ai-answer-rich p:last-child { margin-bottom: 0; }
+        .ai-answer-rich h1, .ai-answer-rich h2, .ai-answer-rich h3, .ai-answer-rich h4 {
+            margin: 0.85em 0 0.45em;
+            line-height: 1.35;
+            font-weight: 800;
+        }
+        .ai-answer-rich ul, .ai-answer-rich ol {
+            margin: 0.4em 0 0.85em;
+            padding-left: 1.35em;
+        }
+        .ai-answer-rich li { margin: 0.25em 0; }
+        .ai-answer-rich blockquote {
+            margin: 0.6em 0;
+            padding: 0.35em 0.8em;
+            border-left: 3px solid #c4b5fd;
+            color: #475569;
+            background: #f8fafc;
+        }
+        html[data-theme="dark"] .ai-answer-rich blockquote {
+            background: #1e293b;
+            color: #cbd5e1;
+            border-color: #7c3aed;
+        }
+        .ai-answer-rich pre {
+            margin: 0.6em 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: #f3f4f6;
+            overflow-x: auto;
+            font-size: 0.92em;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        html[data-theme="dark"] .ai-answer-rich pre { background: #111827; }
+        .ai-answer-rich code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.92em;
+            background: #f3f4f6;
+            padding: 0.1em 0.35em;
+            border-radius: 4px;
+        }
+        html[data-theme="dark"] .ai-answer-rich code { background: #1f2937; }
+        .ai-answer-rich pre code { background: transparent; padding: 0; }
+        .ai-answer-rich table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.65em 0 0.85em;
+            font-size: 0.94em;
+        }
+        .ai-answer-rich th, .ai-answer-rich td {
+            border: 1px solid #e5e7eb;
+            padding: 6px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        html[data-theme="dark"] .ai-answer-rich th,
+        html[data-theme="dark"] .ai-answer-rich td { border-color: #374151; }
+        .ai-answer-rich th { background: #f9fafb; font-weight: 700; }
+        html[data-theme="dark"] .ai-answer-rich th { background: #1f2937; }
+        .ai-answer-rich img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 0.5em 0;
+        }
+        .ai-answer-rich hr {
+            border: 0;
+            border-top: 1px solid #e5e7eb;
+            margin: 0.85em 0;
+        }
+        html[data-theme="dark"] .ai-answer-rich hr { border-color: #374151; }
 
         .debate-preview-body {
             padding: 14px;
@@ -4949,6 +5034,8 @@
         <!-- 사이트 자체 에이전트 패널 제거됨. 에이전트는 크롬 확장(하단 바)으로 통일. -->
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <script src="/static/nasaro-features.js?v=20260627p"></script>
     <script>
         const API_URL = "";
@@ -5396,8 +5483,9 @@
                 <div id="content-${slug}" class="compare-content"></div>
                 <div id="retry-${slug}" class="retry-row"></div>`;
             stack.appendChild(pair);
+            ensureCompareStackScrollGuard(stack);
             if (opts.scroll !== false) {
-                scrollComparePairIntoView(stack, pair);
+                pinComparePairScroll(stack, pair);
             }
             return slug;
         }
@@ -5412,7 +5500,7 @@
                 Object.keys(turn.responses || {}).forEach(model => {
                     appendCompareQaPair(model, turn.query, turnIndex, { scroll: false });
                     const failed = turn.responses[model] === COMPARE_FAILURE_MSG;
-                    updateCompareCard(model, turn.responses[model] || "", failed, turnIndex);
+                    updateCompareCard(model, turn.responses[model] || "", failed, turnIndex, { final: true });
                 });
                 if (turn.query) updateCompareAffinityStars(turn.query, Object.keys(turn.responses || {}), turnIndex);
             });
@@ -5907,8 +5995,9 @@
             }
             viewingResultIndex = typeof idx === "number" ? idx : savedResults.indexOf(record);
             const NF = window.NasaroFeatures;
-            const parts = (record.sections || []).map(s =>
-                `<h4 style="margin:12px 0 6px;font-size:14px;color:#6d28d9;">${escapeHtml(s.heading || "")}</h4><pre style="white-space:pre-wrap;margin:0 0 12px;font-family:inherit;line-height:1.55;">${escapeHtml(String(s.body || ""))}</pre>`
+            const sections = record.sections || [];
+            const parts = sections.map((s, i) =>
+                `<div class="saved-result-section"><h4 style="margin:12px 0 6px;font-size:14px;color:#6d28d9;">${escapeHtml(s.heading || "")}</h4><div class="saved-result-body" data-section-idx="${i}"></div></div>`
             ).join("");
             const folderOpts = RESULT_FOLDERS.map(f =>
                 `<option value="${escapeHtml(f)}"${(record.folder || "기본") === f ? " selected" : ""}>${escapeHtml(f)}</option>`
@@ -5927,6 +6016,10 @@
                 </div>`;
             document.getElementById("savedResultExportBtn")?.addEventListener("click", (e) => {
                 NF?.showExportFormatMenu?.(e.currentTarget, record.title || "결과물", record.sections || []);
+            });
+            body.querySelectorAll(".saved-result-body").forEach(el => {
+                const idx = Number(el.dataset.sectionIdx);
+                renderAiAnswer(el, sections[idx]?.body || "");
             });
             document.getElementById("savedResultMetaSave")?.addEventListener("click", () => {
                 if (viewingResultIndex < 0 || !savedResults[viewingResultIndex]) return;
@@ -6177,6 +6270,22 @@
             syncTimer = setTimeout(syncUserData, 1200);
         }
 
+        async function clearActiveCollabEverywhere() {
+            userDataStore().removeItem(ACTIVE_COLLAB_KEY);
+            localStorage.removeItem(ACTIVE_COLLAB_KEY);
+            sessionStorage.removeItem(ACTIVE_COLLAB_KEY);
+            renderActiveCollabSidebar();
+            if (authToken && currentUser) {
+                try {
+                    await apiFetch("/user/sync", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ active_collab: null }),
+                    });
+                } catch {}
+            }
+        }
+
         async function syncUserData() {
             if (!authToken || !currentUser) return;
             if (window.NasaroFeatures?.isPrivacyMode?.()) return;
@@ -6187,11 +6296,16 @@
                 if (aiSettings) payload.ai_settings = aiSettings;
                 try {
                     const activeCollab = JSON.parse(userDataStore().getItem(ACTIVE_COLLAB_KEY) || "null");
-                    if (activeCollab?.task) payload.active_collab = activeCollab;
-                } catch {}
+                    if (activeCollab?.task) {
+                        payload.active_collab = activeCollab;
+                    } else {
+                        payload.active_collab = null;
+                    }
+                } catch {
+                    payload.active_collab = null;
+                }
                 if (savedResults.length) payload.saved_works = savedResults;
                 payload.session_history = sessionHistory.slice(0, 50);
-                if (!Object.keys(payload).length) return;
                 await apiFetch("/user/sync", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -6213,8 +6327,12 @@
                 if (Array.isArray(data.session_history)) {
                     applyServerSessionHistory(data.session_history);
                 }
-                if (data.active_collab) {
-                    localStorage.setItem(ACTIVE_COLLAB_KEY, JSON.stringify(data.active_collab));
+                if (data.active_collab?.task) {
+                    userDataStore().setItem(ACTIVE_COLLAB_KEY, JSON.stringify(data.active_collab));
+                    renderActiveCollabSidebar();
+                } else {
+                    userDataStore().removeItem(ACTIVE_COLLAB_KEY);
+                    localStorage.removeItem(ACTIVE_COLLAB_KEY);
                     renderActiveCollabSidebar();
                 }
                 if (Array.isArray(data.ai_presets) && data.ai_presets.length) {
@@ -6309,8 +6427,7 @@
             });
             collabSession = null;
             collabFinalProduct = "";
-            userDataStore().removeItem(ACTIVE_COLLAB_KEY);
-            renderActiveCollabSidebar();
+            await clearActiveCollabEverywhere();
             document.getElementById("collabWorkspace").style.display = "none";
             document.getElementById("collabIntro").style.display = "";
             collabTaskAsked = false;
@@ -6736,7 +6853,7 @@
                 collabPipelineRunning = false;
                 collabFinalProduct = "";
                 resetCollabIntake();
-                userDataStore().removeItem(ACTIVE_COLLAB_KEY);
+                await clearActiveCollabEverywhere();
                 document.getElementById("collabWorkspace").style.display = "none";
                 document.getElementById("collabIntro").style.display = "flex";
                 const rec = document.getElementById("collabRecommendResult");
@@ -7173,12 +7290,37 @@
                 .replace(/"/g, "&quot;");
         }
 
-        function renderAiAnswer(element, content) {
+        function renderAiAnswer(element, content, opts = {}) {
             if (!element) return;
             const raw = String(content ?? "");
             if (!raw) {
                 element.textContent = "";
+                element.classList.remove("ai-answer-rich");
                 return;
+            }
+            const streaming = opts.streaming === true;
+            if (streaming) {
+                element.classList.remove("ai-answer-rich");
+                element.textContent = raw;
+                return;
+            }
+            if (window.marked && window.DOMPurify) {
+                try {
+                    if (!window.__markedConfigured) {
+                        marked.setOptions({ breaks: true, gfm: true });
+                        window.__markedConfigured = true;
+                    }
+                    const html = DOMPurify.sanitize(marked.parse(raw), {
+                        ADD_ATTR: ["target", "rel"],
+                    });
+                    element.classList.add("ai-answer-rich");
+                    element.innerHTML = html;
+                    element.querySelectorAll("a[href]").forEach(a => {
+                        a.target = "_blank";
+                        a.rel = "noopener noreferrer";
+                    });
+                    return;
+                } catch {}
             }
             let html = escapeHtml(raw);
             html = html.replace(
@@ -7189,6 +7331,7 @@
                 /(^|[\s(])((https?:\/\/)[^\s<>"')\]]+)/g,
                 '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>'
             );
+            element.classList.add("ai-answer-rich");
             element.innerHTML = html;
         }
 
@@ -7196,13 +7339,77 @@
             return element?.innerText || element?.textContent || "";
         }
 
-        function scrollComparePairIntoView(stack, pair) {
+        function getBubbleScrollTop(stack, bubble) {
+            if (!stack || !bubble) return 0;
+            return bubble.getBoundingClientRect().top - stack.getBoundingClientRect().top + stack.scrollTop;
+        }
+
+        let compareStreamPinActive = false;
+
+        function beginCompareStreamPin() {
+            compareStreamPinActive = true;
+        }
+
+        function endCompareStreamPin() {
+            compareStreamPinActive = false;
+            compareScrollPins.clear();
+            compareResizeObservers.forEach(ro => ro.disconnect());
+            compareResizeObservers.clear();
+        }
+
+        const compareScrollPins = new Map();
+        const compareResizeObservers = new Map();
+
+        function stopCompareStackPinWatch(stack) {
+            if (!stack?.id) return;
+            const ro = compareResizeObservers.get(stack.id);
+            if (ro) {
+                ro.disconnect();
+                compareResizeObservers.delete(stack.id);
+            }
+        }
+
+        function watchComparePairPin(stack, pair) {
             if (!stack || !pair) return;
-            requestAnimationFrame(() => {
-                const bubble = pair.querySelector(".compare-q-bubble");
-                const targetTop = bubble ? bubble.offsetTop : pair.offsetTop;
-                stack.scrollTop = Math.max(0, targetTop - 4);
+            const content = pair.querySelector(".compare-content");
+            if (!content || !stack.id) return;
+            stopCompareStackPinWatch(stack);
+            const ro = new ResizeObserver(() => {
+                if (compareStreamPinActive) pinComparePairScroll(stack, pair);
             });
+            ro.observe(content);
+            compareResizeObservers.set(stack.id, ro);
+        }
+
+        function pinComparePairScroll(stack, pair) {
+            if (!stack || !pair) return;
+            const bubble = pair.querySelector(".compare-q-bubble") || pair;
+            const apply = () => {
+                stack.scrollTop = Math.max(0, getBubbleScrollTop(stack, bubble) - 4);
+                if (stack.id) compareScrollPins.set(stack.id, stack.scrollTop);
+            };
+            apply();
+            requestAnimationFrame(() => {
+                apply();
+                requestAnimationFrame(apply);
+            });
+        }
+
+        function scrollComparePairIntoView(stack, pair) {
+            pinComparePairScroll(stack, pair);
+        }
+
+        function maintainCompareScrollPin(stack) {
+            if (!stack?.id || !compareStreamPinActive) return;
+            const pin = compareScrollPins.get(stack.id);
+            if (pin == null) return;
+            if (Math.abs(stack.scrollTop - pin) > 1) stack.scrollTop = pin;
+        }
+
+        function ensureCompareStackScrollGuard(stack) {
+            if (!stack || stack.dataset.scrollGuard) return;
+            stack.dataset.scrollGuard = "1";
+            stack.addEventListener("scroll", () => maintainCompareScrollPin(stack), { passive: true });
         }
 
         function confirmCollabRework(verify) {
@@ -7611,7 +7818,7 @@
             clearInterval(stepInterval);
             progressEl.style.display = "none";
             bodyEl.style.display = "";
-            bodyEl.textContent = content;
+            renderAiAnswer(bodyEl, content);
             metaEl.style.display = "flex";
             metaEl.textContent = `소요: ${(elapsed / 1000).toFixed(1)}초`;
             const cardRefsForContinue = { card, badge, progressEl, logEl, bodyEl, metaEl, actionsEl, stepInterval: null };
@@ -8133,7 +8340,10 @@
             const el = document.createElement("div");
             el.className = `collab-intake-msg ${role}`;
             if (role === "assistant" && speaker) {
-                el.innerHTML = `<strong>${escapeHtml(speaker)}</strong>\n${escapeHtml(text)}`;
+                el.innerHTML = `<strong>${escapeHtml(speaker)}</strong>`;
+                const body = document.createElement("div");
+                el.appendChild(body);
+                renderAiAnswer(body, text);
             } else {
                 el.textContent = text;
             }
@@ -8755,7 +8965,7 @@
 
                 let workBody = "";
                 if (output) {
-                    workBody = `<pre>${esc(output)}</pre>`;
+                    workBody = `<div class="collab-panel-work-output"></div>`;
                 } else if (state === "running") {
                     workBody = `<p class="collab-stage-wait">AI 작업 중…</p>`;
                 } else {
@@ -8765,7 +8975,7 @@
                     workBody += `
                     <div class="collab-final-inline">
                         <h4>✅ 최종 작업물</h4>
-                        <pre>${esc(collabFinalProduct)}</pre>
+                        <div class="collab-final-output"></div>
                     </div>`;
                 }
 
@@ -8790,6 +9000,11 @@
                         </div>
                         <div class="collab-panel-work-body">${workBody}</div>
                     </div>`;
+
+                const workOutEl = bodyEl.querySelector(".collab-panel-work-output");
+                if (workOutEl && output) renderAiAnswer(workOutEl, output);
+                const finalOutEl = bodyEl.querySelector(".collab-final-output");
+                if (finalOutEl && collabFinalProduct) renderAiAnswer(finalOutEl, collabFinalProduct);
 
                 railEl.querySelectorAll("[data-rail-step]").forEach(btn => {
                     btn.addEventListener("click", () => {
@@ -8911,21 +9126,42 @@
             }
         }
 
-        function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex) {
+        function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex, opts = {}) {
             const slug = compareContentSlug(turnIndex, model);
             const element = document.getElementById(`content-${slug}`);
-            if (element) renderAiAnswer(element, content);
+            const streaming = opts.final !== true && !isError;
+            if (element) renderAiAnswer(element, content, { streaming });
 
-            const card = document.getElementById(`compare-card-${compareModelKey(model)}`);
-            if (card) card.classList.toggle("error-card", isError);
+            const pair = document.getElementById(`compare-qa-pair-${slug}`);
+            if (pair) pair.classList.toggle("compare-qa-pair-error", isError);
 
             const retry = document.getElementById(`retry-${slug}`);
-            if (!retry) return;
             if (isError) {
-                retry.innerHTML = `<button class="retry-button" type="button">다시 시도</button>`;
-                retry.querySelector("button").addEventListener("click", () => retryCompareModel(model, turnIndex));
-            } else {
+                if (retry) {
+                    retry.innerHTML = `<button class="retry-button" type="button">다시 시도</button>`;
+                    retry.querySelector("button").addEventListener("click", () => retryCompareModel(model, turnIndex));
+                }
+            } else if (retry) {
                 retry.innerHTML = "";
+            }
+
+            if (turnIndex === compareCurrentTurnIndex) {
+                const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
+                if (stack && pair) {
+                    ensureCompareStackScrollGuard(stack);
+                    if (opts.final === true) {
+                        pinComparePairScroll(stack, pair);
+                    } else if (streaming) {
+                        if (!compareScrollPins.has(stack.id)) pinComparePairScroll(stack, pair);
+                        maintainCompareScrollPin(stack);
+                        requestAnimationFrame(() => {
+                            maintainCompareScrollPin(stack);
+                            if (compareStreamPinActive && !compareScrollPins.has(stack.id)) {
+                                pinComparePairScroll(stack, pair);
+                            }
+                        });
+                    }
+                }
             }
         }
 
@@ -8955,10 +9191,17 @@
             turn.responses[model] = "";
             updateCompareModelMeta(model, "");
             updateCompareCard(model, "다시 시도 중...", false, turnIndex);
+            const retryStack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
+            const retryPair = document.getElementById(`compare-qa-pair-${compareContentSlug(turnIndex, model)}`);
+            pinComparePairScroll(retryStack, retryPair);
+            beginCompareStreamPin();
             try {
                 await streamCompareModel(model, turn.query, turn.responses, turn.sessionId, turnIndex);
+                updateCompareCard(model, turn.responses[model] || "", turn.responses[model] === COMPARE_FAILURE_MSG, turnIndex, { final: true });
             } catch (error) {
                 applyStreamChunk(turn.responses, { model, success: false, error: COMPARE_FAILURE_MSG }, turnIndex);
+            } finally {
+                endCompareStreamPin();
             }
             syncCompareSessionHistory();
         }
@@ -9059,6 +9302,7 @@
             const isFirstTurn = turnIndex === 0;
             const activeModels = getActiveModels();
             if (isFirstTurn) {
+                compareScrollPins.clear();
                 document.getElementById("compareResponses").innerHTML = "";
                 const sumBar = document.getElementById("compareSummaryBar");
                 if (sumBar) sumBar.style.display = "none";
@@ -9072,6 +9316,13 @@
             activeModels.forEach(model => {
                 responses[model] = "";
                 appendCompareQaPair(model, message, turnIndex);
+            });
+            beginCompareStreamPin();
+            activeModels.forEach(model => {
+                const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
+                const pair = document.getElementById(`compare-qa-pair-${compareContentSlug(turnIndex, model)}`);
+                pinComparePairScroll(stack, pair);
+                watchComparePairPin(stack, pair);
             });
             updateCompareAffinityStars(message, activeModels, turnIndex);
 
@@ -9110,10 +9361,10 @@
             });
             refreshCompareSummary(message, responses);
             activeModels.forEach(model => {
-                const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
-                const pair = document.getElementById(`compare-qa-pair-${compareContentSlug(turnIndex, model)}`);
-                scrollComparePairIntoView(stack, pair);
+                const failed = responses[model] === COMPARE_FAILURE_MSG;
+                updateCompareCard(model, responses[model] || "", failed, turnIndex, { final: true });
             });
+            endCompareStreamPin();
             syncCompareSessionHistory();
             const answerText = activeModels.map(m => `[${m}]\n${responses[m] || ""}`).join("\n\n");
             logUserActivity("compare", message, answerText, "compare");
@@ -9313,19 +9564,41 @@
             renderDebateDeck();
         }
 
-        async function requestDebate(endpoint, payload, options = {}) {
+        function patchDebateCardStream(cardId, content, meta = {}) {
+            const idx = debateCards.findIndex(c => c.id === cardId);
+            if (idx !== -1) {
+                debateCards[idx].content = content;
+                debateCards[idx].loading = true;
+                if (meta.actual_label) {
+                    debateCards[idx].actual_label = meta.actual_label;
+                    debateCards[idx].model = meta.actual_label;
+                }
+                if (meta.actual_model) debateCards[idx].actual_model = meta.actual_model;
+                if (meta.requested_label) debateCards[idx].requested_label = meta.requested_label;
+            }
+            const el = document.querySelector(`.debate-card[data-id="${CSS.escape(cardId)}"]`);
+            const bodyEl = el?.querySelector(".debate-card-body, .debate-preview-body");
+            if (bodyEl) renderAiAnswer(bodyEl, content, { streaming: true });
+        }
+
+        async function streamDebateRequest(payload, options = {}) {
             payload.user_id = getDeviceId();
             debateInFlight = true;
             updateDockUI();
             showNotice("debateError", "");
-            showNotice("debateLoading", options.loadingText || "토론 라운드를 순차 생성하는 중입니다.");
+            showNotice("debateLoading", options.loadingText || "토론 발언을 생성하는 중입니다.");
 
             const expectedRound = options.expectedRound || 1;
             const expectedSpeaker = options.expectedSpeaker || 1;
+            const cardId = `${expectedRound}-${expectedSpeaker}-loading`;
+
             if (options.showLoadingCard) appendLoadingCard(expectedRound, expectedSpeaker);
 
+            let content = "";
+            let turnMeta = null;
+
             try {
-                const response = await apiFetch(endpoint, {
+                const response = await apiFetch("/debate/stream", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
@@ -9335,32 +9608,75 @@
                     const errMsg = await parseApiError(response, "토론 요청 실패");
                     throw new Error(errMsg);
                 }
+                if (!response.body) throw new Error("스트림을 사용할 수 없습니다");
 
-                const data = await response.json();
-                if (data.queued) {
-                    queuedDuringFlight = true;
-                    showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
-                    return data;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (value) {
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split("\n\n");
+                        buffer = events.pop() || "";
+                        for (const event of events) {
+                            const line = event.split("\n").find(item => item.startsWith("data: "));
+                            if (!line) continue;
+                            let data;
+                            try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+                            if (data.queued) {
+                                queuedDuringFlight = true;
+                                showNotice("debateLoading", "현재 라운드 진행 중, 다음 라운드에 반영됩니다.");
+                                return { queued: true };
+                            }
+
+                            if (data.chunk) {
+                                content += data.chunk;
+                                patchDebateCardStream(cardId, content, data);
+                            }
+
+                            if (data.done && data.turn) {
+                                turnMeta = data.turn;
+                                if (data.success === false && !content) {
+                                    throw new Error(data.error || DEBATE_FAILURE_MSG);
+                                }
+                            } else if (data.success === false && data.error && !data.chunk) {
+                                throw new Error(data.error || DEBATE_FAILURE_MSG);
+                            }
+                        }
+                    }
+                    if (done) break;
                 }
 
-                replaceLoadingCards(data.round || expectedRound, data.turns || []);
-                if (data.turns?.length && debateTopic) {
-                    const sections = data.turns.map(t => ({
-                        heading: `${t.round_number}R ${t.speaker_index}번 (${t.actual_label || t.requested_label})`,
-                        body: t.content || "",
-                    }));
-                    window.NasaroFeatures?.addResultActions?.(document.getElementById("debateContent"), {
-                        title: debateTopic,
-                        sections,
-                        kind: "debate",
-                        payload: { topic: debateTopic, turns: data.turns },
-                        apiFetch,
-                        showToast,
-                        onSaveResult: saveResultRecord,
-                        loggedIn: !!currentUser,
-                    });
+                if (turnMeta) {
+                    replaceLoadingCards(expectedRound, [turnMeta]);
+                    if (debateTopic) {
+                        const sections = debateCards
+                            .filter(c => !c.loading && !c.is_summary && c.content)
+                            .slice(-3)
+                            .map(t => ({
+                                heading: `${t.round_number}R ${t.speaker_index}번 (${t.actual_label || t.model || ""})`,
+                                body: t.content || "",
+                            }));
+                        if (sections.length) {
+                            window.NasaroFeatures?.addResultActions?.(document.getElementById("debateContent"), {
+                                title: debateTopic,
+                                sections,
+                                kind: "debate",
+                                payload: { topic: debateTopic, cards: debateCards.filter(c => !c.loading) },
+                                apiFetch,
+                                showToast,
+                                onSaveResult: saveResultRecord,
+                                loggedIn: !!currentUser,
+                            });
+                        }
+                    }
+                    return { round: expectedRound, turns: [turnMeta] };
                 }
-                return data;
+
+                throw new Error(DEBATE_FAILURE_MSG);
             } catch (error) {
                 showNotice("debateError", `오류: ${error.message}`);
                 replaceLoadingCards(expectedRound, [{
@@ -9368,7 +9684,7 @@
                     speaker_index: expectedSpeaker,
                     model: `${expectedSpeaker}번`,
                     role: expectedSpeaker === 1 ? "1번 주장" : expectedSpeaker === 2 ? "2번 비평·보완" : "3번 종합",
-                    content: DEBATE_FAILURE_MSG,
+                    content: content || DEBATE_FAILURE_MSG,
                     success: false,
                 }]);
                 return { round: expectedRound, turns: [{ success: false }] };
@@ -9377,6 +9693,10 @@
                 showNotice("debateLoading", "");
                 updateDockUI();
             }
+        }
+
+        async function requestDebate(endpoint, payload, options = {}) {
+            return streamDebateRequest(payload, options);
         }
 
         async function handleDebateStart() {
@@ -9395,7 +9715,7 @@
             syncDebateEmptyHint();
             updateDockUI();
 
-            await runDebateRoundSequence("/debate/start", {
+            await runDebateRoundSequence({
                 session_id: debateSessionId,
                 topic: debateTopic,
             }, 1);
@@ -9476,13 +9796,12 @@
             }
         }
 
-        async function runDebateRoundSequence(firstEndpoint, firstPayload, expectedRound) {
+        async function runDebateRoundSequence(firstPayload, expectedRound) {
             for (let speakerIndex = 1; speakerIndex <= 3; speakerIndex += 1) {
-                const endpoint = speakerIndex === 1 ? firstEndpoint : "/debate/continue";
                 const payload = speakerIndex === 1
                     ? firstPayload
                     : { session_id: debateSessionId, topic: debateTopic };
-                const data = await requestDebate(endpoint, payload, {
+                const data = await streamDebateRequest(payload, {
                     expectedRound,
                     expectedSpeaker: speakerIndex,
                     showLoadingCard: true,
@@ -9550,7 +9869,7 @@
         async function handleDebateContinue(userInput = null) {
             if (!debateStarted || debateInFlight) return;
             const nextRound = Math.max(0, ...debateCards.map(card => card.round_number || 0)) + 1;
-            await runDebateRoundSequence("/debate/continue", {
+            await runDebateRoundSequence({
                 session_id: debateSessionId,
                 topic: debateTopic,
                 user_input: userInput,

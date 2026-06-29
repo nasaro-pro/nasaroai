@@ -80,7 +80,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
-COMPARE_STREAM_TIMEOUT = httpx.Timeout(35.0, connect=10.0)
+COMPARE_STREAM_TIMEOUT = httpx.Timeout(90.0, connect=10.0)
+DEBATE_STREAM_TIMEOUT = httpx.Timeout(90.0, connect=10.0)
 MODEL_REFRESH_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 MAX_COMPARE_STREAM_MODEL_ATTEMPTS = 5
 MODEL_CACHE_TTL_SECONDS = 600
@@ -2095,6 +2096,133 @@ async def call_ai_model(
         return await _call_ai_model_core(label, prompt, max_tokens, excluded_models)
 
 
+async def stream_label_chat(
+    label: str,
+    prompt: str,
+    max_tokens: int | None = None,
+    excluded_models: set[str] | None = None,
+) -> AsyncIterator[dict]:
+    """Stream OpenRouter chat chunks for one label. Yields chunk/meta/error/complete events."""
+    if label not in COMPANY_LABELS:
+        yield {"error": USER_FACING_FAILURE_MSG}
+        return
+
+    await ensure_model_cache_fresh()
+    persona = PERSONAS[label]
+    candidates = build_model_try_order(label, excluded_models)
+    if not candidates:
+        yield {"error": USER_FACING_FAILURE_MSG}
+        return
+
+    requested_model = candidates[0]
+    failed_candidates: list[str] = []
+
+    for model_id in candidates:
+        parts: list[str] = []
+        meta_payload = {
+            "requested_label": label,
+            "actual_label": label_for_model_id(model_id),
+            "requested_model": requested_model,
+            "actual_model": model_id,
+            "is_real_company_model": model_id.startswith(COMPANY_PREFIXES[label]),
+        }
+        meta_sent = False
+        try:
+            async with httpx.AsyncClient(timeout=DEBATE_STREAM_TIMEOUT) as client:
+                for attempt in range(2):
+                    async with client.stream(
+                        "POST",
+                        OPENROUTER_CHAT_URL,
+                        headers=build_openrouter_headers(),
+                        json=build_chat_payload(
+                            model_id=model_id,
+                            persona=persona,
+                            prompt=prompt,
+                            stream=True,
+                            max_tokens=max_tokens,
+                        ),
+                    ) as response:
+                        if response.status_code == 429:
+                            body = (await response.aread()).decode("utf-8", "ignore")
+                            if is_daily_free_limit(body, model_id):
+                                yield {"error": DAILY_LIMIT_MSG}
+                                return
+                            if attempt == 0:
+                                await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
+                                continue
+                            failed_candidates.append(model_id)
+                            break
+
+                        if response.status_code != 200:
+                            body = (await response.aread()).decode("utf-8", "ignore")
+                            if response.status_code == 401:
+                                yield {"error": OPENROUTER_AUTH_ERROR_MSG}
+                                return
+                            if is_daily_free_limit(body, model_id):
+                                yield {"error": DAILY_LIMIT_MSG}
+                                return
+                            failed_candidates.append(model_id)
+                            if should_try_next_candidate(response.status_code):
+                                break
+                            yield {"error": USER_FACING_FAILURE_MSG}
+                            return
+
+                        async for line in response.aiter_lines():
+                            if not line or not line.startswith("data: "):
+                                continue
+                            if line == "data: [DONE]":
+                                break
+                            try:
+                                raw = json.loads(line[6:])
+                            except json.JSONDecodeError:
+                                yield {"error": USER_FACING_FAILURE_MSG}
+                                return
+                            if raw.get("error"):
+                                yield {"error": USER_FACING_FAILURE_MSG}
+                                return
+                            delta = (raw.get("choices") or [{}])[0].get("delta") or {}
+                            chunk = delta.get("content")
+                            if isinstance(chunk, list):
+                                chunk = "".join(
+                                    str(b.get("text") or b) if isinstance(b, dict) else str(b)
+                                    for b in chunk
+                                )
+                            if not chunk:
+                                continue
+                            parts.append(chunk)
+                            event: dict = {"chunk": chunk}
+                            if not meta_sent:
+                                event["meta"] = meta_payload
+                                meta_sent = True
+                            yield event
+
+                        content = "".join(parts)
+                        if not content.strip() or is_meta_or_invalid_response(content, prompt):
+                            failed_candidates.append(model_id)
+                            break
+
+                        yield {
+                            "complete": True,
+                            "result": ModelCallResult(
+                                success=True,
+                                content=content,
+                                requested_label=label,
+                                actual_label=meta_payload["actual_label"],
+                                requested_model=requested_model,
+                                actual_model=model_id,
+                                is_real_company_model=meta_payload["is_real_company_model"],
+                                failed_candidates=failed_candidates,
+                            ),
+                        }
+                        return
+        except httpx.HTTPError as exc:
+            logger.warning("Debate stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
+            failed_candidates.append(model_id)
+            continue
+
+    yield {"error": USER_FACING_FAILURE_MSG}
+
+
 def compress_turn_content(text: str, max_sentences: int = 2, max_chars: int = 180) -> str:
     clean = re.sub(r"\s+", " ", text).strip()
     sentences = re.split(r"(?<=[.!?。!?])\s+", clean)
@@ -3393,6 +3521,255 @@ async def debate_continue(request: DebateRequest, http_request: Request) -> dict
     return debate_response(session, turns)
 
 
+def _commit_debate_stream_turn(
+    session: DebateSession,
+    speaker_index: int,
+    requested_label: str,
+    result: ModelCallResult,
+    *,
+    is_retry: bool,
+) -> DebateTurn:
+    if not result.success:
+        turn = make_failure_turn(
+            session.round_number,
+            speaker_index,
+            requested_label,
+            content=result.error or USER_FACING_FAILURE_MSG,
+        )
+    else:
+        already_used = set(session.round_used_models)
+        already_used.update(t.actual_model for t in session.current_round_turns if t.actual_model)
+        if result.actual_model in already_used:
+            turn = make_failure_turn(session.round_number, speaker_index, requested_label)
+        else:
+            session.round_used_models.append(result.actual_model)
+            turn = result_to_debate_turn(session.round_number, speaker_index, requested_label, result)
+
+    session.failed_candidates.extend(result.failed_candidates if result.success else [])
+
+    if is_retry:
+        session.current_round_turns = [
+            existing for existing in session.current_round_turns if existing.speaker_index != speaker_index
+        ]
+        session.current_round_turns.append(turn)
+        session.current_round_turns.sort(key=lambda existing: existing.speaker_index)
+    else:
+        session.current_round_turns.append(turn)
+    return turn
+
+
+@app.post("/debate/stream")
+async def debate_stream(request: DebateRequest, http_request: Request) -> StreamingResponse:
+    async def generate() -> AsyncIterator[str]:
+        yield ": keepalive\n\n"
+        lock = get_debate_lock(request.session_id)
+
+        async with lock:
+            session = load_debate_session(request.session_id)
+            if session is None:
+                if request.retry_speaker_index is not None:
+                    yield sse({"success": False, "error": "Debate session not found"})
+                    return
+                session = DebateSession(topic=request.topic)
+                store_debate_session(request.session_id, session)
+
+            speaker_index: int
+            requested_label: str
+            prompt: str
+            speaker_max_tokens: int | None
+            is_retry = request.retry_speaker_index is not None
+
+            if is_retry:
+                try:
+                    await _require_debate_coin(http_request, request.user_id)
+                except HTTPException as exc:
+                    yield sse({"success": False, "error": _quota_error_message(exc.detail)})
+                    return
+                speaker_index = request.retry_speaker_index  # type: ignore[assignment]
+                if speaker_index < 1 or speaker_index > 3:
+                    yield sse({"success": False, "error": "Invalid speaker index"})
+                    return
+                if len(session.round_speaker_labels) >= speaker_index:
+                    requested_label = session.round_speaker_labels[speaker_index - 1]
+                else:
+                    requested_label = random.choice(COMPANY_LABELS)
+                prior_turns = [
+                    turn for turn in session.current_round_turns
+                    if turn.speaker_index < speaker_index and turn.success
+                ]
+                prompt = build_round_prompt(
+                    topic=session.topic,
+                    round_number=session.round_number,
+                    speaker_index=speaker_index,
+                    prior_turns=prior_turns,
+                    previous_summary=session.previous_summary,
+                    user_input=None,
+                )
+                speaker_max_tokens = 380 if speaker_index == 1 else None
+            else:
+                if request.user_input and len(session.current_round_turns) < 3:
+                    append_pending_user_input(
+                        session,
+                        request.user_input,
+                        target_round=session.round_number + 1,
+                    )
+                    store_debate_session(request.session_id, session)
+                    yield sse({"queued": True})
+                    return
+
+                if request.user_input:
+                    append_pending_user_input(
+                        session,
+                        request.user_input,
+                        target_round=session.round_number + 1,
+                    )
+
+                try:
+                    ai_calls = debate_ai_calls_for_next_step(session)
+                    for _ in range(ai_calls):
+                        await _require_debate_coin(http_request, request.user_id)
+                except HTTPException as exc:
+                    yield sse({"success": False, "error": _quota_error_message(exc.detail)})
+                    return
+
+                round_user_input = await prepare_next_round_if_needed(session)
+                speaker_index = len(session.current_round_turns) + 1
+                if speaker_index > 3:
+                    yield sse({"success": False, "error": "Invalid debate state"})
+                    return
+
+                if len(session.round_speaker_labels) < 3:
+                    session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(
+                        session.round_speaker_labels
+                    )
+
+                requested_label = session.round_speaker_labels[speaker_index - 1]
+                prior_turns = [t for t in session.current_round_turns if t.success]
+                prompt = build_round_prompt(
+                    topic=session.topic,
+                    round_number=session.round_number,
+                    speaker_index=speaker_index,
+                    prior_turns=prior_turns,
+                    previous_summary=session.previous_summary,
+                    user_input=round_user_input if speaker_index == 1 else None,
+                )
+                speaker_max_tokens = 380 if speaker_index == 1 else None
+
+            already_used_models: set[str] = set(session.round_used_models)
+            already_used_models.update(
+                turn.actual_model for turn in session.current_round_turns if turn.actual_model
+            )
+            excluded = set(already_used_models)
+
+            stream_meta: dict = {}
+            final_result: ModelCallResult | None = None
+
+            async with DEBATE_AI_SEMAPHORE:
+                async for event in stream_label_chat(
+                    requested_label,
+                    prompt,
+                    max_tokens=speaker_max_tokens,
+                    excluded_models=excluded,
+                ):
+                    if event.get("error"):
+                        failure = make_failed_result(
+                            requested_label=requested_label,
+                            requested_model="",
+                            actual_model="",
+                            failed_candidates=[],
+                            error=event["error"],
+                        )
+                        turn = _commit_debate_stream_turn(
+                            session,
+                            speaker_index,
+                            requested_label,
+                            failure,
+                            is_retry=is_retry,
+                        )
+                        store_debate_session(request.session_id, session)
+                        yield sse(
+                            {
+                                "success": False,
+                                "error": event["error"],
+                                "done": True,
+                                "turn": dump_model(turn),
+                                "round": session.round_number,
+                            }
+                        )
+                        return
+
+                    if event.get("chunk"):
+                        if event.get("meta"):
+                            stream_meta = event["meta"]
+                        yield sse(
+                            {
+                                "success": True,
+                                "chunk": event["chunk"],
+                                "round": session.round_number,
+                                "speaker_index": speaker_index,
+                                **stream_meta,
+                            }
+                        )
+
+                    if event.get("complete"):
+                        final_result = event["result"]
+                        break
+
+            if final_result is None:
+                failure = make_failed_result(
+                    requested_label=requested_label,
+                    requested_model="",
+                    actual_model="",
+                    failed_candidates=[],
+                    error=USER_FACING_FAILURE_MSG,
+                )
+                turn = _commit_debate_stream_turn(
+                    session,
+                    speaker_index,
+                    requested_label,
+                    failure,
+                    is_retry=is_retry,
+                )
+                store_debate_session(request.session_id, session)
+                yield sse(
+                    {
+                        "success": False,
+                        "error": USER_FACING_FAILURE_MSG,
+                        "done": True,
+                        "turn": dump_model(turn),
+                        "round": session.round_number,
+                    }
+                )
+                return
+
+            turn = _commit_debate_stream_turn(
+                session,
+                speaker_index,
+                requested_label,
+                final_result,
+                is_retry=is_retry,
+            )
+            store_debate_session(request.session_id, session)
+            yield sse(
+                {
+                    "success": True,
+                    "done": True,
+                    "turn": dump_model(turn),
+                    "round": session.round_number,
+                }
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 def _parse_json_object(text: str) -> dict:
     if not text:
         return {}
@@ -4013,7 +4390,10 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
     user = get_user_by_token(_bearer_token(request))
     if not user:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-    merged = merge_user_data(user["id"], body.model_dump(exclude_none=True))
+    dump = body.model_dump(exclude_none=True)
+    if "active_collab" in body.model_fields_set and body.active_collab is None:
+        dump["active_collab"] = None
+    merged = merge_user_data(user["id"], dump)
     return {"success": True, "data": merged}
 
 

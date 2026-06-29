@@ -526,6 +526,19 @@ def set_user_data(user_id: int, data_key: str, payload: Any) -> None:
             conn.close()
 
 
+def delete_user_data(user_id: int, data_key: str) -> None:
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "DELETE FROM user_data WHERE user_id = ? AND data_key = ?",
+                (user_id, data_key),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
 def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     current = get_user_data(user_id)
     skip_empty_scalar_keys = {"extension_prefs", "ai_presets", "ai_settings"}
@@ -547,6 +560,8 @@ def merge_user_data(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
             current[key] = value
             continue
         if key == "active_collab" and value is None:
+            current.pop("active_collab", None)
+            delete_user_data(user_id, "active_collab")
             continue
         if key not in current:
             current[key] = value
