@@ -74,6 +74,18 @@ from auth_store import (
     touch_device_presence,
     send_chat_message,
     signup as auth_signup_fn,
+    cancel_work_coin_tip,
+    create_chat_group,
+    get_room_messages,
+    list_chat_rooms,
+    list_friends,
+    list_friend_requests,
+    refund_coins,
+    respond_friend_request,
+    search_users,
+    send_friend_request,
+    send_room_message,
+    send_work_coin_tip,
     toggle_work_like,
     verify_admin_password,
     verify_admin_token,
@@ -240,9 +252,7 @@ def _platform(request: Request) -> str:
 
 
 def _quota_error_payload(feature: str, info: dict) -> dict:
-    feat_label = {"compare": "비교", "debate": "토론", "collab": "협업", "agent": "에이전트"}.get(feature, feature)
-    pool_limit = int(info.get("limit", 0))
-    pool_used = int(info.get("used", 0))
+    balance = int(info.get("balance", info.get("remaining", 0)))
     if info.get("banned"):
         return {
             "message": "이 계정 또는 기기는 사용이 제한되었습니다. 문의해 주세요.",
@@ -251,18 +261,12 @@ def _quota_error_payload(feature: str, info: dict) -> dict:
         }
     if info.get("guest"):
         return {
-            "message": (
-                f"오늘 비회원 코인을 모두 사용했습니다 ({pool_used}/{pool_limit}🪙). "
-                "로그인하면 하루 250🪙까지 이용할 수 있습니다."
-            ),
+            "message": f"코인이 부족합니다 (보유 🪙{balance}). 로그인 후 더 많은 코인을 받을 수 있습니다.",
             "quota": info,
             "login_required": True,
         }
     return {
-        "message": (
-            f"오늘 코인을 모두 사용했습니다 ({pool_used}/{pool_limit}🪙). "
-            "내일 자정(KST)에 초기화됩니다."
-        ),
+        "message": f"코인이 부족합니다 (보유 🪙{balance}).",
         "quota": info,
     }
 
@@ -2810,9 +2814,14 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
         yield ": keepalive\n\n"
         current_model_id: str | None = None
         stream_started = False
+        compare_subject: str | None = None
+        compare_coin_charged = False
+        compare_had_success = False
         try:
             try:
+                compare_subject, _ = _resolve_subject(request, data.user_id)
                 await _require_compare_coin(request, data.user_id)
+                compare_coin_charged = True
             except HTTPException as exc:
                 yield sse(
                     {
@@ -2930,6 +2939,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                             for b in chunk
                                         )
                                     if chunk:
+                                        compare_had_success = True
                                         yield sse(
                                             {
                                                 "model": data.model_name,
@@ -2967,6 +2977,11 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
             logger.exception("compare/stream generate failed label=%s session=%s", label, session_id[:8])
             yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
         finally:
+            if compare_coin_charged and not compare_had_success and compare_subject:
+                try:
+                    await asyncio.to_thread(refund_coins, compare_subject, 1.0, "compare")
+                except Exception:
+                    logger.exception("compare coin refund failed subject=%s", compare_subject)
             if current_model_id:
                 await release_compare_model(session_id, current_model_id)
             if stream_started:
@@ -4419,10 +4434,10 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
 
 
 @app.get("/social/works")
-def social_works_list(request: Request, limit: int = 50) -> dict:
+def social_works_list(request: Request, limit: int = 50, friends_only: int = 0) -> dict:
     user = get_user_by_token(_bearer_token(request))
     viewer_id = user["id"] if user else None
-    works = list_public_works(limit=limit, viewer_id=viewer_id)
+    works = list_public_works(limit=limit, viewer_id=viewer_id, friends_only=bool(friends_only))
     return {"works": works}
 
 
@@ -4445,14 +4460,32 @@ def social_works_create(body: PublicWorkCreateRequest, request: Request) -> dict
 
 @app.post("/social/works/{work_id}/like")
 def social_works_like(work_id: int, request: Request) -> dict:
+    """Backward compat — redirects to coin tip."""
+    return social_works_tip(work_id, request)
+
+
+@app.post("/social/works/{work_id}/tip")
+def social_works_tip(work_id: int, request: Request) -> dict:
     user = get_user_by_token(_bearer_token(request))
     if not user:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
     try:
-        result = toggle_work_like(work_id, user["id"])
+        result = send_work_coin_tip(work_id, user["id"])
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"success": True, **result}
+
+
+@app.delete("/social/works/{work_id}/tip")
+def social_works_tip_cancel(work_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        result = cancel_work_coin_tip(work_id, user["id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
 
 
 @app.get("/social/works/{work_id}/comments")
@@ -4478,11 +4511,113 @@ def social_works_comment_add(work_id: int, body: WorkCommentRequest, request: Re
 
 
 @app.get("/social/users")
-def social_users_list(request: Request) -> dict:
+def social_users_list(request: Request, q: str = "", friends_only: bool = False) -> dict:
     user = get_user_by_token(_bearer_token(request))
     if not user:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
-    return {"users": list_chat_users(user["id"])}
+    if q.strip():
+        return {"users": search_users(q, user["id"])}
+    return {"users": list_chat_users(user["id"], friends_only=friends_only)}
+
+
+@app.get("/social/friends")
+def social_friends_list(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {
+        "friends": list_friends(user["id"]),
+        "requests": list_friend_requests(user["id"]),
+    }
+
+
+class FriendRequestBody(BaseModel):
+    user_id: int
+
+
+class FriendRespondBody(BaseModel):
+    user_id: int
+    accept: bool = True
+
+
+@app.post("/social/friends/request")
+def social_friend_request(body: FriendRequestBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        return send_friend_request(user["id"], body.user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/social/friends/respond")
+def social_friend_respond(body: FriendRespondBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        return respond_friend_request(user["id"], body.user_id, body.accept)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ChatGroupCreateBody(BaseModel):
+    name: str = ""
+    member_ids: list[int] = Field(default_factory=list)
+
+
+@app.get("/social/chat/rooms")
+def social_chat_rooms(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {"rooms": list_chat_rooms(user["id"])}
+
+
+@app.post("/social/chat/groups")
+def social_chat_group_create(body: ChatGroupCreateBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        group = create_chat_group(user["id"], body.name, body.member_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "group": group}
+
+
+@app.get("/social/chat/room/{room_id:path}")
+def social_chat_room_get(room_id: str, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        messages = get_room_messages(user["id"], room_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"messages": messages, "room_id": room_id}
+
+
+class RoomMessageBody(BaseModel):
+    body: str = ""
+
+
+@app.post("/social/chat/room/{room_id:path}")
+def social_chat_room_send(room_id: str, body: RoomMessageBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        msg = send_room_message(
+            user["id"],
+            user.get("display_name") or user.get("username") or "사용자",
+            room_id,
+            body.body,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "message": msg}
 
 
 @app.get("/social/chat/{peer_id}")

@@ -43,7 +43,11 @@ _lock = threading.Lock()
 
 MEMBER_DAILY_COINS = 250.0
 GUEST_DAILY_COINS = 70.0
+MEMBER_INITIAL_COINS = 250.0
+GUEST_INITIAL_COINS = 70.0
 POOL_FEATURE = "_pool"
+WORK_COIN_TIP_AMOUNT = 1.0
+WORK_COIN_TIP_GRACE_SECONDS = 5.0
 
 MEMBER_QUOTA_LIMITS: dict[str, float] = {
     "compare": MEMBER_DAILY_COINS,
@@ -310,6 +314,79 @@ def init_db() -> None:
                     daily_limit REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     PRIMARY KEY(subject, feature)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS coin_balance (
+                    subject TEXT PRIMARY KEY,
+                    balance REAL NOT NULL DEFAULT 0,
+                    updated_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS friend_requests (
+                    from_user_id INTEGER NOT NULL,
+                    to_user_id INTEGER NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at REAL NOT NULL,
+                    PRIMARY KEY(from_user_id, to_user_id),
+                    FOREIGN KEY(from_user_id) REFERENCES users(id),
+                    FOREIGN KEY(to_user_id) REFERENCES users(id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS friendships (
+                    user_id INTEGER NOT NULL,
+                    friend_id INTEGER NOT NULL,
+                    created_at REAL NOT NULL,
+                    PRIMARY KEY(user_id, friend_id),
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    FOREIGN KEY(friend_id) REFERENCES users(id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL DEFAULT '',
+                    created_by INTEGER NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(created_by) REFERENCES users(id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_group_members (
+                    group_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    joined_at REAL NOT NULL,
+                    PRIMARY KEY(group_id, user_id),
+                    FOREIGN KEY(group_id) REFERENCES chat_groups(id),
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS work_coin_tips (
+                    work_id INTEGER NOT NULL,
+                    from_user_id INTEGER NOT NULL,
+                    amount REAL NOT NULL DEFAULT 1,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at REAL NOT NULL,
+                    confirm_after REAL NOT NULL,
+                    confirmed_at REAL,
+                    PRIMARY KEY(work_id, from_user_id),
+                    FOREIGN KEY(work_id) REFERENCES public_works(id),
+                    FOREIGN KEY(from_user_id) REFERENCES users(id)
                 )
                 """
             )
@@ -984,42 +1061,129 @@ def resolve_device_id(fingerprint: str, proposed_id: str = "") -> str:
             conn.close()
 
 
-def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, Any]:
-    clean_subject = (subject or "").strip()
-    feat = (feature or "").strip()
-    if not clean_subject or feat not in QUOTA_ADMIN_FEATURES:
-        raise ValueError("invalid subject or feature")
-    day_key = _day_key()
-    limits = quota_limits_for_subject(clean_subject)
-    limit = float(limits.get(feat, 9999))
+def _initial_coins_for_subject(subject: str) -> float:
+    return MEMBER_INITIAL_COINS if (subject or "").startswith("user:") else GUEST_INITIAL_COINS
+
+
+def ensure_coin_balance(subject: str) -> float:
+    clean = (subject or "").strip()
+    if not clean:
+        return 0.0
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT balance FROM coin_balance WHERE subject = ?",
+                (clean,),
+            ).fetchone()
+            if row is not None:
+                return float(row["balance"])
+            initial = _initial_coins_for_subject(clean)
+            now = time.time()
+            conn.execute(
+                "INSERT INTO coin_balance (subject, balance, updated_at) VALUES (?, ?, ?)",
+                (clean, initial, now),
+            )
+            conn.commit()
+            return initial
+        finally:
+            conn.close()
+
+
+def get_coin_balance(subject: str) -> float:
+    return ensure_coin_balance(subject)
+
+
+def adjust_coin_balance(subject: str, delta: float) -> dict[str, Any]:
+    clean = (subject or "").strip()
+    if not clean:
+        raise ValueError("invalid subject")
+    ensure_coin_balance(clean)
     delta_val = float(delta)
     with _lock:
         conn = _connect()
         try:
             row = conn.execute(
+                "SELECT balance FROM coin_balance WHERE subject = ?",
+                (clean,),
+            ).fetchone()
+            bal = float(row["balance"]) if row else 0.0
+            new_bal = max(0.0, bal + delta_val)
+            conn.execute(
+                "UPDATE coin_balance SET balance = ?, updated_at = ? WHERE subject = ?",
+                (new_bal, time.time(), clean),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"subject": clean, "balance": round(new_bal, 2), "delta": round(delta_val, 2)}
+
+
+def refund_coins(subject: str, amount: float, feature: str = "") -> dict[str, Any]:
+    amt = max(0.0, float(amount))
+    if amt <= 0:
+        return {"subject": subject, "balance": get_coin_balance(subject), "refunded": 0}
+    result = adjust_coin_balance(subject, amt)
+    day_key = _day_key()
+    feat = (feature or "_refund").strip() or "_refund"
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
                 "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
-                (clean_subject, feat, day_key),
+                (subject, feat, day_key),
             ).fetchone()
             used = float(row["count"]) if row else 0.0
-            new_used = max(0.0, used + delta_val)
+            new_used = max(0.0, used - amt)
             conn.execute(
                 """
                 INSERT INTO quota_usage (subject, feature, day_key, count)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(subject, feature, day_key) DO UPDATE SET count = excluded.count
                 """,
-                (clean_subject, feat, day_key, new_used),
+                (subject, feat, day_key, new_used),
             )
             conn.commit()
         finally:
             conn.close()
+    result["refunded"] = amt
+    return result
+
+
+def admin_set_coin_balance(subject: str, balance: float) -> dict[str, Any]:
+    clean = (subject or "").strip()
+    if not clean:
+        raise ValueError("invalid subject")
+    ensure_coin_balance(clean)
+    new_bal = max(0.0, float(balance))
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                "UPDATE coin_balance SET balance = ?, updated_at = ? WHERE subject = ?",
+                (new_bal, time.time(), clean),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"subject": clean, "balance": round(new_bal, 2)}
+
+
+def admin_adjust_quota(subject: str, feature: str, delta: float) -> dict[str, Any]:
+    """Admin: add (+) or subtract (-) coins from persistent balance."""
+    clean_subject = (subject or "").strip()
+    if not clean_subject:
+        raise ValueError("invalid subject")
+    result = adjust_coin_balance(clean_subject, float(delta))
+    snap = get_quota_snapshot(clean_subject)
     return {
         "subject": clean_subject,
-        "feature": feat,
-        "used": round(new_used, 2),
-        "limit": limit,
-        "remaining": round(max(0.0, limit - new_used), 2),
-        "day_key": day_key,
+        "feature": feature or POOL_FEATURE,
+        "balance": result["balance"],
+        "delta": result["delta"],
+        "remaining": result["balance"],
+        "limit": result["balance"],
+        "used": snap.get("total", {}).get("used", 0),
     }
 
 
@@ -1074,33 +1238,36 @@ def check_and_consume_quota(
     amount: float = 1.0,
 ) -> tuple[bool, dict[str, Any]]:
     amt = max(0.0, float(amount))
-    limits = quota_limits_for_subject(subject)
-    limit = float(limits.get(feature, 9999))
-    day_key = _day_key()
-    now = time.time()
     if is_subject_banned(subject):
+        balance = get_coin_balance(subject)
         return False, {
             "feature": feature,
             "used": 0,
-            "limit": limit,
-            "day_key": day_key,
+            "limit": balance,
+            "remaining": balance,
+            "balance": balance,
+            "day_key": _day_key(),
             "banned": True,
             "guest": is_guest_subject(subject),
         }
-    pool_limit = daily_pool_limit(subject)
+    balance = get_coin_balance(subject)
+    if balance + 1e-9 < amt:
+        return False, {
+            "feature": feature,
+            "used": 0,
+            "limit": balance,
+            "remaining": balance,
+            "balance": balance,
+            "day_key": _day_key(),
+            "guest": is_guest_subject(subject),
+            "insufficient": True,
+        }
+    adjust_coin_balance(subject, -amt)
+    day_key = _day_key()
+    now = time.time()
     with _lock:
         conn = _connect()
         try:
-            total_used = _total_coins_used(conn, subject, day_key)
-            if total_used + amt > pool_limit + 1e-9:
-                return False, {
-                    "feature": feature,
-                    "used": total_used,
-                    "limit": pool_limit,
-                    "day_key": day_key,
-                    "guest": is_guest_subject(subject),
-                    "pool": True,
-                }
             row = conn.execute(
                 "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
                 (subject, feature, day_key),
@@ -1122,33 +1289,33 @@ def check_and_consume_quota(
             except Exception:
                 pass
             conn.commit()
-            new_total = total_used + amt
             new_feature_used = used + amt
-            return True, {
-                "feature": feature,
-                "used": new_feature_used,
-                "limit": pool_limit,
-                "total_used": new_total,
-                "day_key": day_key,
-                "guest": is_guest_subject(subject),
-                "pool": True,
-            }
         finally:
             conn.close()
+    new_balance = get_coin_balance(subject)
+    return True, {
+        "feature": feature,
+        "used": new_feature_used,
+        "limit": new_balance,
+        "remaining": new_balance,
+        "balance": new_balance,
+        "total_used": new_feature_used,
+        "day_key": day_key,
+        "guest": is_guest_subject(subject),
+    }
 
 
 def get_quota_snapshot(subject: str) -> dict[str, Any]:
     day_key = _day_key()
-    limits = quota_limits_for_subject(subject)
-    pool_limit = daily_pool_limit(subject)
-    out = {}
+    balance = get_coin_balance(subject)
     banned = is_subject_banned(subject)
+    total_used_today = 0.0
+    out: dict[str, Any] = {}
     with _lock:
         conn = _connect()
         try:
-            total_used = _total_coins_used(conn, subject, day_key)
-            pool_remaining = round(max(0.0, pool_limit - total_used), 2)
-            for feature, limit in limits.items():
+            total_used_today = _total_coins_used(conn, subject, day_key)
+            for feature in MEMBER_QUOTA_LIMITS:
                 row = conn.execute(
                     "SELECT count FROM quota_usage WHERE subject = ? AND feature = ? AND day_key = ?",
                     (subject, feature, day_key),
@@ -1156,25 +1323,27 @@ def get_quota_snapshot(subject: str) -> dict[str, Any]:
                 used = float(row["count"]) if row else 0.0
                 out[feature] = {
                     "used": round(used, 2),
-                    "limit": pool_limit,
-                    "remaining": pool_remaining,
+                    "limit": balance,
+                    "remaining": balance,
                 }
         finally:
             conn.close()
     total = {
-        "used": round(total_used, 2),
-        "limit": pool_limit,
-        "remaining": pool_remaining,
+        "used": round(total_used_today, 2),
+        "limit": balance,
+        "remaining": balance,
+        "balance": balance,
     }
     return {
         "day_key": day_key,
         "features": out,
         "coins": out,
         "total": total,
+        "balance": balance,
         "guest": is_guest_subject(subject),
         "banned": banned,
-        "limits": limits,
-        "pool_limit": pool_limit,
+        "limits": quota_limits_for_subject(subject),
+        "pool_limit": balance,
     }
 
 
@@ -2173,44 +2342,78 @@ def _chat_room_id(user_a: int, user_b: int) -> str:
     return f"{lo}:{hi}"
 
 
-def list_public_works(limit: int = 50, viewer_id: int | None = None) -> list[dict[str, Any]]:
+def list_public_works(limit: int = 50, viewer_id: int | None = None, friends_only: bool = False) -> list[dict[str, Any]]:
+    confirm_pending_work_tips()
     limit = max(1, min(int(limit or 50), 100))
     with _lock:
         conn = _connect()
         try:
-            rows = conn.execute(
-                """
-                SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
-                       (SELECT COUNT(*) FROM work_likes wl WHERE wl.work_id = w.id) AS like_count,
-                       (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
-                FROM public_works w
-                ORDER BY w.created_at DESC
-                LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-            liked_ids: set[int] = set()
+            if friends_only and viewer_id is not None:
+                rows = conn.execute(
+                    """
+                    SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
+                            WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
+                           (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
+                    FROM public_works w
+                    INNER JOIN friendships f ON f.friend_id = w.user_id AND f.user_id = ?
+                    ORDER BY w.created_at DESC
+                    LIMIT ?
+                    """,
+                    (viewer_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
+                            WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
+                           (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
+                    FROM public_works w
+                    ORDER BY w.created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+            tip_map: dict[int, dict] = {}
             if viewer_id is not None:
-                liked_rows = conn.execute(
-                    "SELECT work_id FROM work_likes WHERE user_id = ?",
+                tip_rows = conn.execute(
+                    """
+                    SELECT work_id, status, confirm_after, amount
+                    FROM work_coin_tips WHERE from_user_id = ?
+                    """,
                     (viewer_id,),
                 ).fetchall()
-                liked_ids = {int(r["work_id"]) for r in liked_rows}
+                for tr in tip_rows:
+                    tip_map[int(tr["work_id"])] = {
+                        "status": tr["status"],
+                        "confirm_after": tr["confirm_after"],
+                        "amount": tr["amount"],
+                    }
         finally:
             conn.close()
     out: list[dict[str, Any]] = []
+    now = time.time()
     for r in rows:
+        wid = int(r["id"])
+        tip = tip_map.get(wid) if viewer_id is not None else None
+        pending = tip and tip["status"] == "pending" and now < float(tip["confirm_after"])
         out.append({
-            "id": r["id"],
+            "id": wid,
             "user_id": r["user_id"],
             "author_name": r["author_name"],
             "title": r["title"],
             "body": r["body"],
             "created_at": r["created_at"],
             "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
-            "like_count": int(r["like_count"] or 0),
+            "coin_total": float(r["coin_total"] or 0),
+            "like_count": int(r["coin_total"] or 0),
             "comment_count": int(r["comment_count"] or 0),
-            "liked_by_me": r["id"] in liked_ids,
+            "tipped_by_me": tip is not None and tip["status"] in ("pending", "confirmed"),
+            "liked_by_me": tip is not None and tip["status"] in ("pending", "confirmed"),
+            "tip_pending": bool(pending),
+            "tip_confirm_after": float(tip["confirm_after"]) if tip else None,
+            "tip_seconds_left": max(0, int(float(tip["confirm_after"]) - now)) if pending else 0,
         })
     return out
 
@@ -2420,6 +2623,8 @@ def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -
         raise ValueError("메시지를 입력하세요.")
     if user_id == peer_id:
         raise ValueError("자기 자신에게는 보낼 수 없습니다.")
+    if not _are_friends(user_id, peer_id):
+        raise ValueError("친구만 1:1 채팅할 수 있습니다. 먼저 친구를 추가하세요.")
     room = _chat_room_id(user_id, peer_id)
     now = time.time()
     with _lock:
@@ -2449,3 +2654,546 @@ def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -
         "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
         "is_mine": True,
     }
+
+
+def _user_display_name(row: sqlite3.Row) -> str:
+    name = (row["display_name"] or "").strip()
+    if name:
+        return name
+    return (row["user_email"] or row["email"] or f"user{row['id']}").split("@")[0]
+
+
+def _are_friends(user_id: int, other_id: int) -> bool:
+    if user_id == other_id:
+        return True
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?",
+                (user_id, other_id),
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+
+
+def search_users(query: str, viewer_id: int, limit: int = 30) -> list[dict[str, Any]]:
+    q = (query or "").strip()
+    limit = max(1, min(int(limit or 30), 50))
+    with _lock:
+        conn = _connect()
+        try:
+            if q:
+                like = f"%{q}%"
+                rows = conn.execute(
+                    """
+                    SELECT id, display_name, email, user_email, created_at
+                    FROM users
+                    WHERE id != ?
+                      AND (display_name LIKE ? OR email LIKE ? OR user_email LIKE ?)
+                    ORDER BY display_name ASC
+                    LIMIT ?
+                    """,
+                    (viewer_id, like, like, like, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, display_name, email, user_email, created_at
+                    FROM users WHERE id != ?
+                    ORDER BY display_name ASC LIMIT ?
+                    """,
+                    (viewer_id, limit),
+                ).fetchall()
+            friend_ids = {
+                int(r["friend_id"])
+                for r in conn.execute(
+                    "SELECT friend_id FROM friendships WHERE user_id = ?",
+                    (viewer_id,),
+                ).fetchall()
+            }
+            pending_out = {
+                int(r["to_user_id"])
+                for r in conn.execute(
+                    "SELECT to_user_id FROM friend_requests WHERE from_user_id = ? AND status = 'pending'",
+                    (viewer_id,),
+                ).fetchall()
+            }
+            pending_in = {
+                int(r["from_user_id"])
+                for r in conn.execute(
+                    "SELECT from_user_id FROM friend_requests WHERE to_user_id = ? AND status = 'pending'",
+                    (viewer_id,),
+                ).fetchall()
+            }
+        finally:
+            conn.close()
+    out = []
+    for r in rows:
+        uid = int(r["id"])
+        rel = "none"
+        if uid in friend_ids:
+            rel = "friend"
+        elif uid in pending_out:
+            rel = "pending_sent"
+        elif uid in pending_in:
+            rel = "pending_received"
+        out.append({
+            "id": uid,
+            "display_name": _user_display_name(r),
+            "relation": rel,
+        })
+    return out
+
+
+def list_friends(user_id: int) -> list[dict[str, Any]]:
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT u.id, u.display_name, u.email, u.user_email, f.created_at
+                FROM friendships f
+                JOIN users u ON u.id = f.friend_id
+                WHERE f.user_id = ?
+                ORDER BY u.display_name ASC
+                """,
+                (user_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [{
+        "id": r["id"],
+        "display_name": _user_display_name(r),
+        "friend_since": r["created_at"],
+    } for r in rows]
+
+
+def list_friend_requests(user_id: int) -> dict[str, list[dict[str, Any]]]:
+    with _lock:
+        conn = _connect()
+        try:
+            incoming = conn.execute(
+                """
+                SELECT fr.from_user_id, fr.created_at, u.display_name, u.email, u.user_email
+                FROM friend_requests fr
+                JOIN users u ON u.id = fr.from_user_id
+                WHERE fr.to_user_id = ? AND fr.status = 'pending'
+                ORDER BY fr.created_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+            outgoing = conn.execute(
+                """
+                SELECT fr.to_user_id, fr.created_at, u.display_name, u.email, u.user_email
+                FROM friend_requests fr
+                JOIN users u ON u.id = fr.to_user_id
+                WHERE fr.from_user_id = ? AND fr.status = 'pending'
+                ORDER BY fr.created_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return {
+        "incoming": [{
+            "id": r["from_user_id"],
+            "display_name": _user_display_name(r),
+            "created_at": r["created_at"],
+        } for r in incoming],
+        "outgoing": [{
+            "id": r["to_user_id"],
+            "display_name": _user_display_name(r),
+            "created_at": r["created_at"],
+        } for r in outgoing],
+    }
+
+
+def send_friend_request(from_user_id: int, to_user_id: int) -> dict[str, Any]:
+    if from_user_id == to_user_id:
+        raise ValueError("자기 자신에게는 친구 요청을 보낼 수 없습니다.")
+    if _are_friends(from_user_id, to_user_id):
+        raise ValueError("이미 친구입니다.")
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            peer = conn.execute("SELECT id FROM users WHERE id = ?", (to_user_id,)).fetchone()
+            if not peer:
+                raise ValueError("계정을 찾을 수 없습니다.")
+            existing = conn.execute(
+                """
+                SELECT status FROM friend_requests
+                WHERE from_user_id = ? AND to_user_id = ?
+                """,
+                (from_user_id, to_user_id),
+            ).fetchone()
+            if existing and existing["status"] == "pending":
+                raise ValueError("이미 친구 요청을 보냈습니다.")
+            reverse = conn.execute(
+                """
+                SELECT status FROM friend_requests
+                WHERE from_user_id = ? AND to_user_id = ?
+                """,
+                (to_user_id, from_user_id),
+            ).fetchone()
+            if reverse and reverse["status"] == "pending":
+                conn.execute(
+                    "UPDATE friend_requests SET status = 'accepted' WHERE from_user_id = ? AND to_user_id = ?",
+                    (to_user_id, from_user_id),
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)",
+                    (from_user_id, to_user_id, now),
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)",
+                    (to_user_id, from_user_id, now),
+                )
+                conn.commit()
+                return {"success": True, "status": "accepted", "auto_accepted": True}
+            conn.execute(
+                """
+                INSERT INTO friend_requests (from_user_id, to_user_id, status, created_at)
+                VALUES (?, ?, 'pending', ?)
+                ON CONFLICT(from_user_id, to_user_id) DO UPDATE SET status = 'pending', created_at = excluded.created_at
+                """,
+                (from_user_id, to_user_id, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"success": True, "status": "pending"}
+
+
+def respond_friend_request(user_id: int, from_user_id: int, accept: bool) -> dict[str, Any]:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                """
+                SELECT status FROM friend_requests
+                WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'
+                """,
+                (from_user_id, user_id),
+            ).fetchone()
+            if not row:
+                raise ValueError("친구 요청을 찾을 수 없습니다.")
+            if accept:
+                conn.execute(
+                    "UPDATE friend_requests SET status = 'accepted' WHERE from_user_id = ? AND to_user_id = ?",
+                    (from_user_id, user_id),
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)",
+                    (user_id, from_user_id, now),
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)",
+                    (from_user_id, user_id, now),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM friend_requests WHERE from_user_id = ? AND to_user_id = ?",
+                    (from_user_id, user_id),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"success": True, "accepted": accept}
+
+
+def confirm_pending_work_tips() -> None:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT t.work_id, t.from_user_id, t.amount, w.user_id AS author_id
+                FROM work_coin_tips t
+                JOIN public_works w ON w.id = t.work_id
+                WHERE t.status = 'pending' AND t.confirm_after <= ?
+                """,
+                (now,),
+            ).fetchall()
+            for r in rows:
+                author_subject = f"user:{r['author_id']}"
+                ensure_coin_balance(author_subject)
+                conn.execute(
+                    "UPDATE coin_balance SET balance = balance + ?, updated_at = ? WHERE subject = ?",
+                    (float(r["amount"]), now, author_subject),
+                )
+                conn.execute(
+                    """
+                    UPDATE work_coin_tips SET status = 'confirmed', confirmed_at = ?
+                    WHERE work_id = ? AND from_user_id = ?
+                    """,
+                    (now, r["work_id"], r["from_user_id"]),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def send_work_coin_tip(work_id: int, from_user_id: int, amount: float = WORK_COIN_TIP_AMOUNT) -> dict[str, Any]:
+    confirm_pending_work_tips()
+    amt = max(0.0, float(amount or WORK_COIN_TIP_AMOUNT))
+    if amt <= 0:
+        raise ValueError("코인 수량이 올바르지 않습니다.")
+    now = time.time()
+    confirm_after = now + WORK_COIN_TIP_GRACE_SECONDS
+    from_subject = f"user:{from_user_id}"
+    with _lock:
+        conn = _connect()
+        try:
+            work = conn.execute(
+                "SELECT id, user_id FROM public_works WHERE id = ?",
+                (work_id,),
+            ).fetchone()
+            if not work:
+                raise ValueError("작업을 찾을 수 없습니다.")
+            if int(work["user_id"]) == from_user_id:
+                raise ValueError("본인 작업에는 코인을 보낼 수 없습니다.")
+            existing = conn.execute(
+                "SELECT status, confirm_after FROM work_coin_tips WHERE work_id = ? AND from_user_id = ?",
+                (work_id, from_user_id),
+            ).fetchone()
+            if existing:
+                if existing["status"] == "confirmed":
+                    raise ValueError("이미 코인을 보냈습니다.")
+                if existing["status"] == "pending" and now < float(existing["confirm_after"]):
+                    raise ValueError("취소 대기 중인 코인이 있습니다.")
+            balance = ensure_coin_balance(from_subject)
+            if balance + 1e-9 < amt:
+                raise ValueError("코인이 부족합니다.")
+            conn.execute(
+                "UPDATE coin_balance SET balance = balance - ?, updated_at = ? WHERE subject = ?",
+                (amt, now, from_subject),
+            )
+            conn.execute(
+                """
+                INSERT INTO work_coin_tips (work_id, from_user_id, amount, status, created_at, confirm_after)
+                VALUES (?, ?, ?, 'pending', ?, ?)
+                ON CONFLICT(work_id, from_user_id) DO UPDATE SET
+                    amount = excluded.amount,
+                    status = 'pending',
+                    created_at = excluded.created_at,
+                    confirm_after = excluded.confirm_after,
+                    confirmed_at = NULL
+                """,
+                (work_id, from_user_id, amt, now, confirm_after),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {
+        "work_id": work_id,
+        "amount": amt,
+        "status": "pending",
+        "confirm_after": confirm_after,
+        "seconds_left": WORK_COIN_TIP_GRACE_SECONDS,
+    }
+
+
+def cancel_work_coin_tip(work_id: int, from_user_id: int) -> dict[str, Any]:
+    now = time.time()
+    from_subject = f"user:{from_user_id}"
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                """
+                SELECT amount, status, confirm_after FROM work_coin_tips
+                WHERE work_id = ? AND from_user_id = ?
+                """,
+                (work_id, from_user_id),
+            ).fetchone()
+            if not row:
+                raise ValueError("보낸 코인이 없습니다.")
+            if row["status"] != "pending":
+                raise ValueError("이미 확정된 코인은 취소할 수 없습니다.")
+            if now >= float(row["confirm_after"]):
+                confirm_pending_work_tips()
+                raise ValueError("취소 가능 시간이 지났습니다.")
+            amt = float(row["amount"])
+            conn.execute(
+                "UPDATE coin_balance SET balance = balance + ?, updated_at = ? WHERE subject = ?",
+                (amt, now, from_subject),
+            )
+            conn.execute(
+                "DELETE FROM work_coin_tips WHERE work_id = ? AND from_user_id = ?",
+                (work_id, from_user_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"success": True, "refunded": amt}
+
+
+def _group_room_id(group_id: int) -> str:
+    return f"g:{int(group_id)}"
+
+
+def create_chat_group(creator_id: int, name: str, member_ids: list[int]) -> dict[str, Any]:
+    title = (name or "").strip()[:80] or "단체방"
+    members = sorted({int(creator_id)} | {int(m) for m in member_ids if int(m) != creator_id})
+    if len(members) < 2:
+        raise ValueError("단체방에는 2명 이상 필요합니다.")
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            for mid in members:
+                if not conn.execute("SELECT 1 FROM users WHERE id = ?", (mid,)).fetchone():
+                    raise ValueError(f"계정 {mid}을(를) 찾을 수 없습니다.")
+            cur = conn.execute(
+                "INSERT INTO chat_groups (name, created_by, created_at) VALUES (?, ?, ?)",
+                (title, creator_id, now),
+            )
+            gid = int(cur.lastrowid)
+            for mid in members:
+                conn.execute(
+                    "INSERT INTO chat_group_members (group_id, user_id, joined_at) VALUES (?, ?, ?)",
+                    (gid, mid, now),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"id": gid, "name": title, "room_id": _group_room_id(gid), "member_count": len(members)}
+
+
+def list_chat_rooms(user_id: int) -> list[dict[str, Any]]:
+    rooms: list[dict[str, Any]] = []
+    friends = list_friends(user_id)
+    for f in friends:
+        fid = int(f["id"])
+        room = _chat_room_id(user_id, fid)
+        rooms.append({
+            "room_id": room,
+            "room_type": "dm",
+            "name": f["display_name"],
+            "peer_id": fid,
+        })
+    with _lock:
+        conn = _connect()
+        try:
+            groups = conn.execute(
+                """
+                SELECT g.id, g.name, g.created_at,
+                       (SELECT COUNT(*) FROM chat_group_members gm WHERE gm.group_id = g.id) AS member_count
+                FROM chat_groups g
+                INNER JOIN chat_group_members m ON m.group_id = g.id AND m.user_id = ?
+                ORDER BY g.created_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    for g in groups:
+        rooms.append({
+            "room_id": _group_room_id(g["id"]),
+            "room_type": "group",
+            "group_id": g["id"],
+            "name": g["name"],
+            "member_count": int(g["member_count"] or 0),
+        })
+    return rooms
+
+
+def _user_in_group(conn: sqlite3.Connection, group_id: int, user_id: int) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM chat_group_members WHERE group_id = ? AND user_id = ?",
+        (group_id, user_id),
+    ).fetchone()
+    return row is not None
+
+
+def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict[str, Any]]:
+    room_id = (room_id or "").strip()
+    limit = max(1, min(int(limit or 120), 300))
+    if room_id.startswith("g:"):
+        group_id = int(room_id.split(":", 1)[1])
+        with _lock:
+            conn = _connect()
+            try:
+                if not _user_in_group(conn, group_id, user_id):
+                    raise ValueError("이 방에 참여하지 않았습니다.")
+                rows = conn.execute(
+                    """
+                    SELECT id, room_id, sender_id, sender_name, body, created_at
+                    FROM user_chat_messages WHERE room_id = ? ORDER BY created_at ASC LIMIT ?
+                    """,
+                    (room_id, limit),
+                ).fetchall()
+            finally:
+                conn.close()
+    else:
+        parts = room_id.split(":")
+        if len(parts) != 2:
+            raise ValueError("잘못된 채팅방입니다.")
+        peer_id = int(parts[0]) if int(parts[0]) != user_id else int(parts[1])
+        if not _are_friends(user_id, peer_id):
+            raise ValueError("친구만 1:1 채팅할 수 있습니다.")
+        return get_chat_messages(user_id, peer_id, limit=limit)
+    return [{
+        "id": r["id"],
+        "room_id": r["room_id"],
+        "sender_id": r["sender_id"],
+        "sender_name": r["sender_name"],
+        "body": r["body"],
+        "created_at": r["created_at"],
+        "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
+        "is_mine": r["sender_id"] == user_id,
+    } for r in rows]
+
+
+def send_room_message(user_id: int, sender_name: str, room_id: str, body: str) -> dict[str, Any]:
+    room_id = (room_id or "").strip()
+    if room_id.startswith("g:"):
+        group_id = int(room_id.split(":", 1)[1])
+        body = (body or "").strip()[:4000]
+        if not body:
+            raise ValueError("메시지를 입력하세요.")
+        now = time.time()
+        with _lock:
+            conn = _connect()
+            try:
+                if not _user_in_group(conn, group_id, user_id):
+                    raise ValueError("이 방에 참여하지 않았습니다.")
+                cur = conn.execute(
+                    """
+                    INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (room_id, user_id, (sender_name or "").strip()[:64], body, now),
+                )
+                conn.commit()
+                msg_id = int(cur.lastrowid)
+            finally:
+                conn.close()
+        return {
+            "id": msg_id,
+            "room_id": room_id,
+            "sender_id": user_id,
+            "sender_name": sender_name,
+            "body": body,
+            "created_at": now,
+            "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
+            "is_mine": True,
+        }
+    parts = room_id.split(":")
+    if len(parts) != 2:
+        raise ValueError("잘못된 채팅방입니다.")
+    peer_id = int(parts[0]) if int(parts[0]) != user_id else int(parts[1])
+    if not _are_friends(user_id, peer_id):
+        raise ValueError("친구만 1:1 채팅할 수 있습니다.")
+    return send_chat_message(user_id, sender_name, peer_id, body)
+
+
+def list_chat_users(exclude_user_id: int, limit: int = 50, friends_only: bool = True) -> list[dict[str, Any]]:
+    if friends_only:
+        return list_friends(exclude_user_id)
+    return search_users("", exclude_user_id, limit=limit)

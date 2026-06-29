@@ -4913,6 +4913,73 @@
             flex-shrink: 0;
         }
         .discord-compose button:hover { background: #4752c4; }
+        .chat-sidebar-tools {
+            display: flex;
+            gap: 6px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #1e1f22;
+        }
+        .chat-sidebar-tools input {
+            flex: 1;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: #1e1f22;
+            color: #dbdee1;
+        }
+        .chat-sidebar-tools button {
+            border: none;
+            background: #5865f2;
+            color: #fff;
+            border-radius: 6px;
+            padding: 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .chat-friend-requests, .chat-search-results {
+            padding: 6px 10px;
+            border-bottom: 1px solid #1e1f22;
+            font-size: 11px;
+        }
+        .chat-friend-req, .chat-search-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            padding: 6px 0;
+        }
+        .chat-friend-req button, .chat-search-item button {
+            border: none;
+            background: #5865f2;
+            color: #fff;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .works-search-row { margin-top: 8px; }
+        .works-search-row input {
+            width: 100%;
+            border: 1px solid #dbdbdb;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .works-coin-btn {
+            border: none;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .works-coin-btn.tipped { background: #374151; cursor: default; }
+        .works-coin-btn.pending { background: #dc2626; }
+        html[data-theme="dark"] .works-search-row input { background: #1a1a1a; border-color: #333; color: #e5e5e5; }
 
         /* ── Instagram 스타일 작업 피드 ── */
         .insta-workspace {
@@ -5638,19 +5705,25 @@
             </section>
 
             <section id="chatWorkspace" class="app-workspace-panel discord-workspace" aria-label="계정 채팅">
-                <div id="chatLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 다른 계정과 채팅할 수 있습니다.</div>
+                <div id="chatLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 친구와 채팅할 수 있습니다.</div>
                 <div id="chatLayout" class="discord-layout" style="display:none;">
                     <aside class="discord-sidebar">
                         <div class="discord-sidebar-head">
-                            <span class="discord-sidebar-title">💬 다이렉트 메시지</span>
+                            <span class="discord-sidebar-title">💬 채팅 · 친구</span>
                         </div>
-                        <div id="chatUserList" class="discord-member-list"></div>
+                        <div class="chat-sidebar-tools">
+                            <input id="chatUserSearch" type="search" placeholder="계정 검색…" autocomplete="off">
+                            <button id="chatGroupCreateBtn" type="button" title="단체방">＋방</button>
+                        </div>
+                        <div id="chatFriendRequests" class="chat-friend-requests" style="display:none;"></div>
+                        <div id="chatUserSearchResults" class="chat-search-results" style="display:none;"></div>
+                        <div id="chatRoomList" class="discord-member-list"></div>
                     </aside>
                     <div class="discord-main">
-                        <div class="discord-channel-bar" id="chatChannelTitle">대화 상대를 선택하세요</div>
+                        <div class="discord-channel-bar" id="chatChannelTitle">대화방을 선택하세요</div>
                         <div id="chatMessages" class="discord-messages"></div>
                         <div class="discord-compose">
-                            <input id="chatInput" type="text" placeholder="#general 에 메시지 보내기…" autocomplete="off">
+                            <input id="chatInput" type="text" placeholder="메시지 입력…" autocomplete="off">
                             <button id="chatSendBtn" type="button" aria-label="전송">➤</button>
                         </div>
                     </div>
@@ -5661,7 +5734,12 @@
                 <div id="worksLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 작업물을 등록할 수 있습니다.</div>
                 <div class="insta-top-bar">
                     <h2 class="insta-top-title">📋 작업 피드</h2>
-                    <p class="insta-top-desc">완성한 작업물을 공유하고 좋아요·댓글을 남겨보세요</p>
+                    <p class="insta-top-desc">친구 작업물 · 🪙1 코인으로 응원 (5초 내 취소 가능)</p>
+                    <div class="works-search-row">
+                        <input id="worksUserSearch" type="search" placeholder="계정 검색 · 친구 추가…" autocomplete="off">
+                    </div>
+                    <div id="worksFriendRequests" class="chat-friend-requests" style="display:none;"></div>
+                    <div id="worksUserSearchResults" class="chat-search-results" style="display:none;"></div>
                 </div>
                 <div id="worksCompose" class="insta-compose-card" style="display:none;">
                     <div class="insta-compose-row">
@@ -5768,7 +5846,7 @@
                 <div style="margin:0 20px 4px;padding:12px 14px;background:#f0fdf4;border:1px solid #86efac;border-radius:12px;font-size:12px;color:#166534;line-height:1.6;">
                     <strong style="display:block;margin-bottom:4px;">📊 무료 사용 쿼터 안내 (1일 기준)</strong>
                     • 비교 <strong>50회</strong> · 토론 <strong>10회</strong> · 협업 <strong>5회</strong> · 에이전트 <strong>20회</strong><br>
-                    • 쿼터 초과 시 다음날 자정(KST) 자동 리셋<br>
+                    • 코인 부족 시 관리자에게 문의하거나 작업 공유에서 코인을 받을 수 있습니다<br>
                     • 로그인 시 쿼터 추가 제공
                 </div>
                 <!-- Browserless 안내 -->
@@ -7421,10 +7499,9 @@
                 if (!res.ok) return;
                 const q = await res.json();
                 const total = q.total || {};
-                const rem = Math.round(total.remaining ?? 0);
-                const lim = Math.round(total.limit ?? (q.guest ? 70 : 250));
-                el.textContent = `${COIN}${rem}/${lim}`;
-                el.title = (q.guest ? "비회원" : "회원") + ` 통합 코인 · AI 1회=🪙1 · KST 자정 리셋`;
+                const rem = Math.round(total.remaining ?? q.balance ?? 0);
+                el.textContent = `${COIN}${rem}`;
+                el.title = (q.guest ? "비회원" : "회원") + ` 보유 코인 · AI 1회=🪙1`;
             } catch {
                 el.textContent = "";
             }
@@ -7904,8 +7981,9 @@
 
         // ── 앱 워크스페이스 (AI / 채팅 / 작업 공유) ─────────────────────────
         let currentAppWorkspace = "ai";
-        let chatPeerId = null;
+        let chatRoomId = null;
         let chatPollTimer = null;
+        let workTipTimers = {};
 
         const AI_PANEL_IDS = ["comparePanel", "debatePanel", "collabPanel"];
 
@@ -7970,33 +8048,145 @@
             if (chatLayout) chatLayout.style.display = loggedIn ? "grid" : "none";
             if (worksHint) worksHint.style.display = loggedIn ? "none" : "block";
             if (worksCompose) worksCompose.style.display = loggedIn ? "block" : "none";
-            if (loggedIn && currentAppWorkspace === "chat") loadChatUsers();
-            if (currentAppWorkspace === "works") loadWorksFeed();
+            if (loggedIn && currentAppWorkspace === "chat") {
+                loadChatRooms();
+                loadFriendRequests();
+            }
+            if (currentAppWorkspace === "works") {
+                loadWorksFeed();
+                loadFriendRequests("works");
+            }
         }
 
-        function renderChatUserLists(users) {
-            const emptyMsg = users.length
-                ? null
-                : "<div style='padding:10px;font-size:11px;color:#949ba4;'>다른 계정이 없습니다.</div>";
-            ["chatUserList", "sideMenuChatList"].forEach(id => {
+        async function loadFriendRequests(context = "chat") {
+            if (!currentUser) return;
+            const boxId = context === "works" ? "worksFriendRequests" : "chatFriendRequests";
+            const box = document.getElementById(boxId);
+            if (!box) return;
+            try {
+                const res = await apiFetch("/social/friends");
+                if (!res.ok) return;
+                const data = await res.json();
+                const incoming = data.requests?.incoming || [];
+                if (!incoming.length) { box.style.display = "none"; box.innerHTML = ""; return; }
+                box.style.display = "block";
+                box.innerHTML = "<div style='font-weight:700;margin-bottom:4px;color:#949ba4;'>친구 요청</div>";
+                incoming.forEach(r => {
+                    const row = document.createElement("div");
+                    row.className = "chat-friend-req";
+                    row.innerHTML = `<span>${escapeHtml(r.display_name)}</span>`;
+                    const accept = document.createElement("button");
+                    accept.type = "button";
+                    accept.textContent = "수락";
+                    accept.addEventListener("click", () => respondFriendRequest(r.id, true));
+                    const reject = document.createElement("button");
+                    reject.type = "button";
+                    reject.textContent = "거절";
+                    reject.style.background = "#4b5563";
+                    reject.addEventListener("click", () => respondFriendRequest(r.id, false));
+                    row.append(accept, reject);
+                    box.appendChild(row);
+                });
+            } catch {}
+        }
+
+        async function respondFriendRequest(fromId, accept) {
+            try {
+                const res = await apiFetch("/social/friends/respond", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: fromId, accept }),
+                });
+                if (!res.ok) { showToast("처리 실패"); return; }
+                showToast(accept ? "친구가 되었습니다." : "요청을 거절했습니다.");
+                loadFriendRequests("chat");
+                loadFriendRequests("works");
+                loadChatRooms();
+            } catch { showToast("처리 실패"); }
+        }
+
+        async function searchSocialUsers(query, resultsId) {
+            const box = document.getElementById(resultsId);
+            if (!box || !currentUser) return;
+            const q = (query || "").trim();
+            if (!q) { box.style.display = "none"; box.innerHTML = ""; return; }
+            box.style.display = "block";
+            box.innerHTML = "<div style='color:#949ba4;'>검색 중…</div>";
+            try {
+                const res = await apiFetch("/social/users?q=" + encodeURIComponent(q));
+                if (!res.ok) throw new Error("fail");
+                const data = await res.json();
+                const users = data.users || [];
+                if (!users.length) {
+                    box.innerHTML = "<div style='color:#949ba4;'>결과 없음</div>";
+                    return;
+                }
+                box.innerHTML = "";
+                users.forEach(u => {
+                    const row = document.createElement("div");
+                    row.className = "chat-search-item";
+                    row.innerHTML = `<span>${escapeHtml(u.display_name)}</span>`;
+                    const btn = document.createElement("button");
+                    if (u.relation === "friend") {
+                        btn.textContent = "친구";
+                        btn.disabled = true;
+                    } else if (u.relation === "pending_sent") {
+                        btn.textContent = "요청됨";
+                        btn.disabled = true;
+                    } else if (u.relation === "pending_received") {
+                        btn.textContent = "수락";
+                        btn.addEventListener("click", () => respondFriendRequest(u.id, true));
+                    } else {
+                        btn.textContent = "친구 추가";
+                        btn.addEventListener("click", () => sendFriendRequest(u.id));
+                    }
+                    row.appendChild(btn);
+                    box.appendChild(row);
+                });
+            } catch {
+                box.innerHTML = "<div style='color:#dc2626;'>검색 실패</div>";
+            }
+        }
+
+        async function sendFriendRequest(userId) {
+            try {
+                const res = await apiFetch("/social/friends/request", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: userId }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "요청 실패"); return; }
+                showToast(data.auto_accepted ? "친구가 되었습니다!" : "친구 요청을 보냈습니다.");
+                loadChatRooms();
+                loadFriendRequests("chat");
+                loadFriendRequests("works");
+            } catch { showToast("요청 실패"); }
+        }
+
+        function renderChatRoomList(rooms) {
+            const lists = ["chatRoomList", "sideMenuChatList"];
+            const emptyMsg = rooms.length ? null : "<div style='padding:10px;font-size:11px;color:#949ba4;'>친구를 추가하면 채팅방이 표시됩니다.</div>";
+            lists.forEach(id => {
                 const list = document.getElementById(id);
                 if (!list) return;
                 if (emptyMsg) { list.innerHTML = emptyMsg; return; }
                 list.innerHTML = "";
-                users.forEach(u => {
+                rooms.forEach(room => {
                     const btn = document.createElement("button");
                     btn.type = "button";
-                    btn.className = "chat-user-btn discord-member-btn" + (chatPeerId === u.id ? " active" : "");
-                    btn.dataset.peerId = u.id;
-                    const name = u.display_name || ("user" + u.id);
+                    btn.className = "chat-user-btn discord-member-btn" + (chatRoomId === room.room_id ? " active" : "");
+                    btn.dataset.roomId = room.room_id;
+                    const name = room.name || "채팅";
                     const initial = name.charAt(0).toUpperCase();
-                    if (id === "chatUserList") {
-                        btn.innerHTML = `<span class="discord-member-avatar">${escapeHtml(initial)}</span><span>${escapeHtml(name)}</span>`;
+                    const prefix = room.room_type === "group" ? "👥 " : "";
+                    if (id === "chatRoomList") {
+                        btn.innerHTML = `<span class="discord-member-avatar">${escapeHtml(initial)}</span><span>${prefix}${escapeHtml(name)}</span>`;
                     } else {
-                        btn.textContent = name;
+                        btn.textContent = prefix + name;
                     }
                     btn.addEventListener("click", () => {
-                        selectChatPeer(u.id, u.display_name);
+                        selectChatRoom(room.room_id, name, room.room_type);
                         if (window.innerWidth < 768) setSideMenuOpen(false);
                     });
                     list.appendChild(btn);
@@ -8004,49 +8194,42 @@
             });
         }
 
-        async function loadChatUsers() {
-            const sideList = document.getElementById("sideMenuChatList");
-            const mainList = document.getElementById("chatUserList");
-            if (!sideList && !mainList) return;
-            const loading = "<div style='padding:10px;font-size:11px;color:#9ca3af;'>불러오는 중…</div>";
-            if (sideList) sideList.innerHTML = loading;
-            if (mainList) mainList.innerHTML = loading;
-            if (!currentUser) {
-                const hint = "<div class='works-empty'>로그인 후 채팅 목록이 표시됩니다.</div>";
-                if (sideList) sideList.innerHTML = hint;
-                if (mainList) mainList.innerHTML = hint;
-                return;
-            }
+        async function loadChatRooms() {
+            const list = document.getElementById("chatRoomList");
+            if (!list || !currentUser) return;
+            list.innerHTML = "<div style='padding:10px;font-size:11px;color:#949ba4;'>불러오는 중…</div>";
             try {
-                const res = await apiFetch("/social/users");
+                const res = await apiFetch("/social/chat/rooms");
                 if (!res.ok) throw new Error("fail");
                 const data = await res.json();
-                renderChatUserLists(data.users || []);
-                if (!chatPeerId && (data.users || [])[0]) selectChatPeer(data.users[0].id, data.users[0].display_name);
+                const rooms = data.rooms || [];
+                renderChatRoomList(rooms);
+                if (!chatRoomId && rooms[0]) selectChatRoom(rooms[0].room_id, rooms[0].name, rooms[0].room_type);
             } catch {
-                const err = "<div style='padding:10px;font-size:11px;color:#dc2626;'>목록을 불러오지 못했습니다.</div>";
-                if (sideList) sideList.innerHTML = err;
-                if (mainList) mainList.innerHTML = err;
+                list.innerHTML = "<div style='padding:10px;font-size:11px;color:#dc2626;'>목록을 불러오지 못했습니다.</div>";
             }
         }
 
-        async function selectChatPeer(peerId, name) {
-            chatPeerId = peerId;
+        function selectChatRoom(roomId, name, roomType) {
+            chatRoomId = roomId;
             document.querySelectorAll(".chat-user-btn, .discord-member-btn").forEach(btn => {
-                btn.classList.toggle("active", String(btn.dataset.peerId) === String(peerId));
+                btn.classList.toggle("active", btn.dataset.roomId === roomId);
             });
             const titleEl = document.getElementById("chatChannelTitle");
-            if (titleEl) titleEl.textContent = name ? ("# " + name) : "대화 상대를 선택하세요";
+            if (titleEl) {
+                const prefix = roomType === "group" ? "👥 " : "# ";
+                titleEl.textContent = prefix + (name || "채팅");
+            }
             const chatInput = document.getElementById("chatInput");
-            if (chatInput) chatInput.placeholder = name ? ("@" + name + " 에게 메시지…") : "메시지 입력…";
-            await loadChatMessages();
+            if (chatInput) chatInput.placeholder = (name || "채팅") + " 에 메시지…";
+            loadChatMessages();
         }
 
         async function loadChatMessages() {
             const box = document.getElementById("chatMessages");
-            if (!box || !chatPeerId) return;
+            if (!box || !chatRoomId) return;
             try {
-                const res = await apiFetch("/social/chat/" + chatPeerId);
+                const res = await apiFetch("/social/chat/room/" + encodeURIComponent(chatRoomId));
                 if (!res.ok) return;
                 const data = await res.json();
                 box.innerHTML = "";
@@ -8070,17 +8253,21 @@
         }
 
         async function sendChatMessage() {
-            if (!currentUser || !chatPeerId) { openAuthModal("login"); return; }
+            if (!currentUser || !chatRoomId) { openAuthModal("login"); return; }
             const input = document.getElementById("chatInput");
             const body = (input?.value || "").trim();
             if (!body) return;
             try {
-                const res = await apiFetch("/social/chat/" + chatPeerId, {
+                const res = await apiFetch("/social/chat/room/" + encodeURIComponent(chatRoomId), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ body }),
                 });
-                if (!res.ok) { showToast("전송 실패"); return; }
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    showToast(typeof data.detail === "string" ? data.detail : "전송 실패");
+                    return;
+                }
                 if (input) input.value = "";
                 await loadChatMessages();
             } catch { showToast("전송 실패"); }
@@ -8090,7 +8277,7 @@
             stopChatPoll();
             if (!currentUser) return;
             chatPollTimer = setInterval(() => {
-                if (currentAppWorkspace === "chat" && chatPeerId) loadChatMessages();
+                if (currentAppWorkspace === "chat" && chatRoomId) loadChatMessages();
             }, 5000);
         }
         function stopChatPoll() {
@@ -8101,6 +8288,34 @@
         document.getElementById("chatInput")?.addEventListener("keydown", e => {
             if (e.key === "Enter") { e.preventDefault(); sendChatMessage(); }
         });
+        let chatSearchTimer = null;
+        document.getElementById("chatUserSearch")?.addEventListener("input", e => {
+            clearTimeout(chatSearchTimer);
+            chatSearchTimer = setTimeout(() => searchSocialUsers(e.target.value, "chatUserSearchResults"), 300);
+        });
+        document.getElementById("worksUserSearch")?.addEventListener("input", e => {
+            clearTimeout(chatSearchTimer);
+            chatSearchTimer = setTimeout(() => searchSocialUsers(e.target.value, "worksUserSearchResults"), 300);
+        });
+        document.getElementById("chatGroupCreateBtn")?.addEventListener("click", async () => {
+            if (!currentUser) { openAuthModal("login"); return; }
+            const name = prompt("단체방 이름");
+            if (!name) return;
+            const idsRaw = prompt("초대할 친구 ID (쉼표로 구분, 본인 제외)", "");
+            const member_ids = (idsRaw || "").split(",").map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+            try {
+                const res = await apiFetch("/social/chat/groups", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, member_ids }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "생성 실패"); return; }
+                showToast("단체방이 생성되었습니다.");
+                await loadChatRooms();
+                if (data.group?.room_id) selectChatRoom(data.group.room_id, data.group.name, "group");
+            } catch { showToast("생성 실패"); }
+        });
 
         async function loadWorksFeed() {
             const feed = document.getElementById("worksFeed");
@@ -8109,7 +8324,7 @@
             if (!feed) return;
             feed.innerHTML = "<div class='works-empty' style='text-align:center;color:#9ca3af;padding:20px;'>불러오는 중…</div>";
             try {
-                const res = await apiFetch("/social/works");
+                const res = await apiFetch("/social/works?friends_only=1");
                 if (!res.ok) throw new Error("fail");
                 const data = await res.json();
                 renderWorksFeed(data.works || []);
@@ -8156,6 +8371,17 @@
                 const initial = (w.author_name || "?").charAt(0).toUpperCase();
                 const title = w.title || "제목 없음";
                 const bodyPreview = (w.body || "").slice(0, 180) + ((w.body || "").length > 180 ? "…" : "");
+                const coinTotal = w.coin_total ?? w.like_count ?? 0;
+                const tipPending = w.tip_pending;
+                const tipped = w.tipped_by_me && !tipPending;
+                let coinBtnHtml = "";
+                if (tipped) {
+                    coinBtnHtml = `<button type="button" class="works-coin-btn tipped" disabled>🪙 보냄</button>`;
+                } else if (tipPending) {
+                    coinBtnHtml = `<button type="button" class="works-coin-btn pending" data-tip="${w.id}" data-cancel="1">취소 ${w.tip_seconds_left || 5}s</button>`;
+                } else {
+                    coinBtnHtml = `<button type="button" class="works-coin-btn" data-tip="${w.id}">🪙 1코인</button>`;
+                }
                 card.innerHTML = `
                     <div class="insta-card-head">
                         <div class="insta-avatar">${escapeHtml(initial)}</div>
@@ -8171,36 +8397,69 @@
                         </div>
                     </div>
                     <div class="insta-actions">
-                        <button type="button" class="works-like-btn${w.liked_by_me ? " liked" : ""}" data-like="${w.id}" aria-label="좋아요">❤️</button>
-                        <span class="insta-like-count">${w.like_count || 0}</span>
+                        ${coinBtnHtml}
+                        <span class="insta-like-count">🪙 ${coinTotal}</span>
                         <button type="button" class="works-comment-toggle" data-comments="${w.id}" aria-label="댓글">💬</button>
                         <span class="insta-comment-count">${w.comment_count || 0}</span>
                     </div>
                     <div class="insta-caption"><strong>${escapeHtml(w.author_name || "사용자")}</strong>${escapeHtml(w.body || "")}</div>
                     <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
                 feed.appendChild(card);
+                if (tipPending) scheduleWorkTipCountdown(w.id, w.tip_seconds_left || 5);
             });
-            feed.querySelectorAll(".works-like-btn").forEach(btn => {
-                btn.addEventListener("click", () => toggleWorkLike(btn.dataset.like, btn));
+            feed.querySelectorAll(".works-coin-btn[data-tip]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    if (btn.dataset.cancel === "1") cancelWorkCoinTip(btn.dataset.tip, btn);
+                    else sendWorkCoinTip(btn.dataset.tip, btn);
+                });
             });
             feed.querySelectorAll(".works-comment-toggle").forEach(btn => {
                 btn.addEventListener("click", () => toggleWorkComments(btn.dataset.comments));
             });
         }
 
-        async function toggleWorkLike(workId, btnEl) {
+        function scheduleWorkTipCountdown(workId, seconds) {
+            if (workTipTimers[workId]) clearInterval(workTipTimers[workId]);
+            let left = seconds;
+            workTipTimers[workId] = setInterval(() => {
+                left -= 1;
+                const btn = document.querySelector(`.works-coin-btn[data-tip="${workId}"][data-cancel="1"]`);
+                if (btn && left > 0) btn.textContent = `취소 ${left}s`;
+                if (left <= 0) {
+                    clearInterval(workTipTimers[workId]);
+                    delete workTipTimers[workId];
+                    loadWorksFeed();
+                    refreshSideQuota();
+                }
+            }, 1000);
+        }
+
+        async function sendWorkCoinTip(workId, btnEl) {
             if (!currentUser) { openAuthModal("login"); return; }
             try {
-                const res = await apiFetch("/social/works/" + workId + "/like", { method: "POST" });
-                if (!res.ok) return;
-                const data = await res.json();
-                if (btnEl) {
-                    btnEl.classList.toggle("liked", !!data.liked_by_me);
-                    const card = btnEl.closest(".insta-card, .works-card");
-                    const countEl = card?.querySelector(".insta-like-count");
-                    if (countEl) countEl.textContent = String(data.like_count || 0);
-                }
-            } catch {}
+                const res = await apiFetch("/social/works/" + workId + "/tip", { method: "POST" });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "코인 전송 실패"); return; }
+                showToast("🪙1 코인을 보냈습니다. 5초 내 취소 가능.");
+                refreshSideQuota();
+                loadWorksFeed();
+            } catch { showToast("코인 전송 실패"); }
+        }
+
+        async function cancelWorkCoinTip(workId, btnEl) {
+            try {
+                const res = await apiFetch("/social/works/" + workId + "/tip", { method: "DELETE" });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { showToast(typeof data.detail === "string" ? data.detail : "취소 실패"); return; }
+                showToast("코인 전송을 취소했습니다.");
+                if (workTipTimers[workId]) { clearInterval(workTipTimers[workId]); delete workTipTimers[workId]; }
+                refreshSideQuota();
+                loadWorksFeed();
+            } catch { showToast("취소 실패"); }
+        }
+
+        async function toggleWorkLike(workId, btnEl) {
+            return sendWorkCoinTip(workId, btnEl);
         }
 
         async function toggleWorkComments(workId) {

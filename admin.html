@@ -663,9 +663,8 @@
     function renderQuotaAdminPanel(subject, snapshot, limits, banned) {
       const snap = snapshot || {};
       const total = snap.total || {};
-      const poolUsed = Math.round(total.used ?? 0);
-      const poolLimit = Math.round(total.limit ?? limits?._pool ?? limits?.compare ?? 250);
-      const poolRem = Math.round(total.remaining ?? Math.max(0, poolLimit - poolUsed));
+      const balance = Math.round(total.balance ?? total.remaining ?? snap.balance ?? 0);
+      const usedToday = Math.round(total.used ?? 0);
       const feats = ["compare", "debate", "collab", "agent"];
       const features = snap.features || snap;
       const breakdown = feats.map(f => {
@@ -677,14 +676,18 @@
         </div>`;
       }).join("");
       return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
-        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">오늘 통합 코인 (AI 1회=🪙1) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
+        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">보유 코인 (AI 1회=🪙1) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
         <div class="quota-row" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #334155;">
-          <span class="quota-feat">통합</span>
-          <span class="quota-val" id="quotaPoolVal" data-qval="_pool">🪙${poolUsed}/🪙${poolLimit} (남음 🪙${poolRem})</span>
-          <input type="number" class="q-limit-inp" data-feature="_pool" value="${poolLimit}" min="0" max="9999" step="1" style="width:54px" title="일일 통합 한도">
-          <button type="button" class="secondary q-save-limit" data-feature="_pool">한도 저장</button>
+          <span class="quota-feat">잔액</span>
+          <span class="quota-val" id="quotaPoolVal" data-qval="_pool">🪙${balance}</span>
         </div>
-        <div style="font-size:11px;color:#94a3b8;margin:0 0 6px;">기능별 통계 (같은 코인 풀 · 조정 불가)</div>
+        <div style="font-size:11px;color:#94a3b8;margin:0 0 8px;">오늘 사용 ${usedToday}🪙 · 아래에서 코인 추가/회수</div>
+        <div class="quota-coin-adjust" style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <input type="number" id="quotaCoinAdjustAmt" class="q-limit-inp" value="10" min="1" max="99999" step="1" style="width:72px" title="조정할 코인 수">
+          <button type="button" class="secondary" id="quotaCoinPlusBtn">＋ 추가</button>
+          <button type="button" class="secondary" id="quotaCoinMinusBtn">－ 회수</button>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin:0 0 6px;">기능별 오늘 사용 통계</div>
         ${breakdown || "<div class='empty'>없음</div>"}
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="secondary" id="quotaRefreshBtn">새로고침</button>
@@ -702,11 +705,8 @@
         const total = snap.total || {};
         const poolEl = document.getElementById("quotaPoolVal");
         if (poolEl) {
-          poolEl.textContent = `🪙${Math.round(total.used ?? 0)}/🪙${Math.round(total.limit ?? 0)} (남음 🪙${Math.round(total.remaining ?? 0)})`;
-        }
-        const poolInp = box.querySelector('.q-limit-inp[data-feature="_pool"]');
-        if (poolInp && document.activeElement !== poolInp) {
-          poolInp.value = String(Math.round(total.limit ?? poolInp.value ?? 0));
+          const bal = Math.round(total.balance ?? total.remaining ?? snap.balance ?? 0);
+          poolEl.textContent = `🪙${bal}`;
         }
         ["compare", "debate", "collab", "agent"].forEach(f => {
           const el = box.querySelector(`[data-qval="${f}"]`);
@@ -724,17 +724,14 @@
 
     function wireQuotaAdminPanel(subject) {
       document.getElementById("quotaAdminBox")?.addEventListener("click", async e => {
-        const saveLim = e.target.closest(".q-save-limit");
-        if (saveLim) {
-          const feature = saveLim.dataset.feature;
-          const boxEl = document.getElementById("quotaAdminBox");
-          const inp = boxEl?.querySelector(`.q-limit-inp[data-feature="${feature}"]`);
-          const daily_limit = Math.max(0, parseInt(inp?.value || "0", 10) || 0);
+        const adjustAmt = () => Math.max(1, parseInt(document.getElementById("quotaCoinAdjustAmt")?.value || "1", 10) || 1);
+        if (e.target.id === "quotaCoinPlusBtn" || e.target.id === "quotaCoinMinusBtn") {
+          const delta = e.target.id === "quotaCoinPlusBtn" ? adjustAmt() : -adjustAmt();
           try {
-            await api("/admin/quota/limit", {
+            await api("/admin/quota/adjust", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ subject, feature, daily_limit }),
+              body: JSON.stringify({ subject, feature: "_pool", delta }),
             });
             await refreshQuotaAdminPanel(subject);
             if (selectedUserId) selectUser(selectedUserId);
