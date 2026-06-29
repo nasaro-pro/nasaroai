@@ -35,7 +35,7 @@
             transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 데스크톱: 앱 레일 + 사이드메뉴가 본문·질문창을 같은 만큼만 밀음 */
+        /* 데스크톱: 레일+메뉴 한 덩어리, 본문·질문창은 그 너비만큼만 밀림 */
         @media (min-width: 768px) {
             .app {
                 --content-inset: var(--app-rail-width);
@@ -44,16 +44,43 @@
             .app.sidebar-open {
                 --content-inset: calc(var(--app-rail-width) + var(--side-menu-width));
             }
-            .side-menu {
-                left: var(--app-rail-width);
-                width: var(--side-menu-width);
+            .desktop-chrome {
+                display: flex;
+                flex-direction: row;
+                align-items: stretch;
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100dvh;
+                width: var(--app-rail-width);
+                overflow: hidden;
                 z-index: 440;
+                transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             }
-            .side-menu.open {
-                transform: translateX(0);
+            .desktop-chrome.sidebar-open {
+                width: calc(var(--app-rail-width) + var(--side-menu-width));
             }
-            .side-menu:not(.open) {
-                transform: translateX(calc(-1 * var(--side-menu-width)));
+            .app-rail--desktop {
+                position: relative;
+                left: auto;
+                top: auto;
+                flex: 0 0 var(--app-rail-width);
+                width: var(--app-rail-width);
+                height: 100%;
+                z-index: 1;
+            }
+            .desktop-chrome .side-menu {
+                position: relative;
+                left: auto;
+                top: auto;
+                flex: 0 0 var(--side-menu-width);
+                width: var(--side-menu-width);
+                height: 100%;
+                transform: none;
+                z-index: 1;
+                box-shadow: none;
+                border-left: 1px solid #e5e7eb;
+                border-right: none;
             }
             .side-menu-overlay {
                 display: none;
@@ -71,8 +98,11 @@
                 left: 0;
                 right: 0;
             }
-            .app-rail--desktop {
-                z-index: 430;
+        }
+
+        @media (max-width: 767px) {
+            .desktop-chrome {
+                display: contents;
             }
         }
 
@@ -187,6 +217,10 @@
             .side-menu-overlay {
                 display: none;
             }
+        }
+
+        .desktop-chrome {
+            display: none;
         }
 
         .side-menu {
@@ -4859,6 +4893,12 @@
 <body>
     <div class="app">
         <div id="sideMenuOverlay" class="side-menu-overlay"></div>
+        <div id="desktopChrome" class="desktop-chrome">
+        <nav id="appRailDesktop" class="app-rail app-rail--desktop" aria-label="앱 메뉴">
+            <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
+            <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
+            <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
+        </nav>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
                 <span class="side-menu-brand" id="sideMenuBrand">Nasaro AI</span>
@@ -4911,12 +4951,7 @@
                 </div>
             </div>
         </aside>
-
-        <nav id="appRailDesktop" class="app-rail app-rail--desktop" aria-label="앱 메뉴">
-            <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
-            <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
-            <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
-        </nav>
+        </div>
 
         <!-- 설정 팝오버 패널 -->
         <div id="settingsPanel" class="settings-panel" role="dialog" aria-label="설정">
@@ -6316,12 +6351,14 @@
         const sideMenuOverlay = document.getElementById("sideMenuOverlay");
         const menuToggleBtn = document.getElementById("menuToggleBtn");
         const appShell = document.querySelector(".app");
+        const desktopChrome = document.getElementById("desktopChrome");
         const newChatBtn = document.getElementById("newChatBtn");
 
         function setSideMenuOpen(open) {
             sideMenu.classList.toggle("open", open);
             sideMenuOverlay.classList.toggle("open", open);
             appShell.classList.toggle("sidebar-open", open);
+            desktopChrome?.classList.toggle("sidebar-open", open);
             if (settingsPanel?.classList.contains("open")) positionSettingsPanel();
             if (!open) {
                 const sp = document.getElementById("settingsPanel");
