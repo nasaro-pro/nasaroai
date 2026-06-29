@@ -12113,6 +12113,10 @@
             } finally {
                 try { reader.releaseLock(); } catch {}
             }
+
+            if (!String(responses[model] || "").trim()) {
+                applyStreamChunk(responses, { model, success: false, error: COMPARE_FAILURE_MSG }, turnIndex);
+            }
         }
 
         async function handleCompare() {

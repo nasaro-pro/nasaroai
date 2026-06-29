@@ -1782,6 +1782,46 @@ def sse(payload: dict) -> str:
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
+def _delta_text(value: object) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "".join(
+            str(block.get("text") or block) if isinstance(block, dict) else str(block)
+            for block in value
+        )
+    return ""
+
+
+def extract_stream_delta(raw: dict) -> str:
+    """Extract streamed text from OpenRouter SSE JSON (content, reasoning, or text fields)."""
+    choices = raw.get("choices") or [{}]
+    if not choices:
+        return ""
+    choice0 = choices[0] if isinstance(choices[0], dict) else {}
+    parts: list[str] = []
+    for container in (choice0.get("delta"), choice0.get("message"), choice0):
+        if not isinstance(container, dict):
+            continue
+        for key in ("content", "reasoning", "text"):
+            chunk = _delta_text(container.get(key))
+            if chunk:
+                parts.append(chunk)
+    return "".join(parts)
+
+
+def openrouter_headers_or_error() -> tuple[dict[str, str] | None, str | None]:
+    try:
+        return build_openrouter_headers(), None
+    except HTTPException as exc:
+        detail = exc.detail
+        if exc.status_code == 503 and isinstance(detail, str) and "OPENROUTER" in detail.upper():
+            return None, OPENROUTER_AUTH_ERROR_MSG
+        if isinstance(detail, str) and detail.strip():
+            return None, detail
+        return None, OPENROUTER_AUTH_ERROR_MSG
+
+
 def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
     return [
             {"role": "system", "content": persona},
@@ -2145,6 +2185,11 @@ async def stream_label_chat(
     requested_model = candidates[0]
     failed_candidates: list[str] = []
 
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        yield {"error": header_error}
+        return
+
     for model_id in candidates:
         parts: list[str] = []
         meta_payload = {
@@ -2161,7 +2206,7 @@ async def stream_label_chat(
                     async with client.stream(
                         "POST",
                         OPENROUTER_CHAT_URL,
-                        headers=build_openrouter_headers(),
+                        headers=headers,
                         json=build_chat_payload(
                             model_id=model_id,
                             persona=persona,
@@ -2203,18 +2248,16 @@ async def stream_label_chat(
                             try:
                                 raw = json.loads(line[6:])
                             except json.JSONDecodeError:
-                                yield {"error": USER_FACING_FAILURE_MSG}
-                                return
+                                continue
                             if raw.get("error"):
-                                yield {"error": USER_FACING_FAILURE_MSG}
+                                err_body = raw.get("error")
+                                if isinstance(err_body, dict):
+                                    err_msg = err_body.get("message") or USER_FACING_FAILURE_MSG
+                                else:
+                                    err_msg = str(err_body) or USER_FACING_FAILURE_MSG
+                                yield {"error": err_msg}
                                 return
-                            delta = (raw.get("choices") or [{}])[0].get("delta") or {}
-                            chunk = delta.get("content")
-                            if isinstance(chunk, list):
-                                chunk = "".join(
-                                    str(b.get("text") or b) if isinstance(b, dict) else str(b)
-                                    for b in chunk
-                                )
+                            chunk = extract_stream_delta(raw)
                             if not chunk:
                                 continue
                             parts.append(chunk)
@@ -2843,6 +2886,11 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
             await mark_compare_stream_started(session_id)
             stream_started = True
 
+            headers, header_error = openrouter_headers_or_error()
+            if header_error:
+                yield sse({"model": data.model_name, "success": False, "error": header_error})
+                return
+
             while len(excluded_by_failure) < MAX_COMPARE_STREAM_MODEL_ATTEMPTS:
                 yield ": keepalive\n\n"
                 if current_model_id:
@@ -2870,7 +2918,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                             async with client.stream(
                                 "POST",
                                 OPENROUTER_CHAT_URL,
-                                headers=build_openrouter_headers(),
+                                headers=headers,
                                 json={
                                     **build_chat_payload(
                                         model_id=model_id,
@@ -2921,27 +2969,27 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                     yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
                                     return
 
+                                stream_got_content = False
                                 async for line in response.aiter_lines():
                                     if not line or not line.startswith("data: "):
                                         continue
                                     if line == "data: [DONE]":
-                                        return
+                                        break
                                     try:
                                         raw = json.loads(line[6:])
                                     except json.JSONDecodeError:
-                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
-                                        return
+                                        continue
                                     if raw.get("error"):
-                                        yield sse({"model": data.model_name, "success": False, "error": COMPARE_FAILURE_MSG})
+                                        err_body = raw.get("error")
+                                        if isinstance(err_body, dict):
+                                            err_msg = err_body.get("message") or COMPARE_FAILURE_MSG
+                                        else:
+                                            err_msg = str(err_body) or COMPARE_FAILURE_MSG
+                                        yield sse({"model": data.model_name, "success": False, "error": err_msg})
                                         return
-                                    delta = (raw.get("choices") or [{}])[0].get("delta") or {}
-                                    chunk = delta.get("content")
-                                    if isinstance(chunk, list):
-                                        chunk = "".join(
-                                            str(b.get("text") or b) if isinstance(b, dict) else str(b)
-                                            for b in chunk
-                                        )
+                                    chunk = extract_stream_delta(raw)
                                     if chunk:
+                                        stream_got_content = True
                                         compare_had_success = True
                                         yield sse(
                                             {
@@ -2953,7 +3001,11 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                                 "chunk": chunk,
                                             }
                                         )
-                                return
+                                if stream_got_content:
+                                    return
+                                excluded_by_failure.add(model_id)
+                                failed_this_model = True
+                                break
 
                 except httpx.HTTPError as exc:
                     logger.warning("Stream HTTPError label=%s model=%s error=%s", label, model_id, exc)
@@ -3606,221 +3658,232 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
         debate_coin_charged = False
         debate_had_success = False
 
-        async with lock:
-            session = load_debate_session(request.session_id)
-            if session is None:
-                if request.retry_speaker_index is not None:
-                    yield sse({"success": False, "error": "Debate session not found"})
-                    return
-                session = DebateSession(topic=request.topic)
-                store_debate_session(request.session_id, session)
-
-            speaker_index: int
-            requested_label: str
-            prompt: str
-            speaker_max_tokens: int | None
-            is_retry = request.retry_speaker_index is not None
-
-            if is_retry:
-                try:
-                    debate_subject, _ = _resolve_subject(http_request, request.user_id)
-                    await _require_debate_coin(http_request, request.user_id)
-                    debate_coin_charged = True
-                except HTTPException as exc:
-                    yield sse({"success": False, "error": _quota_error_message(exc.detail)})
-                    return
-                speaker_index = request.retry_speaker_index  # type: ignore[assignment]
-                if speaker_index < 1 or speaker_index > 3:
-                    yield sse({"success": False, "error": "Invalid speaker index"})
-                    return
-                if len(session.round_speaker_labels) >= speaker_index:
-                    requested_label = session.round_speaker_labels[speaker_index - 1]
-                else:
-                    requested_label = random.choice(COMPANY_LABELS)
-                prior_turns = [
-                    turn for turn in session.current_round_turns
-                    if turn.speaker_index < speaker_index and turn.success
-                ]
-                prompt = build_round_prompt(
-                    topic=session.topic,
-                    round_number=session.round_number,
-                    speaker_index=speaker_index,
-                    prior_turns=prior_turns,
-                    previous_summary=session.previous_summary,
-                    user_input=None,
-                )
-                speaker_max_tokens = 380 if speaker_index == 1 else None
-            else:
-                if request.user_input and len(session.current_round_turns) < 3:
-                    append_pending_user_input(
-                        session,
-                        request.user_input,
-                        target_round=session.round_number + 1,
-                    )
+        try:
+            async with lock:
+                session = load_debate_session(request.session_id)
+                if session is None:
+                    if request.retry_speaker_index is not None:
+                        yield sse({"success": False, "error": "Debate session not found"})
+                        return
+                    session = DebateSession(topic=request.topic)
                     store_debate_session(request.session_id, session)
-                    yield sse({"queued": True})
-                    return
 
-                if request.user_input:
-                    append_pending_user_input(
-                        session,
-                        request.user_input,
-                        target_round=session.round_number + 1,
+                speaker_index: int
+                requested_label: str
+                prompt: str
+                speaker_max_tokens: int | None
+                is_retry = request.retry_speaker_index is not None
+
+                if is_retry:
+                    try:
+                        debate_subject, _ = _resolve_subject(http_request, request.user_id)
+                        await _require_debate_coin(http_request, request.user_id)
+                        debate_coin_charged = True
+                    except HTTPException as exc:
+                        yield sse({"success": False, "error": _quota_error_message(exc.detail)})
+                        return
+                    speaker_index = request.retry_speaker_index  # type: ignore[assignment]
+                    if speaker_index < 1 or speaker_index > 3:
+                        yield sse({"success": False, "error": "Invalid speaker index"})
+                        return
+                    if len(session.round_speaker_labels) >= speaker_index:
+                        requested_label = session.round_speaker_labels[speaker_index - 1]
+                    else:
+                        requested_label = random.choice(COMPANY_LABELS)
+                    prior_turns = [
+                        turn for turn in session.current_round_turns
+                        if turn.speaker_index < speaker_index and turn.success
+                    ]
+                    prompt = build_round_prompt(
+                        topic=session.topic,
+                        round_number=session.round_number,
+                        speaker_index=speaker_index,
+                        prior_turns=prior_turns,
+                        previous_summary=session.previous_summary,
+                        user_input=None,
                     )
-
-                try:
-                    debate_subject, _ = _resolve_subject(http_request, request.user_id)
-                    await _require_debate_coin(http_request, request.user_id)
-                    debate_coin_charged = True
-                except HTTPException as exc:
-                    yield sse({"success": False, "error": _quota_error_message(exc.detail)})
-                    return
-
-                round_user_input = await prepare_next_round_if_needed(session)
-                speaker_index = len(session.current_round_turns) + 1
-                if speaker_index > 3:
-                    yield sse({"success": False, "error": "Invalid debate state"})
-                    return
-
-                if len(session.round_speaker_labels) < 3:
-                    session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(
-                        session.round_speaker_labels
-                    )
-
-                requested_label = session.round_speaker_labels[speaker_index - 1]
-                prior_turns = [t for t in session.current_round_turns if t.success]
-                prompt = build_round_prompt(
-                    topic=session.topic,
-                    round_number=session.round_number,
-                    speaker_index=speaker_index,
-                    prior_turns=prior_turns,
-                    previous_summary=session.previous_summary,
-                    user_input=round_user_input if speaker_index == 1 else None,
-                )
-                speaker_max_tokens = 380 if speaker_index == 1 else None
-
-            already_used_models: set[str] = set(session.round_used_models)
-            already_used_models.update(
-                turn.actual_model for turn in session.current_round_turns if turn.actual_model
-            )
-            excluded = set(already_used_models)
-
-            stream_meta: dict = {}
-            final_result: ModelCallResult | None = None
-
-            async with DEBATE_AI_SEMAPHORE:
-                async for event in stream_label_chat(
-                    requested_label,
-                    prompt,
-                    max_tokens=speaker_max_tokens,
-                    excluded_models=excluded,
-                ):
-                    if event.get("error"):
-                        failure = make_failed_result(
-                            requested_label=requested_label,
-                            requested_model="",
-                            actual_model="",
-                            failed_candidates=[],
-                            error=event["error"],
-                        )
-                        turn = _commit_debate_stream_turn(
+                    speaker_max_tokens = 380 if speaker_index == 1 else None
+                else:
+                    if request.user_input and len(session.current_round_turns) < 3:
+                        append_pending_user_input(
                             session,
-                            speaker_index,
-                            requested_label,
-                            failure,
-                            is_retry=is_retry,
+                            request.user_input,
+                            target_round=session.round_number + 1,
                         )
                         store_debate_session(request.session_id, session)
-                        yield sse(
-                            {
-                                "success": False,
-                                "error": event["error"],
-                                "done": True,
-                                "turn": dump_model(turn),
-                                "round": session.round_number,
-                            }
-                        )
-                        if debate_coin_charged and not debate_had_success and debate_subject:
-                            try:
-                                await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
-                            except Exception:
-                                logger.exception("debate coin refund failed subject=%s", debate_subject)
+                        yield sse({"queued": True})
                         return
 
-                    if event.get("chunk"):
-                        debate_had_success = True
-                        if event.get("meta"):
-                            stream_meta = event["meta"]
-                        yield sse(
-                            {
-                                "success": True,
-                                "chunk": event["chunk"],
-                                "round": session.round_number,
-                                "speaker_index": speaker_index,
-                                **stream_meta,
-                            }
+                    if request.user_input:
+                        append_pending_user_input(
+                            session,
+                            request.user_input,
+                            target_round=session.round_number + 1,
                         )
 
-                    if event.get("complete"):
-                        final_result = event["result"]
-                        break
+                    try:
+                        debate_subject, _ = _resolve_subject(http_request, request.user_id)
+                        await _require_debate_coin(http_request, request.user_id)
+                        debate_coin_charged = True
+                    except HTTPException as exc:
+                        yield sse({"success": False, "error": _quota_error_message(exc.detail)})
+                        return
 
-            if final_result is None:
-                failure = make_failed_result(
-                    requested_label=requested_label,
-                    requested_model="",
-                    actual_model="",
-                    failed_candidates=[],
-                    error=USER_FACING_FAILURE_MSG,
+                    round_user_input = await prepare_next_round_if_needed(session)
+                    speaker_index = len(session.current_round_turns) + 1
+                    if speaker_index > 3:
+                        yield sse({"success": False, "error": "Invalid debate state"})
+                        return
+
+                    if len(session.round_speaker_labels) < 3:
+                        session.round_speaker_labels = pick_speaker_labels_avoiding_repeat(
+                            session.round_speaker_labels
+                        )
+
+                    requested_label = session.round_speaker_labels[speaker_index - 1]
+                    prior_turns = [t for t in session.current_round_turns if t.success]
+                    prompt = build_round_prompt(
+                        topic=session.topic,
+                        round_number=session.round_number,
+                        speaker_index=speaker_index,
+                        prior_turns=prior_turns,
+                        previous_summary=session.previous_summary,
+                        user_input=round_user_input if speaker_index == 1 else None,
+                    )
+                    speaker_max_tokens = 380 if speaker_index == 1 else None
+
+                already_used_models: set[str] = set(session.round_used_models)
+                already_used_models.update(
+                    turn.actual_model for turn in session.current_round_turns if turn.actual_model
                 )
+                excluded = set(already_used_models)
+
+                stream_meta: dict = {}
+                final_result: ModelCallResult | None = None
+
+                async with DEBATE_AI_SEMAPHORE:
+                    async for event in stream_label_chat(
+                        requested_label,
+                        prompt,
+                        max_tokens=speaker_max_tokens,
+                        excluded_models=excluded,
+                    ):
+                        if event.get("error"):
+                            failure = make_failed_result(
+                                requested_label=requested_label,
+                                requested_model="",
+                                actual_model="",
+                                failed_candidates=[],
+                                error=event["error"],
+                            )
+                            turn = _commit_debate_stream_turn(
+                                session,
+                                speaker_index,
+                                requested_label,
+                                failure,
+                                is_retry=is_retry,
+                            )
+                            store_debate_session(request.session_id, session)
+                            yield sse(
+                                {
+                                    "success": False,
+                                    "error": event["error"],
+                                    "done": True,
+                                    "turn": dump_model(turn),
+                                    "round": session.round_number,
+                                }
+                            )
+                            return
+
+                        if event.get("chunk"):
+                            debate_had_success = True
+                            if event.get("meta"):
+                                stream_meta = event["meta"]
+                            yield sse(
+                                {
+                                    "success": True,
+                                    "chunk": event["chunk"],
+                                    "round": session.round_number,
+                                    "speaker_index": speaker_index,
+                                    **stream_meta,
+                                }
+                            )
+
+                        if event.get("complete"):
+                            final_result = event["result"]
+                            break
+
+                if final_result is None:
+                    failure = make_failed_result(
+                        requested_label=requested_label,
+                        requested_model="",
+                        actual_model="",
+                        failed_candidates=[],
+                        error=USER_FACING_FAILURE_MSG,
+                    )
+                    turn = _commit_debate_stream_turn(
+                        session,
+                        speaker_index,
+                        requested_label,
+                        failure,
+                        is_retry=is_retry,
+                    )
+                    store_debate_session(request.session_id, session)
+                    yield sse(
+                        {
+                            "success": False,
+                            "error": USER_FACING_FAILURE_MSG,
+                            "done": True,
+                            "turn": dump_model(turn),
+                            "round": session.round_number,
+                        }
+                    )
+                    return
+
                 turn = _commit_debate_stream_turn(
                     session,
                     speaker_index,
                     requested_label,
-                    failure,
+                    final_result,
                     is_retry=is_retry,
                 )
                 store_debate_session(request.session_id, session)
+                if final_result.success:
+                    debate_had_success = True
                 yield sse(
                     {
-                        "success": False,
-                        "error": USER_FACING_FAILURE_MSG,
+                        "success": final_result.success,
                         "done": True,
                         "turn": dump_model(turn),
                         "round": session.round_number,
+                        **({"error": final_result.error} if not final_result.success else {}),
                     }
                 )
-                if debate_coin_charged and not debate_had_success and debate_subject:
-                    try:
-                        await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
-                    except Exception:
-                        logger.exception("debate coin refund failed subject=%s", debate_subject)
-                return
-
-            turn = _commit_debate_stream_turn(
-                session,
-                speaker_index,
-                requested_label,
-                final_result,
-                is_retry=is_retry,
+        except HTTPException as exc:
+            logger.warning(
+                "debate/stream HTTPException session=%s status=%s",
+                request.session_id[:8],
+                exc.status_code,
             )
-            store_debate_session(request.session_id, session)
-            if final_result.success:
-                debate_had_success = True
-            elif debate_coin_charged and not debate_had_success and debate_subject:
+            detail = exc.detail
+            if exc.status_code == 503 and isinstance(detail, str) and "OPENROUTER" in detail.upper():
+                error_msg = OPENROUTER_AUTH_ERROR_MSG
+            elif exc.status_code == 429:
+                error_msg = _quota_error_message(detail)
+            elif isinstance(detail, str) and detail.strip():
+                error_msg = detail
+            else:
+                error_msg = USER_FACING_FAILURE_MSG
+            yield sse({"success": False, "error": error_msg, "done": True})
+        except Exception:
+            logger.exception("debate/stream unexpected error session=%s", request.session_id[:8])
+            yield sse({"success": False, "error": USER_FACING_FAILURE_MSG, "done": True})
+        finally:
+            if debate_coin_charged and not debate_had_success and debate_subject:
                 try:
                     await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
                 except Exception:
                     logger.exception("debate coin refund failed subject=%s", debate_subject)
-            yield sse(
-                {
-                    "success": final_result.success,
-                    "done": True,
-                    "turn": dump_model(turn),
-                    "round": session.round_number,
-                    **({"error": final_result.error} if not final_result.success else {}),
-                }
-            )
 
     return StreamingResponse(
         generate(),
