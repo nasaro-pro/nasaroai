@@ -6826,7 +6826,7 @@
         }
 
         // ── 새 채팅 ──────────────────────────────────────────────────────────
-        function startNewChat() {
+        async function startNewChat() {
             window.NasaroFeatures?.hideFloatingResultActions?.();
             const mode = currentMode;
             mainInput.value = "";
@@ -6858,7 +6858,6 @@
                 document.getElementById("collabIntro").style.display = "flex";
                 const rec = document.getElementById("collabRecommendResult");
                 if (rec) rec.innerHTML = "";
-                renderActiveCollabSidebar();
             }
             updateDockUI();
             syncDebateEmptyHint();
