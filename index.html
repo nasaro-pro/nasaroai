@@ -4818,7 +4818,7 @@
         .discord-workspace {
             max-width: none;
             padding: 0;
-            height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 0px));
+            height: calc(100dvh - var(--header-height, 72px) - var(--workspace-agent-bar, 0px) - var(--bottom-offset, 0px));
             min-height: 420px;
         }
         .discord-workspace.active { display: flex; flex-direction: column; }
@@ -4836,7 +4836,7 @@
         }
         @media (max-width: 640px) {
             .discord-workspace {
-                height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 56px));
+                height: calc(100dvh - var(--header-height, 72px) - var(--workspace-agent-bar, 0px) - var(--bottom-offset, 56px));
                 min-height: 0;
             }
             .discord-layout {
@@ -5153,7 +5153,7 @@
         .home-workspace {
             max-width: 640px;
             margin: 0 auto;
-            padding: 0 12px 24px;
+            padding: calc(var(--workspace-agent-bar, 0px) + 8px) 12px 24px;
             flex-direction: column;
         }
         .home-profile-card {
@@ -5294,27 +5294,41 @@
             font-weight: 800;
             font-size: 18px;
         }
-        .workspace-agent-fab {
-            position: fixed;
-            right: 16px;
-            bottom: calc(var(--bottom-offset, 72px) + 12px);
-            z-index: 360;
+        .workspace-agent-top {
             display: none;
+            position: fixed;
+            top: var(--header-height, 72px);
+            left: var(--content-inset, 0);
+            right: 0;
+            z-index: 370;
+            padding: 6px 12px;
+            min-height: 44px;
+            box-sizing: border-box;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .workspace-agent-top.visible { display: flex; }
+        .workspace-agent-fab {
+            position: static;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             min-width: 48px;
-            height: 48px;
+            height: 40px;
             padding: 0 14px;
-            border-radius: 24px;
+            border-radius: 12px;
             border: 1px solid #c4b5fd;
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
             color: #5b21b6;
             font-size: 13px;
             font-weight: 800;
             cursor: pointer;
-            box-shadow: 0 4px 16px rgba(91,33,182,0.22);
+            box-shadow: 0 2px 10px rgba(91,33,182,0.15);
         }
-        .workspace-agent-fab.visible { display: inline-flex; }
         .workspace-agent-fab.active {
             background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
             color: #fff;
@@ -5627,7 +5641,7 @@
         /* ── Instagram 스타일 작업 피드 ── */
         .insta-workspace {
             max-width: 640px;
-            padding: 0 0 24px;
+            padding: calc(var(--workspace-agent-bar, 0px) + 8px) 0 24px;
         }
         .insta-top-bar {
             padding: 12px 16px 8px;
@@ -5868,48 +5882,168 @@
         html[data-theme="dark"] .side-menu-section + .side-menu-section {
             border-top-color: var(--dm-border-soft);
         }
-        html[data-theme="dark"] .discord-layout,
-        html[data-theme="dark"] .discord-sidebar,
-        html[data-theme="dark"] .discord-main,
-        html[data-theme="dark"] .discord-channel-bar { background: #1e1f22; border-color: #111; }
-        html[data-theme="dark"] .discord-compose input { background: #111214; color: #dbdee1; }
-        html[data-theme="dark"] .insta-top-bar { border-color: #333; }
-        html[data-theme="dark"] .insta-top-title { color: #f5f5f5; }
-        html[data-theme="dark"] .insta-top-desc { color: #a3a3a3; }
-        html[data-theme="dark"] .insta-card,
-        html[data-theme="dark"] .insta-compose-card { background: #141414; border-color: #333; }
-        html[data-theme="dark"] .insta-compose-row input,
-        html[data-theme="dark"] .insta-compose-card textarea { background: #1a1a1a; border-color: #333; color: #e5e5e5; }
-        html[data-theme="dark"] .insta-caption,
-        html[data-theme="dark"] .insta-actions .insta-like-count,
-        html[data-theme="dark"] .insta-actions .insta-comment-count { color: #e5e5e5; }
-        html[data-theme="dark"] .insta-actions { border-color: #333; }
-        html[data-theme="dark"] .dock-mode-group { background: #171717; border-color: #333; }
-        html[data-theme="dark"] .dock-mode-group .mode-btn.active { background: #262626; color: #c4b5fd; }
-        html[data-theme="dark"] .dock-result-actions-slot.has-actions { background: rgba(30,27,46,.96); border-color: #4c1d95; }
-        html[data-theme="dark"] .mode-btn,
-        html[data-theme="dark"] .dock-btn.muted,
-        html[data-theme="dark"] .result-action-btn,
-        html[data-theme="dark"] .session-history-item,
-        html[data-theme="dark"] .side-menu-works-item,
-        html[data-theme="dark"] .works-empty,
-        html[data-theme="dark"] .input-tool-btn:not(.ai-all-active) {
-            background: #1a1a1a;
-            border-color: #333;
-            color: #e5e5e5;
-        }
-        html[data-theme="dark"] .compare-card,
-        html[data-theme="dark"] .collab-intro,
-        html[data-theme="dark"] .notice,
-        html[data-theme="dark"] .settings-panel,
-        html[data-theme="dark"] .auth-modal-box {
-            background: #141414;
-            border-color: #333;
-            color: #e5e5e5;
-        }
         html[data-theme="dark"] .site-header { background: rgba(10,10,10,.96); border-color: #262626; }
         html[data-theme="dark"] .header-brand h1 { color: #f5f5f5; }
         html[data-theme="dark"] .header-brand p { color: #a3a3a3; }
+        html[data-theme="dark"] .workspace-agent-top {
+            background: rgba(15, 18, 25, 0.96);
+            border-color: var(--dm-border-soft);
+        }
+        html[data-theme="dark"] .workspace-agent-fab {
+            background: linear-gradient(135deg, #1a1530 0%, #141824 100%);
+            border-color: #5b4b9a;
+            color: #c4b5fd;
+        }
+        html[data-theme="dark"] .workspace-agent-fab.active {
+            background: linear-gradient(135deg, #5b21b6 0%, #4c1d95 100%);
+            color: #fff;
+            border-color: #7c3aed;
+        }
+        html[data-theme="dark"] .workspace-login-hint {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text-muted);
+        }
+        html[data-theme="dark"] .discord-layout,
+        html[data-theme="dark"] .discord-sidebar,
+        html[data-theme="dark"] .discord-main,
+        html[data-theme="dark"] .discord-channel-bar,
+        html[data-theme="dark"] .discord-compose,
+        html[data-theme="dark"] .chat-friend-requests,
+        html[data-theme="dark"] .chat-search-results,
+        html[data-theme="dark"] .chat-sidebar-tools {
+            background: var(--dm-surface);
+            border-color: var(--dm-border-soft);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .discord-sidebar-head,
+        html[data-theme="dark"] .discord-sidebar-title { color: var(--dm-text-muted); border-color: var(--dm-border-soft); }
+        html[data-theme="dark"] .discord-messages {
+            background: linear-gradient(180deg, #0f1219 0%, #141824 100%);
+        }
+        html[data-theme="dark"] .discord-compose input,
+        html[data-theme="dark"] .chat-sidebar-tools input {
+            background: var(--dm-surface-2);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .discord-compose input:focus {
+            background: #1a2030;
+            border-color: #7c3aed;
+        }
+        html[data-theme="dark"] .chat-user-btn,
+        html[data-theme="dark"] .discord-member-btn { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .chat-user-btn:hover,
+        html[data-theme="dark"] .discord-member-btn:hover,
+        html[data-theme="dark"] .chat-room-list-item:hover { background: var(--dm-surface-2); color: var(--dm-text); }
+        html[data-theme="dark"] .chat-user-btn.active,
+        html[data-theme="dark"] .discord-member-btn.active,
+        html[data-theme="dark"] .chat-room-list-item.active { background: var(--dm-accent-bg); color: #e9d5ff; }
+        html[data-theme="dark"] .chat-room-list-name,
+        html[data-theme="dark"] #chatChannelTitle { color: var(--dm-text); }
+        html[data-theme="dark"] .chat-room-list-sub,
+        html[data-theme="dark"] .chat-bubble-meta { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .chat-bubble-row.theirs .chat-bubble {
+            background: var(--dm-surface-2);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .chat-date-divider {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text-muted);
+        }
+        html[data-theme="dark"] .chat-mobile-back,
+        html[data-theme="dark"] .chat-channel-actions button {
+            background: var(--dm-surface-2);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .chat-welcome-panel,
+        html[data-theme="dark"] .chat-empty-state { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .chat-welcome-panel strong,
+        html[data-theme="dark"] .chat-empty-state strong { color: var(--dm-text); }
+        html[data-theme="dark"] .chat-group-modal,
+        html[data-theme="dark"] .chat-group-modal-overlay .chat-group-modal {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .chat-group-modal input { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .home-profile-card,
+        html[data-theme="dark"] .home-compose-card,
+        html[data-theme="dark"] .home-saved-item,
+        html[data-theme="dark"] .home-profile-edit input,
+        html[data-theme="dark"] .home-profile-edit textarea {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .home-profile-meta h2 { color: var(--dm-text); }
+        html[data-theme="dark"] .home-profile-meta p,
+        html[data-theme="dark"] .home-saved-preview,
+        html[data-theme="dark"] .home-saved-meta { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .home-tab-btn {
+            background: var(--dm-surface-2);
+            border-color: var(--dm-border);
+            color: var(--dm-text-muted);
+        }
+        html[data-theme="dark"] .home-tab-btn.active {
+            background: var(--dm-accent-bg);
+            border-color: #7c3aed;
+            color: #e9d5ff;
+        }
+        html[data-theme="dark"] .home-saved-item button.secondary {
+            background: var(--dm-surface-2);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .home-friend-req-box,
+        html[data-theme="dark"] .side-menu-friend-item {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .insta-story { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .insta-story-ring span { background: var(--dm-surface-2); color: var(--dm-text); }
+        html[data-theme="dark"] .compare-summary-bar {
+            background: linear-gradient(180deg, #1a2030 0%, #141824 100%);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
+        html[data-theme="dark"] .compare-summary-block.common {
+            background: rgba(22, 101, 52, 0.15);
+            border-color: #166534;
+            color: #86efac;
+        }
+        html[data-theme="dark"] .compare-summary-block.diff {
+            background: rgba(154, 52, 18, 0.15);
+            border-color: #9a3412;
+            color: #fdba74;
+        }
+        html[data-theme="dark"] .compare-summary-oneline { color: var(--dm-text); }
+        html[data-theme="dark"] .compare-summary-reason { color: var(--dm-text-muted); border-color: var(--dm-border); }
+        html[data-theme="dark"] .app-rail-btn {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text-muted);
+        }
+        html[data-theme="dark"] .insta-top-bar { border-color: var(--dm-border-soft); background: transparent; }
+        html[data-theme="dark"] .insta-top-title { color: var(--dm-text); }
+        html[data-theme="dark"] .insta-top-desc { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .insta-card,
+        html[data-theme="dark"] .insta-compose-card { background: var(--dm-surface); border-color: var(--dm-border); }
+        html[data-theme="dark"] .insta-compose-row input,
+        html[data-theme="dark"] .insta-compose-card textarea { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .insta-caption,
+        html[data-theme="dark"] .insta-actions .insta-like-count,
+        html[data-theme="dark"] .insta-actions .insta-comment-count,
+        html[data-theme="dark"] .insta-author { color: var(--dm-text); }
+        html[data-theme="dark"] .insta-time { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .insta-actions { border-color: var(--dm-border-soft); }
+        html[data-theme="dark"] .dock-mode-group { background: var(--dm-surface-2); border-color: var(--dm-border); }
+        html[data-theme="dark"] .dock-mode-group .mode-btn.active { background: var(--dm-accent-bg); color: #e9d5ff; }
+        html[data-theme="dark"] .dock-result-actions-slot.has-actions { background: transparent; border-color: var(--dm-border-soft); }
+        html[data-theme="dark"] .input-dock { background: rgba(15, 18, 25, 0.94); border-color: var(--dm-border-soft); }
+        html[data-theme="dark"] .app-workspace-panel { background: transparent; color: var(--dm-text); }
 
         /* 데스크톱 좌측 chrome — 아래 일반 규칙(fixed 레일 등)보다 반드시 우선 */
         @media (min-width: 768px) {
@@ -6586,7 +6720,9 @@
             </div>
         </div>
 
-        <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
+        <div id="workspaceAgentTopBar" class="workspace-agent-top">
+            <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
+        </div>
         <div id="floatChatsLayer" class="float-chats-layer" aria-live="polite"></div>
 
         <div id="chatGroupModalOverlay" class="chat-group-modal-overlay" aria-hidden="true">
@@ -8934,11 +9070,18 @@
         }
 
         function updateWorkspaceAgentFab(ws) {
+            const bar = document.getElementById("workspaceAgentTopBar");
             const fab = document.getElementById("workspaceAgentFab");
-            if (!fab) return;
             const show = ws === "chat" || ws === "works" || ws === "home";
-            fab.classList.toggle("visible", show);
-            fab.classList.toggle("active", !!agentActive);
+            if (bar) bar.classList.toggle("visible", show);
+            if (fab) {
+                fab.classList.toggle("active", !!agentActive);
+                fab.textContent = agentActive ? "● 에이전트" : "🌐 에이전트";
+            }
+            document.documentElement.style.setProperty("--workspace-agent-bar", show ? "48px" : "0px");
+            if (show && agentActive && agentPanel?.style.display !== "none" && !agentPanelUserMoved) {
+                requestAnimationFrame(() => positionPanelNearButton(getAgentAnchorButton()));
+            }
         }
 
         function setAppWorkspace(ws) {
@@ -9174,7 +9317,7 @@
 
         function navigateToChat(roomId, name, roomType) {
             if (!requireLogin() || !roomId) return;
-            setAppWorkspace("chat");
+            if (currentAppWorkspace !== "chat") setAppWorkspace("chat");
             selectChatRoom(roomId, name, roomType);
             setSideMenuOpen(false);
         }
@@ -10892,24 +11035,40 @@
         }
         function hideLauncher() { agentFloatLauncher?.classList.remove("visible"); }
 
-        function positionPanelAboveButton(btn) {
+        function isTopScreenAnchor(btn) {
+            if (!btn) return false;
+            if (btn.id === "workspaceAgentFab") return true;
+            const topBar = document.getElementById("workspaceAgentTopBar");
+            if (topBar?.classList.contains("visible") && topBar.contains(btn)) return true;
+            const r = btn.getBoundingClientRect();
+            return r.top < window.innerHeight * 0.3;
+        }
+
+        function positionPanelNearButton(btn) {
             if (!agentPanel || !btn) return;
             const W = window.innerWidth;
             const H = window.innerHeight;
             const r = btn.getBoundingClientRect();
             const gap = 10;
             const pW = Math.min(560, W - 16);
-            let pH = W <= 520
-                ? Math.min(Math.floor(H * 0.55), 520)
-                : Math.min(Math.floor(H * 0.78), 760);
-            const spaceAbove = r.top - gap - 8;
-            if (spaceAbove < pH) pH = Math.max(200, spaceAbove);
-            // 버튼 우측 기준으로 패널을 바로 위에 배치 (왼쪽으로 치우치지 않게)
+            const preferBelow = isTopScreenAnchor(btn);
+            let pH = preferBelow
+                ? Math.min(Math.floor(H * 0.62), 640)
+                : (W <= 520 ? Math.min(Math.floor(H * 0.55), 520) : Math.min(Math.floor(H * 0.78), 760));
             let left = r.right - pW;
             left = Math.max(8, Math.min(W - pW - 8, left));
-            let top = r.top - pH - gap;
-            if (top < 8) top = Math.min(r.bottom + gap, H - pH - 8);
-            top = Math.max(8, Math.min(H - pH - 8, top));
+            let top;
+            if (preferBelow) {
+                const spaceBelow = H - r.bottom - gap - 8;
+                pH = Math.min(pH, Math.max(220, spaceBelow));
+                top = Math.min(r.bottom + gap, H - pH - 8);
+            } else {
+                const spaceAbove = r.top - gap - 8;
+                pH = Math.min(pH, Math.max(200, spaceAbove));
+                top = r.top - pH - gap;
+                if (top < 8) top = Math.min(r.bottom + gap, H - pH - 8);
+                top = Math.max(8, Math.min(H - pH - 8, top));
+            }
             agentPanel.style.left = left + "px";
             agentPanel.style.top = top + "px";
             agentPanel.style.right = "auto";
@@ -10921,8 +11080,7 @@
 
         function positionPanelNearLauncher() {
             if (!agentPanel || agentPanelUserMoved) return;
-            const anchor = (agentFloatLauncher?.classList.contains("visible") ? agentFloatLauncher : agentToggleBtn);
-            positionPanelAboveButton(anchor);
+            positionPanelNearButton(getAgentAnchorButton());
         }
 
         function scheduleAgentPanelReposition() {
@@ -10939,15 +11097,13 @@
             agentPanelUserMoved = false;
             const anchor = (fromLauncher && agentFloatLauncher?.classList.contains("visible"))
                 ? agentFloatLauncher
-                : agentToggleBtn;
+                : getAgentAnchorButton();
             agentPanel.classList.remove("minimized");
-            agentPanel.style.visibility = "hidden";
+            positionPanelNearButton(anchor);
             agentPanel.style.display = "flex";
-            positionPanelAboveButton(anchor);
-            agentPanel.style.visibility = "";
             hideLauncher();
             requestAnimationFrame(() => {
-                if (!agentPanelUserMoved) positionPanelAboveButton(anchor);
+                if (!agentPanelUserMoved) positionPanelNearButton(anchor);
                 setTimeout(() => agentInputEl?.focus(), 60);
             });
         }
@@ -10980,8 +11136,9 @@
         }
 
         function getAgentAnchorButton() {
+            const topBar = document.getElementById("workspaceAgentTopBar");
             const fab = document.getElementById("workspaceAgentFab");
-            if (fab?.classList.contains("visible")) return fab;
+            if (topBar?.classList.contains("visible") && fab) return fab;
             if (agentFloatLauncher?.classList.contains("visible")) return agentFloatLauncher;
             return agentToggleBtn;
         }
