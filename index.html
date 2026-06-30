@@ -1987,15 +1987,13 @@
             font-size: 13px;
             line-height: 1.55;
             padding: 12px 14px;
-            margin: 0 0 12px;
+            margin: 12px 0 0;
             border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             color: #334155;
-            position: sticky;
-            top: 0;
-            z-index: 8;
-            box-shadow: 0 4px 14px rgba(15,23,42,0.06);
+            position: static;
+            box-shadow: 0 2px 8px rgba(15,23,42,0.04);
         }
         .compare-summary-head {
             display: flex;
@@ -4836,10 +4834,6 @@
             margin: 0;
             box-shadow: none;
         }
-        @media (min-width: 768px) {
-            .discord-layout.chat-sidebar-mode { grid-template-columns: 1fr; }
-            .discord-layout.chat-sidebar-mode .discord-sidebar { display: none; }
-        }
         @media (max-width: 640px) {
             .discord-workspace {
                 height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 56px));
@@ -5327,11 +5321,71 @@
             border-color: #6d28d9;
         }
         .float-chats-layer {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 340;
+            display: none !important;
         }
+        .chat-channel-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .chat-channel-actions button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 50%;
+            background: #f3f4f6;
+            color: #374151;
+            font-size: 16px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .chat-channel-actions button:hover { background: #e5e7eb; }
+        .chat-room-list-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            text-align: left;
+            padding: 10px 12px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .chat-room-list-item:hover { background: #eef2ff; }
+        .chat-room-list-item.active { background: #ede9fe; }
+        .chat-room-list-meta {
+            flex: 1;
+            min-width: 0;
+        }
+        .chat-room-list-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chat-room-list-sub {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 2px;
+        }
+        .chat-welcome-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 32px 24px;
+            text-align: center;
+            color: #6b7280;
+        }
+        .chat-welcome-panel strong { font-size: 18px; color: #111827; }
         .float-chat-win {
             position: absolute;
             width: min(300px, calc(100vw - 24px));
@@ -6130,6 +6184,7 @@
                 </div>
                 <div id="compareError" class="notice error"></div>
                 <div id="compareLoading" class="notice info"></div>
+                <div id="compareResponses" class="compare-grid"></div>
                 <div id="compareSummaryBar" class="compare-summary-bar" style="display:none;" aria-live="polite">
                     <div class="compare-summary-head">
                         <span class="compare-summary-pick" id="compareSummaryPick"></span>
@@ -6147,7 +6202,6 @@
                     </div>
                     <div class="compare-summary-reason" id="compareSummaryReason"></div>
                 </div>
-                <div id="compareResponses" class="compare-grid"></div>
             </section>
 
             <section id="debatePanel" class="panel">
@@ -6312,6 +6366,9 @@
                         <div class="discord-channel-bar" id="chatChannelBar">
                             <button type="button" id="chatMobileBackBtn" class="chat-mobile-back" aria-label="채팅 목록">←</button>
                             <span id="chatChannelTitle">대화방을 선택하세요</span>
+                            <div class="chat-channel-actions">
+                                <button type="button" id="chatRefreshBtn" title="새로고침" aria-label="새로고침">↻</button>
+                            </div>
                         </div>
                         <div id="chatMessages" class="discord-messages"></div>
                         <div id="chatTypingIndicator" class="chat-typing-indicator" aria-hidden="true">전송 중…</div>
@@ -8110,18 +8167,17 @@
                     showToast("서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.", "error", 5000);
                     return;
                 }
+                let modelsOk = false;
                 if (infoRes.ok) {
                     const data = await infoRes.json();
-                    if (data.error) {
-                        showToast("AI 모델 목록 오류: " + data.error, "warn", 6000);
-                    }
+                    modelsOk = !data.error;
                 }
                 if (healthRes.ok) {
                     const h = await healthRes.json();
                     if (!h.openrouter_configured) {
-                        showToast(h.hint || "OPENROUTER_API_KEY만 설정하면 됩니다. OpenAI 키는 필요 없습니다.", "error", 8000);
-                    } else if (h.openrouter_key_valid === false && h.hint) {
-                        showToast("AI API: " + h.hint, "warn", 8000);
+                        showToast(h.hint || "OPENROUTER_API_KEY만 설정하면 됩니다.", "error", 6000);
+                    } else if (!modelsOk && h.hint) {
+                        showToast("AI 모델: " + h.hint, "warn", 5000);
                     }
                 }
             } catch {
@@ -8620,7 +8676,7 @@
                 const [quotaRes, infoRes, healthRes] = await Promise.all([
                     apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId())),
                     apiFetch("/system/info"),
-                    apiFetch("/health"),
+                    apiFetch("/health?verify=1"),
                 ]);
                 if (quotaRes.ok) {
                     const q = await quotaRes.json();
@@ -8873,9 +8929,8 @@
             const brand = document.getElementById("sideMenuBrand");
             const titles = { ai: "Nasaro AI", chat: "💬 채팅", works: "📋 작업 공유", home: "🏠 홈" };
             if (brand) brand.textContent = titles[ws] || titles.ai;
-            const chatLayout = document.getElementById("chatLayout");
-            if (chatLayout) chatLayout.classList.toggle("chat-sidebar-mode", ws === "chat" && window.innerWidth >= 768);
             if (ws === "works" || ws === "home") loadSideMenuFriends();
+            if (ws === "chat" && currentUser) loadChatRooms();
         }
 
         function updateWorkspaceAgentFab(ws) {
@@ -8900,20 +8955,25 @@
             const worksWs = document.getElementById("worksWorkspace");
             const homeWs = document.getElementById("homeWorkspace");
             const isAi = currentAppWorkspace === "ai";
+            const isChat = currentAppWorkspace === "chat";
 
             AI_PANEL_IDS.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = isAi ? "" : "none";
             });
-            if (chatWs) chatWs.classList.toggle("active", currentAppWorkspace === "chat");
+            if (chatWs) chatWs.classList.toggle("active", isChat);
             if (worksWs) worksWs.classList.toggle("active", currentAppWorkspace === "works");
             if (homeWs) homeWs.classList.toggle("active", currentAppWorkspace === "home");
 
             if (dockInner) dockInner.style.display = isAi ? "" : "none";
             if (dockAgentRow) dockAgentRow.style.display = isAi ? "" : "none";
-            if (dockShell) dockShell.style.display = isAi || window.innerWidth < 768 ? "" : "none";
+            if (dockShell) {
+                if (isAi) dockShell.style.display = "";
+                else if (window.innerWidth < 768) dockShell.style.display = "";
+                else dockShell.style.display = "none";
+            }
 
-            if (currentAppWorkspace === "chat") {
+            if (isChat) {
                 refreshSocialWorkspace();
                 startChatPoll();
             } else {
@@ -8921,7 +8981,6 @@
             }
             if (currentAppWorkspace === "works") loadWorksFeed();
             if (currentAppWorkspace === "home") refreshHomeWorkspace();
-            renderFloatChats();
 
             try { localStorage.setItem("nasaroai_app_workspace", currentAppWorkspace); } catch {}
             if (isAi) updateDockUI();
@@ -9113,6 +9172,24 @@
             return row;
         }
 
+        function navigateToChat(roomId, name, roomType) {
+            if (!requireLogin() || !roomId) return;
+            setAppWorkspace("chat");
+            selectChatRoom(roomId, name, roomType);
+            setSideMenuOpen(false);
+        }
+
+        function openFloatChat(roomId, name, roomType) {
+            navigateToChat(roomId, name, roomType);
+        }
+
+        function dmRoomIdForFriend(friendId) {
+            if (!currentUser?.id) return "";
+            const lo = Math.min(currentUser.id, friendId);
+            const hi = Math.max(currentUser.id, friendId);
+            return `${lo}:${hi}`;
+        }
+
         function renderChatRoomList(rooms) {
             const lists = ["chatRoomList", "sideMenuChatList"];
             const emptyMsg = rooms.length ? null : "<div style='padding:10px;font-size:11px;color:#949ba4;'>친구를 추가하면 채팅방이 표시됩니다.</div>";
@@ -9124,19 +9201,27 @@
                 rooms.forEach(room => {
                     const btn = document.createElement("button");
                     btn.type = "button";
-                    btn.className = "chat-user-btn discord-member-btn" + (chatRoomId === room.room_id ? " active" : "");
+                    btn.className = (id === "chatRoomList" ? "chat-room-list-item" : "chat-user-btn discord-member-btn")
+                        + (chatRoomId === room.room_id ? " active" : "");
                     btn.dataset.roomId = room.room_id;
                     const name = room.name || "채팅";
                     const initial = name.charAt(0).toUpperCase();
                     const prefix = room.room_type === "group" ? "👥 " : "";
                     if (id === "chatRoomList") {
-                        btn.innerHTML = `<span class="discord-member-avatar">${escapeHtml(initial)}</span><span>${prefix}${escapeHtml(name)}</span>`;
+                        const sub = room.room_type === "group"
+                            ? `단체방 · ${room.member_count || 0}명`
+                            : "1:1 채팅";
+                        btn.innerHTML = `
+                            <span class="discord-member-avatar">${escapeHtml(initial)}</span>
+                            <span class="chat-room-list-meta">
+                                <span class="chat-room-list-name">${prefix}${escapeHtml(name)}</span>
+                                <span class="chat-room-list-sub">${escapeHtml(sub)}</span>
+                            </span>`;
                     } else {
                         btn.textContent = prefix + name;
                     }
                     btn.addEventListener("click", () => {
-                        selectChatRoom(room.room_id, name, room.room_type);
-                        if (window.innerWidth < 768) setSideMenuOpen(false);
+                        navigateToChat(room.room_id, name, room.room_type);
                     });
                     list.appendChild(btn);
                 });
@@ -9153,15 +9238,47 @@
                 const data = await res.json();
                 const rooms = data.rooms || [];
                 renderChatRoomList(rooms);
-                if (!chatRoomId && rooms[0]) selectChatRoom(rooms[0].room_id, rooms[0].name, rooms[0].room_type);
+                if (!chatRoomId && rooms[0] && window.innerWidth > 640) {
+                    selectChatRoom(rooms[0].room_id, rooms[0].name, rooms[0].room_type);
+                } else if (!chatRoomId) {
+                    showChatWelcome();
+                }
             } catch {
                 list.innerHTML = "<div style='padding:10px;font-size:11px;color:#dc2626;'>목록을 불러오지 못했습니다.</div>";
             }
         }
 
+        function showChatWelcome() {
+            const box = document.getElementById("chatMessages");
+            if (!box) return;
+            box.innerHTML = `
+                <div class="chat-welcome-panel">
+                    <span style="font-size:40px;">💬</span>
+                    <strong>Nasaro 채팅</strong>
+                    <span>왼쪽에서 친구 또는 단체방을 선택하세요.<br>검색으로 새 친구를 추가할 수 있습니다.</span>
+                </div>`;
+        }
+
+        function chatMessageDateKey(m) {
+            if (m?.created_at) {
+                try { return new Date(Number(m.created_at) * 1000).toDateString(); } catch {}
+            }
+            return (m?.created_at_iso || "").slice(0, 10);
+        }
+
+        function formatChatDateLabelFromMessage(m) {
+            if (m?.created_at) {
+                try {
+                    const d = new Date(Number(m.created_at) * 1000);
+                    if (!Number.isNaN(d.getTime())) return formatChatDateLabel(d.toISOString());
+                } catch {}
+            }
+            return formatChatDateLabel(m?.created_at_iso);
+        }
+
         function selectChatRoom(roomId, name, roomType) {
             chatRoomId = roomId;
-            document.querySelectorAll(".chat-user-btn, .discord-member-btn").forEach(btn => {
+            document.querySelectorAll(".chat-user-btn, .discord-member-btn, .chat-room-list-item").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.roomId === roomId);
             });
             const titleEl = document.getElementById("chatChannelTitle");
@@ -9195,12 +9312,12 @@
                 }
                 let lastDate = "";
                 messages.forEach(m => {
-                    const dateKey = (m.created_at_iso || "").slice(0, 10);
+                    const dateKey = chatMessageDateKey(m);
                     if (dateKey && dateKey !== lastDate) {
                         lastDate = dateKey;
                         const divider = document.createElement("div");
                         divider.className = "chat-date-divider";
-                        divider.textContent = formatChatDateLabel(m.created_at_iso);
+                        divider.textContent = formatChatDateLabelFromMessage(m);
                         box.appendChild(divider);
                     }
                     appendChatBubble(box, m);
@@ -9257,12 +9374,16 @@
             if (!currentUser) return;
             chatPollTimer = setInterval(() => {
                 if (currentAppWorkspace === "chat" && chatRoomId) loadChatMessages();
-            }, 5000);
+            }, 3000);
         }
         function stopChatPoll() {
             if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
         }
 
+        document.getElementById("chatRefreshBtn")?.addEventListener("click", () => {
+            if (chatRoomId) loadChatMessages();
+            else loadChatRooms();
+        });
         document.getElementById("chatSendBtn")?.addEventListener("click", sendChatMessage);
         document.getElementById("chatInput")?.addEventListener("keydown", e => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
@@ -9270,11 +9391,10 @@
         document.getElementById("chatMobileBackBtn")?.addEventListener("click", () => {
             chatRoomId = null;
             updateChatMobileLayout();
-            const box = document.getElementById("chatMessages");
-            if (box) box.innerHTML = `<div class="chat-empty-state"><span style="font-size:32px;">💬</span><strong>대화방을 선택하세요</strong><span>목록에서 친구 또는 방을 선택합니다.</span></div>`;
+            showChatWelcome();
             const titleEl = document.getElementById("chatChannelTitle");
             if (titleEl) titleEl.textContent = "대화방을 선택하세요";
-            document.querySelectorAll(".chat-user-btn, .discord-member-btn").forEach(btn => btn.classList.remove("active"));
+            document.querySelectorAll(".chat-user-btn, .discord-member-btn, .chat-room-list-item").forEach(btn => btn.classList.remove("active"));
         });
         window.addEventListener("resize", () => {
             if (typeof updateChatMobileLayout === "function") updateChatMobileLayout();
@@ -9289,189 +9409,6 @@
             chatSearchTimer = setTimeout(() => searchSocialUsers(e.target.value, "worksUserSearchResults"), 300);
         });
         document.getElementById("chatGroupCreateBtn")?.addEventListener("click", () => openChatGroupModal());
-
-        const FLOAT_CHAT_KEY = "nasaro_float_chats_v1";
-        const MAX_FLOAT_CHATS = 3;
-        let floatChats = [];
-        let floatChatPollTimer = null;
-
-        function loadFloatChatsState() {
-            try { floatChats = JSON.parse(sessionStorage.getItem(FLOAT_CHAT_KEY) || "[]"); } catch { floatChats = []; }
-        }
-        function saveFloatChatsState() {
-            try { sessionStorage.setItem(FLOAT_CHAT_KEY, JSON.stringify(floatChats)); } catch {}
-        }
-
-        function dmRoomIdForFriend(friendId) {
-            if (!currentUser?.id) return "";
-            const lo = Math.min(currentUser.id, friendId);
-            const hi = Math.max(currentUser.id, friendId);
-            return `${lo}:${hi}`;
-        }
-
-        function openFloatChat(roomId, name, roomType) {
-            if (!requireLogin() || !roomId) return;
-            loadFloatChatsState();
-            const existing = floatChats.find(c => c.roomId === roomId);
-            if (existing) {
-                existing.minimized = false;
-                saveFloatChatsState();
-                renderFloatChats();
-                return;
-            }
-            if (floatChats.length >= MAX_FLOAT_CHATS) {
-                showToast("채팅창은 최대 3개까지 열 수 있습니다.");
-                return;
-            }
-            floatChats.push({
-                roomId,
-                name: name || "채팅",
-                roomType: roomType || "dm",
-                x: Math.min(window.innerWidth - 320, 16 + floatChats.length * 28),
-                y: Math.min(window.innerHeight - 360, 72 + floatChats.length * 28),
-                minimized: false,
-            });
-            saveFloatChatsState();
-            renderFloatChats();
-            startFloatChatPoll();
-        }
-
-        function closeFloatChat(roomId) {
-            loadFloatChatsState();
-            floatChats = floatChats.filter(c => c.roomId !== roomId);
-            saveFloatChatsState();
-            renderFloatChats();
-            if (!floatChats.length) stopFloatChatPoll();
-        }
-
-        async function loadFloatChatMessages(roomId, box) {
-            if (!box || !roomId) return;
-            try {
-                const res = await apiFetch("/social/chat/room/" + encodeURIComponent(roomId));
-                if (!res.ok) return;
-                const data = await res.json();
-                const msgs = data.messages || [];
-                box.innerHTML = msgs.map(m => {
-                    const mine = m.sender_id === currentUser?.id;
-                    return `<div style="margin:4px 0;${mine ? "text-align:right;" : ""}"><span style="font-weight:700;font-size:11px;">${escapeHtml(m.sender_name || "")}</span><div style="background:${mine ? "#ede9fe" : "#f3f4f6"};display:inline-block;padding:4px 8px;border-radius:8px;margin-top:2px;">${escapeHtml(m.body || "")}</div></div>`;
-                }).join("") || "<div style='color:#9ca3af;'>메시지 없음</div>";
-                box.scrollTop = box.scrollHeight;
-            } catch {}
-        }
-
-        async function sendFloatChatMessage(roomId, input) {
-            if (!requireLogin() || !roomId) return;
-            const body = (input?.value || "").trim();
-            if (!body) return;
-            try {
-                const res = await apiFetch("/social/chat/room/" + encodeURIComponent(roomId), {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ body }),
-                });
-                if (!res.ok) { showToast("전송 실패"); return; }
-                input.value = "";
-                const box = document.querySelector(`.float-chat-win[data-room-id="${CSS.escape(roomId)}"] .float-chat-msgs`);
-                if (box) await loadFloatChatMessages(roomId, box);
-            } catch { showToast("전송 실패"); }
-        }
-
-        function makeFloatChatDraggable(win, chat) {
-            const head = win.querySelector(".float-chat-head");
-            if (!head) return;
-            let active = false, ox = 0, oy = 0, sx = 0, sy = 0;
-            const getXY = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-            head.addEventListener("mousedown", e => {
-                if (e.target.closest("button")) return;
-                const [cx, cy] = getXY(e);
-                ox = cx; oy = cy; sx = chat.x; sy = chat.y; active = true;
-            });
-            head.addEventListener("touchstart", e => {
-                if (e.target.closest("button")) return;
-                const [cx, cy] = getXY(e);
-                ox = cx; oy = cy; sx = chat.x; sy = chat.y; active = true;
-            }, { passive: true });
-            const onMove = e => {
-                if (!active) return;
-                const [cx, cy] = getXY(e);
-                chat.x = Math.max(8, Math.min(window.innerWidth - 280, sx + cx - ox));
-                chat.y = Math.max(8, Math.min(window.innerHeight - 200, sy + cy - oy));
-                win.style.left = chat.x + "px";
-                win.style.top = chat.y + "px";
-            };
-            const onEnd = () => {
-                if (active) { active = false; saveFloatChatsState(); }
-            };
-            window.addEventListener("mousemove", onMove);
-            window.addEventListener("touchmove", onMove, { passive: true });
-            window.addEventListener("mouseup", onEnd);
-            window.addEventListener("touchend", onEnd);
-        }
-
-        function renderFloatChats() {
-            const layer = document.getElementById("floatChatsLayer");
-            if (!layer) return;
-            loadFloatChatsState();
-            layer.innerHTML = "";
-            if (!floatChats.length) return;
-            floatChats.forEach(chat => {
-                const win = document.createElement("div");
-                win.className = "float-chat-win";
-                win.dataset.roomId = chat.roomId;
-                win.style.left = (chat.x || 16) + "px";
-                win.style.top = (chat.y || 80) + "px";
-                if (chat.minimized) win.style.height = "40px";
-                win.innerHTML = `
-                    <div class="float-chat-head">
-                        <span>${escapeHtml(chat.name || "채팅")}</span>
-                        <button type="button" data-minimize title="접기">−</button>
-                        <button type="button" data-close title="닫기">✕</button>
-                    </div>
-                    <div class="float-chat-msgs"></div>
-                    <div class="float-chat-compose">
-                        <input type="text" placeholder="메시지…" autocomplete="off">
-                        <button type="button">➤</button>
-                    </div>`;
-                if (chat.minimized) {
-                    win.querySelector(".float-chat-msgs")?.remove();
-                    win.querySelector(".float-chat-compose")?.remove();
-                }
-                layer.appendChild(win);
-                makeFloatChatDraggable(win, chat);
-                win.querySelector("[data-close]")?.addEventListener("click", () => closeFloatChat(chat.roomId));
-                win.querySelector("[data-minimize]")?.addEventListener("click", () => {
-                    chat.minimized = !chat.minimized;
-                    saveFloatChatsState();
-                    renderFloatChats();
-                });
-                if (!chat.minimized) {
-                    const msgs = win.querySelector(".float-chat-msgs");
-                    loadFloatChatMessages(chat.roomId, msgs);
-                    const input = win.querySelector(".float-chat-compose input");
-                    const sendBtn = win.querySelector(".float-chat-compose button");
-                    sendBtn?.addEventListener("click", () => sendFloatChatMessage(chat.roomId, input));
-                    input?.addEventListener("keydown", e => {
-                        if (e.key === "Enter") { e.preventDefault(); sendFloatChatMessage(chat.roomId, input); }
-                    });
-                }
-            });
-            if (floatChats.length) startFloatChatPoll();
-        }
-
-        function startFloatChatPoll() {
-            if (floatChatPollTimer) return;
-            floatChatPollTimer = setInterval(() => {
-                loadFloatChatsState();
-                floatChats.forEach(chat => {
-                    if (chat.minimized) return;
-                    const box = document.querySelector(`.float-chat-win[data-room-id="${CSS.escape(chat.roomId)}"] .float-chat-msgs`);
-                    if (box) loadFloatChatMessages(chat.roomId, box);
-                });
-            }, 5000);
-        }
-        function stopFloatChatPoll() {
-            if (floatChatPollTimer) { clearInterval(floatChatPollTimer); floatChatPollTimer = null; }
-        }
 
         async function openChatGroupModal() {
             if (!requireLogin()) return;
@@ -9531,7 +9468,7 @@
                 showToast("단체방이 생성되었습니다.");
                 closeChatGroupModal();
                 await loadChatRooms();
-                if (data.group?.room_id) selectChatRoom(data.group.room_id, data.group.name, "group");
+                if (data.group?.room_id) navigateToChat(data.group.room_id, data.group.name, "group");
             } catch { showToast("생성 실패"); }
         });
 
@@ -9578,14 +9515,11 @@
                 chatBtn.textContent = "채팅";
                 chatBtn.addEventListener("click", e => {
                     e.stopPropagation();
-                    const roomId = dmRoomIdForFriend(f.id);
-                    openFloatChat(roomId, f.display_name, "dm");
+                    navigateToChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
                 });
                 row.append(profBtn, chatBtn);
                 row.addEventListener("click", () => {
-                    setAppWorkspace("chat");
-                    const roomId = dmRoomIdForFriend(f.id);
-                    selectChatRoom(roomId, f.display_name, "dm");
+                    navigateToChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
                 });
                 list.appendChild(row);
             });
@@ -9604,7 +9538,7 @@
                 el.addEventListener("click", () => {
                     const fid = parseInt(el.dataset.friendId, 10);
                     const f = friends.find(x => x.id === fid);
-                    if (f) openFloatChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
+                    if (f) navigateToChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
                 });
             });
         }
@@ -9893,7 +9827,7 @@
             if (!requireLogin()) return;
             const msg = `「${work.title || "작업"}」 공동작업 하실래요?\n${(work.body || "").slice(0, 200)}`;
             if (work.user_id && work.user_id !== currentUser.id) {
-                openFloatChat(dmRoomIdForFriend(work.user_id), work.author_name || "친구", "dm");
+                navigateToChat(dmRoomIdForFriend(work.user_id), work.author_name || "친구", "dm");
                 setTimeout(async () => {
                     try {
                         await apiFetch("/social/chat/room/" + encodeURIComponent(dmRoomIdForFriend(work.user_id)), {
@@ -10382,7 +10316,6 @@
         refreshSavedResultsUI();
         renderSessionHistory();
         bootstrapAuth().then(() => {
-            renderFloatChats();
             updateWorkspaceAgentFab(currentAppWorkspace);
         });
         wireCollabActionBar();

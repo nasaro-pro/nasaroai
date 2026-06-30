@@ -4247,7 +4247,7 @@ async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request
 
 
 @app.get("/health")
-async def health() -> dict:
+async def health(verify: bool = False) -> dict:
     api_key = get_openrouter_api_key()
     payload: dict = {
         "status": "ok",
@@ -4262,14 +4262,17 @@ async def health() -> dict:
         payload["openrouter_key_source"] = get_openrouter_key_source()
         payload["openrouter_key_kind"] = classify_api_key(api_key)
         payload["needs_openai_key"] = False
-        try:
-            valid, err = await verify_openrouter_auth()
-            payload["openrouter_key_valid"] = valid
-            if err:
-                payload["hint"] = err
-        except Exception as exc:
-            payload["openrouter_key_valid"] = False
-            payload["hint"] = f"OpenRouter 검증 오류: {exc.__class__.__name__}"
+        if verify:
+            try:
+                valid, err = await verify_openrouter_auth()
+                payload["openrouter_key_valid"] = valid
+                if err:
+                    payload["hint"] = err
+            except Exception as exc:
+                payload["openrouter_key_valid"] = False
+                payload["hint"] = f"OpenRouter 검증 오류: {exc.__class__.__name__}"
+        else:
+            payload["openrouter_key_valid"] = None
     else:
         payload["openrouter_key_valid"] = False
         payload["openrouter_key_kind"] = "missing"
