@@ -387,9 +387,8 @@
         privBtn.type = "button";
         privBtn.className = "input-tool-btn privacy-btn privacy-btn-compact" + (privacyMode && loggedIn() ? " active" : "");
         privBtn.title = t("privacy_tip");
-        privBtn.innerHTML = `<span class="priv-text">${privacyMode && loggedIn() ? "🔒" : "🔓"}</span><span class="priv-q" title="${t("privacy_tip")}">?</span>`;
-        privBtn.addEventListener("click", e => {
-            if (e.target.classList.contains("priv-q")) return;
+        privBtn.innerHTML = `<span class="priv-text">${privacyMode && loggedIn() ? "🔒" : "🔓"}</span>`;
+        privBtn.addEventListener("click", () => {
             if (!loggedIn()) {
                 opts.showToast?.(t("privacy_login"), "warn", 4000);
                 opts.onLoginRequired?.();
@@ -404,10 +403,6 @@
             } else {
                 opts.showToast?.(t("privacy_off"), "info", 3000);
             }
-        });
-        privBtn.querySelector(".priv-q")?.addEventListener("click", e => {
-            e.stopPropagation();
-            opts.showToast?.(loggedIn() ? t("privacy_on_admin") : t("privacy_login"), "info", 5000);
         });
         syncBtn();
         return privBtn;

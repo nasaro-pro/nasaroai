@@ -1929,6 +1929,56 @@
             grid-template-columns: 1fr;
             gap: 12px;
         }
+        .compare-grid.compare-cols-1 { grid-template-columns: 1fr; }
+        .compare-grid.compare-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .compare-grid.compare-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .compare-grid.compare-cols-1 .compare-card { height: 240px; }
+        .compare-grid.compare-cols-2 .compare-card { height: 300px; }
+        .compare-grid.compare-cols-3 .compare-card { height: 340px; }
+        .compare-card.compare-card-dragging { opacity: 0.55; }
+        .compare-card.compare-card-drop-target {
+            outline: 2px dashed #7c3aed;
+            outline-offset: 2px;
+        }
+        .compare-drag-handle {
+            cursor: grab;
+            font-size: 14px;
+            line-height: 1;
+            color: #9ca3af;
+            padding: 0 2px;
+            user-select: none;
+            touch-action: none;
+        }
+        .compare-drag-handle:active { cursor: grabbing; }
+        .compare-layout-picker {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 2px;
+            border-radius: 10px;
+            border: 1px solid #ddd6fe;
+            background: #f5f3ff;
+        }
+        .compare-layout-picker .layout-col-btn {
+            min-width: 28px;
+            height: 32px;
+            padding: 0 6px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #6d28d9;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .compare-layout-picker .layout-col-btn.active {
+            background: #7c3aed;
+            color: #fff;
+        }
+        html[data-theme="dark"] .compare-layout-picker {
+            background: #1e1b4b;
+            border-color: #4c1d95;
+        }
 
         .compare-summary-bar {
             font-size: 13px;
@@ -2069,12 +2119,12 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            height: auto;
+            height: 340px;
             max-height: min(calc(100dvh - var(--bottom-offset, 150px) - 96px), 620px);
         }
 
         #comparePanel.active .compare-grid:not(:empty) {
-            align-items: start;
+            align-items: stretch;
         }
 
         .compare-card-header {
@@ -2762,17 +2812,11 @@
         }
 
         @media (min-width: 640px) {
-            .compare-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-                gap: 16px;
-            }
+            .compare-grid { gap: 16px; }
         }
 
         @media (min-width: 960px) {
-            .compare-grid {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 18px;
-            }
+            .compare-grid { gap: 18px; }
         }
 
         @media (max-width: 640px) {
@@ -4051,8 +4095,8 @@
             justify-content: stretch;
             gap: 6px;
             width: 100%;
-            padding: 0 0 4px;
-            order: 2;
+            padding: 0;
+            margin: 0 0 6px;
         }
         .dock-result-actions-slot.has-actions {
             display: flex;
@@ -4066,6 +4110,11 @@
         html[data-theme="dark"] .dock-result-actions-slot.has-actions {
             background: rgba(30, 27, 46, 0.96);
             border-color: #4c1d95;
+        }
+        .dock-shell > .dock-result-actions-slot.has-actions {
+            display: flex;
+            margin: 0 8px 6px;
+            border-radius: 12px;
         }
         .dock-btn-row { order: 1; }
         .dock-compose-row { order: 3; }
@@ -6365,6 +6414,7 @@
         </div>
 
         <div id="dockShell" class="dock-shell">
+            <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
             <div class="dock-agent-row">
                 <button id="agentToggleBtn" class="dock-agent-outside agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
             </div>
@@ -6385,7 +6435,6 @@
                         </div>
                         <div class="dock-btn-right" id="dockBtnToolsRight"></div>
                     </div>
-                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-compose-row">
                         <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
@@ -6443,7 +6492,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="/static/nasaro-features.js?v=20260627p"></script>
+    <script src="/static/nasaro-features.js?v=20260630a"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -6848,11 +6897,127 @@
         let resultTagFilter = "";
         let viewingResultIndex = -1;
 
+        function buildCompareLayoutPicker() {
+            const wrap = document.createElement("div");
+            wrap.className = "compare-layout-picker";
+            wrap.title = "비교 창 열 개수 (1·2·3칸)";
+            [1, 2, 3].forEach(cols => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "layout-col-btn" + (compareGridCols === cols ? " active" : "");
+                btn.textContent = String(cols);
+                btn.title = cols === 1 ? "1열 (세로)" : cols === 2 ? "2열" : "3열";
+                btn.addEventListener("click", () => {
+                    compareGridCols = cols;
+                    localStorage.setItem("nasaroai_compare_cols", String(cols));
+                    wrap.querySelectorAll(".layout-col-btn").forEach(b => b.classList.toggle("active", Number(b.textContent) === cols));
+                    applyCompareGridLayout();
+                });
+                wrap.appendChild(btn);
+            });
+            return wrap;
+        }
+
+        function syncCompareCardOrder(models) {
+            const active = models || getActiveModels();
+            const kept = compareCardOrder.filter(m => active.includes(m));
+            active.forEach(m => {
+                if (!kept.includes(m)) kept.push(m);
+            });
+            compareCardOrder = kept;
+            localStorage.setItem("nasaroai_compare_order", JSON.stringify(compareCardOrder));
+            return compareCardOrder;
+        }
+
+        function applyCompareGridLayout() {
+            const root = document.getElementById("compareResponses");
+            if (!root) return;
+            root.className = `compare-grid compare-cols-${compareGridCols}`;
+            reorderCompareCardsDom();
+        }
+
+        function reorderCompareCardsDom() {
+            const root = document.getElementById("compareResponses");
+            if (!root) return;
+            syncCompareCardOrder(getActiveModels()).forEach(model => {
+                const card = document.getElementById(`compare-card-${compareModelKey(model)}`);
+                if (card) root.appendChild(card);
+            });
+        }
+
+        function swapCompareCardOrder(fromModel, toModel) {
+            const order = syncCompareCardOrder(getActiveModels());
+            const fromIdx = order.indexOf(fromModel);
+            const toIdx = order.indexOf(toModel);
+            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+            order[fromIdx] = toModel;
+            order[toIdx] = fromModel;
+            compareCardOrder = order;
+            localStorage.setItem("nasaroai_compare_order", JSON.stringify(compareCardOrder));
+            reorderCompareCardsDom();
+        }
+
+        function initCompareCardDrag(card, model) {
+            if (!card || card.dataset.dragReady === "1") return;
+            card.dataset.dragReady = "1";
+            card.draggable = false;
+            const handle = card.querySelector(".compare-drag-handle");
+            handle?.addEventListener("mousedown", () => { card.draggable = true; });
+            handle?.addEventListener("touchstart", () => { card.draggable = true; }, { passive: true });
+            card.addEventListener("dragstart", e => {
+                e.dataTransfer.setData("text/plain", model);
+                e.dataTransfer.effectAllowed = "move";
+                card.classList.add("compare-card-dragging");
+            });
+            card.addEventListener("dragend", () => {
+                card.draggable = false;
+                card.classList.remove("compare-card-dragging");
+                document.querySelectorAll(".compare-card-drop-target").forEach(el => el.classList.remove("compare-card-drop-target"));
+            });
+            card.addEventListener("dragover", e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                card.classList.add("compare-card-drop-target");
+            });
+            card.addEventListener("dragleave", () => card.classList.remove("compare-card-drop-target"));
+            card.addEventListener("drop", e => {
+                e.preventDefault();
+                card.classList.remove("compare-card-drop-target");
+                const fromModel = e.dataTransfer.getData("text/plain");
+                if (fromModel && fromModel !== model) swapCompareCardOrder(fromModel, model);
+            });
+        }
+
+        async function copyTextToClipboard(text) {
+            const value = String(text || "");
+            if (!value.trim()) return false;
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(value);
+                    return true;
+                }
+            } catch {}
+            try {
+                const ta = document.createElement("textarea");
+                ta.value = value;
+                ta.setAttribute("readonly", "");
+                ta.style.position = "fixed";
+                ta.style.left = "-9999px";
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand("copy");
+                document.body.removeChild(ta);
+                return ok;
+            } catch {
+                return false;
+            }
+        }
+
         function ensureCompareModelCards(models) {
             const root = document.getElementById("compareResponses");
             if (!root) return;
-            root.className = "compare-grid";
-            models.forEach(model => {
+            applyCompareGridLayout();
+            syncCompareCardOrder(models).forEach(model => {
                 const key = compareModelKey(model);
                 if (document.getElementById(`compare-card-${key}`)) return;
                 const color = colorFor(model);
@@ -6863,24 +7028,36 @@
                 card.style.borderLeftColor = color;
                 card.innerHTML = `
                     <div class="compare-card-header" style="color: ${color};">
+                        <span class="compare-drag-handle" title="드래그하여 순서 변경">⠿</span>
                         <span class="dot" style="background: ${color};"></span>
                         <span>${model}</span>
                         <span class="compare-model-meta" id="model-meta-${key}"></span>
-                        <button type="button" class="compare-copy-btn" data-copy-key="${key}" title="복사">복사</button>
+                        <button type="button" class="compare-copy-btn" data-copy-key="${key}" title="답변 복사">복사</button>
                     </div>
                     <div class="compare-qa-stack" id="compare-qa-stack-${key}"></div>`;
                 root.appendChild(card);
-                card.querySelector(".compare-copy-btn")?.addEventListener("click", () => {
+                initCompareCardDrag(card, model);
+                card.querySelector(".compare-copy-btn")?.addEventListener("click", async () => {
                     const stack = document.getElementById(`compare-qa-stack-${key}`);
                     const contents = stack?.querySelectorAll(".compare-content") || [];
                     const lastContent = contents[contents.length - 1];
-                    const text = getAiAnswerPlainText(lastContent);
-                    if (!text.trim()) {
+                    let text = getAiAnswerPlainText(lastContent).trim();
+                    if (!text) {
+                        const turn = compareTurns[compareCurrentTurnIndex];
+                        text = String(turn?.responses?.[model] || compareResponses?.[model] || "").trim();
+                    }
+                    if (!text || text === COMPARE_FAILURE_MSG) {
                         showToast("복사할 답변이 없습니다.", "error");
                         return;
                     }
-                    navigator.clipboard.writeText(text).then(() => showToast("답변을 복사했습니다.", "success")).catch(() => showToast("복사 실패", "error"));
+                    const ok = await copyTextToClipboard(text);
+                    showToast(ok ? "답변을 복사했습니다." : "복사 실패", ok ? "success" : "error");
                 });
+            });
+            reorderCompareCardsDom();
+            syncCompareCardOrder(models).forEach(model => {
+                const card = document.getElementById(`compare-card-${compareModelKey(model)}`);
+                if (card) initCompareCardDrag(card, model);
             });
         }
 
@@ -7165,10 +7342,14 @@
             if (!parts) return;
             if (isMobileCompact()) {
                 leftCompose.appendChild(parts.ai);
-                if (mobileTools) mobileTools.append(parts.privacy, parts.voice);
+                if (mobileTools) {
+                    mobileTools.append(parts.privacy, parts.voice);
+                    if (currentMode === "compare") mobileTools.append(buildCompareLayoutPicker());
+                }
             } else {
                 leftDock.appendChild(parts.ai);
                 rightDock.append(parts.privacy, parts.voice);
+                if (currentMode === "compare") rightDock.append(buildCompareLayoutPicker());
             }
             const newChatBtn = document.getElementById("newChatBtn");
             if (newChatBtn) newChatBtn.classList.toggle("is-hidden", isMobileCompact());
@@ -7216,6 +7397,13 @@
         let compareTurns = [];
         let compareCurrentTurnIndex = 0;
         let compareResponses = {};
+        let compareGridCols = Number(localStorage.getItem("nasaroai_compare_cols")) || 3;
+        if (![1, 2, 3].includes(compareGridCols)) compareGridCols = 3;
+        let compareCardOrder = [];
+        try {
+            const savedOrder = JSON.parse(localStorage.getItem("nasaroai_compare_order") || "[]");
+            if (Array.isArray(savedOrder)) compareCardOrder = savedOrder.filter(m => MODELS.includes(m));
+        } catch {}
 
         let collabTaskAsked = false;
         let collabRecommendInFlight = false;
@@ -9981,6 +10169,7 @@
                 mainInput.disabled = false;
                 autoResizeInput();
                 updateDockCoinHint();
+                applyCompareGridLayout();
                 return;
             }
 
