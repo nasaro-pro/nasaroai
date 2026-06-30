@@ -7711,7 +7711,7 @@
                 if (healthRes.ok) {
                     const h = await healthRes.json();
                     if (!h.openrouter_configured) {
-                        showToast(h.hint || "OPENROUTER_API_KEY가 설정되지 않았습니다. Railway Variables를 확인하세요.", "error", 8000);
+                        showToast(h.hint || "OPENROUTER_API_KEY만 설정하면 됩니다. OpenAI 키는 필요 없습니다.", "error", 8000);
                     } else if (h.openrouter_key_valid === false && h.hint) {
                         showToast("AI API: " + h.hint, "warn", 8000);
                     }
@@ -8245,7 +8245,7 @@
                     const h = await healthRes.json();
                     diag.push("서버: 정상");
                     if (h.openrouter_configured) {
-                        const src = h.openrouter_key_source || (h.env_openrouter_api_key ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY");
+                        const src = h.openrouter_key_source || "OPENROUTER_API_KEY";
                         const valid = h.openrouter_key_valid === true ? "OpenRouter 검증 OK" : (h.openrouter_key_valid === false ? "검증 실패" : "미검증");
                         diag.push(`AI: OpenRouter (${src}, ${valid})`);
                     } else {

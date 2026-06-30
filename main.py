@@ -1404,14 +1404,18 @@ AGENT_STEP_CONCURRENCY = int(os.environ.get("AGENT_STEP_CONCURRENCY", "8"))
 AGENT_STEP_SEMAPHORE = asyncio.Semaphore(AGENT_STEP_CONCURRENCY)
 
 
+def _clean_env_key(raw: str) -> str:
+    return (raw or "").strip().strip('"').strip("'")
+
+
 def get_openrouter_api_key() -> str:
     """Return OpenRouter API key from env. Only OpenRouter-format keys are accepted."""
     for name in ("OPENROUTER_API_KEY", "OPENROUTER_KEY"):
-        val = os.environ.get(name, "").strip()
+        val = _clean_env_key(os.environ.get(name, ""))
         if val:
             return val
     # Legacy: OPENAI_API_KEY only if it is actually an OpenRouter key (sk-or-v1-…)
-    openai_env = os.environ.get("OPENAI_API_KEY", "").strip()
+    openai_env = _clean_env_key(os.environ.get("OPENAI_API_KEY", ""))
     if openai_env and classify_api_key(openai_env) == "openrouter":
         return openai_env
     return ""
@@ -1419,12 +1423,44 @@ def get_openrouter_api_key() -> str:
 
 def get_openrouter_key_source() -> str:
     for name in ("OPENROUTER_API_KEY", "OPENROUTER_KEY"):
-        if os.environ.get(name, "").strip():
+        if _clean_env_key(os.environ.get(name, "")):
             return name
-    openai_env = os.environ.get("OPENAI_API_KEY", "").strip()
+    openai_env = _clean_env_key(os.environ.get("OPENAI_API_KEY", ""))
     if openai_env and classify_api_key(openai_env) == "openrouter":
         return "OPENAI_API_KEY (openrouter-format)"
     return ""
+
+
+def missing_openrouter_key_message() -> str:
+    openai_env = _clean_env_key(os.environ.get("OPENAI_API_KEY", ""))
+    if openai_env and classify_api_key(openai_env) == "openai":
+        return (
+            "OPENROUTER_API_KEY가 없습니다. OpenAI 키(OPENAI_API_KEY)만으로는 동작하지 않습니다. "
+            "openrouter.ai/keys 에서 sk-or-v1-… 키를 발급해 OPENROUTER_API_KEY에 넣으세요."
+        )
+    return (
+        "OPENROUTER_API_KEY가 설정되지 않았습니다. openrouter.ai/keys 에서 sk-or-v1-… 키를 "
+        "Railway Variables에 등록하세요. OpenAI 키는 필요 없습니다."
+    )
+
+
+def openrouter_auth_failure_message(*, status_code: int | None = None, body: str = "") -> str:
+    key = get_openrouter_api_key()
+    if not key:
+        return missing_openrouter_key_message()
+    if classify_api_key(key) == "openai":
+        return (
+            "OPENROUTER_API_KEY에 OpenAI 전용 키(sk-…)가 들어 있습니다. "
+            "openrouter.ai/keys 의 sk-or-v1-… OpenRouter 키를 사용하세요."
+        )
+    if status_code == 401:
+        return "OpenRouter API 키가 거부되었습니다(401). openrouter.ai/keys 에서 키를 다시 확인하세요."
+    if status_code == 402:
+        return "OpenRouter 크레딧이 부족합니다. openrouter.ai/credits 에서 충전하세요."
+    snippet = (body or "")[:120].replace("\n", " ").strip()
+    if status_code:
+        return f"OpenRouter API 오류({status_code}). {snippet}".strip()
+    return "OpenRouter API 호출에 실패했습니다. 키와 크레딧을 확인하세요."
 
 
 def require_openrouter_key() -> str:
@@ -1432,13 +1468,13 @@ def require_openrouter_key() -> str:
     if not key:
         raise HTTPException(
             status_code=503,
-            detail="OPENROUTER_API_KEY가 설정되지 않았습니다. Railway Variables에 OpenRouter 키(sk-or-v1-…)를 등록하세요.",
+            detail=missing_openrouter_key_message(),
         )
     return key
 
 
 def classify_api_key(key: str) -> str:
-    k = key.strip()
+    k = _clean_env_key(key)
     if not k:
         return "missing"
     low = k.lower()
@@ -1449,10 +1485,8 @@ def classify_api_key(key: str) -> str:
     return "unknown"
 
 
-OPENROUTER_AUTH_ERROR_MSG = (
-    "OpenRouter 인증 실패입니다. Railway Variables에 OPENROUTER_API_KEY(openrouter.ai/keys)를 설정하세요. "
-    "OPENAI_API_KEY만 있고 OpenAI 전용 키(sk-…)라면 Nasaro AI가 동작하지 않습니다."
-)
+# Backward-compatible alias — prefer openrouter_auth_failure_message() for context.
+OPENROUTER_AUTH_ERROR_MSG = openrouter_auth_failure_message()
 
 
 async def verify_openrouter_auth() -> tuple[bool | None, str | None]:
@@ -1477,11 +1511,9 @@ async def verify_openrouter_auth() -> tuple[bool | None, str | None]:
     if response.status_code == 200:
         return True, None
     if response.status_code == 401:
-        if classify_api_key(api_key) == "openai":
-            return False, OPENROUTER_AUTH_ERROR_MSG
-        return False, "OpenRouter 인증 실패(401). API 키를 확인하세요."
+        return False, openrouter_auth_failure_message(status_code=401, body=response.text)
     snippet = response.text[:160].replace("\n", " ")
-    return False, f"OpenRouter 오류({response.status_code}): {snippet}"
+    return False, openrouter_auth_failure_message(status_code=response.status_code, body=snippet)
 
 
 def build_openrouter_headers() -> dict[str, str]:
@@ -1498,7 +1530,7 @@ def log_openrouter_key_status() -> None:
     api_key = get_openrouter_api_key()
     prefix = api_key[:12] if api_key else "N/A"
     if not api_key:
-        openai_only = os.environ.get("OPENAI_API_KEY", "").strip()
+        openai_only = _clean_env_key(os.environ.get("OPENAI_API_KEY", ""))
         if openai_only and classify_api_key(openai_only) != "openrouter":
             logger.warning(
                 "OPENROUTER_API_KEY missing; OPENAI_API_KEY is OpenAI-only (sk-…) — "
@@ -1841,11 +1873,11 @@ def openrouter_headers_or_error() -> tuple[dict[str, str] | None, str | None]:
         return build_openrouter_headers(), None
     except HTTPException as exc:
         detail = exc.detail
-        if exc.status_code == 503 and isinstance(detail, str) and "OPENROUTER" in detail.upper():
-            return None, OPENROUTER_AUTH_ERROR_MSG
+        if exc.status_code == 503:
+            return None, missing_openrouter_key_message()
         if isinstance(detail, str) and detail.strip():
             return None, detail
-        return None, OPENROUTER_AUTH_ERROR_MSG
+        return None, openrouter_auth_failure_message()
 
 
 def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
@@ -2137,12 +2169,13 @@ async def _call_ai_model_core(
                     response.text[:300],
                 )
                 if response.status_code == 401:
+                    body = (await response.aread()).decode("utf-8", "ignore")
                     return make_failed_result(
                         requested_label=label,
                         requested_model=requested_model,
                         actual_model=model_id,
                         failed_candidates=failed_candidates,
-                        error=OPENROUTER_AUTH_ERROR_MSG,
+                        error=openrouter_auth_failure_message(status_code=401, body=body),
                     )
                 if is_daily_free_limit(response.text, model_id):
                     return make_failed_result(
@@ -2274,7 +2307,7 @@ async def stream_label_chat(
                         if response.status_code != 200:
                             body = (await response.aread()).decode("utf-8", "ignore")
                             if response.status_code == 401:
-                                yield {"error": OPENROUTER_AUTH_ERROR_MSG}
+                                yield {"error": openrouter_auth_failure_message(status_code=401, body=body)}
                                 return
                             if is_daily_free_limit(body, model_id):
                                 yield {"error": DAILY_LIMIT_MSG}
@@ -3002,7 +3035,11 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                                         body[:300],
                                     )
                                     if response.status_code == 401:
-                                        yield sse({"model": data.model_name, "success": False, "error": OPENROUTER_AUTH_ERROR_MSG})
+                                        yield sse({
+                                            "model": data.model_name,
+                                            "success": False,
+                                            "error": openrouter_auth_failure_message(status_code=401, body=body),
+                                        })
                                         return
                                     if is_daily_free_limit(body, model_id):
                                         yield sse({"model": data.model_name, "success": False, "error": DAILY_LIMIT_MSG})
@@ -3058,8 +3095,8 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
                     failed_this_model = True
                 except HTTPException as exc:
                     detail = exc.detail
-                    if exc.status_code == 503 and isinstance(detail, str) and "OPENROUTER" in detail.upper():
-                        error_msg = OPENROUTER_AUTH_ERROR_MSG
+                    if exc.status_code == 503:
+                        error_msg = missing_openrouter_key_message()
                     elif exc.status_code == 429:
                         error_msg = _quota_error_message(detail)
                     elif isinstance(detail, str):
@@ -3911,8 +3948,8 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                 exc.status_code,
             )
             detail = exc.detail
-            if exc.status_code == 503 and isinstance(detail, str) and "OPENROUTER" in detail.upper():
-                error_msg = OPENROUTER_AUTH_ERROR_MSG
+            if exc.status_code == 503:
+                error_msg = missing_openrouter_key_message()
             elif exc.status_code == 429:
                 error_msg = _quota_error_message(detail)
             elif isinstance(detail, str) and detail.strip():
@@ -4082,6 +4119,8 @@ async def health() -> dict:
     }
     if api_key:
         payload["openrouter_key_source"] = get_openrouter_key_source()
+        payload["openrouter_key_kind"] = classify_api_key(api_key)
+        payload["needs_openai_key"] = False
         try:
             valid, err = await verify_openrouter_auth()
             payload["openrouter_key_valid"] = valid
@@ -4092,9 +4131,17 @@ async def health() -> dict:
             payload["hint"] = f"OpenRouter 검증 오류: {exc.__class__.__name__}"
     else:
         payload["openrouter_key_valid"] = False
-        payload["hint"] = (
-            "Railway Variables에 OPENROUTER_API_KEY(sk-or-v1-…)를 설정한 뒤 재배포하세요."
-        )
+        payload["openrouter_key_kind"] = "missing"
+        payload["needs_openai_key"] = False
+        raw_set = bool(os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY"))
+        payload["openrouter_env_set"] = raw_set
+        if raw_set and not _clean_env_key(os.environ.get("OPENROUTER_API_KEY", "")) and not _clean_env_key(os.environ.get("OPENROUTER_KEY", "")):
+            payload["hint"] = (
+                "OPENROUTER_API_KEY 변수는 있지만 값이 비어 있습니다. "
+                "sk-or-v1-… OpenRouter 키를 넣고 재배포하세요."
+            )
+        else:
+            payload["hint"] = missing_openrouter_key_message()
     return payload
 
 
