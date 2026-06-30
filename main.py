@@ -463,6 +463,26 @@ COMPANY_PREFIXES: dict[str, str] = {
 COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
 MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"]
 
+# UI 표시명 → 백엔드 라벨 (협업 intake 등)
+UI_LABEL_ALIASES: dict[str, str] = {
+    "claude": "Anthropic",
+    "gpt": "OpenAI",
+    "chatgpt": "OpenAI",
+    "gemini": "Google",
+    "grok": "xAI",
+    "perplexity": "Perplexity",
+    "deepseek": "DeepSeek",
+}
+
+
+def resolve_company_label(label: str) -> str:
+    """Map UI names (Claude, GPT, …) to COMPANY_LABELS entries."""
+    normalized = (label or "").strip()
+    if normalized in COMPANY_LABELS:
+        return normalized
+    alias = UI_LABEL_ALIASES.get(normalized.lower())
+    return alias or normalized
+
 # 페르소나(개성) 제거: 모든 라벨은 동일한 중립 시스템 메시지를 사용한다.
 NEUTRAL_SYSTEM_PROMPT = (
     "한국어로 명확하고 정확하게 답변하세요. "
@@ -643,7 +663,7 @@ class CollabIntakeRequest(BaseModel):
     task: str
     messages: list[CollabIntakeMessage] = Field(default_factory=list)
     user_id: str = ""
-    intake_model: str = "Claude"
+    intake_model: str = "Anthropic"
 
 
 class AdminQuotaLimitRequest(BaseModel):
@@ -1600,12 +1620,35 @@ def largest_free_model_for_prefix(prefix: str) -> str | None:
     return sorted(models, key=model_size_score, reverse=True)[0]
 
 
+def normalize_model_alias(model_id: str) -> str:
+    """Strip OpenRouter auto-router '~' prefix used in substitute_chain aliases."""
+    return (model_id or "").strip().lstrip("~")
+
+
+def is_known_openrouter_model(model_id: str) -> bool:
+    normalized = normalize_model_alias(model_id)
+    if not normalized:
+        return False
+    if normalized == LAST_RESORT_MODEL:
+        return True
+    if normalized in MODEL_CACHE_STATE.all_model_ids:
+        return True
+    if normalized in MODEL_CACHE_STATE.free_model_ids:
+        return True
+    return normalized.endswith(":free")
+
+
 def resolve_catalog_model(model_id: str) -> str | None:
-    if model_id in MODEL_CACHE_STATE.all_model_ids:
-        return model_id
-    if model_id in MODEL_CACHE_STATE.free_model_ids:
-        return model_id
-    if model_id == "qwen/qwen3-coder:free":
+    normalized = normalize_model_alias(model_id)
+    if not normalized:
+        return None
+    if normalized in MODEL_CACHE_STATE.all_model_ids:
+        return normalized
+    if normalized in MODEL_CACHE_STATE.free_model_ids:
+        return normalized
+    if normalized == LAST_RESORT_MODEL:
+        return normalized
+    if normalized == "qwen/qwen3-coder:free":
         qwen_candidates = [
             candidate
             for candidate in MODEL_CACHE_STATE.all_free_models
@@ -1613,10 +1656,20 @@ def resolve_catalog_model(model_id: str) -> str | None:
         ]
         if qwen_candidates:
             return sorted(qwen_candidates, key=qwen_model_score, reverse=True)[0]
-    prefix = model_id.split("/", 1)[0] + "/" if "/" in model_id else ""
+    prefix = normalized.split("/", 1)[0] + "/" if "/" in normalized else ""
     if prefix:
         return largest_free_model_for_prefix(prefix)
     return None
+
+
+def sanitize_model_candidates(model_ids: list[str]) -> list[str]:
+    """Drop unresolved '~alias' entries so OpenRouter never receives invalid model IDs."""
+    cleaned: list[str] = []
+    for model_id in model_ids:
+        resolved = resolve_catalog_model(model_id) or normalize_model_alias(model_id)
+        if is_known_openrouter_model(resolved):
+            cleaned.append(resolved)
+    return unique(cleaned) if cleaned else [LAST_RESORT_MODEL]
 
 
 def build_model_chain_for_label(label: str) -> list[str]:
@@ -1628,8 +1681,9 @@ def build_model_chain_for_label(label: str) -> list[str]:
         chain.append(config.official_model_id)
 
     for substitute in config.substitute_chain:
-        resolved = resolve_catalog_model(substitute) or substitute
-        chain.append(resolved)
+        resolved = resolve_catalog_model(substitute)
+        if resolved:
+            chain.append(resolved)
 
     own_prefix = COMPANY_PREFIXES[label]
     extras = [
@@ -1748,7 +1802,7 @@ def rebuild_model_mappings(source: str) -> None:
 
     assignments = assign_models_without_overlap()
     for label in COMPANY_LABELS:
-        candidates = assignments[label][:MAX_MODEL_CANDIDATES_PER_LABEL]
+        candidates = sanitize_model_candidates(assignments[label][:MAX_MODEL_CANDIDATES_PER_LABEL])
         MODEL_CANDIDATES[label] = candidates
         MODEL_MAPPING[label] = candidates[0]
         FALLBACK_MODEL_MAPPING[label] = candidates[1] if len(candidates) > 1 else candidates[0]
@@ -1834,6 +1888,10 @@ async def ensure_model_cache_fresh() -> None:
 @app.on_event("startup")
 async def startup() -> None:
     log_openrouter_key_status()
+    if not is_admin_password_configured():
+        logger.warning(
+            "ADMIN_PASSWORD is not set — /admin login disabled until Railway Variables adds it."
+        )
     await ensure_model_cache_fresh()
 
 
@@ -2882,8 +2940,22 @@ async def acquire_compare_model(
             sorted(used),
             pool,
         )
-        logger.info("acquire_compare_model done session_id=%s label=%s model=None", sid, label)
-        return None
+
+    # Parallel compare streams can exhaust the per-session unique pool even when
+    # fallbacks are still available — prefer any valid candidate over hard failure.
+    fallback_pool = build_model_try_order(label, excluded_by_failure)
+    if fallback_pool:
+        model_id = fallback_pool[0]
+        logger.info(
+            "acquire_compare_model fallback session_id=%s label=%s model=%s",
+            sid,
+            label,
+            model_id,
+        )
+        return model_id
+
+    logger.info("acquire_compare_model done session_id=%s label=%s model=None", sid, label)
+    return None
 
 
 async def mark_compare_stream_started(session_id: str) -> None:
@@ -3167,12 +3239,27 @@ def _build_intake_enriched_task(messages: list, task: str) -> str:
 @app.post("/collab/intake")
 async def collab_intake(data: CollabIntakeRequest, request: Request) -> dict:
     """AI 추천 전 작업 세부사항을 채팅으로 수집한다 (1 coin/질문, 최대 10 coin)."""
+    try:
+        return await _collab_intake_impl(data, request)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("collab/intake failed task=%s", (data.task or "")[:80])
+        raise HTTPException(
+            status_code=500,
+            detail="정보 수집 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        ) from None
+
+
+async def _collab_intake_impl(data: CollabIntakeRequest, request: Request) -> dict:
     await ensure_model_cache_fresh()
     task = data.task.strip()
     if not task:
         raise HTTPException(status_code=400, detail="작업 내용을 입력하세요.")
 
-    intake_model = (data.intake_model or "Claude").strip() or "Claude"
+    intake_model = resolve_company_label((data.intake_model or "Anthropic").strip() or "Anthropic")
+    if intake_model not in COMPANY_LABELS:
+        intake_model = "Anthropic"
     user_turns = sum(1 for m in data.messages if (m.role or "").strip() == "user")
     asked_questions = [
         (m.content or "").strip()
@@ -4214,7 +4301,12 @@ async def models_health() -> dict[str, str]:
             [model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates]
         )}
     semaphore = asyncio.Semaphore(HEALTHCHECK_CONCURRENCY)
-    model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
+    model_ids = unique([
+        model_id
+        for candidates in MODEL_CANDIDATES.values()
+        for model_id in candidates
+        if is_known_openrouter_model(model_id)
+    ])
     results = await asyncio.gather(*(check_model_health(semaphore, model_id, headers=headers) for model_id in model_ids))
     return dict(results)
 
@@ -4259,14 +4351,19 @@ async def refresh_label_health(force: bool = False) -> None:
 
 def ranked_labels(preferred: list[str] | None = None) -> list[str]:
     preferred = preferred or []
+    resolved_preferred = [
+        resolve_company_label(label)
+        for label in preferred
+        if resolve_company_label(label) in COMPANY_LABELS
+    ]
 
     def sort_key(label: str) -> tuple:
         health = LABEL_HEALTH.get(label, {})
         ok_rank = 0 if health.get("ok") else 1
-        pref_rank = preferred.index(label) if label in preferred else len(preferred) + 1
+        pref_rank = resolved_preferred.index(label) if label in resolved_preferred else len(resolved_preferred) + 1
         return (ok_rank, pref_rank, label)
 
-    ordered = list(dict.fromkeys([*preferred, *COMPANY_LABELS]))
+    ordered = list(dict.fromkeys([*resolved_preferred, *COMPANY_LABELS]))
     return sorted(ordered, key=sort_key)
 
 
