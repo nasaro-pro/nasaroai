@@ -93,6 +93,31 @@ from auth_store import (
     verify_admin_password,
     verify_admin_token,
 )
+from media_store import (
+    FAL_SERVICE_UNAVAILABLE_MSG,
+    FalServiceUnavailableError,
+    MEDIA_PROVIDER_CONFIG,
+    is_fal_media_label,
+    media_modality_for_label,
+    run_media_generation,
+)
+from pricing_store import (
+    CHAT_PRICING_LABELS,
+    IMAGE_PRICING_LABELS,
+    VIDEO_PRICING_LABELS,
+    admin_create_coin_grant,
+    admin_list_popups,
+    admin_upsert_popup,
+    create_media_job,
+    dismiss_popup,
+    execute_coin_grant,
+    get_active_popup_for_subject,
+    get_media_job,
+    get_model_coin_cost,
+    list_pricing_catalog,
+    process_due_coin_grants,
+    update_media_job,
+)
 
 load_dotenv()
 
@@ -182,6 +207,7 @@ app = FastAPI(title="Nasaro AI Backend")
 @app.on_event("startup")
 async def _startup_db() -> None:
     init_db()
+    process_due_coin_grants()
     logger.info("Nasaro DB path: %s (cloud_backup=%s)", DB_PATH, cloud_backup_enabled())
     if cloud_backup_enabled():
         asyncio.create_task(_cloud_db_bootstrap())
@@ -363,88 +389,83 @@ def _compare_quota_key(subject: str, session_id: str) -> str:
 async def _require_compare_coin(
     request: Request,
     device_id: str | None = None,
+    *,
+    label: str = "OpenAI",
 ) -> dict | None:
-    """Charge 1 coin per compare model stream (1 AI call = 1 coin)."""
+    return await require_model_coin(
+        request,
+        label,
+        device_id=device_id,
+        feature="compare",
+        action="compare",
+        detail=f"compare {label}",
+    )
+
+
+async def require_model_coin(
+    request: Request,
+    label: str,
+    *,
+    modality: str = "chat",
+    device_id: str | None = None,
+    feature: str = "compare",
+    action: str = "",
+    detail: str = "",
+) -> dict | None:
+    """Charge fixed per-model coins from model_pricing."""
+    coin_cost = get_model_coin_cost(label, modality)
     subject, user = _resolve_subject(request, device_id)
-    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "compare", 1.0)
+    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, feature, float(coin_cost))
     if not ok:
         raise HTTPException(
             status_code=429,
-            detail=_quota_error_payload("compare", info),
+            detail=_quota_error_payload(feature, info),
         )
     dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
     log_activity(
         subject,
-        "compare",
+        feature,
         user_id=user["id"] if user else None,
         device_id=dev,
         platform=_platform(request),
-        action="compare",
-        detail="compare AI call",
+        action=action or feature,
+        detail=(detail or f"{label} {modality} 🪙{coin_cost}")[:500],
     )
-    return user
-
-
-AGENT_MISSION_CHARGED: set[str] = set()
-AGENT_MISSION_LOCK = asyncio.Lock()
-
-
-def _agent_mission_key(subject: str, mission_id: str) -> str:
-    mid = (mission_id or "").strip()
-    return f"{subject}:{mid}" if mid else subject
+    return {"user": user, "subject": subject, "coin_cost": coin_cost}
 
 
 async def _require_agent_coin(
     request: Request,
     device_id: str | None = None,
     *,
+    label: str = "OpenAI",
     action: str = "agent",
     detail: str = "",
 ) -> dict | None:
-    """Charge 1 coin per agent AI call."""
-    subject, user = _resolve_subject(request, device_id)
-    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "agent", 1.0)
-    if not ok:
-        raise HTTPException(
-            status_code=429,
-            detail=_quota_error_payload("agent", info),
-        )
-    dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
-    log_activity(
-        subject,
-        "agent",
-        user_id=user["id"] if user else None,
-        device_id=dev,
-        platform=_platform(request),
+    return await require_model_coin(
+        request,
+        label,
+        device_id=device_id,
+        feature="agent",
         action=action,
-        detail=(detail or action)[:500],
+        detail=detail or action,
     )
-    return user
 
 
 async def _require_debate_coin(
     request: Request,
     device_id: str | None = None,
+    *,
+    label: str = "OpenAI",
 ) -> dict | None:
-    """Charge 1 coin per debate AI speaker call."""
-    subject, user = _resolve_subject(request, device_id)
-    ok, info = await asyncio.to_thread(check_and_consume_quota, subject, "debate", 1.0)
-    if not ok:
-        raise HTTPException(
-            status_code=429,
-            detail=_quota_error_payload("debate", info),
-        )
-    dev = (device_id or request.headers.get("X-Device-Id") or "").strip()
-    log_activity(
-        subject,
-        "debate",
-        user_id=user["id"] if user else None,
-        device_id=dev,
-        platform=_platform(request),
+    return await require_model_coin(
+        request,
+        label,
+        device_id=device_id,
+        feature="debate",
         action="debate",
-        detail="debate AI call",
+        detail=f"debate {label}",
     )
-    return user
 
 
 def _quota_error_message(detail: object) -> str:
@@ -469,14 +490,20 @@ app.add_middleware(
 COMPANY_PREFIXES: dict[str, str] = {
     "OpenAI": "openai/",
     "Anthropic": "anthropic/",
+    "Anthropic-Opus": "anthropic/",
     "Google": "google/",
     "xAI": "x-ai/",
     "Perplexity": "perplexity/",
     "DeepSeek": "deepseek/",
+    "DeepSeek-Flash": "deepseek/",
+    "DeepSeek-Pro": "deepseek/",
+    "GLM": "zhipuai/",
+    "MiniMax": "minimax/",
 }
 
 COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
-MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"]
+MODELS = list(CHAT_PRICING_LABELS)
+ALL_PRICING_LABELS = list(CHAT_PRICING_LABELS) + list(IMAGE_PRICING_LABELS) + list(VIDEO_PRICING_LABELS)
 
 # UI 표시명 → 백엔드 라벨 (협업 intake 등)
 UI_LABEL_ALIASES: dict[str, str] = {
@@ -487,16 +514,57 @@ UI_LABEL_ALIASES: dict[str, str] = {
     "grok": "xAI",
     "perplexity": "Perplexity",
     "deepseek": "DeepSeek",
+    "deepseek-flash": "DeepSeek-Flash",
+    "deepseek-pro": "DeepSeek-Pro",
+    "glm": "GLM",
+    "minimax": "MiniMax",
+    "opus": "Anthropic-Opus",
+    "sonnet": "Anthropic",
+}
+
+COLLAB_TOOL_ALIASES: dict[str, str] = {
+    "Claude": "Anthropic",
+    "ChatGPT": "OpenAI",
+    "GPT": "OpenAI",
+    "Gemini": "Google",
+    "Grok": "xAI",
 }
 
 
 def resolve_company_label(label: str) -> str:
     """Map UI names (Claude, GPT, …) to COMPANY_LABELS entries."""
     normalized = (label or "").strip()
-    if normalized in COMPANY_LABELS:
+    if normalized in COMPANY_LABELS or normalized in MEDIA_PROVIDER_CONFIG:
         return normalized
     alias = UI_LABEL_ALIASES.get(normalized.lower())
     return alias or normalized
+
+
+def label_modality(label: str) -> str:
+    clean = (label or "").strip()
+    if clean in MEDIA_PROVIDER_CONFIG:
+        return MEDIA_PROVIDER_CONFIG[clean].modality
+    return "chat"
+
+
+def _map_collab_tool_name(name: str) -> str:
+    raw = (name or "").strip()
+    if not raw:
+        return raw
+    if raw in MEDIA_PROVIDER_CONFIG or raw in CHAT_PRICING_LABELS:
+        return raw
+    return COLLAB_TOOL_ALIASES.get(raw, resolve_company_label(raw))
+
+
+def _collab_stage_options(selected: dict, stage_index: int, meta: dict) -> list[str]:
+    keys = ["research", "structure", "production", "review"]
+    tool_key = keys[stage_index % 4]
+    mapped = [_map_collab_tool_name(t) for t in selected["tools"].get(tool_key) or []]
+    known = set(CHAT_PRICING_LABELS) | set(MEDIA_PROVIDER_CONFIG.keys())
+    options = [m for m in mapped if m in known]
+    if options:
+        return options
+    return list(meta.get("options") or [])
 
 # 페르소나(개성) 제거: 모든 라벨은 동일한 중립 시스템 메시지를 사용한다.
 NEUTRAL_SYSTEM_PROMPT = (
@@ -529,6 +597,11 @@ PERSONAS: dict[str, str] = {
     "DeepSeek": (
         NEUTRAL_SYSTEM_PROMPT
     ),
+    "DeepSeek-Flash": (NEUTRAL_SYSTEM_PROMPT),
+    "DeepSeek-Pro": (NEUTRAL_SYSTEM_PROMPT),
+    "Anthropic-Opus": (NEUTRAL_SYSTEM_PROMPT),
+    "GLM": (NEUTRAL_SYSTEM_PROMPT),
+    "MiniMax": (NEUTRAL_SYSTEM_PROMPT),
 }
 
 # 토론: 형식 토론이 아니라 주제/질문에 각자 답·비판·주장
@@ -602,9 +675,9 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
     ),
     "Anthropic": LabelProviderConfig(
         label="Anthropic",
-        official_model_id="anthropic/claude-3-haiku",
+        official_model_id="anthropic/claude-sonnet-4.6",
         substitute_chain=(
-            "~anthropic/claude-haiku-latest",
+            "anthropic/claude-3.5-sonnet",
             "~anthropic/claude-sonnet-latest",
             "anthropic/claude-opus-4.8-fast",
         ),
@@ -640,6 +713,34 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
             "deepseek/deepseek-v4-flash",
             "deepseek/deepseek-v4-pro",
         ),
+    ),
+    "DeepSeek-Flash": LabelProviderConfig(
+        label="DeepSeek-Flash",
+        official_model_id="deepseek/deepseek-v4-flash",
+        substitute_chain=("deepseek/deepseek-chat",),
+    ),
+    "DeepSeek-Pro": LabelProviderConfig(
+        label="DeepSeek-Pro",
+        official_model_id="deepseek/deepseek-v4-pro",
+        substitute_chain=("deepseek/deepseek-chat",),
+    ),
+    "Anthropic-Opus": LabelProviderConfig(
+        label="Anthropic-Opus",
+        official_model_id="anthropic/claude-opus-4.8",
+        substitute_chain=(
+            "anthropic/claude-opus-4.6",
+            "anthropic/claude-sonnet-4.6",
+        ),
+    ),
+    "GLM": LabelProviderConfig(
+        label="GLM",
+        official_model_id="zhipuai/glm-4.6",
+        substitute_chain=("z-ai/glm-4.6", "zhipuai/glm-4.5-air"),
+    ),
+    "MiniMax": LabelProviderConfig(
+        label="MiniMax",
+        official_model_id="minimax/minimax-m2.1",
+        substitute_chain=("minimax/minimax-01",),
     ),
 }
 
@@ -891,7 +992,7 @@ COLLAB_TYPE_RULES: list[dict] = [
         "tools": {
             "research": ["Perplexity", "YouTube 트렌드", "Google Trends"],
             "structure": ["Claude", "ChatGPT", "Whimsical AI"],
-            "production": ["CapCut", "Vrew", "HeyGen", "ElevenLabs", "Suno"],
+            "production": ["Veo 3.1 Fast", "Veo 3.1 Standard", "Kling 3.0 Standard", "Sora 2 Pro"],
             "review": ["Claude", "Grammarly", "YouTube Studio 분석"],
         },
         "algorithm": [
@@ -971,7 +1072,7 @@ COLLAB_TYPE_RULES: list[dict] = [
         "tools": {
             "research": ["Pinterest", "Dribbble", "Perplexity"],
             "structure": ["ChatGPT", "Claude"],
-            "production": ["Midjourney", "DALL·E 3", "Canva", "Photoroom"],
+            "production": ["Seedream 4.5", "Grok Imagine", "Grok Imagine Pro", "Nano Banana Pro"],
             "review": ["Canva", "Claude"],
         },
         "algorithm": [
@@ -1322,13 +1423,21 @@ def build_collab_plan(task: str, forced_type: str | None = None) -> dict:
         [m["default_model"] for m in COLLAB_STAGE_META],
     )
     stage_recommendations = []
+    dynamic_stage_meta = []
     for i, meta in enumerate(COLLAB_STAGE_META):
+        options = _collab_stage_options(selected, i, meta)
+        modality = label_modality(options[0]) if options else "chat"
+        dyn_meta = {**meta, "options": options, "modality": modality}
+        dynamic_stage_meta.append(dyn_meta)
         model = stage_models[i] if i < len(stage_models) else meta["default_model"]
-        alts = [m for m in meta["options"] if m != model][:2]
+        if model not in options and options:
+            model = options[0]
+        alts = [m for m in options if m != model][:2]
         stage_recommendations.append(
             {
                 "index": i + 1,
                 "model": model,
+                "modality": label_modality(model),
                 "reason": meta["hint"],
                 "alternatives": alts,
             }
@@ -1342,7 +1451,7 @@ def build_collab_plan(task: str, forced_type: str | None = None) -> dict:
             "검증 AI는 재작성하지 않고, 문제 지적 후 해당 단계 AI가 수정합니다."
         ),
         "stage_models": stage_models,
-        "stage_meta": COLLAB_STAGE_META,
+        "stage_meta": dynamic_stage_meta,
         "stage_recommendations": stage_recommendations,
         "stages": stages,
         "acceptance": selected["acceptance"],
@@ -1956,6 +2065,89 @@ def openrouter_headers_or_error() -> tuple[dict[str, str] | None, str | None]:
         if isinstance(detail, str) and detail.strip():
             return None, detail
         return None, openrouter_auth_failure_message()
+
+
+def _raise_fal_unavailable() -> None:
+    raise HTTPException(status_code=503, detail=FAL_SERVICE_UNAVAILABLE_MSG)
+
+
+async def _run_media_job_background(
+    job_id: str,
+    label: str,
+    prompt: str,
+    headers: dict[str, str] | None,
+) -> None:
+    job = get_media_job(job_id)
+    subject = (job or {}).get("subject") or ""
+    coin_cost = int((job or {}).get("coin_cost") or 0)
+    feature = (job or {}).get("feature") or "studio"
+    if is_fal_media_label(label):
+        update_media_job(job_id, status="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
+        if subject and coin_cost:
+            await asyncio.to_thread(refund_coins, subject, float(coin_cost), feature)
+        return
+    try:
+        update_media_job(job_id, status="running")
+        url = await run_media_generation(label, prompt, openrouter_headers=headers)
+        update_media_job(job_id, status="completed", result_url=url)
+    except FalServiceUnavailableError:
+        update_media_job(job_id, status="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
+        if subject and coin_cost:
+            await asyncio.to_thread(refund_coins, subject, float(coin_cost), feature)
+    except Exception as exc:
+        logger.exception("media job failed job_id=%s label=%s", job_id, label)
+        update_media_job(job_id, status="failed", error=str(exc)[:500])
+        if subject and coin_cost:
+            await asyncio.to_thread(refund_coins, subject, float(coin_cost), feature)
+
+
+class MediaGenerateRequest(BaseModel):
+    label: str
+    prompt: str = ""
+    image_url: str = ""
+    user_id: str = ""
+
+
+class StudioRunRequest(BaseModel):
+    label: str
+    prompt: str = ""
+    image_url: str = ""
+    user_id: str = ""
+
+
+class ChatAiRequest(BaseModel):
+    label: str = "DeepSeek"
+    prompt: str
+    user_id: str = ""
+
+
+class WorkAiCommentRequest(BaseModel):
+    label: str = "Anthropic"
+    prompt: str = ""
+    work_id: int
+    user_id: str = ""
+
+
+class PopupDismissBody(BaseModel):
+    notice_id: int
+    user_id: str = ""
+
+
+class AdminPopupBody(BaseModel):
+    title: str
+    body: str
+    kind: str = "event"
+    day_key: str = ""
+
+
+class AdminCoinGrantBody(BaseModel):
+    amount: float
+    target_mode: str = "all"
+    title: str = ""
+    min_balance: float | None = None
+    registered_after: float | None = None
+    subjects: list[str] = Field(default_factory=list)
+    scheduled_at: float | None = None
 
 
 def build_compare_messages(
@@ -3065,11 +3257,13 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
         stream_started = False
         compare_subject: str | None = None
         compare_coin_charged = False
+        compare_coin_amount = get_model_coin_cost(label)
         compare_had_success = False
         try:
             try:
                 compare_subject, _ = _resolve_subject(request, data.user_id)
-                await _require_compare_coin(request, data.user_id)
+                charge = await _require_compare_coin(request, data.user_id, label=label)
+                compare_coin_amount = int((charge or {}).get("coin_cost", compare_coin_amount))
                 compare_coin_charged = True
             except HTTPException as exc:
                 yield sse(
@@ -3241,7 +3435,7 @@ async def stream_compare(data: CompareRequest, request: Request) -> StreamingRes
         finally:
             if compare_coin_charged and not compare_had_success and compare_subject:
                 try:
-                    await asyncio.to_thread(refund_coins, compare_subject, 1.0, "compare")
+                    await asyncio.to_thread(refund_coins, compare_subject, float(compare_coin_amount), "compare")
                 except Exception:
                     logger.exception("compare coin refund failed subject=%s", compare_subject)
             if current_model_id:
@@ -3630,12 +3824,87 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     stage_model = (data.stage_model or "").strip() or COLLAB_STAGE_MODEL_LABELS[
         data.stage_index % len(COLLAB_STAGE_MODEL_LABELS)
     ]
+    stage_model = resolve_company_label(stage_model)
+    modality = label_modality(stage_model)
     stage_roles = ["조사·리서치", "구조·기획", "제작·초안", "검증·품질"]
     stage_role = stage_roles[data.stage_index % 4]
+
+    if modality in ("image", "video") and data.stage_index == 2:
+        if is_fal_media_label(stage_model):
+            _raise_fal_unavailable()
+        coin_info = await require_model_coin(
+            request,
+            stage_model,
+            modality=modality,
+            device_id=data.user_id,
+            feature="collab",
+            action="run_stage_media",
+            detail=f"collab media {stage_model}",
+        )
+        subject = coin_info["subject"]
+        coin_cost = int(coin_info["coin_cost"])
+        media_prompt = (data.previous_notes or data.task or "").strip()[:4000]
+        headers, header_error = openrouter_headers_or_error()
+        cfg = MEDIA_PROVIDER_CONFIG.get(stage_model)
+        if header_error and cfg and cfg.provider == "openrouter":
+            await asyncio.to_thread(refund_coins, subject, float(coin_cost), "collab")
+            raise HTTPException(status_code=503, detail=header_error)
+        try:
+            if modality == "video":
+                job_id = str(uuid.uuid4())
+                create_media_job(job_id, subject, stage_model, modality, media_prompt, coin_cost, feature="collab")
+                asyncio.create_task(
+                    _run_media_job_background(job_id, stage_model, media_prompt, headers or {})
+                )
+                return {
+                    "stage_index": data.stage_index,
+                    "stage_name": data.stage_name,
+                    "stage_role": stage_role,
+                    "model_label": stage_model,
+                    "modality": modality,
+                    "job_id": job_id,
+                    "success": True,
+                    "ai_success": True,
+                    "guidance": "동영상 생성 중입니다. 잠시 후 미리보기가 표시됩니다.",
+                }
+            url = await run_media_generation(
+                stage_model,
+                media_prompt,
+                openrouter_headers=headers,
+            )
+            return {
+                "stage_index": data.stage_index,
+                "stage_name": data.stage_name,
+                "stage_role": stage_role,
+                "model_label": stage_model,
+                "modality": modality,
+                "media_url": url,
+                "media_type": modality,
+                "success": True,
+                "ai_success": True,
+                "guidance": f"생성된 이미지: {url}",
+            }
+        except FalServiceUnavailableError:
+            await asyncio.to_thread(refund_coins, subject, float(coin_cost), "collab")
+            _raise_fal_unavailable()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            await asyncio.to_thread(refund_coins, subject, float(coin_cost), "collab")
+            logger.exception("collab media stage failed label=%s", stage_model)
+            raise HTTPException(status_code=502, detail=str(exc)[:500]) from exc
+
     prompt = _collab_stage_prompt(data)
     max_tokens = 3800 if data.stage_index == 2 else (1400 if data.stage_index == 3 else (1600 if data.stage_index == 1 else 1400))
 
-    _require_quota(request, "collab", data.user_id, action="run_stage")
+    await require_model_coin(
+        request,
+        stage_model,
+        device_id=data.user_id,
+        feature="collab",
+        action="run_stage",
+        detail=f"collab chat {stage_model}",
+    )
     result = await call_ai_best(prompt, max_tokens=max_tokens, preferred_labels=[stage_model])
     guidance = result.content if result.success else (
         f"{data.stage_name} 단계를 진행하세요.\n\n{prompt[:500]}..."
@@ -3656,6 +3925,7 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
         "stage_name": data.stage_name,
         "guidance": guidance,
         "model_label": result.requested_label if result.success else stage_model,
+        "modality": "chat",
         "stage_role": stage_role,
         "success": True,
         "ai_success": result.success,
@@ -3878,6 +4148,7 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
         lock = get_debate_lock(request.session_id)
         debate_subject: str | None = None
         debate_coin_charged = False
+        debate_coin_amount = 1
         debate_had_success = False
 
         try:
@@ -3899,8 +4170,6 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                 if is_retry:
                     try:
                         debate_subject, _ = _resolve_subject(http_request, request.user_id)
-                        await _require_debate_coin(http_request, request.user_id)
-                        debate_coin_charged = True
                     except HTTPException as exc:
                         yield sse({"success": False, "error": _quota_error_message(exc.detail)})
                         return
@@ -3945,8 +4214,6 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
 
                     try:
                         debate_subject, _ = _resolve_subject(http_request, request.user_id)
-                        await _require_debate_coin(http_request, request.user_id)
-                        debate_coin_charged = True
                     except HTTPException as exc:
                         yield sse({"success": False, "error": _quota_error_message(exc.detail)})
                         return
@@ -3979,6 +4246,17 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
                     turn.actual_model for turn in session.current_round_turns if turn.actual_model
                 )
                 excluded = set(already_used_models)
+
+                try:
+                    debate_coin_amount = get_model_coin_cost(requested_label)
+                    charge = await _require_debate_coin(
+                        http_request, request.user_id, label=requested_label
+                    )
+                    debate_coin_amount = int((charge or {}).get("coin_cost", debate_coin_amount))
+                    debate_coin_charged = True
+                except HTTPException as exc:
+                    yield sse({"success": False, "error": _quota_error_message(exc.detail)})
+                    return
 
                 stream_meta: dict = {}
                 final_result: ModelCallResult | None = None
@@ -4103,7 +4381,7 @@ async def debate_stream(request: DebateRequest, http_request: Request) -> Stream
         finally:
             if debate_coin_charged and not debate_had_success and debate_subject:
                 try:
-                    await asyncio.to_thread(refund_coins, debate_subject, 1.0, "debate")
+                    await asyncio.to_thread(refund_coins, debate_subject, float(debate_coin_amount), "debate")
                 except Exception:
                     logger.exception("debate coin refund failed subject=%s", debate_subject)
 
@@ -5136,6 +5414,192 @@ def serve_guide() -> FileResponse:
     )
 
 
+@app.get("/pricing/catalog")
+def pricing_catalog() -> dict:
+    models = []
+    for row in list_pricing_catalog():
+        cfg = MEDIA_PROVIDER_CONFIG.get(row["label"])
+        provider = cfg.provider if cfg else "openrouter"
+        fal_stubbed = is_fal_media_label(row["label"])
+        models.append(
+            {
+                **row,
+                "provider": provider,
+                "available": not fal_stubbed,
+                "unavailable_reason": FAL_SERVICE_UNAVAILABLE_MSG if fal_stubbed else "",
+            }
+        )
+    return {"models": models, "chat_labels": list(CHAT_PRICING_LABELS)}
+
+
+@app.get("/popup/active")
+def popup_active(request: Request, user_id: str = "") -> dict:
+    subject, _ = _resolve_subject(request, user_id)
+    popup = get_active_popup_for_subject(subject)
+    return {"popup": popup}
+
+
+@app.post("/popup/dismiss")
+def popup_dismiss(body: PopupDismissBody, request: Request) -> dict:
+    subject, _ = _resolve_subject(request, body.user_id)
+    return dismiss_popup(subject, body.notice_id)
+
+
+@app.post("/media/generate-image")
+async def generate_image(data: MediaGenerateRequest, request: Request) -> dict:
+    label = (data.label or "").strip()
+    if label not in MEDIA_PROVIDER_CONFIG or MEDIA_PROVIDER_CONFIG[label].modality != "image":
+        raise HTTPException(status_code=400, detail="Invalid image model label")
+    if is_fal_media_label(label):
+        _raise_fal_unavailable()
+    coin_info = await require_model_coin(
+        request, label, modality="image", device_id=data.user_id, feature="studio", action="generate_image"
+    )
+    subject = coin_info["subject"]
+    coin_cost = int(coin_info["coin_cost"])
+    headers, header_error = openrouter_headers_or_error()
+    cfg = MEDIA_PROVIDER_CONFIG[label]
+    if header_error and cfg.provider == "openrouter":
+        await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
+        raise HTTPException(status_code=503, detail=header_error)
+    try:
+        url = await run_media_generation(
+            label,
+            data.prompt,
+            openrouter_headers=headers,
+            image_url=(data.image_url or "").strip(),
+        )
+        return {"success": True, "label": label, "modality": "image", "media_url": url, "coin_cost": coin_cost}
+    except FalServiceUnavailableError:
+        await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
+        _raise_fal_unavailable()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
+        raise HTTPException(status_code=502, detail=str(exc)[:500]) from exc
+
+
+@app.post("/media/generate-video")
+async def generate_video(data: MediaGenerateRequest, request: Request) -> dict:
+    label = (data.label or "").strip()
+    if label not in MEDIA_PROVIDER_CONFIG or MEDIA_PROVIDER_CONFIG[label].modality != "video":
+        raise HTTPException(status_code=400, detail="Invalid video model label")
+    if is_fal_media_label(label):
+        _raise_fal_unavailable()
+    coin_info = await require_model_coin(
+        request, label, modality="video", device_id=data.user_id, feature="studio", action="generate_video"
+    )
+    subject = coin_info["subject"]
+    coin_cost = int(coin_info["coin_cost"])
+    job_id = str(uuid.uuid4())
+    prompt = (data.prompt or "").strip()
+    create_media_job(job_id, subject, label, "video", prompt, coin_cost)
+    headers, _ = openrouter_headers_or_error()
+    asyncio.create_task(_run_media_job_background(job_id, label, prompt, headers))
+    return {"success": True, "job_id": job_id, "label": label, "modality": "video", "coin_cost": coin_cost}
+
+
+@app.get("/media/job/{job_id}")
+def media_job_status(job_id: str, request: Request) -> dict:
+    job = get_media_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"job": job}
+
+
+@app.post("/studio/run")
+async def studio_run(data: StudioRunRequest, request: Request) -> dict:
+    label = resolve_company_label((data.label or "").strip())
+    modality = label_modality(label)
+    if modality == "chat":
+        if label not in COMPANY_LABELS:
+            raise HTTPException(status_code=400, detail="Invalid chat model")
+        await require_model_coin(
+            request, label, device_id=data.user_id, feature="studio", action="studio_chat"
+        )
+        result = await call_ai_best((data.prompt or "").strip(), max_tokens=2500, preferred_labels=[label])
+        if not result.success:
+            raise HTTPException(status_code=502, detail=result.error or "생성 실패")
+        return {
+            "success": True,
+            "modality": "chat",
+            "label": label,
+            "text": result.content,
+            "coin_cost": get_model_coin_cost(label),
+        }
+    if modality == "image":
+        if is_fal_media_label(label):
+            _raise_fal_unavailable()
+        return await generate_image(
+            MediaGenerateRequest(label=label, prompt=data.prompt, image_url=data.image_url, user_id=data.user_id),
+            request,
+        )
+    if is_fal_media_label(label):
+        _raise_fal_unavailable()
+    return await generate_video(
+        MediaGenerateRequest(label=label, prompt=data.prompt, image_url=data.image_url, user_id=data.user_id),
+        request,
+    )
+
+
+@app.post("/social/chat/{room_id}/ai")
+async def social_chat_room_ai(room_id: str, body: ChatAiRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    label = resolve_company_label(body.label)
+    if label not in COMPANY_LABELS:
+        raise HTTPException(status_code=400, detail="Invalid model")
+    prompt = (body.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="질문을 입력하세요.")
+    await require_model_coin(request, label, device_id=body.user_id, feature="compare", action="chat_ai")
+    result = await call_ai_best(prompt, max_tokens=2000, preferred_labels=[label])
+    if not result.success:
+        raise HTTPException(status_code=502, detail=result.error or "AI 호출 실패")
+    ai_name = f"AI · {label}"
+    try:
+        msg = send_room_message(
+            user["id"],
+            ai_name,
+            room_id,
+            result.content,
+            sender_type="ai",
+            model_label=label,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "message": msg, "coin_cost": get_model_coin_cost(label)}
+
+
+@app.post("/social/work/{work_id}/ai-comment")
+async def social_work_ai_comment(work_id: int, body: WorkAiCommentRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    label = resolve_company_label(body.label)
+    if label not in COMPANY_LABELS:
+        raise HTTPException(status_code=400, detail="Invalid model")
+    prompt = (body.prompt or "이 작업물에 대한 피드백을 한국어로 작성해주세요.").strip()
+    await require_model_coin(request, label, device_id=body.user_id, feature="compare", action="work_ai_comment")
+    result = await call_ai_best(prompt, max_tokens=1800, preferred_labels=[label])
+    if not result.success:
+        raise HTTPException(status_code=502, detail=result.error or "AI 호출 실패")
+    try:
+        comment = add_work_comment(
+            work_id,
+            user["id"],
+            f"AI · {label}",
+            result.content,
+            commenter_type="ai",
+            model_label=label,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "comment": comment, "coin_cost": get_model_coin_cost(label)}
+
+
 @app.get("/admin")
 def serve_admin() -> FileResponse:
     path = os.path.join(BASE_DIR, "admin.html")
@@ -5349,6 +5813,54 @@ def admin_quota_set_limit(body: AdminQuotaLimitRequest, request: Request) -> dic
     _require_admin(request)
     try:
         return admin_set_quota_limit(body.subject, body.feature, body.daily_limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.get("/admin/popups")
+def admin_popups_list(request: Request, limit: int = 30) -> dict:
+    _require_admin(request)
+    return {"popups": admin_list_popups(limit=limit)}
+
+
+@app.post("/admin/popup")
+def admin_popup_upsert(body: AdminPopupBody, request: Request) -> dict:
+    _require_admin(request)
+    if not (body.title or "").strip() and not (body.body or "").strip():
+        raise HTTPException(status_code=400, detail="제목 또는 본문을 입력하세요.")
+    return admin_upsert_popup(body.title, body.body, body.kind, body.day_key or None)
+
+
+@app.post("/admin/coins/grant")
+def admin_coins_grant(body: AdminCoinGrantBody, request: Request) -> dict:
+    _require_admin(request)
+    filt: dict = {}
+    if body.min_balance is not None:
+        filt["min_balance"] = float(body.min_balance)
+    if body.registered_after is not None:
+        filt["registered_after"] = float(body.registered_after)
+    if body.subjects:
+        filt["subjects"] = body.subjects
+    mode = body.target_mode.strip().lower()
+    if mode == "conditional":
+        mode = "members"
+    try:
+        return admin_create_coin_grant(
+            body.amount,
+            mode,
+            filt,
+            title=body.title,
+            scheduled_at=body.scheduled_at,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/admin/coins/grant/{grant_id}/execute")
+def admin_coins_grant_execute(grant_id: int, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return execute_coin_grant(grant_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 

@@ -397,9 +397,27 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE activity_log ADD COLUMN question TEXT NOT NULL DEFAULT ''")
             if "answer" not in act_cols:
                 conn.execute("ALTER TABLE activity_log ADD COLUMN answer TEXT NOT NULL DEFAULT ''")
+            chat_cols = {r[1] for r in conn.execute("PRAGMA table_info(user_chat_messages)").fetchall()}
+            if "sender_type" not in chat_cols:
+                conn.execute("ALTER TABLE user_chat_messages ADD COLUMN sender_type TEXT NOT NULL DEFAULT 'user'")
+            if "model_label" not in chat_cols:
+                conn.execute("ALTER TABLE user_chat_messages ADD COLUMN model_label TEXT NOT NULL DEFAULT ''")
+            wc_cols = {r[1] for r in conn.execute("PRAGMA table_info(work_comments)").fetchall()}
+            if "commenter_type" not in wc_cols:
+                conn.execute("ALTER TABLE work_comments ADD COLUMN commenter_type TEXT NOT NULL DEFAULT 'user'")
+            if "model_label" not in wc_cols:
+                conn.execute("ALTER TABLE work_comments ADD COLUMN model_label TEXT NOT NULL DEFAULT ''")
+            from pricing_store import ensure_pricing_tables, seed_model_pricing, process_due_coin_grants
+
+            ensure_pricing_tables(conn)
+            seed_model_pricing(conn)
             conn.commit()
         finally:
             conn.close()
+    try:
+        process_due_coin_grants()
+    except Exception:
+        pass
 
 
 _USER_COLS = "id, email, user_email, display_name, created_at"
@@ -2591,7 +2609,9 @@ def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
         try:
             rows = conn.execute(
                 """
-                SELECT id, work_id, user_id, author_name, body, created_at
+                SELECT id, work_id, user_id, author_name, body, created_at,
+                       COALESCE(commenter_type, 'user') AS commenter_type,
+                       COALESCE(model_label, '') AS model_label
                 FROM work_comments
                 WHERE work_id = ?
                 ORDER BY created_at ASC
@@ -2607,16 +2627,28 @@ def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
         "user_id": r["user_id"],
         "author_name": r["author_name"],
         "body": r["body"],
+        "commenter_type": r["commenter_type"],
+        "model_label": r["model_label"],
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
     } for r in rows]
 
 
-def add_work_comment(work_id: int, user_id: int, author_name: str, body: str) -> dict[str, Any]:
+def add_work_comment(
+    work_id: int,
+    user_id: int,
+    author_name: str,
+    body: str,
+    *,
+    commenter_type: str = "user",
+    model_label: str = "",
+) -> dict[str, Any]:
     body = (body or "").strip()[:2000]
     if not body:
         raise ValueError("댓글 내용을 입력하세요.")
     now = time.time()
+    ctype = (commenter_type or "user").strip()[:16] or "user"
+    mlabel = (model_label or "").strip()[:64]
     with _lock:
         conn = _connect()
         try:
@@ -2628,10 +2660,10 @@ def add_work_comment(work_id: int, user_id: int, author_name: str, body: str) ->
                 raise ValueError("작업을 찾을 수 없습니다.")
             cur = conn.execute(
                 """
-                INSERT INTO work_comments (work_id, user_id, author_name, body, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO work_comments (work_id, user_id, author_name, body, created_at, commenter_type, model_label)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (work_id, user_id, (author_name or "").strip()[:64], body, now),
+                (work_id, user_id, (author_name or "").strip()[:64], body, now, ctype, mlabel),
             )
             conn.commit()
             comment_id = int(cur.lastrowid)
@@ -2643,6 +2675,8 @@ def add_work_comment(work_id: int, user_id: int, author_name: str, body: str) ->
         "user_id": user_id,
         "author_name": author_name,
         "body": body,
+        "commenter_type": ctype,
+        "model_label": mlabel,
         "created_at": now,
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(now)),
     }
@@ -2661,7 +2695,9 @@ def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict
                 raise ValueError("상대 계정을 찾을 수 없습니다.")
             rows = conn.execute(
                 """
-                SELECT id, room_id, sender_id, sender_name, body, created_at
+                SELECT id, room_id, sender_id, sender_name, body, created_at,
+                       COALESCE(sender_type, 'user') AS sender_type,
+                       COALESCE(model_label, '') AS model_label
                 FROM user_chat_messages
                 WHERE room_id = ?
                 ORDER BY created_at ASC
@@ -2677,13 +2713,23 @@ def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict
         "sender_id": r["sender_id"],
         "sender_name": r["sender_name"],
         "body": r["body"],
+        "sender_type": r["sender_type"],
+        "model_label": r["model_label"],
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
         "is_mine": r["sender_id"] == user_id,
     } for r in rows]
 
 
-def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -> dict[str, Any]:
+def send_chat_message(
+    user_id: int,
+    sender_name: str,
+    peer_id: int,
+    body: str,
+    *,
+    sender_type: str = "user",
+    model_label: str = "",
+) -> dict[str, Any]:
     body = (body or "").strip()[:4000]
     if not body:
         raise ValueError("메시지를 입력하세요.")
@@ -2693,6 +2739,8 @@ def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -
         raise ValueError("친구만 1:1 채팅할 수 있습니다. 먼저 친구를 추가하세요.")
     room = _chat_room_id(user_id, peer_id)
     now = time.time()
+    stype = (sender_type or "user").strip()[:16] or "user"
+    mlabel = (model_label or "").strip()[:64]
     with _lock:
         conn = _connect()
         try:
@@ -2701,10 +2749,10 @@ def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -
                 raise ValueError("상대 계정을 찾을 수 없습니다.")
             cur = conn.execute(
                 """
-                INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at, sender_type, model_label)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (room, user_id, (sender_name or "").strip()[:64], body, now),
+                (room, user_id, (sender_name or "").strip()[:64], body, now, stype, mlabel),
             )
             conn.commit()
             msg_id = int(cur.lastrowid)
@@ -2716,6 +2764,8 @@ def send_chat_message(user_id: int, sender_name: str, peer_id: int, body: str) -
         "sender_id": user_id,
         "sender_name": sender_name,
         "body": body,
+        "sender_type": stype,
+        "model_label": mlabel,
         "created_at": now,
         "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
         "is_mine": True,
@@ -3194,7 +3244,9 @@ def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict
                     raise ValueError("이 방에 참여하지 않았습니다.")
                 rows = conn.execute(
                     """
-                    SELECT id, room_id, sender_id, sender_name, body, created_at
+                    SELECT id, room_id, sender_id, sender_name, body, created_at,
+                           COALESCE(sender_type, 'user') AS sender_type,
+                           COALESCE(model_label, '') AS model_label
                     FROM user_chat_messages WHERE room_id = ? ORDER BY created_at ASC LIMIT ?
                     """,
                     (room_id, limit),
@@ -3215,14 +3267,26 @@ def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict
         "sender_id": r["sender_id"],
         "sender_name": r["sender_name"],
         "body": r["body"],
+        "sender_type": r["sender_type"],
+        "model_label": r["model_label"],
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
         "is_mine": r["sender_id"] == user_id,
     } for r in rows]
 
 
-def send_room_message(user_id: int, sender_name: str, room_id: str, body: str) -> dict[str, Any]:
+def send_room_message(
+    user_id: int,
+    sender_name: str,
+    room_id: str,
+    body: str,
+    *,
+    sender_type: str = "user",
+    model_label: str = "",
+) -> dict[str, Any]:
     room_id = (room_id or "").strip()
+    stype = (sender_type or "user").strip()[:16] or "user"
+    mlabel = (model_label or "").strip()[:64]
     if room_id.startswith("g:"):
         group_id = int(room_id.split(":", 1)[1])
         body = (body or "").strip()[:4000]
@@ -3236,10 +3300,10 @@ def send_room_message(user_id: int, sender_name: str, room_id: str, body: str) -
                     raise ValueError("이 방에 참여하지 않았습니다.")
                 cur = conn.execute(
                     """
-                    INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at, sender_type, model_label)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (room_id, user_id, (sender_name or "").strip()[:64], body, now),
+                    (room_id, user_id, (sender_name or "").strip()[:64], body, now, stype, mlabel),
                 )
                 conn.commit()
                 msg_id = int(cur.lastrowid)
@@ -3251,6 +3315,8 @@ def send_room_message(user_id: int, sender_name: str, room_id: str, body: str) -
             "sender_id": user_id,
             "sender_name": sender_name,
             "body": body,
+            "sender_type": stype,
+            "model_label": mlabel,
             "created_at": now,
             "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
             "is_mine": True,
@@ -3261,7 +3327,7 @@ def send_room_message(user_id: int, sender_name: str, room_id: str, body: str) -
     peer_id = int(parts[0]) if int(parts[0]) != user_id else int(parts[1])
     if not _are_friends(user_id, peer_id):
         raise ValueError("친구만 1:1 채팅할 수 있습니다.")
-    return send_chat_message(user_id, sender_name, peer_id, body)
+    return send_chat_message(user_id, sender_name, peer_id, body, sender_type=stype, model_label=mlabel)
 
 
 def list_chat_users(exclude_user_id: int, limit: int = 50, friends_only: bool = True) -> list[dict[str, Any]]:

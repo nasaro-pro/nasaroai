@@ -4818,7 +4818,7 @@
         .discord-workspace {
             max-width: none;
             padding: 0;
-            height: calc(100dvh - var(--header-height, 72px) - var(--workspace-agent-bar, 0px) - var(--bottom-offset, 0px));
+            height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 0px));
             min-height: 420px;
         }
         .discord-workspace.active { display: flex; flex-direction: column; }
@@ -4836,7 +4836,7 @@
         }
         @media (max-width: 640px) {
             .discord-workspace {
-                height: calc(100dvh - var(--header-height, 72px) - var(--workspace-agent-bar, 0px) - var(--bottom-offset, 56px));
+                height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 56px));
                 min-height: 0;
             }
             .discord-layout {
@@ -5153,7 +5153,7 @@
         .home-workspace {
             max-width: 640px;
             margin: 0 auto;
-            padding: calc(var(--workspace-agent-bar, 0px) + 8px) 12px 24px;
+            padding: 8px 12px 24px;
             flex-direction: column;
         }
         .home-profile-card {
@@ -5297,21 +5297,23 @@
         .workspace-agent-top {
             display: none;
             position: fixed;
-            top: var(--header-height, 72px);
-            left: var(--content-inset, 0);
-            right: 0;
+            top: calc(var(--header-height, 72px) + 6px);
+            right: max(12px, var(--content-inset, 0px));
+            left: auto;
+            width: auto;
             z-index: 370;
-            padding: 6px 12px;
-            min-height: 44px;
+            padding: 0;
+            min-height: 0;
             box-sizing: border-box;
             align-items: center;
             justify-content: flex-end;
-            gap: 8px;
-            background: rgba(255, 255, 255, 0.94);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #e5e7eb;
+            gap: 0;
+            background: transparent;
+            border: none;
+            pointer-events: none;
         }
         .workspace-agent-top.visible { display: flex; }
+        .workspace-agent-top .workspace-agent-fab { pointer-events: auto; }
         .workspace-agent-fab {
             position: static;
             display: inline-flex;
@@ -5641,7 +5643,7 @@
         /* ── Instagram 스타일 작업 피드 ── */
         .insta-workspace {
             max-width: 640px;
-            padding: calc(var(--workspace-agent-bar, 0px) + 8px) 0 24px;
+            padding: 8px 0 24px;
         }
         .insta-top-bar {
             padding: 12px 16px 8px;
@@ -5885,10 +5887,6 @@
         html[data-theme="dark"] .site-header { background: rgba(10,10,10,.96); border-color: #262626; }
         html[data-theme="dark"] .header-brand h1 { color: #f5f5f5; }
         html[data-theme="dark"] .header-brand p { color: #a3a3a3; }
-        html[data-theme="dark"] .workspace-agent-top {
-            background: rgba(15, 18, 25, 0.96);
-            border-color: var(--dm-border-soft);
-        }
         html[data-theme="dark"] .workspace-agent-fab {
             background: linear-gradient(135deg, #1a1530 0%, #141824 100%);
             border-color: #5b4b9a;
@@ -5904,6 +5902,44 @@
             border-color: var(--dm-border);
             color: var(--dm-text-muted);
         }
+        .studio-workspace { padding: 8px 12px 24px; overflow: hidden; }
+        .studio-layout { display: grid; grid-template-columns: 240px 1fr 1fr; gap: 12px; height: calc(100dvh - var(--header-height, 72px) - 32px); min-height: 420px; }
+        @media (max-width: 900px) { .studio-layout { grid-template-columns: 1fr; height: auto; } }
+        .studio-models, .studio-compose, .studio-result-panel {
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; overflow: auto;
+        }
+        .studio-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+        .studio-tabs button { flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .studio-tabs button.active { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+        .studio-model-card {
+            display: block; width: 100%; text-align: left; padding: 10px; margin-bottom: 6px;
+            border-radius: 10px; border: 1px solid #e5e7eb; background: #fafafa; cursor: pointer;
+        }
+        .studio-model-card.active { border-color: #7c3aed; background: #f5f3ff; }
+        .studio-model-card.disabled { opacity: 0.45; cursor: not-allowed; }
+        .studio-model-card .coin { font-size: 15px; font-weight: 800; color: #7c3aed; }
+        #studioPrompt { width: 100%; min-height: 140px; border-radius: 10px; border: 1px solid #e5e7eb; padding: 10px; font: inherit; resize: vertical; }
+        #studioRunBtn { margin-top: 10px; width: 100%; padding: 12px; border-radius: 10px; border: none; background: #7c3aed; color: #fff; font-weight: 800; cursor: pointer; }
+        #studioRunBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #studioResult { margin-top: 12px; min-height: 120px; white-space: pre-wrap; word-break: break-word; }
+        .studio-result-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .studio-result-actions button { padding: 8px 12px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-weight: 700; }
+        .site-popup-overlay {
+            position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.55); padding: 16px;
+        }
+        .site-popup-overlay.open { display: flex; }
+        .site-popup-box { max-width: 420px; width: 100%; background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+        .site-popup-box h3 { margin: 0 0 8px; font-size: 18px; }
+        .site-popup-body { font-size: 14px; line-height: 1.55; color: #374151; white-space: pre-wrap; max-height: 50vh; overflow: auto; }
+        .site-popup-actions { margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; }
+        .chat-ai-btn { padding: 0 12px; border-radius: 8px; border: 1px solid #c4b5fd; background: #f5f3ff; color: #5b21b6; font-weight: 800; cursor: pointer; }
+        .msg-ai .discord-msg-body { background: #f5f3ff; border: 1px solid #ddd6fe; }
+        html[data-theme="dark"] .studio-models,
+        html[data-theme="dark"] .studio-compose,
+        html[data-theme="dark"] .studio-result-panel { background: var(--dm-surface); border-color: var(--dm-border); }
+        html[data-theme="dark"] .site-popup-box { background: #1e293b; color: #e2e8f0; }
+        html[data-theme="dark"] .site-popup-body { color: #cbd5e1; }
         html[data-theme="dark"] .discord-layout,
         html[data-theme="dark"] .discord-sidebar,
         html[data-theme="dark"] .discord-main,
@@ -6079,6 +6115,7 @@
         <div id="desktopChrome" class="desktop-chrome">
         <nav id="appRailDesktop" class="app-rail app-rail--desktop" aria-label="앱 메뉴">
             <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
+            <button type="button" class="app-rail-btn" data-workspace="studio" title="AI 스튜디오">🎨</button>
             <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
             <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
             <button type="button" class="app-rail-btn" data-workspace="home" title="홈">🏠</button>
@@ -6481,6 +6518,34 @@
                 </div>
             </section>
 
+            <section id="studioWorkspace" class="app-workspace-panel studio-workspace" aria-label="AI 스튜디오">
+                <div class="studio-layout">
+                    <aside class="studio-models">
+                        <h2 style="margin:0 0 8px;font-size:16px;">🎨 AI 스튜디오</h2>
+                        <div class="studio-tabs" id="studioModTabs">
+                            <button type="button" data-mod="chat" class="active">채팅</button>
+                            <button type="button" data-mod="image">이미지</button>
+                            <button type="button" data-mod="video">동영상</button>
+                        </div>
+                        <div id="studioModelList"></div>
+                    </aside>
+                    <div class="studio-compose">
+                        <label for="studioPrompt" style="font-size:12px;font-weight:700;">프롬프트</label>
+                        <textarea id="studioPrompt" placeholder="원하는 결과를 설명하세요…"></textarea>
+                        <input id="studioImageUrl" type="url" placeholder="참조 이미지 URL (선택)" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid #e5e7eb;">
+                        <button type="button" id="studioRunBtn">생성하기 <span id="studioRunCost">🪙1</span></button>
+                    </div>
+                    <div class="studio-result-panel">
+                        <div style="font-size:12px;font-weight:700;margin-bottom:8px;">결과</div>
+                        <div id="studioResult">모델을 선택하고 생성하기를 누르세요.</div>
+                        <div class="studio-result-actions">
+                            <button type="button" id="studioSaveWorkBtn" disabled>작업물로 저장</button>
+                            <button type="button" id="studioRegenBtn" disabled>다시 생성</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="chatWorkspace" class="app-workspace-panel discord-workspace" aria-label="계정 채팅">
                 <div id="chatLoginHint" class="workspace-login-hint" style="display:none;">로그인하면 친구와 채팅할 수 있습니다.</div>
                 <div id="chatLayout" class="discord-layout" style="display:none;">
@@ -6507,7 +6572,8 @@
                         <div id="chatMessages" class="discord-messages"></div>
                         <div id="chatTypingIndicator" class="chat-typing-indicator" aria-hidden="true">전송 중…</div>
                         <div class="discord-compose">
-                            <input id="chatInput" type="text" placeholder="메시지 입력…" autocomplete="off">
+                            <button id="chatAiBtn" type="button" class="chat-ai-btn" title="AI 호출">🤖 AI</button>
+                            <input id="chatInput" type="text" placeholder="메시지 입력… (/ai 질문)" autocomplete="off">
                             <button id="chatSendBtn" type="button" aria-label="전송">➤</button>
                         </div>
                     </div>
@@ -6720,6 +6786,16 @@
             </div>
         </div>
 
+        <div id="sitePopupOverlay" class="site-popup-overlay" aria-hidden="true">
+            <div class="site-popup-box" role="dialog" aria-modal="true">
+                <h3 id="sitePopupTitle">공지</h3>
+                <div id="sitePopupBody" class="site-popup-body"></div>
+                <div class="site-popup-actions">
+                    <button type="button" id="sitePopupCloseBtn">오늘 그만 보기</button>
+                </div>
+            </div>
+        </div>
+
         <div id="workspaceAgentTopBar" class="workspace-agent-top">
             <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
         </div>
@@ -6797,6 +6873,7 @@
                 </div>
                 <nav id="appRailMobile" class="app-rail app-rail--mobile" aria-label="앱 메뉴">
                     <button type="button" class="app-rail-btn active" data-workspace="ai"><span>🤖</span><span class="rail-label">AI</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="studio"><span>🎨</span><span class="rail-label">스튜디오</span></button>
                     <button type="button" class="app-rail-btn" data-workspace="chat"><span>💬</span><span class="rail-label">채팅</span></button>
                     <button type="button" class="app-rail-btn" data-workspace="works"><span>📋</span><span class="rail-label">작업</span></button>
                     <button type="button" class="app-rail-btn" data-workspace="home"><span>🏠</span><span class="rail-label">홈</span></button>
@@ -6871,7 +6948,236 @@
             deepseek: "#9333ea",
             Unknown: "#6b7280",
         };
-        const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek"];
+        const MODELS = ["OpenAI", "Anthropic", "Google", "xAI", "Perplexity", "DeepSeek", "DeepSeek-Flash", "DeepSeek-Pro", "GLM", "MiniMax", "Anthropic-Opus"];
+        let pricingCatalog = [];
+        let studioSelectedLabel = "DeepSeek";
+        let studioModality = "chat";
+        let studioLastResult = null;
+        let currentCoinBalance = 0;
+        const SERVICE_PREP_MSG = "현재 해당 기능은 서비스 준비 중입니다. 잠시만 기다려주세요!";
+
+        function isServicePrepMessage(msg) {
+            return String(msg || "").includes("서비스 준비");
+        }
+
+        function showServicePrepNotice(msg, resultEl) {
+            const text = msg || SERVICE_PREP_MSG;
+            if (resultEl) resultEl.textContent = text;
+            showToast(text, "warn");
+        }
+
+        async function loadPricingCatalog() {
+            try {
+                const res = await apiFetch("/pricing/catalog");
+                if (!res.ok) return;
+                const data = await res.json();
+                pricingCatalog = data.models || [];
+                if (Array.isArray(data.chat_labels) && data.chat_labels.length) {
+                    window.__CHAT_LABELS = data.chat_labels.slice();
+                    COLLAB_API_MODELS = data.chat_labels.slice();
+                }
+                renderStudioModelList();
+            } catch {}
+        }
+
+        function chatModelLabels() {
+            return window.__CHAT_LABELS || MODELS;
+        }
+
+        function coinCostFor(label, modality) {
+            const hit = pricingCatalog.find(m => m.label === label && (!modality || m.modality === modality));
+            return hit ? hit.coin_cost : 1;
+        }
+
+        function modelsForModality(mod) {
+            return pricingCatalog.filter(m => m.modality === mod && m.is_active !== false);
+        }
+
+        function renderStudioModelList() {
+            const box = document.getElementById("studioModelList");
+            if (!box) return;
+            const list = modelsForModality(studioModality);
+            if (!list.length) {
+                box.innerHTML = "<div style='font-size:12px;color:#6b7280;'>모델 목록 로딩 중…</div>";
+                return;
+            }
+            if (!list.some(m => m.label === studioSelectedLabel)) {
+                studioSelectedLabel = list[0].label;
+            }
+            box.innerHTML = list.map(m => {
+                const unavailable = m.available === false || m.provider === "fal";
+                const disabled = unavailable || (currentCoinBalance > 0 && currentCoinBalance < m.coin_cost);
+                const unit = m.unit_label === "clip_5s" ? " · 5초" : (m.unit_label === "image" ? " · 1장" : "");
+                const badge = unavailable ? `<div style="font-size:11px;color:#b45309;margin-top:4px;">준비 중</div>` : "";
+                return `<button type="button" class="studio-model-card${m.label === studioSelectedLabel ? " active" : ""}${disabled ? " disabled" : ""}" data-label="${m.label}" data-unavailable="${unavailable ? "1" : "0"}" data-cost="${m.coin_cost}">
+                    <div>${m.label}</div>
+                    <div class="coin">🪙${m.coin_cost}${unit}</div>
+                    ${badge}
+                </button>`;
+            }).join("");
+            const costEl = document.getElementById("studioRunCost");
+            if (costEl) costEl.textContent = `🪙${coinCostFor(studioSelectedLabel, studioModality)}`;
+        }
+
+        async function runStudioGenerate() {
+            const prompt = (document.getElementById("studioPrompt")?.value || "").trim();
+            if (!prompt) { showToast("프롬프트를 입력하세요.", "warn"); return; }
+            const sel = pricingCatalog.find(m => m.label === studioSelectedLabel);
+            if (sel && sel.available === false) {
+                showServicePrepNotice(sel.unavailable_reason || SERVICE_PREP_MSG, document.getElementById("studioResult"));
+                return;
+            }
+            const btn = document.getElementById("studioRunBtn");
+            const resultEl = document.getElementById("studioResult");
+            if (btn) btn.disabled = true;
+            if (resultEl) resultEl.textContent = "생성 중…";
+            try {
+                const body = {
+                    label: studioSelectedLabel,
+                    prompt,
+                    image_url: (document.getElementById("studioImageUrl")?.value || "").trim(),
+                    user_id: ensureDeviceId(),
+                };
+                const res = await apiFetch("/studio/run", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const msg = typeof data.detail === "string"
+                        ? data.detail
+                        : (data.detail?.message || await parseApiError(res, "생성 실패"));
+                    if (res.status === 503 && isServicePrepMessage(msg)) {
+                        showServicePrepNotice(msg, resultEl);
+                        return;
+                    }
+                    throw new Error(msg);
+                }
+                studioLastResult = data;
+                if (data.modality === "video" && data.job_id) {
+                    if (resultEl) resultEl.textContent = "동영상 생성 중… (폴링)";
+                    await pollStudioVideoJob(data.job_id, resultEl);
+                } else if (data.media_url) {
+                    if (resultEl) {
+                        resultEl.innerHTML = data.modality === "image"
+                            ? `<img src="${data.media_url}" alt="result" style="max-width:100%;border-radius:10px;">`
+                            : `<video src="${data.media_url}" controls style="max-width:100%;border-radius:10px;"></video>`;
+                    }
+                } else {
+                    if (resultEl) resultEl.textContent = data.text || "";
+                }
+                document.getElementById("studioSaveWorkBtn")?.removeAttribute("disabled");
+                document.getElementById("studioRegenBtn")?.removeAttribute("disabled");
+                fetchQuotaRemaining?.();
+            } catch (e) {
+                if (isServicePrepMessage(e.message)) {
+                    showServicePrepNotice(e.message, resultEl);
+                } else {
+                    if (resultEl) resultEl.textContent = e.message || "생성 실패";
+                    showToast(e.message || "생성 실패", "error");
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function pollStudioVideoJob(jobId, resultEl) {
+            for (let i = 0; i < 120; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                const res = await apiFetch("/media/job/" + encodeURIComponent(jobId));
+                if (!res.ok) continue;
+                const data = await res.json();
+                const job = data.job || {};
+                if (job.status === "completed" && job.result_url) {
+                    studioLastResult = { ...studioLastResult, media_url: job.result_url };
+                    if (resultEl) resultEl.innerHTML = `<video src="${job.result_url}" controls style="max-width:100%;border-radius:10px;"></video>`;
+                    return;
+                }
+                if (job.status === "failed") {
+                    const errMsg = job.error || "동영상 생성 실패";
+                    if (isServicePrepMessage(errMsg)) {
+                        showServicePrepNotice(errMsg, resultEl);
+                        return;
+                    }
+                    throw new Error(errMsg);
+                }
+            }
+            throw new Error("동영상 생성 시간 초과");
+        }
+
+        async function saveStudioAsWork() {
+            if (!studioLastResult || !currentUser) { showToast("로그인 후 저장할 수 있습니다.", "warn"); return; }
+            const title = (studioSelectedLabel + " · " + studioModality).slice(0, 80);
+            const body = studioLastResult.text || studioLastResult.media_url || "";
+            try {
+                const res = await apiFetch("/social/works", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ title, body }),
+                });
+                if (!res.ok) throw new Error("저장 실패");
+                showToast("작업물로 저장했습니다.", "success");
+                setAppWorkspace("works");
+            } catch (e) { showToast(e.message || "저장 실패", "error"); }
+        }
+
+        async function maybeShowSitePopup() {
+            try {
+                const res = await apiFetch("/popup/active?user_id=" + encodeURIComponent(ensureDeviceId()));
+                if (!res.ok) return;
+                const data = await res.json();
+                const popup = data.popup;
+                if (!popup) return;
+                document.getElementById("sitePopupTitle").textContent = popup.title || "공지";
+                document.getElementById("sitePopupBody").textContent = popup.body || "";
+                const overlay = document.getElementById("sitePopupOverlay");
+                overlay.classList.add("open");
+                overlay.dataset.noticeId = String(popup.id);
+                overlay.setAttribute("aria-hidden", "false");
+            } catch {}
+        }
+
+        async function dismissSitePopup() {
+            const overlay = document.getElementById("sitePopupOverlay");
+            const noticeId = parseInt(overlay?.dataset.noticeId || "0", 10);
+            overlay?.classList.remove("open");
+            overlay?.setAttribute("aria-hidden", "true");
+            if (!noticeId) return;
+            try {
+                await apiFetch("/popup/dismiss", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ notice_id: noticeId, user_id: ensureDeviceId() }),
+                });
+            } catch {}
+        }
+
+        function pickChatAiModel() {
+            const labels = chatModelLabels();
+            const lines = labels.map(l => `${l} (🪙${coinCostFor(l, "chat")})`).join("\n");
+            const pick = prompt("AI 모델을 선택하세요:\n" + lines, labels[0] || "DeepSeek");
+            if (!pick) return null;
+            const label = labels.find(l => pick.includes(l)) || labels[0];
+            return label;
+        }
+
+        async function invokeChatAi(promptText) {
+            if (!chatRoomId) { showToast("대화방을 먼저 선택하세요.", "warn"); return; }
+            const label = pickChatAiModel();
+            if (!label) return;
+            try {
+                const res = await apiFetch("/social/chat/" + encodeURIComponent(chatRoomId) + "/ai", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ label, prompt: promptText, user_id: ensureDeviceId() }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.detail?.message || data.detail || "AI 호출 실패");
+                await loadChatMessages();
+                fetchQuotaRemaining?.();
+            } catch (e) { showToast(e.message || "AI 호출 실패", "error"); }
+        }
         const COIN = "🪙";
         function coinCost(n) {
             const v = Math.max(0, Number(n) || 0);
@@ -7769,7 +8075,7 @@
         let collabSelectedStage = 0;
         let collabPipelineRunning = false;
         let collabFinalProduct = "";
-        const COLLAB_API_MODELS = ["Perplexity", "Anthropic", "OpenAI", "DeepSeek", "Google", "xAI"];
+        let COLLAB_API_MODELS = MODELS.slice();
         const COLLAB_STAGE_META_FALLBACK = [
             { short: "조사", role: "조사·트렌드", default_model: "Perplexity", options: ["Perplexity", "xAI", "OpenAI", "Google"], hint: "최신 정보·출처 조사" },
             { short: "구조", role: "구조·기획", default_model: "Anthropic", options: ["Anthropic", "OpenAI", "Google", "DeepSeek"], hint: "목차·논리 설계" },
@@ -7914,6 +8220,8 @@
                 if (!res.ok) return null;
                 const q = await res.json();
                 cachedQuotaRemaining = Math.round(q.total?.remaining ?? q.balance ?? 0);
+                currentCoinBalance = cachedQuotaRemaining;
+                renderStudioModelList();
                 return cachedQuotaRemaining;
             } catch {
                 return null;
@@ -9063,7 +9371,7 @@
             document.getElementById("sideMenuPanelChat")?.classList.toggle("active", ws === "chat");
             document.getElementById("sideMenuPanelWorks")?.classList.toggle("active", ws === "works" || ws === "home");
             const brand = document.getElementById("sideMenuBrand");
-            const titles = { ai: "Nasaro AI", chat: "💬 채팅", works: "📋 작업 공유", home: "🏠 홈" };
+            const titles = { ai: "Nasaro AI", studio: "🎨 스튜디오", chat: "💬 채팅", works: "📋 작업 공유", home: "🏠 홈" };
             if (brand) brand.textContent = titles[ws] || titles.ai;
             if (ws === "works" || ws === "home") loadSideMenuFriends();
             if (ws === "chat" && currentUser) loadChatRooms();
@@ -9078,7 +9386,6 @@
                 fab.classList.toggle("active", !!agentActive);
                 fab.textContent = agentActive ? "● 에이전트" : "🌐 에이전트";
             }
-            document.documentElement.style.setProperty("--workspace-agent-bar", show ? "48px" : "0px");
             if (show && agentActive && agentPanel?.style.display !== "none" && !agentPanelUserMoved) {
                 requestAnimationFrame(() => positionPanelNearButton(getAgentAnchorButton()));
             }
@@ -9095,16 +9402,19 @@
             const dockAgentRow = document.querySelector(".dock-agent-row");
             const dockShell = document.getElementById("dockShell");
             const chatWs = document.getElementById("chatWorkspace");
+            const studioWs = document.getElementById("studioWorkspace");
             const worksWs = document.getElementById("worksWorkspace");
             const homeWs = document.getElementById("homeWorkspace");
             const isAi = currentAppWorkspace === "ai";
             const isChat = currentAppWorkspace === "chat";
+            const isStudio = currentAppWorkspace === "studio";
 
             AI_PANEL_IDS.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = isAi ? "" : "none";
             });
             if (chatWs) chatWs.classList.toggle("active", isChat);
+            if (studioWs) studioWs.classList.toggle("active", isStudio);
             if (worksWs) worksWs.classList.toggle("active", currentAppWorkspace === "works");
             if (homeWs) homeWs.classList.toggle("active", currentAppWorkspace === "home");
 
@@ -9115,6 +9425,8 @@
                 else if (window.innerWidth < 768) dockShell.style.display = "";
                 else dockShell.style.display = "none";
             }
+
+            if (isStudio) renderStudioModelList();
 
             if (isChat) {
                 refreshSocialWorkspace();
@@ -9301,13 +9613,15 @@
 
         function appendChatBubble(box, m) {
             const mine = !!m.is_mine;
+            const isAi = (m.sender_type || "") === "ai";
             const row = document.createElement("div");
-            row.className = "chat-bubble-row" + (mine ? " mine" : " theirs");
+            row.className = "chat-bubble-row" + (mine ? " mine" : " theirs") + (isAi ? " msg-ai" : "");
             const time = formatChatTime(m.created_at_iso);
             const name = m.sender_name || (mine ? "나" : "상대");
+            const badge = m.model_label ? ` · ${escapeHtml(m.model_label)}` : "";
             row.innerHTML = `
                 <div class="chat-bubble-meta">
-                    <span class="chat-bubble-name">${escapeHtml(name)}</span>
+                    <span class="chat-bubble-name">${escapeHtml(name)}${badge}</span>
                     <span class="chat-bubble-time">${escapeHtml(time)}</span>
                 </div>
                 <div class="chat-bubble">${escapeHtml(m.body || "")}</div>`;
@@ -9476,6 +9790,12 @@
             const typing = document.getElementById("chatTypingIndicator");
             const body = (input?.value || "").trim();
             if (!body) return;
+            if (/^\/ai\s+/i.test(body) || /^@ai\s+/i.test(body)) {
+                const promptText = body.replace(/^\/ai\s+/i, "").replace(/^@ai\s+/i, "").trim();
+                if (input) input.value = "";
+                await invokeChatAi(promptText);
+                return;
+            }
             const box = document.getElementById("chatMessages");
             const empty = box?.querySelector(".chat-empty-state");
             if (empty) empty.remove();
@@ -9528,6 +9848,34 @@
             else loadChatRooms();
         });
         document.getElementById("chatSendBtn")?.addEventListener("click", sendChatMessage);
+        document.getElementById("chatAiBtn")?.addEventListener("click", () => {
+            const input = document.getElementById("chatInput");
+            const text = (input?.value || "").trim();
+            if (text) { if (input) input.value = ""; invokeChatAi(text); }
+            else invokeChatAi(prompt("AI에게 질문:") || "");
+        });
+        document.getElementById("sitePopupCloseBtn")?.addEventListener("click", dismissSitePopup);
+        document.getElementById("studioModTabs")?.addEventListener("click", e => {
+            const btn = e.target.closest("button[data-mod]");
+            if (!btn) return;
+            studioModality = btn.dataset.mod || "chat";
+            document.querySelectorAll("#studioModTabs button").forEach(b => b.classList.toggle("active", b === btn));
+            renderStudioModelList();
+        });
+        document.getElementById("studioModelList")?.addEventListener("click", e => {
+            const card = e.target.closest(".studio-model-card");
+            if (!card) return;
+            if (card.dataset.unavailable === "1") {
+                showServicePrepNotice(SERVICE_PREP_MSG, document.getElementById("studioResult"));
+                return;
+            }
+            if (card.classList.contains("disabled")) return;
+            studioSelectedLabel = card.dataset.label || studioSelectedLabel;
+            renderStudioModelList();
+        });
+        document.getElementById("studioRunBtn")?.addEventListener("click", runStudioGenerate);
+        document.getElementById("studioRegenBtn")?.addEventListener("click", runStudioGenerate);
+        document.getElementById("studioSaveWorkBtn")?.addEventListener("click", saveStudioAsWork);
         document.getElementById("chatInput")?.addEventListener("keydown", e => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
         });
@@ -11985,6 +12333,11 @@
             });
         }
 
+        function labelModalityFromName(label) {
+            const hit = pricingCatalog.find(m => m.label === label);
+            return hit?.modality || "chat";
+        }
+
         function getCollabStageMeta(idx) {
             const fromPlan = collabSession?.plan?.stage_meta;
             if (Array.isArray(fromPlan) && fromPlan[idx]) return fromPlan[idx];
@@ -12202,18 +12555,66 @@
                 });
                 if (!response.ok) {
                     const errMsg = await parseApiError(response, "단계 실행 실패");
+                    if (response.status === 503 && isServicePrepMessage(errMsg)) {
+                        showToast(errMsg, "warn");
+                        collabSession.stageOutputs[stageIndex] = errMsg;
+                        collabSession.stageStates[stageIndex] = "active";
+                        appendCollabLog(errMsg, "warn");
+                        persistActiveCollab();
+                        renderCollabRunner(document.getElementById("collabRecommendResult"));
+                        return null;
+                    }
                     throw new Error(errMsg);
                 }
                 const data = await response.json();
+                if (data.modality === "video" && data.job_id) {
+                    appendCollabLog("동영상 생성 중…", "info");
+                    for (let i = 0; i < 120; i++) {
+                        await new Promise(r => setTimeout(r, 3000));
+                        const jr = await apiFetch("/media/job/" + encodeURIComponent(data.job_id));
+                        if (!jr.ok) continue;
+                        const jd = await jr.json();
+                        const job = jd.job || {};
+                        if (job.status === "completed" && job.result_url) {
+                            data.media_url = job.result_url;
+                            data.guidance = job.result_url;
+                            break;
+                        }
+                        if (job.status === "failed") {
+                            const errMsg = job.error || "동영상 생성 실패";
+                            if (isServicePrepMessage(errMsg)) {
+                                showToast(errMsg, "warn");
+                                collabSession.stageOutputs[stageIndex] = errMsg;
+                                collabSession.stageStates[stageIndex] = "active";
+                                appendCollabLog(errMsg, "warn");
+                                persistActiveCollab();
+                                renderCollabRunner(document.getElementById("collabRecommendResult"));
+                                return null;
+                            }
+                            throw new Error(errMsg);
+                        }
+                    }
+                }
                 const modelNote = data.model_label ? `[${data.model_label} · ${data.stage_role || ""}]\n` : "";
-                collabSession.stageOutputs[stageIndex] = modelNote + (data.guidance || "");
+                if (data.media_url) {
+                    collabSession.stageOutputs[stageIndex] = modelNote + (data.modality === "image"
+                        ? `![생성 이미지](${data.media_url})\n${data.media_url}`
+                        : `[생성 동영상](${data.media_url})\n${data.media_url}`);
+                } else {
+                    collabSession.stageOutputs[stageIndex] = modelNote + (data.guidance || "");
+                }
                 collabSession.stageStates[stageIndex] = "done";
                 appendCollabLog(`${stageIndex + 1}단계 완료`, "ok");
                 persistActiveCollab();
                 renderCollabRunner(document.getElementById("collabRecommendResult"));
                 return data;
             } catch (err) {
-                collabSession.stageOutputs[stageIndex] = `오류: ${err.message}`;
+                if (isServicePrepMessage(err.message)) {
+                    showToast(err.message, "warn");
+                }
+                collabSession.stageOutputs[stageIndex] = isServicePrepMessage(err.message)
+                    ? err.message
+                    : `오류: ${err.message}`;
                 collabSession.stageStates[stageIndex] = "active";
                 appendCollabLog(`오류: ${err.message}`, "err");
                 persistActiveCollab();
@@ -12429,10 +12830,11 @@
                     const state = collabSession.stageStates[i] || "idle";
                     const sm = getCollabStageMeta(i);
                     const model = collabStageModels[i] || sm.default_model || "AI";
-                    const opts = (sm.options || COLLAB_API_MODELS).filter(m => COLLAB_API_MODELS.includes(m));
-                    const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m =>
-                        `<option value="${esc(m)}" ${model === m ? "selected" : ""}>${esc(m)}</option>`
-                    ).join("");
+                    const opts = sm.options || COLLAB_API_MODELS;
+                    const modelOptions = (opts.length ? opts : COLLAB_API_MODELS).map(m => {
+                        const cost = coinCostFor(m, sm.modality || labelModalityFromName(m));
+                        return `<option value="${esc(m)}" ${model === m ? "selected" : ""}>${esc(m)} 🪙${cost}</option>`;
+                    }).join("");
                     return `
                     <div class="collab-rail-step-wrap ${i === sel ? "selected" : ""}">
                         <button type="button" class="collab-rail-step compact-v4 ${state}" data-rail-step="${i}">
@@ -13469,6 +13871,8 @@
             initDebateSuggestions();
             syncDebateEmptyHint();
             bootstrapApiCheck();
+            loadPricingCatalog().catch(() => {});
+            maybeShowSitePopup();
             ensureDeviceId().finally(() => {
                 startPresencePing();
                 refreshSideQuota();

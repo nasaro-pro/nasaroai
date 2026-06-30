@@ -314,7 +314,7 @@
         </section>
         <section class="panel">
           <h2>AI 사용량 · 오늘 vs 전체</h2>
-          <p class="stat-hint">AI 1회 호출 = 🪙1 · 통합 코인 풀에서 차감</p>
+          <p class="stat-hint">모델별 고정 코인 · 통합 풀에서 차감 (/pricing/catalog)</p>
           <div id="usageCompareTable"></div>
         </section>
         <section class="panel">
@@ -330,6 +330,40 @@
         <section class="panel">
           <h2>회원 · 비회원 AI 사용 (오늘)</h2>
           <div id="usageAudienceTable"></div>
+        </section>
+        <section class="panel">
+          <h2>오늘 팝업 공지</h2>
+          <p class="stat-hint">등록 시 해당 날짜에 처음 접속한 사용자에게 1회 표시됩니다.</p>
+          <input id="popupTitle" type="text" placeholder="제목 (이벤트/점검/프로모션)">
+          <textarea id="popupBody" placeholder="팝업 본문" style="margin-top:8px;"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <select id="popupKind" style="width:auto;">
+              <option value="event">event</option>
+              <option value="maintenance">maintenance</option>
+              <option value="promo">promo</option>
+            </select>
+            <input id="popupDayKey" type="date" style="width:auto;" title="비우면 오늘">
+            <button type="button" id="popupSaveBtn">팝업 등록</button>
+          </div>
+          <div id="popupAdminHint" style="font-size:11px;color:#94a3b8;margin-top:8px;"></div>
+        </section>
+        <section class="panel">
+          <h2>코인 이벤트 지급</h2>
+          <p class="stat-hint">전체/회원/비회원/조건부 일괄 지급 · 예약 가능</p>
+          <input id="grantTitle" type="text" placeholder="이벤트 이름 (메모)">
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+            <input id="grantAmount" type="number" min="1" value="50" style="width:88px;" title="지급 코인">
+            <select id="grantMode" style="width:auto;">
+              <option value="all">전체 (회원+비회원)</option>
+              <option value="members">회원 전체</option>
+              <option value="guests">비회원(기기) 전체</option>
+              <option value="conditional">조건부 (잔액 ≤ 기준)</option>
+            </select>
+            <input id="grantMinBalance" type="number" placeholder="max 잔액" style="width:88px;display:none;" title="이 잔액 이하만 지급">
+          </div>
+          <input id="grantSchedule" type="datetime-local" style="margin-top:8px;" title="비우면 즉시 실행">
+          <button type="button" id="grantRunBtn" style="margin-top:8px;">코인 지급 실행</button>
+          <div id="grantResultHint" style="font-size:11px;color:#94a3b8;margin-top:8px;"></div>
         </section>
         <section class="panel full">
           <div class="chart-panel-head">
@@ -676,7 +710,7 @@
         </div>`;
       }).join("");
       return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
-        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">보유 코인 (AI 1회=🪙1) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
+        <h3 style="font-size:13px;color:#c4b5fd;margin:0 0 8px;">보유 코인 (모델별 🪙 고정가) ${banned ? '<span class="badge open">차단</span>' : ""}</h3>
         <div class="quota-row" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #334155;">
           <span class="quota-feat">잔액</span>
           <span class="quota-val" id="quotaPoolVal" data-qval="_pool">🪙${balance}</span>
@@ -1702,6 +1736,7 @@
       renderUsersTable(dashData.users || []);
       renderSupportList();
       loadActivityRetentionSetting().catch(() => {});
+      wirePopupAndGrantAdmin();
       wireChartRangeToggles();
       await restoreAdminUiState();
       startDashAutoRefresh();
@@ -1845,6 +1880,49 @@
         alert(e.message);
       }
     });
+
+    function wirePopupAndGrantAdmin() {
+      const modeSel = document.getElementById("grantMode");
+      modeSel?.addEventListener("change", () => {
+        const mb = document.getElementById("grantMinBalance");
+        if (mb) mb.style.display = modeSel.value === "conditional" ? "" : "none";
+      });
+      document.getElementById("popupSaveBtn")?.addEventListener("click", async () => {
+        const title = document.getElementById("popupTitle")?.value || "";
+        const body = document.getElementById("popupBody")?.value || "";
+        const kind = document.getElementById("popupKind")?.value || "event";
+        const dayKey = document.getElementById("popupDayKey")?.value || "";
+        try {
+          const data = await api("/admin/popup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, body, kind, day_key: dayKey }),
+          });
+          document.getElementById("popupAdminHint").textContent = `등록됨 · id ${data.id} · ${data.day_key}`;
+        } catch (e) { alert(e.message); }
+      });
+      document.getElementById("grantRunBtn")?.addEventListener("click", async () => {
+        const amount = parseFloat(document.getElementById("grantAmount")?.value || "0");
+        const target_mode = document.getElementById("grantMode")?.value || "all";
+        const title = document.getElementById("grantTitle")?.value || "";
+        const min_balance = document.getElementById("grantMinBalance")?.value;
+        const sched = document.getElementById("grantSchedule")?.value;
+        let scheduled_at = null;
+        if (sched) scheduled_at = new Date(sched).getTime() / 1000;
+        const payload = { amount, target_mode, title };
+        if (target_mode === "conditional" && min_balance !== "") payload.min_balance = parseFloat(min_balance);
+        if (scheduled_at) payload.scheduled_at = scheduled_at;
+        if (!confirm(`🪙${amount} 코인을 ${target_mode} 대상에 지급할까요?`)) return;
+        try {
+          const data = await api("/admin/coins/grant", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          document.getElementById("grantResultHint").textContent = data.summary || data.status || JSON.stringify(data);
+        } catch (e) { alert(e.message); }
+      });
+    }
 
     if (adminToken) loadDashboard().catch(showLoginView);
     else clearAdminPasswordField();
