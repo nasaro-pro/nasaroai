@@ -161,6 +161,21 @@ META_RESPONSE_KEYWORDS = [
     "as an ai",
 ]
 
+_META_ANSWER_LINE_RE = re.compile(
+    r"^(?:"
+    r"질문\s*분석|question\s*analysis|"
+    r"the user(?:'s|\s+(?:message|question|greeting|input|query))|"
+    r"this (?:is|appears to be|looks like)|"
+    r"사용자(?:가|는|의)?(?:\s+)?(?:입력|작성|보낸|말한|질문)?|"
+    r"입력(?:된|한)?(?:\s+)?(?:질문|메시지|내용)?|"
+    r"요청(?:은|을|내용)?|"
+    r"분석(?:하면|결과)?|"
+    r"you(?:'re|\s+are)\s+(?:asking|greeting)|"
+    r"(?:it'?s|its)\s+a\s+(?:casual\s+)?(?:greeting|hello)"
+    r")",
+    re.I,
+)
+
 app = FastAPI(title="Nasaro AI Backend")
 
 
@@ -505,6 +520,8 @@ PERSONAS: dict[str, str] = {
     ),
     "xAI": (
         NEUTRAL_SYSTEM_PROMPT
+        + " 질문 분석·의도 해석·「사용자가 ~라고 했습니다」 같은 메타 서두를 절대 쓰지 마세요. "
+        "첫 문장부터 바로 답변 본문만 작성하세요."
     ),
     "Perplexity": (
         NEUTRAL_SYSTEM_PROMPT
@@ -1982,12 +1999,43 @@ def contains_korean(text: str) -> bool:
     return bool(re.search(r"[가-힣]", text))
 
 
+def strip_meta_answer_wrapper(content: str, prompt: str = "") -> str:
+    """Remove Grok-style question-analysis preambles before the actual answer."""
+    if not (content or "").strip():
+        return content
+    lines = content.replace("\r\n", "\n").split("\n")
+    cleaned: list[str] = []
+    skipping = True
+    for line in lines:
+        stripped = line.strip()
+        if skipping:
+            if not stripped:
+                continue
+            if _META_ANSWER_LINE_RE.search(stripped):
+                continue
+            if re.search(r"질문\s*분석|question\s*analysis", stripped, re.I):
+                continue
+            if len(stripped) < 160 and re.search(
+                r"(?:분석|analysis|greeting|인사|말했|said|meaning|의미|해석|casual|질문|message|입력)",
+                stripped,
+                re.I,
+            ) and re.search(r"(?:user|사용자|you|입력|질문|message|greeting|인사)", stripped, re.I):
+                continue
+            skipping = False
+        cleaned.append(line)
+    result = "\n".join(cleaned).strip()
+    return result or content.strip()
+
+
 def is_meta_or_invalid_response(content: str, prompt: str = "") -> bool:
     stripped = content.strip()
     lowered = stripped.lower()
     has_meta_keyword = any(keyword in lowered for keyword in META_RESPONSE_KEYWORDS)
 
     if len(stripped) < 20 and has_meta_keyword:
+        return True
+
+    if len(stripped) < 220 and _META_ANSWER_LINE_RE.search(stripped.split("\n", 1)[0].strip()):
         return True
 
     if len(stripped) >= 20 and contains_korean(prompt) and not contains_korean(stripped):
@@ -2255,6 +2303,11 @@ async def _call_ai_model_core(
                 logger.warning("Invalid/meta response skipped label=%s model=%s content=%s", label, model_id, content[:80])
                 continue
 
+            content = strip_meta_answer_wrapper(content, prompt)
+            if not content.strip():
+                failed_candidates.append(model_id)
+                continue
+
             actual_label = label_for_model_id(model_id)
             return ModelCallResult(
                 success=True,
@@ -2400,6 +2453,11 @@ async def stream_label_chat(
 
                         content = "".join(parts)
                         if not content.strip() or is_meta_or_invalid_response(content, prompt):
+                            failed_candidates.append(model_id)
+                            break
+
+                        content = strip_meta_answer_wrapper(content, prompt)
+                        if not content.strip():
                             failed_candidates.append(model_id)
                             break
 

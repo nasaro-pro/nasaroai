@@ -1901,8 +1901,9 @@
             padding: 8px 12px 12px;
             display: flex;
             flex-direction: column;
-            flex: 1 1 auto;
+            flex: 0 1 auto;
             min-height: 0;
+            max-height: calc(min(calc(100dvh - var(--bottom-offset, 150px) - 96px), 620px) - 42px);
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: contain;
@@ -2068,7 +2069,8 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            min-height: 280px;
+            min-height: 0;
+            height: auto;
             max-height: min(calc(100dvh - var(--bottom-offset, 150px) - 96px), 620px);
         }
 
@@ -2162,8 +2164,9 @@
             left: 50%;
             width: min(780px, 78%);
             margin-left: calc(min(780px, 78%) / -2);
-            min-height: 400px;
+            min-height: 0;
             max-height: min(560px, 62vh);
+            height: auto;
             background: #fff;
             border: 1px solid #e5e7eb;
             border-left: 5px solid #9ca3af;
@@ -2258,8 +2261,8 @@
         }
 
         .debate-card-body {
-            flex: 1 1 auto;
-            min-height: 320px;
+            flex: 0 1 auto;
+            min-height: 0;
             max-height: 440px;
             overflow-y: auto;
             overflow-x: hidden;
@@ -2822,8 +2825,9 @@
                 top: auto;
                 width: 100% !important;
                 margin: 0 0 12px !important;
-                min-height: 280px;
+                min-height: 0;
                 max-height: min(520px, 58vh);
+                height: auto;
                 transform: none !important;
                 opacity: 1 !important;
                 z-index: 1 !important;
@@ -2835,7 +2839,7 @@
             }
             .debate-stage.debate-list-mode .debate-card-body {
                 max-height: min(380px, 42vh);
-                min-height: 200px;
+                min-height: 0;
                 font-size: 15px;
                 padding: 14px 16px;
                 overflow-y: auto;
@@ -10161,6 +10165,42 @@
             return element?.innerText || element?.textContent || "";
         }
 
+        function stripMetaAnswerPreamble(text, model) {
+            if (!text) return text;
+            const label = String(model || "").trim();
+            const s = String(text).replace(/\r\n/g, "\n");
+            const lines = s.split("\n");
+            const out = [];
+            let started = false;
+            const metaLine = /^(?:질문\s*분석|question\s*analysis|the user|사용자(?:가|는|의)?|this (?:is|appears)|입력(?:된|한)?|요청(?:은|을)?|분석(?:하면|결과)?)/i;
+            const metaHint = /(?:분석|analysis|greeting|인사|말했|said|meaning|의미|해석|casual|질문|message|입력|user|사용자)/i;
+            for (const line of lines) {
+                const t = line.trim();
+                if (!started) {
+                    if (!t) continue;
+                    if (metaLine.test(t)) continue;
+                    if (t.length < 160 && metaHint.test(t) && /(?:user|사용자|you|입력|질문|message|greeting|인사|분석|analysis)/i.test(t)) continue;
+                    started = true;
+                }
+                out.push(line);
+            }
+            const result = out.join("\n").trim();
+            if (!result && label === "xAI") return s.trim();
+            return result || s.trim();
+        }
+
+        function compareStackNeedsScroll(stack) {
+            return !!(stack && stack.scrollHeight > stack.clientHeight + 1);
+        }
+
+        function fitCompareStackScroll(stack) {
+            if (!stack) return;
+            if (!compareStackNeedsScroll(stack)) {
+                stack.scrollTop = 0;
+                if (stack.id) compareScrollPins.set(stack.id, 0);
+            }
+        }
+
         function getBubbleScrollTop(stack, bubble) {
             if (!stack || !bubble) return 0;
             return bubble.getBoundingClientRect().top - stack.getBoundingClientRect().top + stack.scrollTop;
@@ -10206,6 +10246,10 @@
 
         function pinComparePairScroll(stack, pair) {
             if (!stack || !pair) return;
+            if (!compareStackNeedsScroll(stack)) {
+                fitCompareStackScroll(stack);
+                return;
+            }
             const bubble = pair.querySelector(".compare-q-bubble") || pair;
             const apply = () => {
                 stack.scrollTop = Math.max(0, getBubbleScrollTop(stack, bubble) - 4);
@@ -11980,6 +12024,12 @@
         }
 
         function updateCompareCard(model, content, isError = false, turnIndex = compareCurrentTurnIndex, opts = {}) {
+            if (!isError && opts.final === true) {
+                content = stripMetaAnswerPreamble(content, model);
+                const turn = compareTurns[turnIndex];
+                if (turn?.responses) turn.responses[model] = content;
+                if (compareResponses && turnIndex === compareCurrentTurnIndex) compareResponses[model] = content;
+            }
             const slug = compareContentSlug(turnIndex, model);
             const element = document.getElementById(`content-${slug}`);
             const streaming = opts.final !== true && !isError;
@@ -12003,7 +12053,8 @@
                 if (stack && pair) {
                     ensureCompareStackScrollGuard(stack);
                     if (opts.final === true) {
-                        pinComparePairScroll(stack, pair);
+                        fitCompareStackScroll(stack);
+                        if (compareStackNeedsScroll(stack)) pinComparePairScroll(stack, pair);
                     } else if (streaming) {
                         if (!compareScrollPins.has(stack.id)) pinComparePairScroll(stack, pair);
                         maintainCompareScrollPin(stack);
@@ -12313,7 +12364,10 @@
                 element.classList.add("hidden-right");
             }
 
-            const body = (listMode || isActive) ? card.content : summarizeOneLine(card.content);
+            const bodyRaw = (listMode || isActive) ? card.content : summarizeOneLine(card.content);
+            const body = (listMode || isActive)
+                ? stripMetaAnswerPreamble(bodyRaw, card.model || card.actual_label || card.requested_label)
+                : bodyRaw;
             const debugId = `debug-${card.id}`;
             element.innerHTML = `
                 <div class="debate-card-header" style="color: ${isFailed ? "#dc2626" : color};">
