@@ -7694,14 +7694,27 @@
 
         async function bootstrapApiCheck() {
             try {
-                const res = await apiFetch("/models/info");
-                if (!res.ok) {
+                const [infoRes, healthRes] = await Promise.all([
+                    apiFetch("/models/info"),
+                    apiFetch("/health"),
+                ]);
+                if (!infoRes.ok && !healthRes.ok) {
                     showToast("서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.", "error", 5000);
                     return;
                 }
-                const data = await res.json();
-                if (data.error) {
-                    showToast("AI API 오류: " + data.error, "warn", 6000);
+                if (infoRes.ok) {
+                    const data = await infoRes.json();
+                    if (data.error) {
+                        showToast("AI 모델 목록 오류: " + data.error, "warn", 6000);
+                    }
+                }
+                if (healthRes.ok) {
+                    const h = await healthRes.json();
+                    if (!h.openrouter_configured) {
+                        showToast(h.hint || "OPENROUTER_API_KEY가 설정되지 않았습니다. Railway Variables를 확인하세요.", "error", 8000);
+                    } else if (h.openrouter_key_valid === false && h.hint) {
+                        showToast("AI API: " + h.hint, "warn", 8000);
+                    }
                 }
             } catch {
                 showToast("서버에 연결할 수 없습니다.", "error", 5000);

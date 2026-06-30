@@ -1985,6 +1985,8 @@ async def request_chat_completion(
     persona: str,
     prompt: str,
     max_tokens: int | None,
+    *,
+    headers: dict[str, str] | None = None,
 ) -> httpx.Response:
     config = get_label_provider_config(label)
     if config.provider != "openrouter" and config.official_model_id and config.official_api_base_url:
@@ -1994,9 +1996,10 @@ async def request_chat_completion(
         url = OPENROUTER_CHAT_URL
         model = model_id
 
+    hdrs = headers if headers is not None else build_openrouter_headers()
     return await client.post(
         url,
-        headers=build_openrouter_headers(),
+        headers=hdrs,
         json=build_chat_payload(model, persona, prompt, stream=False, max_tokens=max_tokens),
     )
 
@@ -2006,6 +2009,8 @@ async def final_attempt_model_call(
     requested_model: str,
     failed_candidates: list[str],
     excluded_models: set[str] | None = None,
+    *,
+    headers: dict[str, str] | None = None,
 ) -> ModelCallResult | None:
     """Last resort: try unused free models with a short prompt before giving up."""
     persona = PERSONAS[label]
@@ -2018,7 +2023,7 @@ async def final_attempt_model_call(
         try:
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                 response = await request_chat_completion(
-                    client, label, model_id, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200
+                    client, label, model_id, persona, FINAL_ATTEMPT_PROMPT, max_tokens=200, headers=headers
                 )
         except httpx.HTTPError as exc:
             logger.warning("Final attempt request failed label=%s model=%s error=%s", label, model_id, exc)
@@ -2063,6 +2068,16 @@ async def _call_ai_model_core(
     await ensure_model_cache_fresh()
     persona = PERSONAS[label]
 
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        return make_failed_result(
+            requested_label=label,
+            requested_model=MODEL_MAPPING.get(label, LAST_RESORT_MODEL),
+            actual_model="",
+            failed_candidates=[],
+            error=header_error,
+        )
+
     candidates = build_model_try_order(label, excluded_models)
     if not candidates:
         return make_failed_result(
@@ -2079,7 +2094,9 @@ async def _call_ai_model_core(
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         for model_id in candidates:
             try:
-                response = await request_chat_completion(client, label, model_id, persona, prompt, max_tokens)
+                response = await request_chat_completion(
+                    client, label, model_id, persona, prompt, max_tokens, headers=headers
+                )
             except httpx.HTTPError as exc:
                 logger.warning("OpenRouter request failed label=%s model=%s error=%s", label, model_id, exc)
                 failed_candidates.append(model_id)
@@ -2103,7 +2120,9 @@ async def _call_ai_model_core(
                 )
                 await asyncio.sleep(RATE_LIMIT_RETRY_DELAY_SECONDS)
                 try:
-                    response = await request_chat_completion(client, label, model_id, persona, prompt, max_tokens)
+                    response = await request_chat_completion(
+                        client, label, model_id, persona, prompt, max_tokens, headers=headers
+                    )
                 except httpx.HTTPError as exc:
                     logger.warning("OpenRouter retry failed label=%s model=%s error=%s", label, model_id, exc)
                     failed_candidates.append(model_id)
@@ -2166,7 +2185,7 @@ async def _call_ai_model_core(
         final_result = None
     else:
         final_result = await final_attempt_model_call(
-            label, requested_model, failed_candidates, excluded_models=excluded_models
+            label, requested_model, failed_candidates, excluded_models=excluded_models, headers=headers
         )
     if final_result is not None:
         return final_result
@@ -3964,7 +3983,7 @@ async def compare_summary(data: CompareSummaryRequest, request: Request) -> dict
         '"reason":"왜 이 AI를 추천하는지 2문장"}'
     )
     labels = ranked_labels()
-    summary_label = labels[0] if labels else "GPT"
+    summary_label = labels[0] if labels else "OpenAI"
     result = await call_ai_best(prompt, max_tokens=650, preferred_labels=[summary_label])
     if not result.success:
         raise HTTPException(status_code=502, detail=result.error or USER_FACING_FAILURE_MSG)
@@ -4024,7 +4043,7 @@ async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request
         '"summary":"라운드 전체 요약 (5~7문장, 질문 이해·핵심 결론 포함)"}'
     )
     labels = ranked_labels()
-    summary_label = labels[0] if labels else "GPT"
+    summary_label = labels[0] if labels else "OpenAI"
     result = await call_ai_best(prompt, max_tokens=900, preferred_labels=[summary_label])
     if not result.success:
         raise HTTPException(status_code=502, detail=result.error or USER_FACING_FAILURE_MSG)
@@ -4052,7 +4071,31 @@ async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    api_key = get_openrouter_api_key()
+    payload: dict = {
+        "status": "ok",
+        "openrouter_configured": bool(api_key),
+        "public_url": public_app_url(),
+        "hosting": "railway" if os.environ.get("RAILWAY_PUBLIC_DOMAIN") else (
+            "render" if os.environ.get("RENDER_EXTERNAL_URL") else "unknown"
+        ),
+    }
+    if api_key:
+        payload["openrouter_key_source"] = get_openrouter_key_source()
+        try:
+            valid, err = await verify_openrouter_auth()
+            payload["openrouter_key_valid"] = valid
+            if err:
+                payload["hint"] = err
+        except Exception as exc:
+            payload["openrouter_key_valid"] = False
+            payload["hint"] = f"OpenRouter 검증 오류: {exc.__class__.__name__}"
+    else:
+        payload["openrouter_key_valid"] = False
+        payload["hint"] = (
+            "Railway Variables에 OPENROUTER_API_KEY(sk-or-v1-…)를 설정한 뒤 재배포하세요."
+        )
+    return payload
 
 
 @app.get("/models/info")
@@ -4081,14 +4124,24 @@ async def models_info() -> dict:
     }
 
 
-async def check_model_health(semaphore: asyncio.Semaphore, model_id: str) -> tuple[str, str]:
+async def check_model_health(
+    semaphore: asyncio.Semaphore,
+    model_id: str,
+    *,
+    headers: dict[str, str] | None = None,
+) -> tuple[str, str]:
     async with semaphore:
         await asyncio.sleep(HEALTHCHECK_DELAY_SECONDS)
+        hdrs = headers
+        if hdrs is None:
+            hdrs, err = openrouter_headers_or_error()
+            if err:
+                return model_id, "실패(API키)"
         try:
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                 response = await client.post(
                     OPENROUTER_CHAT_URL,
-                    headers=build_openrouter_headers(),
+                    headers=hdrs,
                     json={
                         "model": model_id,
                         "max_tokens": 5,
@@ -4106,9 +4159,14 @@ async def check_model_health(semaphore: asyncio.Semaphore, model_id: str) -> tup
 @app.get("/models/health")
 async def models_health() -> dict[str, str]:
     await ensure_model_cache_fresh()
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        return {mid: header_error[:80] for mid in unique(
+            [model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates]
+        )}
     semaphore = asyncio.Semaphore(HEALTHCHECK_CONCURRENCY)
     model_ids = unique([model_id for candidates in MODEL_CANDIDATES.values() for model_id in candidates])
-    results = await asyncio.gather(*(check_model_health(semaphore, model_id) for model_id in model_ids))
+    results = await asyncio.gather(*(check_model_health(semaphore, model_id, headers=headers) for model_id in model_ids))
     return dict(results)
 
 
@@ -4122,13 +4180,25 @@ async def refresh_label_health(force: bool = False) -> None:
         return
 
     await ensure_model_cache_fresh()
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        LABEL_HEALTH.clear()
+        for label in COMPANY_LABELS:
+            LABEL_HEALTH[label] = {
+                "model": MODEL_MAPPING.get(label, ""),
+                "status": header_error[:80],
+                "ok": False,
+            }
+        LABEL_HEALTH_REFRESHED_AT = time.time()
+        return
+
     semaphore = asyncio.Semaphore(HEALTHCHECK_CONCURRENCY)
 
     async def check_label(label: str) -> tuple[str, dict]:
         primary = MODEL_MAPPING.get(label)
         if not primary:
             return label, {"model": "", "status": "미설정", "ok": False}
-        model_id, status = await check_model_health(semaphore, primary)
+        model_id, status = await check_model_health(semaphore, primary, headers=headers)
         return label, {"model": model_id, "status": status, "ok": status == "정상"}
 
     pairs = await asyncio.gather(*(check_label(label) for label in COMPANY_LABELS))
@@ -4228,7 +4298,12 @@ async def agent_step(request: AgentStepRequest, http_request: Request):
 
     await ensure_model_cache_fresh()
     models = _resolve_agent_models()
-    headers = build_openrouter_headers()
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": header_error},
+        )
 
     async with AGENT_STEP_SEMAPHORE:
         try:
@@ -4272,7 +4347,12 @@ async def agent_task(request: AgentRequest, http_request: Request):
     await ensure_model_cache_fresh()
     model = _resolve_agent_models()[0]
     headless = os.environ.get("AGENT_HEADLESS", "true").lower() != "false"
-    headers = build_openrouter_headers()
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": header_error},
+        )
     start_url = _extract_start_url(query)
 
     async with AGENT_LOCK:
@@ -4359,7 +4439,12 @@ async def agent_ask(request: AgentAskRequest, http_request: Request):
 
     await ensure_model_cache_fresh()
     models = _resolve_agent_models()
-    headers = build_openrouter_headers()
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": header_error},
+        )
 
     history_ctx = ""
     for item in (request.history or [])[-3:]:
