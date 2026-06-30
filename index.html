@@ -6869,8 +6869,13 @@
                 root.appendChild(card);
                 card.querySelector(".compare-copy-btn")?.addEventListener("click", () => {
                     const stack = document.getElementById(`compare-qa-stack-${key}`);
-                    const lastContent = stack?.querySelector(".compare-content:last-child");
+                    const contents = stack?.querySelectorAll(".compare-content") || [];
+                    const lastContent = contents[contents.length - 1];
                     const text = getAiAnswerPlainText(lastContent);
+                    if (!text.trim()) {
+                        showToast("복사할 답변이 없습니다.", "error");
+                        return;
+                    }
                     navigator.clipboard.writeText(text).then(() => showToast("답변을 복사했습니다.", "success")).catch(() => showToast("복사 실패", "error"));
                 });
             });
