@@ -1979,6 +1979,9 @@
             background: #1e1b4b;
             border-color: #4c1d95;
         }
+        @media (max-width: 640px) {
+            .compare-layout-picker { display: none !important; }
+        }
 
         .compare-summary-bar {
             font-size: 13px;
@@ -4093,28 +4096,30 @@
             flex-wrap: wrap;
             align-items: stretch;
             justify-content: stretch;
-            gap: 6px;
+            gap: 4px;
             width: 100%;
             padding: 0;
-            margin: 0 0 6px;
+            margin: 0;
+            order: 2;
         }
         .dock-result-actions-slot.has-actions {
             display: flex;
             pointer-events: auto;
-            padding: 6px 4px;
-            border-radius: 10px;
-            background: rgba(245, 243, 255, 0.96);
-            border: 1px solid #ddd6fe;
-            box-shadow: 0 2px 12px rgba(91, 33, 182, 0.08);
+            padding: 4px 0 0;
+            margin: 0;
+            border-radius: 0;
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            background: transparent;
+            box-shadow: none;
         }
         html[data-theme="dark"] .dock-result-actions-slot.has-actions {
-            background: rgba(30, 27, 46, 0.96);
-            border-color: #4c1d95;
+            background: transparent;
+            border-color: #374151;
         }
-        .dock-shell > .dock-result-actions-slot.has-actions {
-            display: flex;
-            margin: 0 8px 6px;
-            border-radius: 12px;
+        .dock-inner:has(.dock-result-actions-slot.has-actions) .dock-compose-row {
+            margin-top: 0;
+            padding-top: 4px;
         }
         .dock-btn-row { order: 1; }
         .dock-compose-row { order: 3; }
@@ -4187,7 +4192,10 @@
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
             color: #6d28d9;
             cursor: pointer;
-            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -4818,23 +4826,32 @@
         .discord-workspace.active { display: flex; flex-direction: column; }
         .discord-layout {
             display: grid;
-            grid-template-columns: 220px 1fr;
+            grid-template-columns: 260px 1fr;
             flex: 1;
             min-height: 0;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
+            border: none;
+            border-radius: 0;
             overflow: hidden;
             background: #fff;
-            margin: 0 12px 12px;
-            box-shadow: 0 2px 12px rgba(15,23,42,0.06);
+            margin: 0;
+            box-shadow: none;
         }
         @media (min-width: 768px) {
             .discord-layout.chat-sidebar-mode { grid-template-columns: 1fr; }
             .discord-layout.chat-sidebar-mode .discord-sidebar { display: none; }
         }
         @media (max-width: 640px) {
-            .discord-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; margin: 0 8px 8px; }
-            .discord-sidebar { max-height: 120px; }
+            .discord-workspace {
+                height: calc(100dvh - var(--header-height, 72px) - var(--bottom-offset, 56px));
+                min-height: 0;
+            }
+            .discord-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr;
+            }
+            .discord-layout:not(.chat-room-active) .discord-main { display: none; }
+            .discord-layout.chat-room-active .discord-sidebar { display: none; }
+            .discord-sidebar { max-height: none; border-right: none; }
         }
         .discord-sidebar {
             background: #f9fafb;
@@ -4896,22 +4913,122 @@
             background: #fff;
         }
         .discord-channel-bar {
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-bottom: 1px solid #e5e7eb;
             font-size: 15px;
             font-weight: 700;
             color: #111827;
             background: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 48px;
+            flex-shrink: 0;
         }
+        .chat-mobile-back {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 50%;
+            background: #f3f4f6;
+            color: #374151;
+            font-size: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        @media (max-width: 640px) {
+            .chat-mobile-back { display: inline-flex; }
+        }
+        #chatChannelTitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .discord-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 16px;
+            padding: 12px 14px 16px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
-            min-height: 200px;
+            gap: 6px;
+            min-height: 0;
+            background: linear-gradient(180deg, #f8fafc 0%, #fff 40%);
+            -webkit-overflow-scrolling: touch;
         }
+        .chat-date-divider {
+            align-self: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6b7280;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 4px 12px;
+            margin: 8px 0 4px;
+        }
+        .chat-bubble-row {
+            display: flex;
+            flex-direction: column;
+            max-width: min(82%, 520px);
+            gap: 2px;
+        }
+        .chat-bubble-row.mine {
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+        .chat-bubble-row.theirs {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+        .chat-bubble-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #9ca3af;
+            padding: 0 4px;
+        }
+        .chat-bubble-row.mine .chat-bubble-meta { flex-direction: row-reverse; }
+        .chat-bubble-name { font-weight: 700; color: #6b7280; }
+        .chat-bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+        }
+        .chat-bubble-row.mine .chat-bubble {
+            background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-bubble-row.theirs .chat-bubble {
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #e5e7eb;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #9ca3af;
+            font-size: 14px;
+            text-align: center;
+            padding: 24px;
+        }
+        .chat-typing-indicator {
+            align-self: flex-start;
+            font-size: 12px;
+            color: #9ca3af;
+            padding: 4px 8px;
+            display: none;
+        }
+        .chat-typing-indicator.visible { display: block; }
         .discord-msg-row {
             display: flex;
             gap: 12px;
@@ -4933,33 +5050,42 @@
         .discord-compose {
             display: flex;
             gap: 8px;
-            padding: 12px 16px 16px;
-            background: #f9fafb;
+            padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+            background: #fff;
             border-top: 1px solid #e5e7eb;
+            flex-shrink: 0;
         }
         .discord-compose input {
             flex: 1;
             border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 14px;
-            background: #fff;
+            border-radius: 22px;
+            padding: 11px 16px;
+            font-size: 15px;
+            background: #f9fafb;
             color: #111827;
+        }
+        .discord-compose input:focus {
+            outline: none;
+            border-color: #a78bfa;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
         }
         .discord-compose input::placeholder { color: #9ca3af; }
         .discord-compose button {
             border: none;
-            background: #5865f2;
+            background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
             color: #fff;
             font-weight: 700;
             font-size: 16px;
-            width: 42px;
-            height: 42px;
-            border-radius: 8px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             cursor: pointer;
             flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(91, 33, 182, 0.25);
         }
-        .discord-compose button:hover { background: #4752c4; }
+        .discord-compose button:hover { filter: brightness(1.05); }
+        .discord-compose button:disabled { opacity: 0.5; cursor: not-allowed; }
         .chat-sidebar-tools {
             display: flex;
             gap: 6px;
@@ -5095,12 +5221,39 @@
         }
         .home-saved-item {
             border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            padding: 10px 12px;
+            border-radius: 12px;
+            padding: 12px 14px;
             background: #fff;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .home-saved-item:hover {
+            border-color: #c4b5fd;
+            box-shadow: 0 2px 10px rgba(91, 33, 182, 0.08);
+        }
+        .home-saved-item .home-saved-meta {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+        .home-saved-item .home-saved-preview {
+            font-size: 12px;
+            color: #6b7280;
+            margin: 6px 0 0;
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .home-saved-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 10px;
         }
         .home-saved-item button {
-            margin-top: 8px;
+            margin-top: 0;
             border: none;
             background: #7c3aed;
             color: #fff;
@@ -5109,6 +5262,10 @@
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
+        }
+        .home-saved-item button.secondary {
+            background: #f3f4f6;
+            color: #374151;
         }
         .insta-stories-bar {
             display: flex;
@@ -6152,8 +6309,12 @@
                         <div id="chatRoomList" class="discord-member-list"></div>
                     </aside>
                     <div class="discord-main">
-                        <div class="discord-channel-bar" id="chatChannelTitle">대화방을 선택하세요</div>
+                        <div class="discord-channel-bar" id="chatChannelBar">
+                            <button type="button" id="chatMobileBackBtn" class="chat-mobile-back" aria-label="채팅 목록">←</button>
+                            <span id="chatChannelTitle">대화방을 선택하세요</span>
+                        </div>
                         <div id="chatMessages" class="discord-messages"></div>
+                        <div id="chatTypingIndicator" class="chat-typing-indicator" aria-hidden="true">전송 중…</div>
                         <div class="discord-compose">
                             <input id="chatInput" type="text" placeholder="메시지 입력…" autocomplete="off">
                             <button id="chatSendBtn" type="button" aria-label="전송">➤</button>
@@ -6414,7 +6575,6 @@
         </div>
 
         <div id="dockShell" class="dock-shell">
-            <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
             <div class="dock-agent-row">
                 <button id="agentToggleBtn" class="dock-agent-outside agent-toggle-btn" type="button" data-i18n="mode_agent">🌐 에이전트</button>
             </div>
@@ -6435,6 +6595,7 @@
                         </div>
                         <div class="dock-btn-right" id="dockBtnToolsRight"></div>
                     </div>
+                    <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-compose-row">
                         <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
                         <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
@@ -6534,7 +6695,7 @@
             const NF = window.NasaroFeatures;
             if (mode === "compare") {
                 const modelCount = (NF?.getSelectedModels?.("compare") || getActiveModels()).length || 1;
-                return modelCount + 1;
+                return modelCount;
             }
             if (mode === "debate") {
                 if (!debateStarted) return getDebateRoundCoinCost(true);
@@ -6932,7 +7093,8 @@
         function applyCompareGridLayout() {
             const root = document.getElementById("compareResponses");
             if (!root) return;
-            root.className = `compare-grid compare-cols-${compareGridCols}`;
+            const cols = isMobileCompact() ? 1 : compareGridCols;
+            root.className = `compare-grid compare-cols-${cols}`;
             reorderCompareCardsDom();
         }
 
@@ -7344,7 +7506,6 @@
                 leftCompose.appendChild(parts.ai);
                 if (mobileTools) {
                     mobileTools.append(parts.privacy, parts.voice);
-                    if (currentMode === "compare") mobileTools.append(buildCompareLayoutPicker());
                 }
             } else {
                 leftDock.appendChild(parts.ai);
@@ -7374,7 +7535,7 @@
             updateDockUI();
             updateAuthUI();
             renderSessionHistory();
-            renderResultFilesList();
+            refreshSavedResultsUI();
         }
 
         const COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요.";
@@ -7509,7 +7670,7 @@
                 if (!id && backup) id = backup;
                 const fp = buildDeviceFingerprint();
                 try {
-                    const res = await fetch((API_URL || "") + "/device/register", {
+                    const res = await fetch(resolveApiUrl("/device/register"), {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ fingerprint: fp, device_id: id || "" }),
@@ -7550,6 +7711,55 @@
             return currentUser ? localStorage : sessionStorage;
         }
 
+        let cachedQuotaRemaining = null;
+
+        async function fetchQuotaRemaining(force = false) {
+            if (!force && cachedQuotaRemaining !== null) return cachedQuotaRemaining;
+            try {
+                await ensureDeviceId();
+                const res = await apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId()));
+                if (!res.ok) return null;
+                const q = await res.json();
+                cachedQuotaRemaining = Math.round(q.total?.remaining ?? q.balance ?? 0);
+                return cachedQuotaRemaining;
+            } catch {
+                return null;
+            }
+        }
+
+        async function ensureCompareQuota(modelCount) {
+            const needed = Math.max(1, modelCount);
+            const rem = await fetchQuotaRemaining(true);
+            if (rem !== null && rem < needed) {
+                const msg = `코인이 부족합니다. 비교 ${needed}개 AI에 🪙${needed} 필요 · 보유 🪙${rem}`;
+                showNotice("compareError", msg);
+                showToast(msg, "error");
+                return false;
+            }
+            return true;
+        }
+
+        function getSavedResultPreview(rec) {
+            if (!rec) return "";
+            if (Array.isArray(rec.sections) && rec.sections.length) {
+                return rec.sections.map(s => String(s.body || "").trim()).filter(Boolean).join("\n").slice(0, 160);
+            }
+            return String(rec.payload?.query || rec.answer || rec.body || "").slice(0, 160);
+        }
+
+        function getSavedResultExportBody(rec) {
+            if (!rec) return "";
+            if (Array.isArray(rec.sections) && rec.sections.length) {
+                return rec.sections.map(s => `[${s.heading || ""}]\n${s.body || ""}`).join("\n\n");
+            }
+            return String(rec.answer || rec.body || rec.payload?.query || "");
+        }
+
+        function refreshSavedResultsUI() {
+            renderResultFilesList();
+            renderHomeSaved();
+        }
+
         function loadSavedResults() {
             const loggedIn = authToken || currentUser;
             const key = loggedIn ? SAVED_RESULTS_KEY : SESSION_RESULTS_KEY;
@@ -7573,7 +7783,7 @@
                 if (savedResults.length > 100) savedResults.length = 100;
             }
             localStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(savedResults));
-            renderResultFilesList();
+            refreshSavedResultsUI();
         }
 
         function persistSavedResults() {
@@ -7607,7 +7817,7 @@
                 scheduleUserSync();
                 await NF?.saveOfflineSnapshot?.(record, true);
             }
-            renderResultFilesList();
+            refreshSavedResultsUI();
             showToast(NF?.t?.("save_result_done") || "결과물에 저장했습니다.", "success");
         }
 
@@ -7671,7 +7881,7 @@
                 rec.tags = tagsRaw.split(/[,，]/).map(t => t.trim()).filter(Boolean).slice(0, 8);
                 persistSavedResults();
                 if (currentUser) scheduleUserSync();
-                renderResultFilesList();
+                refreshSavedResultsUI();
                 showToast("분류를 저장했습니다.", "success");
             });
             modal.classList.add("open");
@@ -7743,7 +7953,7 @@
                     if (!NF?.confirmDelete?.()) return;
                     savedResults.splice(idx, 1);
                     persistSavedResults();
-                    renderResultFilesList();
+                    refreshSavedResultsUI();
                 });
                 item.appendChild(dl);
                 item.appendChild(del);
@@ -8144,7 +8354,7 @@
                 refreshSideQuota();
             }
             renderSessionHistory();
-            renderResultFilesList();
+            refreshSavedResultsUI();
             notifyExtensionAuth();
             updateSupportUI();
             refreshSocialWorkspace();
@@ -8154,13 +8364,10 @@
             const el = document.getElementById("sideQuotaBrief");
             if (!el) return;
             try {
-                const res = await apiFetch("/quota?device_id=" + encodeURIComponent(getDeviceId()));
-                if (!res.ok) return;
-                const q = await res.json();
-                const total = q.total || {};
-                const rem = Math.round(total.remaining ?? q.balance ?? 0);
+                const rem = await fetchQuotaRemaining(true);
+                if (rem === null) return;
                 el.textContent = `${COIN}${rem}`;
-                el.title = (q.guest ? "비회원" : "회원") + ` 보유 코인 · AI 1회=🪙1`;
+                el.title = (currentUser ? "회원" : "비회원") + ` 보유 코인 · AI 1회=🪙1`;
             } catch {
                 el.textContent = "";
             }
@@ -8383,7 +8590,7 @@
 
         function classifyFetchError(err, resStatus) {
             if (err?.name === "AbortError") return { kind: "aborted", retryable: true, message: "사용자가 중단했습니다." };
-            if (resStatus === 429) return { kind: "quota", retryable: false, message: "오늘 코인을 모두 사용했습니다." };
+            if (resStatus === 429) return { kind: "quota", retryable: false, message: "코인이 부족합니다. AI 모델 수를 줄이거나 코인을 확인하세요." };
             if (resStatus === 503) return { kind: "server_busy", retryable: true, message: "서버가 바쁩니다. 잠시 후 재시도하세요." };
             const msg = String(err?.message || err || "");
             if (/failed to fetch|network|timeout/i.test(msg)) return { kind: "network", retryable: true, message: "네트워크 오류입니다." };
@@ -8610,7 +8817,7 @@
             if (!confirm("저장된 결과물을 모두 삭제할까요?")) return;
             savedResults = [];
             persistSavedResults();
-            renderResultFilesList();
+            refreshSavedResultsUI();
         });
         document.getElementById("supportInquiryBtn")?.addEventListener("click", async () => {
             if (!authToken || !currentUser) {
@@ -8859,6 +9066,53 @@
             } catch { showToast("요청 실패"); }
         }
 
+        function formatChatTime(iso) {
+            if (!iso) return "";
+            try {
+                const d = new Date(iso);
+                if (Number.isNaN(d.getTime())) return String(iso).slice(11, 16) || iso;
+                return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+            } catch { return ""; }
+        }
+
+        function formatChatDateLabel(iso) {
+            if (!iso) return "";
+            try {
+                const d = new Date(iso);
+                if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+                const today = new Date();
+                const sameDay = d.toDateString() === today.toDateString();
+                if (sameDay) return "오늘";
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+                if (d.toDateString() === yesterday.toDateString()) return "어제";
+                return d.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+            } catch { return String(iso).slice(0, 10); }
+        }
+
+        function updateChatMobileLayout() {
+            const layout = document.getElementById("chatLayout");
+            if (!layout) return;
+            const mobile = window.innerWidth <= 640;
+            layout.classList.toggle("chat-room-active", mobile && !!chatRoomId);
+        }
+
+        function appendChatBubble(box, m) {
+            const mine = !!m.is_mine;
+            const row = document.createElement("div");
+            row.className = "chat-bubble-row" + (mine ? " mine" : " theirs");
+            const time = formatChatTime(m.created_at_iso);
+            const name = m.sender_name || (mine ? "나" : "상대");
+            row.innerHTML = `
+                <div class="chat-bubble-meta">
+                    <span class="chat-bubble-name">${escapeHtml(name)}</span>
+                    <span class="chat-bubble-time">${escapeHtml(time)}</span>
+                </div>
+                <div class="chat-bubble">${escapeHtml(m.body || "")}</div>`;
+            box.appendChild(row);
+            return row;
+        }
+
         function renderChatRoomList(rooms) {
             const lists = ["chatRoomList", "sideMenuChatList"];
             const emptyMsg = rooms.length ? null : "<div style='padding:10px;font-size:11px;color:#949ba4;'>친구를 추가하면 채팅방이 표시됩니다.</div>";
@@ -8912,36 +9166,44 @@
             });
             const titleEl = document.getElementById("chatChannelTitle");
             if (titleEl) {
-                const prefix = roomType === "group" ? "👥 " : "# ";
+                const prefix = roomType === "group" ? "👥 " : "";
                 titleEl.textContent = prefix + (name || "채팅");
             }
             const chatInput = document.getElementById("chatInput");
             if (chatInput) chatInput.placeholder = (name || "채팅") + " 에 메시지…";
+            updateChatMobileLayout();
             loadChatMessages();
         }
 
         async function loadChatMessages() {
             const box = document.getElementById("chatMessages");
-            if (!box || !chatRoomId) return;
+            if (!box || !chatRoomId) {
+                if (box && !chatRoomId) {
+                    box.innerHTML = `<div class="chat-empty-state"><span style="font-size:32px;">💬</span><strong>대화방을 선택하세요</strong><span>왼쪽 목록에서 친구 또는 방을 선택합니다.</span></div>`;
+                }
+                return;
+            }
             try {
                 const res = await apiFetch("/social/chat/room/" + encodeURIComponent(chatRoomId));
                 if (!res.ok) return;
                 const data = await res.json();
                 box.innerHTML = "";
-                (data.messages || []).forEach(m => {
-                    const row = document.createElement("div");
-                    row.className = "discord-msg-row" + (m.is_mine ? " mine" : "");
-                    const initial = (m.sender_name || "?").charAt(0).toUpperCase();
-                    row.innerHTML = `
-                        <span class="discord-member-avatar">${escapeHtml(initial)}</span>
-                        <div class="discord-msg-body">
-                            <div class="discord-msg-head">
-                                <span class="discord-msg-name">${escapeHtml(m.sender_name || "")}</span>
-                                <span class="discord-msg-time">${escapeHtml(m.created_at_iso || "")}</span>
-                            </div>
-                            <div class="discord-msg-text">${escapeHtml(m.body || "")}</div>
-                        </div>`;
-                    box.appendChild(row);
+                const messages = data.messages || [];
+                if (!messages.length) {
+                    box.innerHTML = `<div class="chat-empty-state"><span style="font-size:28px;">👋</span><strong>첫 메시지를 보내보세요</strong><span>Enter로 빠르게 전송할 수 있습니다.</span></div>`;
+                    return;
+                }
+                let lastDate = "";
+                messages.forEach(m => {
+                    const dateKey = (m.created_at_iso || "").slice(0, 10);
+                    if (dateKey && dateKey !== lastDate) {
+                        lastDate = dateKey;
+                        const divider = document.createElement("div");
+                        divider.className = "chat-date-divider";
+                        divider.textContent = formatChatDateLabel(m.created_at_iso);
+                        box.appendChild(divider);
+                    }
+                    appendChatBubble(box, m);
                 });
                 box.scrollTop = box.scrollHeight;
             } catch {}
@@ -8950,8 +9212,24 @@
         async function sendChatMessage() {
             if (!requireLogin() || !chatRoomId) return;
             const input = document.getElementById("chatInput");
+            const sendBtn = document.getElementById("chatSendBtn");
+            const typing = document.getElementById("chatTypingIndicator");
             const body = (input?.value || "").trim();
             if (!body) return;
+            const box = document.getElementById("chatMessages");
+            const empty = box?.querySelector(".chat-empty-state");
+            if (empty) empty.remove();
+            const optimistic = {
+                is_mine: true,
+                sender_name: currentUser?.display_name || currentUser?.username || "나",
+                body,
+                created_at_iso: new Date().toISOString(),
+            };
+            if (box) appendChatBubble(box, optimistic);
+            if (box) box.scrollTop = box.scrollHeight;
+            if (input) input.value = "";
+            if (sendBtn) sendBtn.disabled = true;
+            if (typing) typing.classList.add("visible");
             try {
                 const res = await apiFetch("/social/chat/room/" + encodeURIComponent(chatRoomId), {
                     method: "POST",
@@ -8961,11 +9239,17 @@
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
                     showToast(typeof data.detail === "string" ? data.detail : "전송 실패");
+                    await loadChatMessages();
                     return;
                 }
-                if (input) input.value = "";
                 await loadChatMessages();
-            } catch { showToast("전송 실패"); }
+            } catch {
+                showToast("전송 실패");
+                await loadChatMessages();
+            } finally {
+                if (sendBtn) sendBtn.disabled = false;
+                if (typing) typing.classList.remove("visible");
+            }
         }
 
         function startChatPoll() {
@@ -8981,7 +9265,19 @@
 
         document.getElementById("chatSendBtn")?.addEventListener("click", sendChatMessage);
         document.getElementById("chatInput")?.addEventListener("keydown", e => {
-            if (e.key === "Enter") { e.preventDefault(); sendChatMessage(); }
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+        });
+        document.getElementById("chatMobileBackBtn")?.addEventListener("click", () => {
+            chatRoomId = null;
+            updateChatMobileLayout();
+            const box = document.getElementById("chatMessages");
+            if (box) box.innerHTML = `<div class="chat-empty-state"><span style="font-size:32px;">💬</span><strong>대화방을 선택하세요</strong><span>목록에서 친구 또는 방을 선택합니다.</span></div>`;
+            const titleEl = document.getElementById("chatChannelTitle");
+            if (titleEl) titleEl.textContent = "대화방을 선택하세요";
+            document.querySelectorAll(".chat-user-btn, .discord-member-btn").forEach(btn => btn.classList.remove("active"));
+        });
+        window.addEventListener("resize", () => {
+            if (typeof updateChatMobileLayout === "function") updateChatMobileLayout();
         });
         let chatSearchTimer = null;
         document.getElementById("chatUserSearch")?.addEventListener("input", e => {
@@ -9475,22 +9771,50 @@
             if (!grid) return;
             loadSavedResults();
             const items = savedResults || [];
+            const NF = window.NasaroFeatures;
             if (!items.length) {
                 grid.innerHTML = "<div class='works-empty'>저장된 결과물이 없습니다. AI 답변에서 「저장」을 사용하세요.</div>";
                 return;
             }
             grid.innerHTML = "";
-            items.slice(0, 30).forEach((item, idx) => {
+            items.slice(0, 30).forEach((rec, idx) => {
                 const div = document.createElement("div");
                 div.className = "home-saved-item";
-                const title = item.title || item.question?.slice(0, 40) || "저장물";
-                const preview = (item.answer || item.body || "").slice(0, 120);
-                div.innerHTML = `<strong>${escapeHtml(title)}</strong><p style="font-size:12px;color:#6b7280;margin:6px 0 0;">${escapeHtml(preview)}</p>`;
+                const title = rec.title || rec.kind || "저장물";
+                const preview = getSavedResultPreview(rec);
+                const tagLine = (rec.tags || []).length ? ` · #${rec.tags.slice(0, 2).join(" #")}` : "";
+                div.innerHTML = `
+                    <strong>${escapeHtml(title)}</strong>
+                    <div class="home-saved-meta">${escapeHtml(rec.folder || "기본")} · ${escapeHtml(rec.saved_at || "")} · ${escapeHtml(rec.kind || "")}${escapeHtml(tagLine)}</div>
+                    <p class="home-saved-preview">${escapeHtml(preview || "내용 없음")}</p>`;
+                div.addEventListener("click", e => {
+                    if (e.target.closest("button")) return;
+                    renderResultFileViewer(rec, idx);
+                });
+                const actions = document.createElement("div");
+                actions.className = "home-saved-actions";
+                const openBtn = document.createElement("button");
+                openBtn.type = "button";
+                openBtn.className = "secondary";
+                openBtn.textContent = "열기";
+                openBtn.addEventListener("click", e => { e.stopPropagation(); renderResultFileViewer(rec, idx); });
+                const expBtn = document.createElement("button");
+                expBtn.type = "button";
+                expBtn.className = "secondary";
+                expBtn.textContent = "다운로드";
+                expBtn.addEventListener("click", e => {
+                    e.stopPropagation();
+                    NF?.showExportFormatMenu?.(expBtn, title, rec.sections || []);
+                });
                 const postBtn = document.createElement("button");
                 postBtn.type = "button";
                 postBtn.textContent = "작업물로 등록";
-                postBtn.addEventListener("click", () => postSavedAsWork(title, item.answer || item.body || ""));
-                div.appendChild(postBtn);
+                postBtn.addEventListener("click", e => {
+                    e.stopPropagation();
+                    postSavedAsWork(title, getSavedResultExportBody(rec));
+                });
+                actions.append(openBtn, expBtn, postBtn);
+                div.appendChild(actions);
                 grid.appendChild(div);
             });
         }
@@ -10055,7 +10379,7 @@
 
         // 저장된 대화 기록 로드
         loadSavedResults();
-        renderResultFilesList();
+        refreshSavedResultsUI();
         renderSessionHistory();
         bootstrapAuth().then(() => {
             renderFloatChats();
@@ -10163,7 +10487,7 @@
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
                 const cmpLabel = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
                 dockPrimaryBtn.textContent = dockBtnLabel(cmpLabel.replace(/\s*🪙\d+$/, ""), getModeCoinCost("compare"));
-                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · AI ${getModeCoinCost("compare")}${COIN} (모델+요약)`;
+                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · AI ${getModeCoinCost("compare")}${COIN} (모델당 ${COIN}1)`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = false;
                 mainInput.disabled = false;
@@ -12384,6 +12708,10 @@
             const message = mainInput.value.trim();
             if (!message) return;
 
+            const activeModels = getActiveModels();
+            await ensureDeviceId();
+            if (!(await ensureCompareQuota(activeModels.length))) return;
+
             mainInput.value = "";
             autoResizeInput();
 
@@ -12401,7 +12729,6 @@
             if (compareHint) compareHint.style.display = "none";
 
             const isFirstTurn = turnIndex === 0;
-            const activeModels = getActiveModels();
             if (isFirstTurn) {
                 compareScrollPins.clear();
                 document.getElementById("compareResponses").innerHTML = "";
@@ -12446,6 +12773,7 @@
 
             showNotice("compareLoading", "");
             dockPrimaryBtn.disabled = false;
+            cachedQuotaRemaining = null;
             refreshSideQuota();
 
             const sections = activeModels.map(m => ({ heading: m, body: responses[m] || "" }));
@@ -13044,7 +13372,7 @@
             wirePreviewModals();
             renderActiveCollabSidebar();
             loadSavedResults();
-            renderResultFilesList();
+            refreshSavedResultsUI();
             renderCollabPresetSidebar();
             renderSessionHistory();
             initCompareSuggestions();
