@@ -7156,9 +7156,10 @@
             if (!parts) return;
             if (isMobileCompact()) {
                 leftCompose.appendChild(parts.ai);
+                if (mobileTools) mobileTools.append(parts.privacy, parts.voice);
             } else {
                 leftDock.appendChild(parts.ai);
-                rightDock.append(parts.voice);
+                rightDock.append(parts.privacy, parts.voice);
             }
             const newChatBtn = document.getElementById("newChatBtn");
             if (newChatBtn) newChatBtn.classList.toggle("is-hidden", isMobileCompact());

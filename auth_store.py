@@ -1408,11 +1408,24 @@ def get_public_share(share_id: str) -> dict[str, Any] | None:
 ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 8
 
 
+def _clean_env_value(raw: str) -> str:
+    return (raw or "").strip().strip('"').strip("'")
+
+
+def get_admin_password_from_env() -> str:
+    return _clean_env_value(os.environ.get("ADMIN_PASSWORD", ""))
+
+
+def is_admin_password_configured() -> bool:
+    return bool(get_admin_password_from_env())
+
+
 def verify_admin_password(password: str) -> bool:
-    expected = os.getenv("ADMIN_PASSWORD", "").strip()
+    expected = get_admin_password_from_env()
     if not expected:
         return False
-    return secrets.compare_digest(str(password), str(expected))
+    supplied = _clean_env_value(str(password or ""))
+    return secrets.compare_digest(supplied, expected)
 
 
 def create_admin_session() -> str:

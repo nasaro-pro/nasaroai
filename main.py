@@ -89,6 +89,7 @@ from auth_store import (
     send_room_message,
     send_work_coin_tip,
     update_user_profile,
+    is_admin_password_configured,
     verify_admin_password,
     verify_admin_token,
 )
@@ -4111,6 +4112,7 @@ async def health() -> dict:
     api_key = get_openrouter_api_key()
     payload: dict = {
         "status": "ok",
+        "admin_password_configured": is_admin_password_configured(),
         "openrouter_configured": bool(api_key),
         "public_url": public_app_url(),
         "hosting": "railway" if os.environ.get("RAILWAY_PUBLIC_DOMAIN") else (
@@ -4995,6 +4997,14 @@ def serve_admin() -> FileResponse:
 
 @app.post("/admin/login")
 def admin_login(body: AdminLoginRequest) -> dict:
+    if not is_admin_password_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "서버에 ADMIN_PASSWORD 환경 변수가 설정되지 않았습니다. "
+                "Railway → Variables에 ADMIN_PASSWORD를 추가한 뒤 재배포하세요."
+            ),
+        )
     if not verify_admin_password(body.password):
         raise HTTPException(status_code=401, detail="관리자 비밀번호가 올바르지 않습니다.")
     token = create_admin_session()
