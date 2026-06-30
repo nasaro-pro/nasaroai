@@ -1939,13 +1939,6 @@ def openrouter_headers_or_error() -> tuple[dict[str, str] | None, str | None]:
         return None, openrouter_auth_failure_message()
 
 
-def build_messages(persona: str, prompt: str) -> list[dict[str, str]]:
-    return [
-            {"role": "system", "content": persona},
-        {"role": "user", "content": prompt},
-    ]
-
-
 def build_compare_messages(
     persona: str,
     prompt: str,
@@ -1973,10 +1966,9 @@ def build_chat_payload(
     max_tokens: int | None = None,
     history: list | None = None,
 ) -> dict:
-    msg_builder = build_compare_messages if history else build_messages
     payload: dict = {
         "model": model_id,
-        "messages": msg_builder(persona, prompt, history),
+        "messages": build_compare_messages(persona, prompt, history),
         "stream": stream,
     }
     if max_tokens is not None:
