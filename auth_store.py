@@ -1071,6 +1071,26 @@ def _initial_coins_for_subject(subject: str) -> float:
     return MEMBER_INITIAL_COINS if (subject or "").startswith("user:") else GUEST_INITIAL_COINS
 
 
+def _ensure_coin_balance_locked(conn: sqlite3.Connection, subject: str) -> float:
+    clean = (subject or "").strip()
+    if not clean:
+        return 0.0
+    row = conn.execute(
+        "SELECT balance FROM coin_balance WHERE subject = ?",
+        (clean,),
+    ).fetchone()
+    if row is not None:
+        return float(row["balance"])
+    initial = _initial_coins_for_subject(clean)
+    now = time.time()
+    conn.execute(
+        "INSERT INTO coin_balance (subject, balance, updated_at) VALUES (?, ?, ?)",
+        (clean, initial, now),
+    )
+    conn.commit()
+    return initial
+
+
 def ensure_coin_balance(subject: str) -> float:
     clean = (subject or "").strip()
     if not clean:
@@ -1078,20 +1098,7 @@ def ensure_coin_balance(subject: str) -> float:
     with _lock:
         conn = _connect()
         try:
-            row = conn.execute(
-                "SELECT balance FROM coin_balance WHERE subject = ?",
-                (clean,),
-            ).fetchone()
-            if row is not None:
-                return float(row["balance"])
-            initial = _initial_coins_for_subject(clean)
-            now = time.time()
-            conn.execute(
-                "INSERT INTO coin_balance (subject, balance, updated_at) VALUES (?, ?, ?)",
-                (clean, initial, now),
-            )
-            conn.commit()
-            return initial
+            return _ensure_coin_balance_locked(conn, clean)
         finally:
             conn.close()
 
@@ -1402,7 +1409,7 @@ ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 8
 
 
 def verify_admin_password(password: str) -> bool:
-    expected = os.getenv("ADMIN_PASSWORD", "050907").strip()
+    expected = os.getenv("ADMIN_PASSWORD", "").strip()
     if not expected:
         return False
     return secrets.compare_digest(str(password), str(expected))
@@ -2564,43 +2571,6 @@ def create_public_work(user_id: int, author_name: str, title: str, body: str) ->
     })
 
 
-def toggle_work_like(work_id: int, user_id: int) -> dict[str, Any]:
-    now = time.time()
-    with _lock:
-        conn = _connect()
-        try:
-            exists = conn.execute(
-                "SELECT 1 FROM public_works WHERE id = ?",
-                (work_id,),
-            ).fetchone()
-            if not exists:
-                raise ValueError("작업을 찾을 수 없습니다.")
-            liked = conn.execute(
-                "SELECT 1 FROM work_likes WHERE work_id = ? AND user_id = ?",
-                (work_id, user_id),
-            ).fetchone()
-            if liked:
-                conn.execute(
-                    "DELETE FROM work_likes WHERE work_id = ? AND user_id = ?",
-                    (work_id, user_id),
-                )
-                liked_by_me = False
-            else:
-                conn.execute(
-                    "INSERT INTO work_likes (work_id, user_id, created_at) VALUES (?, ?, ?)",
-                    (work_id, user_id, now),
-                )
-                liked_by_me = True
-            conn.commit()
-            count_row = conn.execute(
-                "SELECT COUNT(*) AS c FROM work_likes WHERE work_id = ?",
-                (work_id,),
-            ).fetchone()
-        finally:
-            conn.close()
-    return {"work_id": work_id, "liked_by_me": liked_by_me, "like_count": int(count_row["c"] or 0)}
-
-
 def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit or 80), 200))
     with _lock:
@@ -2663,32 +2633,6 @@ def add_work_comment(work_id: int, user_id: int, author_name: str, body: str) ->
         "created_at": now,
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(now)),
     }
-
-
-def list_chat_users(exclude_user_id: int, limit: int = 50) -> list[dict[str, Any]]:
-    limit = max(1, min(int(limit or 50), 100))
-    with _lock:
-        conn = _connect()
-        try:
-            rows = conn.execute(
-                """
-                SELECT id, display_name, email, user_email, created_at
-                FROM users
-                WHERE id != ?
-                ORDER BY display_name ASC, id ASC
-                LIMIT ?
-                """,
-                (exclude_user_id, limit),
-            ).fetchall()
-        finally:
-            conn.close()
-    out: list[dict[str, Any]] = []
-    for r in rows:
-        name = (r["display_name"] or "").strip()
-        if not name:
-            name = (r["user_email"] or r["email"] or f"user{r['id']}").split("@")[0]
-        out.append({"id": r["id"], "display_name": name})
-    return out
 
 
 def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict[str, Any]]:
@@ -3014,34 +2958,38 @@ def respond_friend_request(user_id: int, from_user_id: int, accept: bool) -> dic
     return {"success": True, "accepted": accept}
 
 
+def _confirm_pending_work_tips_locked(conn: sqlite3.Connection, now: float) -> None:
+    rows = conn.execute(
+        """
+        SELECT t.work_id, t.from_user_id, t.amount, w.user_id AS author_id
+        FROM work_coin_tips t
+        JOIN public_works w ON w.id = t.work_id
+        WHERE t.status = 'pending' AND t.confirm_after <= ?
+        """,
+        (now,),
+    ).fetchall()
+    for r in rows:
+        author_subject = f"user:{r['author_id']}"
+        _ensure_coin_balance_locked(conn, author_subject)
+        conn.execute(
+            "UPDATE coin_balance SET balance = balance + ?, updated_at = ? WHERE subject = ?",
+            (float(r["amount"]), now, author_subject),
+        )
+        conn.execute(
+            """
+            UPDATE work_coin_tips SET status = 'confirmed', confirmed_at = ?
+            WHERE work_id = ? AND from_user_id = ?
+            """,
+            (now, r["work_id"], r["from_user_id"]),
+        )
+
+
 def confirm_pending_work_tips() -> None:
     now = time.time()
     with _lock:
         conn = _connect()
         try:
-            rows = conn.execute(
-                """
-                SELECT t.work_id, t.from_user_id, t.amount, w.user_id AS author_id
-                FROM work_coin_tips t
-                JOIN public_works w ON w.id = t.work_id
-                WHERE t.status = 'pending' AND t.confirm_after <= ?
-                """,
-                (now,),
-            ).fetchall()
-            for r in rows:
-                author_subject = f"user:{r['author_id']}"
-                ensure_coin_balance(author_subject)
-                conn.execute(
-                    "UPDATE coin_balance SET balance = balance + ?, updated_at = ? WHERE subject = ?",
-                    (float(r["amount"]), now, author_subject),
-                )
-                conn.execute(
-                    """
-                    UPDATE work_coin_tips SET status = 'confirmed', confirmed_at = ?
-                    WHERE work_id = ? AND from_user_id = ?
-                    """,
-                    (now, r["work_id"], r["from_user_id"]),
-                )
+            _confirm_pending_work_tips_locked(conn, now)
             conn.commit()
         finally:
             conn.close()
@@ -3075,7 +3023,7 @@ def send_work_coin_tip(work_id: int, from_user_id: int, amount: float = WORK_COI
                     raise ValueError("이미 코인을 보냈습니다.")
                 if existing["status"] == "pending" and now < float(existing["confirm_after"]):
                     raise ValueError("취소 대기 중인 코인이 있습니다.")
-            balance = ensure_coin_balance(from_subject)
+            balance = _ensure_coin_balance_locked(conn, from_subject)
             if balance + 1e-9 < amt:
                 raise ValueError("코인이 부족합니다.")
             conn.execute(
@@ -3125,7 +3073,8 @@ def cancel_work_coin_tip(work_id: int, from_user_id: int) -> dict[str, Any]:
             if row["status"] != "pending":
                 raise ValueError("이미 확정된 코인은 취소할 수 없습니다.")
             if now >= float(row["confirm_after"]):
-                confirm_pending_work_tips()
+                _confirm_pending_work_tips_locked(conn, now)
+                conn.commit()
                 raise ValueError("취소 가능 시간이 지났습니다.")
             amt = float(row["amount"])
             conn.execute(

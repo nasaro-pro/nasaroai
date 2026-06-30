@@ -88,7 +88,6 @@ from auth_store import (
     send_friend_request,
     send_room_message,
     send_work_coin_tip,
-    toggle_work_like,
     update_user_profile,
     verify_admin_password,
     verify_admin_token,
