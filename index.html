@@ -1901,9 +1901,8 @@
             padding: 8px 12px 12px;
             display: flex;
             flex-direction: column;
-            flex: 0 1 auto;
+            flex: 1 1 auto;
             min-height: 0;
-            max-height: calc(min(calc(100dvh - var(--bottom-offset, 150px) - 96px), 620px) - 42px);
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: contain;
@@ -2075,7 +2074,7 @@
         }
 
         #comparePanel.active .compare-grid:not(:empty) {
-            align-items: stretch;
+            align-items: start;
         }
 
         .compare-card-header {
@@ -6927,7 +6926,8 @@
                 Object.keys(lastTurn.responses || {}).forEach(model => {
                     const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
                     const pair = document.getElementById(`compare-qa-pair-${compareContentSlug(lastIndex, model)}`);
-                    scrollComparePairIntoView(stack, pair);
+                    if (compareStackNeedsScroll(stack)) scrollComparePairIntoView(stack, pair);
+                    else fitCompareStackScroll(stack);
                 });
             }
         }
@@ -10246,20 +10246,22 @@
 
         function pinComparePairScroll(stack, pair) {
             if (!stack || !pair) return;
-            if (!compareStackNeedsScroll(stack)) {
+            const viewH = stack.clientHeight;
+            const totalH = stack.scrollHeight;
+            if (totalH <= viewH + 1) {
                 fitCompareStackScroll(stack);
                 return;
             }
-            const bubble = pair.querySelector(".compare-q-bubble") || pair;
-            const apply = () => {
-                stack.scrollTop = Math.max(0, getBubbleScrollTop(stack, bubble) - 4);
-                if (stack.id) compareScrollPins.set(stack.id, stack.scrollTop);
-            };
-            apply();
-            requestAnimationFrame(() => {
-                apply();
-                requestAnimationFrame(apply);
-            });
+            const pairTop = pair.offsetTop;
+            const pairBottom = pairTop + pair.offsetHeight;
+            let top;
+            if (pair.offsetHeight <= viewH) {
+                top = Math.max(0, Math.min(pairTop - 8, pairBottom - viewH));
+            } else {
+                top = Math.max(0, pairTop - 8);
+            }
+            stack.scrollTop = top;
+            if (stack.id) compareScrollPins.set(stack.id, top);
         }
 
         function scrollComparePairIntoView(stack, pair) {
@@ -12273,6 +12275,8 @@
             activeModels.forEach(model => {
                 const failed = responses[model] === COMPARE_FAILURE_MSG;
                 updateCompareCard(model, responses[model] || "", failed, turnIndex, { final: true });
+                const stack = document.getElementById(`compare-qa-stack-${compareModelKey(model)}`);
+                fitCompareStackScroll(stack);
             });
             endCompareStreamPin();
             syncCompareSessionHistory();
