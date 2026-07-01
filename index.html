@@ -2486,13 +2486,7 @@
         }
 
         .dock-agent-row {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            width: min(1160px, 100%);
-            margin: 0 auto;
-            padding: 0 10px 14px;
-            box-sizing: border-box;
+            display: none !important;
         }
 
         .dock-inner {
@@ -5297,7 +5291,7 @@
         .workspace-agent-top {
             display: none;
             position: fixed;
-            top: calc(var(--header-height, 72px) + 6px);
+            top: calc(var(--header-height, 72px) + 8px);
             right: max(12px, var(--content-inset, 0px));
             left: auto;
             width: auto;
@@ -5313,7 +5307,35 @@
             pointer-events: none;
         }
         .workspace-agent-top.visible { display: flex; }
-        .workspace-agent-top .workspace-agent-fab { pointer-events: auto; }
+        .workspace-top-tools {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            pointer-events: auto;
+        }
+        .workspace-top-tools .input-tool-btn.privacy-btn-compact {
+            min-width: 44px;
+            height: 40px;
+            padding: 0 10px;
+            font-size: 15px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+        }
+        .workspace-top-tools .input-tool-btn.privacy-btn-compact.active {
+            background: #ede9fe;
+            border-color: #a78bfa;
+        }
+        .workspace-top-tools .workspace-agent-fab { pointer-events: auto; }
+        @media (max-width: 767px) {
+            .workspace-agent-top {
+                top: auto;
+                bottom: calc(var(--input-dock-height, 70px) + 10px);
+                right: 12px;
+            }
+        }
         .workspace-agent-fab {
             position: static;
             display: inline-flex;
@@ -5902,7 +5924,10 @@
             border-color: var(--dm-border);
             color: var(--dm-text-muted);
         }
-        .studio-workspace { padding: 8px 12px 24px; overflow: hidden; }
+        .studio-workspace { padding: 52px 12px 24px; overflow: hidden; }
+        @media (max-width: 767px) {
+            .studio-workspace { padding-top: 8px; padding-bottom: calc(var(--input-dock-height, 70px) + 56px); }
+        }
         .studio-layout { display: grid; grid-template-columns: 240px 1fr 1fr; gap: 12px; height: calc(100dvh - var(--header-height, 72px) - 32px); min-height: 420px; }
         @media (max-width: 900px) { .studio-layout { grid-template-columns: 1fr; height: auto; } }
         .studio-models, .studio-compose, .studio-result-panel {
@@ -6797,7 +6822,10 @@
         </div>
 
         <div id="workspaceAgentTopBar" class="workspace-agent-top">
-            <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
+            <div id="workspaceTopTools" class="workspace-top-tools">
+                <div id="workspacePrivacySlot"></div>
+                <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
+            </div>
         </div>
         <div id="floatChatsLayer" class="float-chats-layer" aria-live="polite"></div>
 
@@ -6923,7 +6951,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="/static/nasaro-features.js?v=20260630a"></script>
+    <script src="/static/nasaro-features.js?v=20260701a"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -7032,11 +7060,12 @@
             if (btn) btn.disabled = true;
             if (resultEl) resultEl.textContent = "생성 중…";
             try {
+                const deviceId = await ensureDeviceId();
                 const body = {
                     label: studioSelectedLabel,
                     prompt,
                     image_url: (document.getElementById("studioImageUrl")?.value || "").trim(),
-                    user_id: ensureDeviceId(),
+                    user_id: deviceId,
                 };
                 const res = await apiFetch("/studio/run", {
                     method: "POST",
@@ -7045,9 +7074,7 @@
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                    const msg = typeof data.detail === "string"
-                        ? data.detail
-                        : (data.detail?.message || await parseApiError(res, "생성 실패"));
+                    const msg = await parseApiError(res, "생성 실패");
                     if (res.status === 503 && isServicePrepMessage(msg)) {
                         showServicePrepNotice(msg, resultEl);
                         return;
@@ -7124,7 +7151,7 @@
 
         async function maybeShowSitePopup() {
             try {
-                const res = await apiFetch("/popup/active?user_id=" + encodeURIComponent(ensureDeviceId()));
+                const res = await apiFetch("/popup/active?user_id=" + encodeURIComponent(getDeviceId()));
                 if (!res.ok) return;
                 const data = await res.json();
                 const popup = data.popup;
@@ -7148,7 +7175,7 @@
                 await apiFetch("/popup/dismiss", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ notice_id: noticeId, user_id: ensureDeviceId() }),
+                    body: JSON.stringify({ notice_id: noticeId, user_id: getDeviceId() }),
                 });
             } catch {}
         }
@@ -7167,10 +7194,11 @@
             const label = pickChatAiModel();
             if (!label) return;
             try {
+                const deviceId = await ensureDeviceId();
                 const res = await apiFetch("/social/chat/" + encodeURIComponent(chatRoomId) + "/ai", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ label, prompt: promptText, user_id: ensureDeviceId() }),
+                    body: JSON.stringify({ label, prompt: promptText, user_id: deviceId }),
                 });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.detail?.message || data.detail || "AI 호출 실패");
@@ -8030,6 +8058,7 @@
             const NF = window.NasaroFeatures;
             if (!NF) return;
             rebuildMainToolbar();
+            rebuildWorkspaceTopBar();
             rebuildAgentToolbar();
             updateDockUI();
             updateAuthUI();
@@ -8575,6 +8604,9 @@
             try {
                 const data = await response.json();
                 if (typeof data.detail === "string") return data.detail;
+                if (Array.isArray(data.detail) && data.detail.length) {
+                    return data.detail.map(e => e.msg || e.message || JSON.stringify(e)).join("; ");
+                }
                 if (data.detail?.message) {
                     if (data.detail.login_required && authBootstrapDone && !currentUser) {
                         setTimeout(() => openAuthModal("login"), 400);
@@ -8855,6 +8887,7 @@
             }
             renderSessionHistory();
             refreshSavedResultsUI();
+            rebuildWorkspaceTopBar();
             notifyExtensionAuth();
             updateSupportUI();
             refreshSocialWorkspace();
@@ -9380,15 +9413,29 @@
         function updateWorkspaceAgentFab(ws) {
             const bar = document.getElementById("workspaceAgentTopBar");
             const fab = document.getElementById("workspaceAgentFab");
-            const show = ws === "chat" || ws === "works" || ws === "home";
-            if (bar) bar.classList.toggle("visible", show);
+            if (bar) bar.classList.add("visible");
             if (fab) {
                 fab.classList.toggle("active", !!agentActive);
                 fab.textContent = agentActive ? "● 에이전트" : "🌐 에이전트";
             }
-            if (show && agentActive && agentPanel?.style.display !== "none" && !agentPanelUserMoved) {
+            if (agentActive && agentPanel?.style.display !== "none" && !agentPanelUserMoved) {
                 requestAnimationFrame(() => positionPanelNearButton(getAgentAnchorButton()));
             }
+        }
+
+        function rebuildWorkspaceTopBar() {
+            const slot = document.getElementById("workspacePrivacySlot");
+            const NF = window.NasaroFeatures;
+            if (!slot || !NF?.buildPrivacyButton) return;
+            slot.innerHTML = "";
+            const anchorInput = mainInput || document.getElementById("studioPrompt") || document.getElementById("chatInput");
+            const privBtn = NF.buildPrivacyButton(anchorInput, {
+                showToast,
+                isLoggedIn: () => !!currentUser,
+                onLoginRequired: () => openAuthModal("login"),
+                onPrivacyChange: () => rebuildWorkspaceTopBar(),
+            });
+            slot.appendChild(privBtn);
         }
 
         function setAppWorkspace(ws) {
@@ -9419,12 +9466,13 @@
             if (homeWs) homeWs.classList.toggle("active", currentAppWorkspace === "home");
 
             if (dockInner) dockInner.style.display = isAi ? "" : "none";
-            if (dockAgentRow) dockAgentRow.style.display = isAi ? "" : "none";
             if (dockShell) {
                 if (isAi) dockShell.style.display = "";
                 else if (window.innerWidth < 768) dockShell.style.display = "";
                 else dockShell.style.display = "none";
             }
+
+            rebuildWorkspaceTopBar();
 
             if (isStudio) renderStudioModelList();
 
@@ -10991,6 +11039,7 @@
                 }
             }
             rebuildMainToolbar();
+            rebuildWorkspaceTopBar();
             updateDockUI();
         }
 
@@ -11011,6 +11060,7 @@
         window.addEventListener("resize", () => {
             scheduleSyncMainPadding();
             rebuildMainToolbar();
+            rebuildWorkspaceTopBar();
             updateDockUI();
             updateCollabActionBar();
             if (typeof updateSideMenuForWorkspace === "function") updateSideMenuForWorkspace(currentAppWorkspace);
@@ -13846,6 +13896,7 @@
             const NF = window.NasaroFeatures;
             if (!NF) return;
             rebuildMainToolbar();
+            rebuildWorkspaceTopBar();
             rebuildAgentToolbar();
             const langSel = document.getElementById("settingsLangSelect");
             const themeSel = document.getElementById("settingsThemeSelect");

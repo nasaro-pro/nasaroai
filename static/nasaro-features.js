@@ -20,9 +20,10 @@
             voice_unsupported: "음성 입력을 지원하지 않습니다.",
             privacy_on: "프라이버시 켬",
             privacy_off: "프라이버시 끔",
-            privacy_tip: "자동 기록·동기화·공유 없음. 이 화면에서만 표시. 「결과물 저장」은 수동 가능.",
+            privacy_tip: "자동 기록·동기화·공유 없음. 세션 데이터는 브라우저 AES-GCM으로 암호화.",
             privacy_login: "프라이버시 모드는 로그인 후 이용할 수 있습니다.",
-            privacy_on_admin: "프라이버시 켬: 관리자 화면에도 내용이 시크릿으로 표시됩니다.",
+            privacy_on_admin: "프라이버시 켬: E2E 로컬 암호화 + 관리자 시크릿 표시.",
+            privacy_e2e_on: "종단간(로컬) 암호화 활성 — 이 브라우저 세션에서만 복호화됩니다.",
             ai_pick: "AI",
             ai_all: "전체",
             ai_collab_pick: "추천 AI",
@@ -82,9 +83,10 @@
             voice_unsupported: "Voice not supported.",
             privacy_on: "Privacy on",
             privacy_off: "Privacy off",
-            privacy_tip: "No auto log/sync/share. Manual save works.",
+            privacy_tip: "No auto log/sync/share. Session data encrypted locally with AES-GCM.",
             privacy_login: "Privacy mode requires login.",
-            privacy_on_admin: "Privacy on: content appears as secret in admin too.",
+            privacy_on_admin: "Privacy on: E2E local encryption + secret in admin.",
+            privacy_e2e_on: "End-to-end (local) encryption active — decryptable only in this browser session.",
             ai_pick: "AI",
             ai_all: "All",
             ai_collab_pick: "Recommend AI",
@@ -153,6 +155,65 @@
     }
 
     function isPrivacyMode() { return privacyMode; }
+
+    let _e2eCryptoKey = null;
+
+    async function deriveE2eKey() {
+        if (_e2eCryptoKey) return _e2eCryptoKey;
+        if (!window.crypto?.subtle) return null;
+        let stored = sessionStorage.getItem("nasaroai_e2e_session");
+        let raw;
+        if (stored) {
+            raw = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
+        } else {
+            raw = crypto.getRandomValues(new Uint8Array(32));
+            sessionStorage.setItem("nasaroai_e2e_session", btoa(String.fromCharCode(...raw)));
+        }
+        _e2eCryptoKey = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+        return _e2eCryptoKey;
+    }
+
+    function clearE2eSession() {
+        _e2eCryptoKey = null;
+        try { sessionStorage.removeItem("nasaroai_e2e_session"); } catch {}
+    }
+
+    async function e2eEncrypt(plaintext) {
+        if (!privacyMode || !plaintext) return plaintext;
+        const key = await deriveE2eKey();
+        if (!key) return plaintext;
+        try {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const enc = await crypto.subtle.encrypt(
+                { name: "AES-GCM", iv },
+                key,
+                new TextEncoder().encode(String(plaintext))
+            );
+            const combined = new Uint8Array(iv.length + enc.byteLength);
+            combined.set(iv);
+            combined.set(new Uint8Array(enc), iv.length);
+            return "e2e:" + btoa(String.fromCharCode(...combined));
+        } catch {
+            return plaintext;
+        }
+    }
+
+    async function e2eDecrypt(stored) {
+        if (!stored || !String(stored).startsWith("e2e:")) return stored;
+        const key = await deriveE2eKey();
+        if (!key) return "[E2E 키 없음]";
+        try {
+            const combined = Uint8Array.from(atob(String(stored).slice(4)), c => c.charCodeAt(0));
+            const iv = combined.slice(0, 12);
+            const data = combined.slice(12);
+            const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+            return new TextDecoder().decode(dec);
+        } catch {
+            return "[복호화 실패]";
+        }
+    }
+
+    function isE2eActive() { return privacyMode; }
 
     function saveModels(mode) {
         if (mode === "collab") localStorage.setItem("nasaroai_model_collab", collabModel);
@@ -396,9 +457,15 @@
             }
             privacyMode = !privacyMode;
             localStorage.setItem("nasaroai_privacy", privacyMode ? "1" : "0");
+            if (privacyMode) {
+                deriveE2eKey().catch(() => {});
+            } else {
+                clearE2eSession();
+            }
             syncBtn();
             opts.onPrivacyChange?.(privacyMode);
             if (privacyMode) {
+                opts.showToast?.(t("privacy_e2e_on"), "info", 5000);
                 opts.showToast?.(t("privacy_on_admin"), "info", 6000);
             } else {
                 opts.showToast?.(t("privacy_off"), "info", 3000);
@@ -784,6 +851,8 @@
     function setPrivacyMode(on) {
         privacyMode = !!on;
         localStorage.setItem("nasaroai_privacy", privacyMode ? "1" : "0");
+        if (privacyMode) deriveE2eKey().catch(() => {});
+        else clearE2eSession();
     }
 
     window.NasaroFeatures = {
@@ -792,7 +861,8 @@
         set lang(v) { lang = v; applyLang(); },
         get theme() { return theme; },
         set theme(v) { theme = v; applyTheme(); },
-        isPrivacyMode, setPrivacyMode, getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
+        isPrivacyMode, setPrivacyMode, isE2eActive, e2eEncrypt, e2eDecrypt, clearE2eSession,
+        getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
         exportAiSettings, importAiSettings,
         applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
         createShareLink, exportMarkdown, addResultActions, hideFloatingResultActions,
