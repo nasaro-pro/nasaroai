@@ -22,11 +22,21 @@ MODEL_PRICING_SEED: list[dict[str, Any]] = [
     {"label": "DeepSeek-Pro", "modality": "chat", "coin_cost": 1, "unit_label": "call"},
     {"label": "GLM", "modality": "chat", "coin_cost": 3, "unit_label": "call"},
     {"label": "MiniMax", "modality": "chat", "coin_cost": 1, "unit_label": "call"},
+    # code — per call
+    {"label": "Qwen-Coder", "modality": "code", "coin_cost": 2, "unit_label": "call"},
+    {"label": "DeepSeek-Coder", "modality": "code", "coin_cost": 1, "unit_label": "call"},
+    {"label": "Codex", "modality": "code", "coin_cost": 5, "unit_label": "call"},
+    {"label": "Claude-Code", "modality": "code", "coin_cost": 12, "unit_label": "call"},
     # image — per image
     {"label": "Seedream 4.5", "modality": "image", "coin_cost": 40, "unit_label": "image"},
     {"label": "Grok Imagine", "modality": "image", "coin_cost": 20, "unit_label": "image"},
     {"label": "Grok Imagine Pro", "modality": "image", "coin_cost": 70, "unit_label": "image"},
     {"label": "Nano Banana Pro", "modality": "image", "coin_cost": 100, "unit_label": "image"},
+    {"label": "Flux Pro", "modality": "image", "coin_cost": 55, "unit_label": "image"},
+    # audio — per clip
+    {"label": "GPT-4o Mini TTS", "modality": "audio", "coin_cost": 8, "unit_label": "clip"},
+    {"label": "Gemini Flash TTS", "modality": "audio", "coin_cost": 6, "unit_label": "clip"},
+    {"label": "Voxtral Mini TTS", "modality": "audio", "coin_cost": 5, "unit_label": "clip"},
     # video — per 5s clip
     {"label": "Veo 3.1 Fast", "modality": "video", "coin_cost": 1100, "unit_label": "clip_5s"},
     {"label": "Veo 3.1 Standard", "modality": "video", "coin_cost": 2800, "unit_label": "clip_5s"},
@@ -42,6 +52,12 @@ IMAGE_PRICING_LABELS: tuple[str, ...] = tuple(
 )
 VIDEO_PRICING_LABELS: tuple[str, ...] = tuple(
     r["label"] for r in MODEL_PRICING_SEED if r["modality"] == "video"
+)
+CODE_PRICING_LABELS: tuple[str, ...] = tuple(
+    r["label"] for r in MODEL_PRICING_SEED if r["modality"] == "code"
+)
+AUDIO_PRICING_LABELS: tuple[str, ...] = tuple(
+    r["label"] for r in MODEL_PRICING_SEED if r["modality"] == "audio"
 )
 
 

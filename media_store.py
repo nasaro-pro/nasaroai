@@ -1,8 +1,9 @@
-"""Image/video generation via OpenRouter and fal.ai."""
+"""Image/video/audio generation via OpenRouter and fal.ai."""
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import os
 import uuid
@@ -14,14 +15,16 @@ import httpx
 logger = logging.getLogger("nasaroai")
 
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_IMAGES_URL = "https://openrouter.ai/api/v1/images"
+OPENROUTER_SPEECH_URL = "https://openrouter.ai/api/v1/audio/speech"
 FAL_QUEUE_URL = "https://queue.fal.run"
 
 
 @dataclass(frozen=True)
 class MediaProviderConfig:
     label: str
-    modality: str  # image | video
-    provider: str  # openrouter | fal | official
+    modality: str  # image | video | audio
+    provider: str  # openrouter | openrouter_image | openrouter_speech | fal
     model_id: str
     extra_params: dict = field(default_factory=dict)
 
@@ -39,16 +42,19 @@ class FalServiceUnavailableError(Exception):
 
 MEDIA_PROVIDER_CONFIG: dict[str, MediaProviderConfig] = {
     "Seedream 4.5": MediaProviderConfig(
-        "Seedream 4.5", "image", "fal", "fal-ai/bytedance/seedream/v4/text-to-image"
+        "Seedream 4.5", "image", "openrouter_image", "bytedance-seed/seedream-4.5"
     ),
     "Grok Imagine": MediaProviderConfig(
-        "Grok Imagine", "image", "openrouter", "x-ai/grok-2-image"
+        "Grok Imagine", "image", "openrouter_image", "x-ai/grok-imagine-image"
     ),
     "Grok Imagine Pro": MediaProviderConfig(
-        "Grok Imagine Pro", "image", "openrouter", "x-ai/grok-2-image-1212"
+        "Grok Imagine Pro", "image", "openrouter_image", "x-ai/grok-imagine-image-pro"
     ),
     "Nano Banana Pro": MediaProviderConfig(
-        "Nano Banana Pro", "image", "openrouter", "google/gemini-3-pro-image-preview"
+        "Nano Banana Pro", "image", "openrouter_image", "google/gemini-3-pro-image-preview"
+    ),
+    "Flux Pro": MediaProviderConfig(
+        "Flux Pro", "image", "openrouter_image", "black-forest-labs/flux-pro-1.1"
     ),
     "Veo 3.1 Fast": MediaProviderConfig(
         "Veo 3.1 Fast", "video", "fal", "fal-ai/veo3.1/fast/image-to-video",
@@ -65,6 +71,21 @@ MEDIA_PROVIDER_CONFIG: dict[str, MediaProviderConfig] = {
     "Sora 2 Pro": MediaProviderConfig(
         "Sora 2 Pro", "video", "fal", "fal-ai/sora/v2/pro/text-to-video",
         {"duration": "5"},
+    ),
+    "GPT-4o Mini TTS": MediaProviderConfig(
+        "GPT-4o Mini TTS", "audio", "openrouter_speech",
+        "openai/gpt-4o-mini-tts-2025-12-15",
+        {"voice": "alloy", "response_format": "mp3"},
+    ),
+    "Gemini Flash TTS": MediaProviderConfig(
+        "Gemini Flash TTS", "audio", "openrouter_speech",
+        "google/gemini-3.1-flash-tts-preview",
+        {"voice": "Kore", "response_format": "mp3"},
+    ),
+    "Voxtral Mini TTS": MediaProviderConfig(
+        "Voxtral Mini TTS", "audio", "openrouter_speech",
+        "mistralai/voxtral-mini-tts-2603",
+        {"voice": "default", "response_format": "mp3"},
     ),
 }
 
@@ -90,7 +111,21 @@ def media_modality_for_label(label: str) -> str:
     return cfg.modality if cfg else "chat"
 
 
-def _extract_image_url_from_openrouter(data: dict) -> str:
+def _extract_image_from_images_api(data: dict) -> str:
+    items = data.get("data") or []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url") or ""
+        if url:
+            return str(url)
+        b64 = item.get("b64_json") or item.get("b64") or ""
+        if b64:
+            return f"data:image/png;base64,{b64}"
+    return ""
+
+
+def _extract_image_url_from_chat(data: dict) -> str:
     choices = data.get("choices") or []
     if not choices:
         return ""
@@ -104,11 +139,10 @@ def _extract_image_url_from_openrouter(data: dict) -> str:
     content = msg.get("content")
     if isinstance(content, list):
         for part in content:
-            if isinstance(part, dict):
-                if part.get("type") == "image_url":
-                    url = (part.get("image_url") or {}).get("url") or ""
-                    if url:
-                        return str(url)
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                url = (part.get("image_url") or {}).get("url") or ""
+                if url:
+                    return str(url)
     if isinstance(content, str) and content.startswith("http"):
         return content.strip()
     return ""
@@ -119,26 +153,75 @@ async def generate_image_openrouter(
     prompt: str,
     headers: dict[str, str],
     image_url: str = "",
+    aspect_ratio: str = "1:1",
 ) -> str:
+    payload: dict[str, Any] = {
+        "model": model_id,
+        "prompt": prompt,
+        "aspect_ratio": aspect_ratio or "1:1",
+        "n": 1,
+    }
+    if image_url:
+        payload["input_references"] = [{"image_url": image_url}]
+    async with httpx.AsyncClient(timeout=180) as client:
+        res = await client.post(OPENROUTER_IMAGES_URL, headers=headers, json=payload)
+    if res.status_code == 200:
+        url = _extract_image_from_images_api(res.json())
+        if url:
+            return url
+    # Fallback: chat completions image modality (legacy models)
     user_content: Any = prompt
     if image_url:
         user_content = [
             {"type": "text", "text": prompt},
             {"type": "image_url", "image_url": {"url": image_url}},
         ]
-    payload = {
+    chat_payload = {
         "model": model_id,
         "messages": [{"role": "user", "content": user_content}],
         "modalities": ["image", "text"],
     }
     async with httpx.AsyncClient(timeout=180) as client:
-        res = await client.post(OPENROUTER_CHAT_URL, headers=headers, json=payload)
-    if res.status_code != 200:
-        raise RuntimeError(f"OpenRouter image HTTP {res.status_code}: {res.text[:300]}")
-    url = _extract_image_url_from_openrouter(res.json())
-    if not url:
+        res2 = await client.post(OPENROUTER_CHAT_URL, headers=headers, json=chat_payload)
+    if res2.status_code != 200:
+        detail = res.text[:200] if res.status_code != 200 else res2.text[:200]
+        raise RuntimeError(f"OpenRouter image HTTP {res.status_code}/{res2.status_code}: {detail}")
+    url2 = _extract_image_url_from_chat(res2.json())
+    if not url2:
         raise RuntimeError("OpenRouter 응답에서 이미지 URL을 찾지 못했습니다.")
-    return url
+    return url2
+
+
+async def generate_audio_openrouter(
+    model_id: str,
+    prompt: str,
+    headers: dict[str, str],
+    *,
+    voice: str = "alloy",
+    response_format: str = "mp3",
+) -> str:
+    payload = {
+        "model": model_id,
+        "input": prompt,
+        "voice": voice or "alloy",
+        "response_format": response_format or "mp3",
+    }
+    async with httpx.AsyncClient(timeout=120) as client:
+        res = await client.post(OPENROUTER_SPEECH_URL, headers=headers, json=payload)
+    if res.status_code != 200:
+        raise RuntimeError(f"OpenRouter TTS HTTP {res.status_code}: {res.text[:300]}")
+    ctype = res.headers.get("content-type", "")
+    if "json" in ctype:
+        data = res.json()
+        b64 = ""
+        if isinstance(data.get("data"), list) and data["data"]:
+            b64 = data["data"][0].get("b64_json") or data["data"][0].get("audio") or ""
+        if b64:
+            return f"data:audio/mp3;base64,{b64}"
+        raise RuntimeError("OpenRouter TTS JSON 응답에서 오디오를 찾지 못했습니다.")
+    b64 = base64.b64encode(res.content).decode("ascii")
+    fmt = "mp3" if response_format == "mp3" else "wav"
+    return f"data:audio/{fmt};base64,{b64}"
 
 
 async def _fal_submit(model_id: str, payload: dict) -> tuple[str, str]:
@@ -155,7 +238,6 @@ async def _fal_submit(model_id: str, payload: dict) -> tuple[str, str]:
     req_id = data.get("request_id") or data.get("gateway_request_id") or ""
     status_url = data.get("status_url") or (f"{FAL_QUEUE_URL}/{model_id}/requests/{req_id}/status" if req_id else "")
     if not status_url:
-        # sync response
         result_url = _extract_fal_media_url(data)
         if result_url:
             return req_id or str(uuid.uuid4()), result_url
@@ -219,25 +301,13 @@ async def poll_fal_status(status_url: str, *, max_wait: int = 600) -> str:
     raise RuntimeError("fal.ai 생성 시간 초과")
 
 
-async def generate_image_fal(model_id: str, prompt: str, image_url: str = "", extra: dict | None = None) -> str:
-    payload: dict[str, Any] = {"prompt": prompt}
-    if extra:
-        payload.update(extra)
-    if image_url:
-        payload["image_url"] = image_url
-    req_id, status_or_url = await _fal_submit(model_id, payload)
-    if status_or_url.startswith("http") and "/status" not in status_or_url:
-        return status_or_url
-    return await poll_fal_status(status_or_url)
-
-
 async def generate_video_fal(model_id: str, prompt: str, image_url: str = "", extra: dict | None = None) -> str:
     payload: dict[str, Any] = {"prompt": prompt}
     if extra:
         payload.update(extra)
     if image_url:
         payload["image_url"] = image_url
-    req_id, status_or_url = await _fal_submit(model_id, payload)
+    _req_id, status_or_url = await _fal_submit(model_id, payload)
     if status_or_url.startswith("http") and "/status" not in status_or_url and "queue" not in status_or_url:
         return status_or_url
     return await poll_fal_status(status_or_url, max_wait=900)
@@ -249,6 +319,7 @@ async def run_media_generation(
     *,
     openrouter_headers: dict[str, str] | None = None,
     image_url: str = "",
+    aspect_ratio: str = "1:1",
 ) -> str:
     cfg = MEDIA_PROVIDER_CONFIG.get(label)
     if not cfg:
@@ -256,13 +327,22 @@ async def run_media_generation(
     prompt = (prompt or "").strip()
     if not prompt:
         raise ValueError("프롬프트를 입력하세요.")
-    if cfg.provider == "openrouter":
+    if cfg.provider in ("openrouter", "openrouter_image"):
         if not openrouter_headers:
             raise RuntimeError("OpenRouter API key required")
-        return await generate_image_openrouter(cfg.model_id, prompt, openrouter_headers, image_url=image_url)
+        return await generate_image_openrouter(
+            cfg.model_id, prompt, openrouter_headers,
+            image_url=image_url, aspect_ratio=aspect_ratio,
+        )
+    if cfg.provider == "openrouter_speech":
+        if not openrouter_headers:
+            raise RuntimeError("OpenRouter API key required")
+        extra = cfg.extra_params or {}
+        return await generate_audio_openrouter(
+            cfg.model_id, prompt, openrouter_headers,
+            voice=str(extra.get("voice", "alloy")),
+            response_format=str(extra.get("response_format", "mp3")),
+        )
     if cfg.provider == "fal":
-        # fal.ai integration kept for future use — stubbed until FAL_KEY is configured.
-        raise FalServiceUnavailableError()
-    if cfg.provider == "official":
         raise FalServiceUnavailableError()
     raise RuntimeError(f"Unsupported provider: {cfg.provider}")

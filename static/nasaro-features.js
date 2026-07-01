@@ -465,8 +465,7 @@
             syncBtn();
             opts.onPrivacyChange?.(privacyMode);
             if (privacyMode) {
-                opts.showToast?.(t("privacy_e2e_on"), "info", 5000);
-                opts.showToast?.(t("privacy_on_admin"), "info", 6000);
+                opts.showToast?.(t("privacy_on_admin"), "info", 5000);
             } else {
                 opts.showToast?.(t("privacy_off"), "info", 3000);
             }
@@ -865,6 +864,7 @@
         getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
         exportAiSettings, importAiSettings,
         applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
+        startVoiceInput,
         createShareLink, exportMarkdown, addResultActions, hideFloatingResultActions,
         showExportFormatMenu, loadShareFromUrl,
         parseScheduleFromText, addAgentSchedule, startAgentScheduleChecker,

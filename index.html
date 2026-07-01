@@ -174,13 +174,16 @@
             margin: 0 auto;
             padding: 14px 18px;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
-            gap: 10px;
+            justify-content: space-between;
+            gap: 12px;
         }
 
         .header-brand {
-            text-align: center;
+            text-align: left;
+            flex: 1;
+            min-width: 0;
         }
 
         .header-brand h1 {
@@ -2572,6 +2575,34 @@
             width: 88px;
             min-width: 88px;
         }
+        .dock-input-wrap {
+            flex: 1 1 auto;
+            position: relative;
+            min-width: 0;
+        }
+        .dock-input-wrap #mainInput {
+            width: 100%;
+            padding-right: 42px;
+        }
+        .dock-mic-btn {
+            position: absolute;
+            right: 6px;
+            bottom: 6px;
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dock-mic-btn:hover { background: rgba(124, 58, 237, 0.08); }
+        .dock-input-wrap.has-text .dock-mic-btn { display: none; }
+        html[data-theme="dark"] .dock-mic-btn:hover { background: rgba(124, 58, 237, 0.2); }
         .dock-compose-row #mainInput {
             flex: 1;
             min-width: 0;
@@ -4416,13 +4447,17 @@
                 flex: 1 1 auto;
                 min-width: 0;
             }
+            .dock-input-wrap {
+                flex: 1 1 auto;
+                min-width: 0;
+            }
             .dock-compose-row #mainInput {
                 flex: 1 1 auto;
-                width: auto;
+                width: 100%;
                 height: 48px;
                 min-height: 48px;
                 max-height: 96px;
-                padding: 10px 10px;
+                padding: 10px 42px 10px 10px;
                 font-size: 16px;
                 border-radius: 14px;
                 border: 1px solid #e2e8f0;
@@ -5288,33 +5323,15 @@
             font-weight: 800;
             font-size: 18px;
         }
-        .workspace-agent-top {
-            display: none;
-            position: fixed;
-            top: calc(var(--header-height, 72px) + 8px);
-            right: max(12px, var(--content-inset, 0px));
-            left: auto;
-            width: auto;
-            z-index: 370;
-            padding: 0;
-            min-height: 0;
-            box-sizing: border-box;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 0;
-            background: transparent;
-            border: none;
-            pointer-events: none;
-        }
-        .workspace-agent-top.visible { display: flex; }
-        .workspace-top-tools {
+        .header-workspace-tools {
             display: flex;
             align-items: center;
             justify-content: flex-end;
             gap: 8px;
-            pointer-events: auto;
+            flex-shrink: 0;
+            margin-left: auto;
         }
-        .workspace-top-tools .input-tool-btn.privacy-btn-compact {
+        .header-workspace-tools .input-tool-btn.privacy-btn-compact {
             min-width: 44px;
             height: 40px;
             padding: 0 10px;
@@ -5324,16 +5341,21 @@
             background: #f9fafb;
             box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
         }
-        .workspace-top-tools .input-tool-btn.privacy-btn-compact.active {
+        .header-workspace-tools .input-tool-btn.privacy-btn-compact.active {
             background: #ede9fe;
             border-color: #a78bfa;
         }
-        .workspace-top-tools .workspace-agent-fab { pointer-events: auto; }
+        html[data-theme="dark"] .header-workspace-tools .input-tool-btn.privacy-btn-compact {
+            background: var(--dm-surface);
+            border-color: var(--dm-border);
+            color: var(--dm-text);
+        }
         @media (max-width: 767px) {
-            .workspace-agent-top {
-                top: auto;
+            .header-workspace-tools {
+                position: fixed;
                 bottom: calc(var(--input-dock-height, 70px) + 10px);
                 right: 12px;
+                z-index: 370;
             }
         }
         .workspace-agent-fab {
@@ -5924,17 +5946,20 @@
             border-color: var(--dm-border);
             color: var(--dm-text-muted);
         }
-        .studio-workspace { padding: 52px 12px 24px; overflow: hidden; }
+        .studio-workspace { padding: 12px 12px 24px; overflow: hidden; }
         @media (max-width: 767px) {
             .studio-workspace { padding-top: 8px; padding-bottom: calc(var(--input-dock-height, 70px) + 56px); }
         }
-        .studio-layout { display: grid; grid-template-columns: 240px 1fr 1fr; gap: 12px; height: calc(100dvh - var(--header-height, 72px) - 32px); min-height: 420px; }
+        .studio-layout { display: grid; grid-template-columns: 260px 1fr 1fr; gap: 12px; height: calc(100dvh - var(--header-height, 72px) - 24px); min-height: 420px; }
         @media (max-width: 900px) { .studio-layout { grid-template-columns: 1fr; height: auto; } }
         .studio-models, .studio-compose, .studio-result-panel {
             background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; overflow: auto;
         }
+        .studio-panel-title { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
+        .studio-panel-desc { margin: 0 0 10px; font-size: 11px; color: #6b7280; line-height: 1.4; }
+        .studio-label { font-size: 12px; font-weight: 700; margin-bottom: 6px; display: block; }
         .studio-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
-        .studio-tabs button { flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .studio-tabs button { flex: 1 1 auto; min-width: 52px; padding: 6px 6px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 11px; font-weight: 700; cursor: pointer; }
         .studio-tabs button.active { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
         .studio-model-card {
             display: block; width: 100%; text-align: left; padding: 10px; margin-bottom: 6px;
@@ -5943,12 +5968,43 @@
         .studio-model-card.active { border-color: #7c3aed; background: #f5f3ff; }
         .studio-model-card.disabled { opacity: 0.45; cursor: not-allowed; }
         .studio-model-card .coin { font-size: 15px; font-weight: 800; color: #7c3aed; }
-        #studioPrompt { width: 100%; min-height: 140px; border-radius: 10px; border: 1px solid #e5e7eb; padding: 10px; font: inherit; resize: vertical; }
+        .studio-history-title { font-size: 11px; font-weight: 800; color: #6b7280; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+        .studio-history-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
+        .studio-history-item {
+            font-size: 11px; padding: 8px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb;
+            cursor: pointer; line-height: 1.35;
+        }
+        .studio-history-item:hover { background: #ede9fe; border-color: #c4b5fd; }
+        .studio-history-item .sh-meta { color: #9ca3af; font-size: 10px; margin-bottom: 2px; }
+        #studioPrompt { width: 100%; min-height: 140px; border-radius: 10px; border: 1px solid #e5e7eb; padding: 10px; font: inherit; resize: vertical; box-sizing: border-box; }
+        .studio-options-row { display: none; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+        .studio-options-row.visible { display: flex; }
+        .studio-options-row select, .studio-options-row input, .studio-ref-url {
+            flex: 1; min-width: 100px; padding: 8px; border-radius: 8px; border: 1px solid #e5e7eb; font: inherit; box-sizing: border-box;
+        }
+        .studio-ref-url { width: 100%; margin-top: 8px; display: none; }
+        .studio-ref-url.visible { display: block; }
         #studioRunBtn { margin-top: 10px; width: 100%; padding: 12px; border-radius: 10px; border: none; background: #7c3aed; color: #fff; font-weight: 800; cursor: pointer; }
         #studioRunBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-        #studioResult { margin-top: 12px; min-height: 120px; white-space: pre-wrap; word-break: break-word; }
+        .studio-result-body { margin-top: 8px; min-height: 120px; white-space: pre-wrap; word-break: break-word; }
+        .studio-result-body pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 10px; overflow-x: auto; font-size: 13px; }
         .studio-result-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-        .studio-result-actions button { padding: 8px 12px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-weight: 700; }
+        .studio-result-actions button { padding: 8px 12px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-weight: 700; font-size: 12px; }
+        html[data-theme="dark"] .studio-models,
+        html[data-theme="dark"] .studio-compose,
+        html[data-theme="dark"] .studio-result-panel { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .studio-panel-desc { color: var(--dm-text-muted); }
+        html[data-theme="dark"] .studio-tabs button { background: var(--dm-surface-2, #1a1a1a); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .studio-tabs button.active { background: #2e1065; border-color: #7c3aed; color: #e9d5ff; }
+        html[data-theme="dark"] .studio-model-card { background: var(--dm-surface-2, #1a1a1a); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .studio-model-card.active { background: #2e1065; border-color: #7c3aed; }
+        html[data-theme="dark"] .studio-history-item { background: var(--dm-surface-2, #1a1a1a); border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .studio-history-item:hover { background: #2e1065; }
+        html[data-theme="dark"] #studioPrompt,
+        html[data-theme="dark"] .studio-options-row select,
+        html[data-theme="dark"] .studio-options-row input,
+        html[data-theme="dark"] .studio-ref-url { background: #0f1219; border-color: var(--dm-border); color: var(--dm-text); }
+        html[data-theme="dark"] .studio-result-actions button { background: var(--dm-surface-2, #1a1a1a); border-color: var(--dm-border); color: var(--dm-text); }
         .site-popup-overlay {
             position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
             background: rgba(0,0,0,0.55); padding: 16px;
@@ -5960,9 +6016,6 @@
         .site-popup-actions { margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px; }
         .chat-ai-btn { padding: 0 12px; border-radius: 8px; border: 1px solid #c4b5fd; background: #f5f3ff; color: #5b21b6; font-weight: 800; cursor: pointer; }
         .msg-ai .discord-msg-body { background: #f5f3ff; border: 1px solid #ddd6fe; }
-        html[data-theme="dark"] .studio-models,
-        html[data-theme="dark"] .studio-compose,
-        html[data-theme="dark"] .studio-result-panel { background: var(--dm-surface); border-color: var(--dm-border); }
         html[data-theme="dark"] .site-popup-box { background: #1e293b; color: #e2e8f0; }
         html[data-theme="dark"] .site-popup-body { color: #cbd5e1; }
         html[data-theme="dark"] .discord-layout,
@@ -6321,6 +6374,10 @@
                     <h1>Nasaro AI</h1>
                     <p>AI 모델 비교·토론·협업 실험실</p>
                 </div>
+                <div id="headerWorkspaceTools" class="header-workspace-tools">
+                    <div id="workspacePrivacySlot"></div>
+                    <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
+                </div>
             </div>
         </header>
 
@@ -6546,24 +6603,42 @@
             <section id="studioWorkspace" class="app-workspace-panel studio-workspace" aria-label="AI 스튜디오">
                 <div class="studio-layout">
                     <aside class="studio-models">
-                        <h2 style="margin:0 0 8px;font-size:16px;">🎨 AI 스튜디오</h2>
+                        <h2 class="studio-panel-title">🎨 AI 스튜디오</h2>
+                        <p class="studio-panel-desc">분야별 AI로 실제 작업물을 생성·편집하세요.</p>
                         <div class="studio-tabs" id="studioModTabs">
                             <button type="button" data-mod="chat" class="active">채팅</button>
+                            <button type="button" data-mod="code">코딩</button>
                             <button type="button" data-mod="image">이미지</button>
+                            <button type="button" data-mod="audio">오디오</button>
                             <button type="button" data-mod="video">동영상</button>
                         </div>
                         <div id="studioModelList"></div>
+                        <div class="studio-history-title">작업 기록</div>
+                        <div id="studioHistoryList" class="studio-history-list"></div>
                     </aside>
                     <div class="studio-compose">
-                        <label for="studioPrompt" style="font-size:12px;font-weight:700;">프롬프트</label>
+                        <label for="studioPrompt" class="studio-label">프롬프트 / 지시</label>
                         <textarea id="studioPrompt" placeholder="원하는 결과를 설명하세요…"></textarea>
-                        <input id="studioImageUrl" type="url" placeholder="참조 이미지 URL (선택)" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid #e5e7eb;">
+                        <div class="studio-options-row" id="studioOptionsRow">
+                            <label class="studio-label">비율</label>
+                            <select id="studioAspect">
+                                <option value="1:1">1:1</option>
+                                <option value="16:9">16:9</option>
+                                <option value="9:16">9:16</option>
+                                <option value="4:3">4:3</option>
+                                <option value="3:4">3:4</option>
+                            </select>
+                            <input id="studioNegative" type="text" placeholder="제외할 요소 (선택)">
+                        </div>
+                        <input id="studioImageUrl" type="url" class="studio-ref-url" placeholder="참조 이미지 URL (선택)">
                         <button type="button" id="studioRunBtn">생성하기 <span id="studioRunCost">🪙1</span></button>
                     </div>
                     <div class="studio-result-panel">
-                        <div style="font-size:12px;font-weight:700;margin-bottom:8px;">결과</div>
-                        <div id="studioResult">모델을 선택하고 생성하기를 누르세요.</div>
+                        <div class="studio-label">결과 미리보기</div>
+                        <div id="studioResult" class="studio-result-body">모델을 선택하고 생성하기를 누르세요.</div>
                         <div class="studio-result-actions">
+                            <button type="button" id="studioCopyBtn" disabled>복사</button>
+                            <button type="button" id="studioDownloadBtn" disabled>다운로드</button>
                             <button type="button" id="studioSaveWorkBtn" disabled>작업물로 저장</button>
                             <button type="button" id="studioRegenBtn" disabled>다시 생성</button>
                         </div>
@@ -6821,12 +6896,6 @@
             </div>
         </div>
 
-        <div id="workspaceAgentTopBar" class="workspace-agent-top">
-            <div id="workspaceTopTools" class="workspace-top-tools">
-                <div id="workspacePrivacySlot"></div>
-                <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
-            </div>
-        </div>
         <div id="floatChatsLayer" class="float-chats-layer" aria-live="polite"></div>
 
         <div id="chatGroupModalOverlay" class="chat-group-modal-overlay" aria-hidden="true">
@@ -6895,7 +6964,10 @@
                     <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-compose-row">
                         <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
-                        <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                        <div class="dock-input-wrap" id="dockInputWrap">
+                            <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
+                            <button type="button" id="dockMicBtn" class="dock-mic-btn" title="음성 입력" aria-label="음성 입력">🎤</button>
+                        </div>
                         <button id="dockPrimaryBtn" class="dock-btn primary dock-submit-btn" type="button">비교 시작 ▶</button>
                     </div>
                 </div>
@@ -6951,7 +7023,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="/static/nasaro-features.js?v=20260701a"></script>
+    <script src="/static/nasaro-features.js?v=20260701b"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
@@ -6981,6 +7053,7 @@
         let studioSelectedLabel = "DeepSeek";
         let studioModality = "chat";
         let studioLastResult = null;
+        let studioHistory = [];
         let currentCoinBalance = 0;
         const SERVICE_PREP_MSG = "현재 해당 기능은 서비스 준비 중입니다. 잠시만 기다려주세요!";
 
@@ -7021,7 +7094,71 @@
             return pricingCatalog.filter(m => m.modality === mod && m.is_active !== false);
         }
 
+        function updateStudioOptionsUI() {
+            const optRow = document.getElementById("studioOptionsRow");
+            const refUrl = document.getElementById("studioImageUrl");
+            const isImage = studioModality === "image";
+            const isVideo = studioModality === "video";
+            optRow?.classList.toggle("visible", isImage);
+            refUrl?.classList.toggle("visible", isImage || isVideo);
+        }
+
+        function renderStudioHistory() {
+            const box = document.getElementById("studioHistoryList");
+            if (!box) return;
+            if (!studioHistory.length) {
+                box.innerHTML = "<div style='font-size:11px;color:#9ca3af;'>아직 기록 없음</div>";
+                return;
+            }
+            box.innerHTML = studioHistory.slice(0, 12).map((h, i) =>
+                `<button type="button" class="studio-history-item" data-idx="${i}">
+                    <div class="sh-meta">${escapeHtml(h.label)} · ${escapeHtml(h.modality)} · ${new Date(h.time).toLocaleString()}</div>
+                    <div>${escapeHtml((h.prompt || "").slice(0, 60))}</div>
+                </button>`
+            ).join("");
+            box.querySelectorAll(".studio-history-item").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const h = studioHistory[Number(btn.dataset.idx)];
+                    if (!h) return;
+                    const ta = document.getElementById("studioPrompt");
+                    if (ta) ta.value = h.prompt || "";
+                    studioSelectedLabel = h.label || studioSelectedLabel;
+                    studioModality = h.modality || studioModality;
+                    document.querySelectorAll("#studioModTabs button").forEach(b =>
+                        b.classList.toggle("active", b.dataset.mod === studioModality));
+                    renderStudioModelList();
+                    updateStudioOptionsUI();
+                    if (h.result) displayStudioResult(h.result, document.getElementById("studioResult"));
+                });
+            });
+        }
+
+        function pushStudioHistory(entry) {
+            studioHistory.unshift({ ...entry, time: Date.now() });
+            if (studioHistory.length > 20) studioHistory.length = 20;
+            renderStudioHistory();
+        }
+
+        function displayStudioResult(data, resultEl) {
+            if (!resultEl) return;
+            resultEl.className = "studio-result-body";
+            if (data.modality === "image" && data.media_url) {
+                resultEl.innerHTML = `<img src="${data.media_url}" alt="result" style="max-width:100%;border-radius:10px;">`;
+            } else if (data.modality === "video" && data.media_url) {
+                resultEl.innerHTML = `<video src="${data.media_url}" controls style="max-width:100%;border-radius:10px;"></video>`;
+            } else if (data.modality === "audio" && data.media_url) {
+                resultEl.innerHTML = `<audio src="${data.media_url}" controls style="width:100%;"></audio>`;
+            } else if (data.modality === "code" && data.text) {
+                resultEl.innerHTML = `<pre><code>${escapeHtml(data.text)}</code></pre>`;
+            } else {
+                resultEl.textContent = data.text || "";
+            }
+            ["studioSaveWorkBtn", "studioRegenBtn", "studioCopyBtn", "studioDownloadBtn"].forEach(id =>
+                document.getElementById(id)?.removeAttribute("disabled"));
+        }
+
         function renderStudioModelList() {
+            updateStudioOptionsUI();
             const box = document.getElementById("studioModelList");
             if (!box) return;
             const list = modelsForModality(studioModality);
@@ -7035,7 +7172,11 @@
             box.innerHTML = list.map(m => {
                 const unavailable = m.available === false || m.provider === "fal";
                 const disabled = unavailable || (currentCoinBalance > 0 && currentCoinBalance < m.coin_cost);
-                const unit = m.unit_label === "clip_5s" ? " · 5초" : (m.unit_label === "image" ? " · 1장" : "");
+                const unit = m.unit_label === "clip_5s" ? " · 5초" : (
+                    m.unit_label === "image" ? " · 1장" : (
+                        m.unit_label === "clip" ? " · 1클립" : ""
+                    )
+                );
                 const badge = unavailable ? `<div style="font-size:11px;color:#b45309;margin-top:4px;">준비 중</div>` : "";
                 return `<button type="button" class="studio-model-card${m.label === studioSelectedLabel ? " active" : ""}${disabled ? " disabled" : ""}" data-label="${m.label}" data-unavailable="${unavailable ? "1" : "0"}" data-cost="${m.coin_cost}">
                     <div>${m.label}</div>
@@ -7048,9 +7189,12 @@
         }
 
         async function runStudioGenerate() {
-            const prompt = (document.getElementById("studioPrompt")?.value || "").trim();
+            const promptEl = document.getElementById("studioPrompt");
+            let prompt = (promptEl?.value || "").trim();
+            const negative = (document.getElementById("studioNegative")?.value || "").trim();
+            if (negative) prompt += `\n\n제외: ${negative}`;
             if (!prompt) { showToast("프롬프트를 입력하세요.", "warn"); return; }
-            const sel = pricingCatalog.find(m => m.label === studioSelectedLabel);
+            const sel = pricingCatalog.find(m => m.label === studioSelectedLabel && m.modality === studioModality);
             if (sel && sel.available === false) {
                 showServicePrepNotice(sel.unavailable_reason || SERVICE_PREP_MSG, document.getElementById("studioResult"));
                 return;
@@ -7058,7 +7202,7 @@
             const btn = document.getElementById("studioRunBtn");
             const resultEl = document.getElementById("studioResult");
             if (btn) btn.disabled = true;
-            if (resultEl) resultEl.textContent = "생성 중…";
+            if (resultEl) { resultEl.className = "studio-result-body"; resultEl.textContent = "생성 중…"; }
             try {
                 const deviceId = await ensureDeviceId();
                 const body = {
@@ -7066,6 +7210,7 @@
                     prompt,
                     image_url: (document.getElementById("studioImageUrl")?.value || "").trim(),
                     user_id: deviceId,
+                    aspect_ratio: (document.getElementById("studioAspect")?.value || "1:1").trim(),
                 };
                 const res = await apiFetch("/studio/run", {
                     method: "POST",
@@ -7085,17 +7230,15 @@
                 if (data.modality === "video" && data.job_id) {
                     if (resultEl) resultEl.textContent = "동영상 생성 중… (폴링)";
                     await pollStudioVideoJob(data.job_id, resultEl);
-                } else if (data.media_url) {
-                    if (resultEl) {
-                        resultEl.innerHTML = data.modality === "image"
-                            ? `<img src="${data.media_url}" alt="result" style="max-width:100%;border-radius:10px;">`
-                            : `<video src="${data.media_url}" controls style="max-width:100%;border-radius:10px;"></video>`;
-                    }
                 } else {
-                    if (resultEl) resultEl.textContent = data.text || "";
+                    displayStudioResult(data, resultEl);
                 }
-                document.getElementById("studioSaveWorkBtn")?.removeAttribute("disabled");
-                document.getElementById("studioRegenBtn")?.removeAttribute("disabled");
+                pushStudioHistory({
+                    label: studioSelectedLabel,
+                    modality: data.modality || studioModality,
+                    prompt: (promptEl?.value || "").trim(),
+                    result: studioLastResult,
+                });
                 fetchQuotaRemaining?.();
             } catch (e) {
                 if (isServicePrepMessage(e.message)) {
@@ -7117,8 +7260,8 @@
                 const data = await res.json();
                 const job = data.job || {};
                 if (job.status === "completed" && job.result_url) {
-                    studioLastResult = { ...studioLastResult, media_url: job.result_url };
-                    if (resultEl) resultEl.innerHTML = `<video src="${job.result_url}" controls style="max-width:100%;border-radius:10px;"></video>`;
+                    studioLastResult = { ...studioLastResult, media_url: job.result_url, modality: "video" };
+                    displayStudioResult(studioLastResult, resultEl);
                     return;
                 }
                 if (job.status === "failed") {
@@ -7215,25 +7358,33 @@
             const c = Math.max(1, Number(coins) || 1);
             return `${text} ${coinCost(c)}`;
         }
-        function getDebateRoundCoinCost(isFirstRound) {
-            return isFirstRound ? 4 : 5;
+        function sumModelCoins(models, modality = "chat") {
+            return (models || []).reduce((s, m) => s + coinCostFor(m, modality), 0);
+        }
+        function getDebateRoundCoinCost() {
+            const NF = window.NasaroFeatures;
+            let debaters = (NF?.getSelectedModels?.("debate") || MODELS).slice();
+            if (debaters.length < 3) debaters = MODELS.slice(0, 3);
+            else debaters = debaters.slice(0, 3);
+            const speechCost = sumModelCoins(debaters, "chat");
+            const summaryCost = coinCostFor(debaters[0] || "OpenAI", "chat");
+            return speechCost + summaryCost;
         }
         function getModeCoinCost(mode) {
             const NF = window.NasaroFeatures;
             if (mode === "compare") {
-                const modelCount = (NF?.getSelectedModels?.("compare") || getActiveModels()).length || 1;
-                return modelCount;
+                const models = NF?.getSelectedModels?.("compare") || getActiveModels();
+                return sumModelCoins(models, "chat");
             }
-            if (mode === "debate") {
-                if (!debateStarted) return getDebateRoundCoinCost(true);
-                return getDebateRoundCoinCost(false);
-            }
+            if (mode === "debate") return getDebateRoundCoinCost();
             if (mode === "collab") {
-                if (collabIntakeActive) return 1;
-                if (collabRecommendInFlight) return 3;
-                if (collabSession?.plan && !collabTaskAsked) return 5;
-                if (collabTaskAsked) return 1;
-                return 1;
+                const cm = NF?.getPrimaryModel?.("collab") || collabModel || "Perplexity";
+                const base = coinCostFor(cm, "chat");
+                if (collabIntakeActive) return base;
+                if (collabRecommendInFlight) return base * 3;
+                if (collabSession?.plan && !collabTaskAsked) return base * 5;
+                if (collabTaskAsked) return base;
+                return base;
             }
             return 1;
         }
@@ -8031,9 +8182,6 @@
             if (!parts) return;
             if (isMobileCompact()) {
                 leftCompose.appendChild(parts.ai);
-                if (mobileTools) {
-                    mobileTools.append(parts.privacy, parts.voice);
-                }
             } else {
                 leftDock.appendChild(parts.ai);
                 rightDock.append(parts.privacy, parts.voice);
@@ -8900,7 +9048,7 @@
                 const rem = await fetchQuotaRemaining(true);
                 if (rem === null) return;
                 el.textContent = `${COIN}${rem}`;
-                el.title = (currentUser ? "회원" : "비회원") + ` 보유 코인 · AI 1회=🪙1`;
+                el.title = (currentUser ? "회원" : "비회원") + ` 보유 코인 · 모델별 🪙 차등`;
             } catch {
                 el.textContent = "";
             }
@@ -9161,7 +9309,7 @@
                     const total = q.total || {};
                     const lines = [
                         `통합 코인 ${coinCost(total.used)}/${coinCost(total.limit)} (남음 ${coinCost(total.remaining)})`,
-                        `AI 1회 = 🪙1 · 비교·토론·협업·에이전트 공통`,
+                        `모델별 🪙 차등 · 비교·토론·협업·스튜디오`,
                     ];
                     Object.entries(q.features || q.coins || {}).forEach(([k, v]) => {
                         if (Number(v.used) > 0) lines.push(`${k} AI호출 ${coinCost(v.used)}`);
@@ -9411,9 +9559,7 @@
         }
 
         function updateWorkspaceAgentFab(ws) {
-            const bar = document.getElementById("workspaceAgentTopBar");
             const fab = document.getElementById("workspaceAgentFab");
-            if (bar) bar.classList.add("visible");
             if (fab) {
                 fab.classList.toggle("active", !!agentActive);
                 fab.textContent = agentActive ? "● 에이전트" : "🌐 에이전트";
@@ -9474,7 +9620,10 @@
 
             rebuildWorkspaceTopBar();
 
-            if (isStudio) renderStudioModelList();
+            if (isStudio) {
+                renderStudioModelList();
+                renderStudioHistory();
+            }
 
             if (isChat) {
                 refreshSocialWorkspace();
@@ -9909,6 +10058,33 @@
             studioModality = btn.dataset.mod || "chat";
             document.querySelectorAll("#studioModTabs button").forEach(b => b.classList.toggle("active", b === btn));
             renderStudioModelList();
+        });
+        document.getElementById("studioCopyBtn")?.addEventListener("click", async () => {
+            const text = studioLastResult?.text || studioLastResult?.media_url || "";
+            if (!text) return;
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast("복사했습니다.", "success");
+            } catch { showToast("복사 실패", "error"); }
+        });
+        document.getElementById("studioDownloadBtn")?.addEventListener("click", () => {
+            const url = studioLastResult?.media_url;
+            const text = studioLastResult?.text;
+            if (url) {
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `studio-${studioSelectedLabel}-${Date.now()}`;
+                a.click();
+                return;
+            }
+            if (text) {
+                const blob = new Blob([text], { type: "text/plain" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `studio-${studioSelectedLabel}-${Date.now()}.txt`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
         });
         document.getElementById("studioModelList")?.addEventListener("click", e => {
             const card = e.target.closest(".studio-model-card");
@@ -10959,7 +11135,7 @@
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
                 const cmpLabel = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
                 dockPrimaryBtn.textContent = dockBtnLabel(cmpLabel.replace(/\s*🪙\d+$/, ""), getModeCoinCost("compare"));
-                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · AI ${getModeCoinCost("compare")}${COIN} (모델당 ${COIN}1)`;
+                dockPrimaryBtn.title = `${NF?.t?.("btn_compare") || "비교"} · 선택 AI 합계 ${getModeCoinCost("compare")}${COIN}`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = false;
                 mainInput.disabled = false;
@@ -10974,8 +11150,8 @@
                     mainInput.placeholder = "질문에 답변…";
                     dockPrimaryBtn.textContent = collabRecommendInFlight
                         ? "…"
-                        : dockBtnLabel("답변 ▶", 1);
-                    dockPrimaryBtn.title = `답변 전송 · ${COIN}1`;
+                        : dockBtnLabel("답변 ▶", getModeCoinCost("collab"));
+                    dockPrimaryBtn.title = `답변 전송 · ${COIN}${getModeCoinCost("collab")}`;
                 } else {
                     mainInput.placeholder = collabTaskAsked
                         ? (NF?.t?.("ph_collab_done") || "추가 수정·요청…")
@@ -10985,10 +11161,10 @@
                         ? "…"
                         : dockBtnLabel(collabTaskAsked ? "추가 ▶" : "시작 ▶", collabCost);
                     dockPrimaryBtn.title = collabTaskAsked
-                        ? `추가 작업 · AI ${COIN}1`
+                        ? `추가 작업 · ${COIN}${collabCost}`
                         : (collabSession?.plan
-                            ? `4단계+최종통합 · AI ${COIN}5 (단계당 ${COIN}1)`
-                            : `정보 수집 ${COIN}1/회 · AI 추천 ${COIN}3 (최대 ${COIN}10)`);
+                            ? `4단계+최종통합 · 약 ${COIN}${collabCost}`
+                            : `정보 수집·AI 추천 · ${COIN}${collabCost}`);
                 }
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = collabRecommendInFlight;
@@ -11001,16 +11177,16 @@
             mainInput.disabled = false;
             if (!debateStarted) {
                 mainInput.placeholder = NF?.t?.("ph_debate") || "토론 주제…";
-                const debateCost = getDebateRoundCoinCost(true);
+                const debateCost = getDebateRoundCoinCost();
                 dockPrimaryBtn.textContent = dockBtnLabel(mob ? "토론 ▶" : (NF?.t?.("btn_debate") || "토론 ▶"), debateCost);
-                dockPrimaryBtn.title = `${NF?.t?.("btn_debate") || "토론"} · 1라운드 AI ${debateCost}${COIN} (발언 3 + 요약 1)`;
+                dockPrimaryBtn.title = `${NF?.t?.("btn_debate") || "토론"} · 1라운드 ${debateCost}${COIN} (모델별 차등)`;
                 dockPrimaryBtn.className = "dock-btn secondary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             } else {
                 mainInput.placeholder = NF?.t?.("ph_debate_cont") || "의견 추가…";
-                const nextCost = getDebateRoundCoinCost(false);
+                const nextCost = getDebateRoundCoinCost();
                 dockPrimaryBtn.textContent = dockBtnLabel(mob ? "다음 ▶" : (NF?.t?.("btn_debate_next") || "다음 ▶"), nextCost);
-                dockPrimaryBtn.title = `${NF?.t?.("btn_debate_next") || "다음"} · 1라운드 AI ${nextCost}${COIN} (발언 3 + 요약 1)`;
+                dockPrimaryBtn.title = `${NF?.t?.("btn_debate_next") || "다음"} · 1라운드 ${nextCost}${COIN} (모델별 차등)`;
                 dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
                 dockPrimaryBtn.disabled = debateInFlight;
             }
@@ -11047,7 +11223,13 @@
             btn.addEventListener("click", () => switchMode(btn.dataset.mode));
         });
 
-        mainInput.addEventListener("input", autoResizeInput);
+        mainInput.addEventListener("input", () => {
+            autoResizeInput();
+            document.getElementById("dockInputWrap")?.classList.toggle("has-text", !!(mainInput.value || "").trim());
+        });
+        document.getElementById("dockMicBtn")?.addEventListener("click", () => {
+            window.NasaroFeatures?.startVoiceInput?.(mainInput, document.getElementById("dockMicBtn"), showToast);
+        });
         mainInput.addEventListener("keydown", event => {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -11435,9 +11617,9 @@
 
         function isTopScreenAnchor(btn) {
             if (!btn) return false;
-            if (btn.id === "workspaceAgentFab") return true;
-            const topBar = document.getElementById("workspaceAgentTopBar");
-            if (topBar?.classList.contains("visible") && topBar.contains(btn)) return true;
+            if (btn.id === "workspaceAgentFab") return window.innerWidth > 767;
+            const headerTools = document.getElementById("headerWorkspaceTools");
+            if (headerTools?.contains(btn)) return window.innerWidth > 767;
             const r = btn.getBoundingClientRect();
             return r.top < window.innerHeight * 0.3;
         }
@@ -11534,9 +11716,8 @@
         }
 
         function getAgentAnchorButton() {
-            const topBar = document.getElementById("workspaceAgentTopBar");
             const fab = document.getElementById("workspaceAgentFab");
-            if (topBar?.classList.contains("visible") && fab) return fab;
+            if (fab) return fab;
             if (agentFloatLauncher?.classList.contains("visible")) return agentFloatLauncher;
             return agentToggleBtn;
         }

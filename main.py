@@ -102,7 +102,9 @@ from media_store import (
     run_media_generation,
 )
 from pricing_store import (
+    AUDIO_PRICING_LABELS,
     CHAT_PRICING_LABELS,
+    CODE_PRICING_LABELS,
     IMAGE_PRICING_LABELS,
     VIDEO_PRICING_LABELS,
     admin_create_coin_grant,
@@ -499,11 +501,18 @@ COMPANY_PREFIXES: dict[str, str] = {
     "DeepSeek-Pro": "deepseek/",
     "GLM": "zhipuai/",
     "MiniMax": "minimax/",
+    "Qwen-Coder": "qwen/",
+    "DeepSeek-Coder": "deepseek/",
+    "Codex": "openai/",
+    "Claude-Code": "anthropic/",
 }
 
 COMPANY_LABELS = list(COMPANY_PREFIXES.keys())
 MODELS = list(CHAT_PRICING_LABELS)
-ALL_PRICING_LABELS = list(CHAT_PRICING_LABELS) + list(IMAGE_PRICING_LABELS) + list(VIDEO_PRICING_LABELS)
+ALL_PRICING_LABELS = (
+    list(CHAT_PRICING_LABELS) + list(CODE_PRICING_LABELS) + list(IMAGE_PRICING_LABELS)
+    + list(AUDIO_PRICING_LABELS) + list(VIDEO_PRICING_LABELS)
+)
 
 # UI 표시명 → 백엔드 라벨 (협업 intake 등)
 UI_LABEL_ALIASES: dict[str, str] = {
@@ -544,6 +553,8 @@ def label_modality(label: str) -> str:
     clean = (label or "").strip()
     if clean in MEDIA_PROVIDER_CONFIG:
         return MEDIA_PROVIDER_CONFIG[clean].modality
+    if clean in CODE_PRICING_LABELS:
+        return "code"
     return "chat"
 
 
@@ -602,6 +613,22 @@ PERSONAS: dict[str, str] = {
     "Anthropic-Opus": (NEUTRAL_SYSTEM_PROMPT),
     "GLM": (NEUTRAL_SYSTEM_PROMPT),
     "MiniMax": (NEUTRAL_SYSTEM_PROMPT),
+    "Qwen-Coder": (
+        NEUTRAL_SYSTEM_PROMPT
+        + " 프로그래밍·코드 작성 요청에는 실행 가능한 코드와 간단한 설명을 제공하세요."
+    ),
+    "DeepSeek-Coder": (
+        NEUTRAL_SYSTEM_PROMPT
+        + " 프로그래밍·코드 작성 요청에는 실행 가능한 코드와 간단한 설명을 제공하세요."
+    ),
+    "Codex": (
+        NEUTRAL_SYSTEM_PROMPT
+        + " 프로그래밍·코드 작성 요청에는 실행 가능한 코드와 간단한 설명을 제공하세요."
+    ),
+    "Claude-Code": (
+        NEUTRAL_SYSTEM_PROMPT
+        + " 프로그래밍·코드 작성 요청에는 실행 가능한 코드와 간단한 설명을 제공하세요."
+    ),
 }
 
 # 토론: 형식 토론이 아니라 주제/질문에 각자 답·비판·주장
@@ -741,6 +768,26 @@ LABEL_PROVIDER_CONFIG: dict[str, LabelProviderConfig] = {
         label="MiniMax",
         official_model_id="minimax/minimax-m2.1",
         substitute_chain=("minimax/minimax-01",),
+    ),
+    "Qwen-Coder": LabelProviderConfig(
+        label="Qwen-Coder",
+        official_model_id="qwen/qwen3-coder",
+        substitute_chain=("qwen/qwen3-coder:free", "deepseek/deepseek-chat"),
+    ),
+    "DeepSeek-Coder": LabelProviderConfig(
+        label="DeepSeek-Coder",
+        official_model_id="deepseek/deepseek-coder-v2",
+        substitute_chain=("deepseek/deepseek-chat",),
+    ),
+    "Codex": LabelProviderConfig(
+        label="Codex",
+        official_model_id="openai/gpt-5.3-codex",
+        substitute_chain=("openai/gpt-4o-mini", "openai/gpt-oss-20b:free"),
+    ),
+    "Claude-Code": LabelProviderConfig(
+        label="Claude-Code",
+        official_model_id="anthropic/claude-sonnet-4.6",
+        substitute_chain=("anthropic/claude-3.5-sonnet",),
     ),
 }
 
@@ -2106,6 +2153,7 @@ class MediaGenerateRequest(BaseModel):
     prompt: str = ""
     image_url: str = ""
     user_id: str = ""
+    aspect_ratio: str = "1:1"
 
 
 class StudioRunRequest(BaseModel):
@@ -2113,6 +2161,7 @@ class StudioRunRequest(BaseModel):
     prompt: str = ""
     image_url: str = ""
     user_id: str = ""
+    aspect_ratio: str = "1:1"
 
 
 class ChatAiRequest(BaseModel):
@@ -5459,7 +5508,7 @@ async def generate_image(data: MediaGenerateRequest, request: Request) -> dict:
     coin_cost = int(coin_info["coin_cost"])
     headers, header_error = openrouter_headers_or_error()
     cfg = MEDIA_PROVIDER_CONFIG[label]
-    if header_error and cfg.provider == "openrouter":
+    if header_error and cfg.provider in ("openrouter", "openrouter_image"):
         await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
         raise HTTPException(status_code=503, detail=header_error)
     try:
@@ -5468,11 +5517,38 @@ async def generate_image(data: MediaGenerateRequest, request: Request) -> dict:
             data.prompt,
             openrouter_headers=headers,
             image_url=(data.image_url or "").strip(),
+            aspect_ratio=(data.aspect_ratio or "1:1").strip() or "1:1",
         )
         return {"success": True, "label": label, "modality": "image", "media_url": url, "coin_cost": coin_cost}
     except FalServiceUnavailableError:
         await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
         _raise_fal_unavailable()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
+        raise HTTPException(status_code=502, detail=str(exc)[:500]) from exc
+
+
+@app.post("/media/generate-audio")
+async def generate_audio(data: MediaGenerateRequest, request: Request) -> dict:
+    label = (data.label or "").strip()
+    if label not in MEDIA_PROVIDER_CONFIG or MEDIA_PROVIDER_CONFIG[label].modality != "audio":
+        raise HTTPException(status_code=400, detail="Invalid audio model label")
+    coin_info = await require_model_coin(
+        request, label, modality="audio", device_id=data.user_id, feature="studio", action="generate_audio"
+    )
+    subject = coin_info["subject"]
+    coin_cost = int(coin_info["coin_cost"])
+    headers, header_error = openrouter_headers_or_error()
+    if header_error:
+        await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
+        raise HTTPException(status_code=503, detail=header_error)
+    try:
+        url = await run_media_generation(
+            label, data.prompt, openrouter_headers=headers,
+        )
+        return {"success": True, "label": label, "modality": "audio", "media_url": url, "coin_cost": coin_cost}
     except HTTPException:
         raise
     except Exception as exc:
@@ -5512,35 +5588,50 @@ def media_job_status(job_id: str, request: Request) -> dict:
 async def studio_run(data: StudioRunRequest, request: Request) -> dict:
     label = resolve_company_label((data.label or "").strip())
     modality = label_modality(label)
-    if modality == "chat":
-        if label not in COMPANY_LABELS:
-            raise HTTPException(status_code=400, detail="Invalid chat model")
+    prompt = (data.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="프롬프트를 입력하세요.")
+    if modality in ("chat", "code"):
+        allowed = CHAT_PRICING_LABELS if modality == "chat" else CODE_PRICING_LABELS
+        if label not in allowed:
+            raise HTTPException(status_code=400, detail="Invalid model")
         await require_model_coin(
-            request, label, device_id=data.user_id, feature="studio", action="studio_chat"
+            request, label, modality=modality, device_id=data.user_id,
+            feature="studio", action=f"studio_{modality}",
         )
-        result = await call_ai_best((data.prompt or "").strip(), max_tokens=2500, preferred_labels=[label])
+        result = await call_ai_best(prompt, max_tokens=2500, preferred_labels=[label])
         if not result.success:
             raise HTTPException(status_code=502, detail=result.error or "생성 실패")
         return {
             "success": True,
-            "modality": "chat",
+            "modality": modality,
             "label": label,
             "text": result.content,
-            "coin_cost": get_model_coin_cost(label),
+            "coin_cost": get_model_coin_cost(label, modality),
         }
     if modality == "image":
         if is_fal_media_label(label):
             _raise_fal_unavailable()
         return await generate_image(
-            MediaGenerateRequest(label=label, prompt=data.prompt, image_url=data.image_url, user_id=data.user_id),
+            MediaGenerateRequest(
+                label=label, prompt=prompt, image_url=data.image_url,
+                user_id=data.user_id, aspect_ratio=data.aspect_ratio,
+            ),
             request,
         )
-    if is_fal_media_label(label):
-        _raise_fal_unavailable()
-    return await generate_video(
-        MediaGenerateRequest(label=label, prompt=data.prompt, image_url=data.image_url, user_id=data.user_id),
-        request,
-    )
+    if modality == "audio":
+        return await generate_audio(
+            MediaGenerateRequest(label=label, prompt=prompt, user_id=data.user_id),
+            request,
+        )
+    if modality == "video":
+        if is_fal_media_label(label):
+            _raise_fal_unavailable()
+        return await generate_video(
+            MediaGenerateRequest(label=label, prompt=prompt, image_url=data.image_url, user_id=data.user_id),
+            request,
+        )
+    raise HTTPException(status_code=400, detail="지원하지 않는 모델입니다.")
 
 
 @app.post("/social/chat/{room_id}/ai")
