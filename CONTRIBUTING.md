@@ -37,3 +37,9 @@ GitHub `main` push 후 몇 분 안에 Railway 배포 상태·로그를 확인합
 
 - **주 배포**: Railway (`railway.json`, `RAILWAY_PUBLIC_DOMAIN` / `PUBLIC_APP_URL`)
 - Render URL 하드코딩 금지 — 동적 `/api/config`, `deploy-hint.js` 사용
+
+## 5. 프론트엔드 모듈 초기화
+
+- `window.NasaroFeatures`, `StudioApp`, `SocialFeatures`, `AgentPlanUI` 등 외부 `<script>` 모듈 **로드 실패 시에도 핵심 부트스트랩은 반드시 실행**한다.
+- **`if (!window.SomeModule) return;`으로 전체 앱 초기화를 중단하는 패턴 금지.** 부가 모듈만 `if (window.X)` / `X?.` 가드 + `console.warn`.
+- 새 `/static/*.js` 추가 시 git 커밋·배포 산출물 포함 여부를 확인한다.

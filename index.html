@@ -7266,13 +7266,19 @@
                 box.innerHTML = "<div style='font-size:11px;color:#9ca3af;'>아직 기록 없음</div>";
                 return;
             }
-            StudioApp.renderHistoryGrid(box, studioHistory.map(h => ({
-                mod: h.modality,
-                prompt: h.prompt,
-                label: h.label,
-                url: h.url || h.result?.media_url,
-                thumb: h.thumb || h.result?.media_url,
-            })));
+            if (window.StudioApp?.renderHistoryGrid) {
+                StudioApp.renderHistoryGrid(box, studioHistory.map(h => ({
+                    mod: h.modality,
+                    prompt: h.prompt,
+                    label: h.label,
+                    url: h.url || h.result?.media_url,
+                    thumb: h.thumb || h.result?.media_url,
+                })));
+                return;
+            }
+            box.innerHTML = studioHistory.slice(0, 8).map(h =>
+                `<div style="font-size:11px;padding:4px 0;border-bottom:1px solid #f3f4f6;">${escapeHtml(h.label || "")} · ${escapeHtml((h.prompt || "").slice(0, 40))}</div>`
+            ).join("");
         }
 
         function pushStudioHistory(entry) {
@@ -7286,6 +7292,11 @@
             resultEl.className = "studio-result-body studio-result-mount";
             studioLastResult = data;
             const mod = data.modality || studioModality;
+            if (!window.StudioApp?.mount) {
+                resultEl.textContent = data.text || data.media_url || "(결과 없음)";
+                enableStudioActionButtons();
+                return;
+            }
             if (mod === "video" && data.job_id && !data.media_url) {
                 StudioApp.mount({
                     polling: true,
@@ -7355,7 +7366,8 @@
             const btn = document.getElementById("studioRunBtn");
             const resultEl = document.getElementById("studioResult");
             if (btn) btn.disabled = true;
-            StudioApp.showSkeleton();
+            if (window.StudioApp?.showSkeleton) StudioApp.showSkeleton();
+            else if (resultEl) resultEl.innerHTML = "<div style='padding:16px;color:#9ca3af;'>생성 중…</div>";
             try {
                 const deviceId = await ensureDeviceId();
                 let promptForApi = prompt;
@@ -7409,7 +7421,7 @@
 
         async function saveStudioAsWork() {
             if (!studioLastResult || !currentUser) { showToast("로그인 후 저장할 수 있습니다.", "warn"); return; }
-            const exp = StudioApp.getExportData();
+            const exp = window.StudioApp?.getExportData?.() || {};
             const title = (studioSelectedLabel + " · " + studioModality).slice(0, 80);
             const bodyText = exp.text || studioLastResult.text || title;
             const mediaUrl = exp.url || studioLastResult.media_url || "";
@@ -10379,7 +10391,7 @@
             updateStudioOptionsUI();
         });
         document.getElementById("studioCopyBtn")?.addEventListener("click", async () => {
-            const exp = StudioApp.getExportData();
+            const exp = window.StudioApp?.getExportData?.() || {};
             const text = exp.text || exp.url || studioLastResult?.text || studioLastResult?.media_url || "";
             if (!text) return;
             try {
@@ -10388,7 +10400,7 @@
             } catch { showToast("복사 실패", "error"); }
         });
         document.getElementById("studioDownloadBtn")?.addEventListener("click", () => {
-            const exp = StudioApp.getExportData();
+            const exp = window.StudioApp?.getExportData?.() || {};
             const url = exp.url || studioLastResult?.media_url;
             const text = exp.text || studioLastResult?.text;
             if (url) {
@@ -10580,6 +10592,10 @@
         function renderWorksStories(friends) {
             const bar = document.getElementById("worksStoriesBar");
             if (!bar) return;
+            if (!window.SocialFeatures) {
+                console.warn("SocialFeatures 모듈 없음 — 스토리 UI 비활성화");
+                return;
+            }
             SocialFeatures.loadStories(apiFetch).then(groups => {
                 if (groups.length) {
                     SocialFeatures.renderStoryBar(bar, groups, (g, idx) => SocialFeatures.openViewer(groups, idx));
@@ -11102,10 +11118,12 @@
                 if (!feed || worksFeedLoading || !worksFeedHasMore) return;
                 if (feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 120) loadWorksFeed(true);
             });
-            SocialFeatures.bindDoubleTapLike(document.getElementById("worksFeed"), (workId) => {
-                const btn = document.querySelector(`.works-coin-btn[data-tip="${workId}"]:not([disabled])`);
-                if (btn && btn.dataset.cancel !== "1") sendWorkCoinTip(workId, btn);
-            });
+            if (window.SocialFeatures?.bindDoubleTapLike) {
+                SocialFeatures.bindDoubleTapLike(document.getElementById("worksFeed"), (workId) => {
+                    const btn = document.querySelector(`.works-coin-btn[data-tip="${workId}"]:not([disabled])`);
+                    if (btn && btn.dataset.cancel !== "1") sendWorkCoinTip(workId, btn);
+                });
+            }
         }
 
         function scheduleWorkTipCountdown(workId, seconds) {
@@ -12064,7 +12082,7 @@
                 if (!d || d.__nasaroai !== "agent") return;
                 if (d.type === "READY") setExtReady(true);
                 if (d.type === "HANDOFF" && agentHistory) {
-                    AgentPlanUI.showHandoff(agentHistory, d.reason || "민감 단계입니다. 직접 진행 후 계속하기를 눌러주세요.", () => {
+                    window.AgentPlanUI?.showHandoff?.(agentHistory, d.reason || "민감 단계입니다. 직접 진행 후 계속하기를 눌러주세요.", () => {
                         window.postMessage({ __nasaroai: "agent", type: "RESUME_TASK" }, "*");
                     });
                 }
@@ -12576,17 +12594,17 @@
 
             try {
                 let planStep = 0;
-                AgentPlanUI.markDone?.(planStep - 1);
+                AgentPlanUI?.markDone?.(planStep - 1);
                 // 1차: 브라우저 자동화 시도
                 let res = await doFetch("/agent/task", { query: mission });
-                AgentPlanUI.markDone?.(planStep++);
+                AgentPlanUI?.markDone?.(planStep++);
 
                 // 브라우저 오류(503) → LLM 폴백
                 if (res.status === 503) {
                     usedFallback = true;
                     const recentHistory = agentMissionHistory.slice(-3);
                     res = await doFetch("/agent/ask", { query: mission, history: recentHistory });
-                    AgentPlanUI.markDone?.(planStep++);
+                    AgentPlanUI?.markDone?.(planStep++);
                 }
 
                 if (res.status === 429) {
@@ -12595,7 +12613,7 @@
 
                 const data = await res.json();
                 if (data.handoff_required) {
-                    AgentPlanUI.showHandoff(agentHistory, data.reason || data.message || "사용자 개입이 필요합니다.", async () => {
+                    window.AgentPlanUI?.showHandoff?.(agentHistory, data.reason || data.message || "사용자 개입이 필요합니다.", async () => {
                         runAgentMission(mission, false, appendToCard);
                     });
                     finalizeCard(cardRefs, "ok", data.reason || "핸드오프 대기 중", mission, Date.now() - startTime);
@@ -12607,7 +12625,7 @@
                 const suffix  = usedFallback ? "\n\n⚠️ [브라우저 없이 LLM으로 실행됨]" : "";
                 if (data.model) appendCardLog(cardRefs.logEl, "모델: " + data.model);
                 finalizeCard(cardRefs, "ok", content + suffix, mission, Date.now() - startTime);
-                AgentPlanUI.markDone?.(99);
+                AgentPlanUI?.markDone?.(99);
 
                 // 기록 추가
                 agentMissionHistory.push({ mission, result: content.slice(0, 300) });
@@ -12752,10 +12770,12 @@
             }
             try {
                 setAgentStatus("loading", "실행 계획 작성 중…");
-                const steps = await fetchAgentPlan(val, await ensureDeviceId());
-                if (agentHistory && steps?.length) {
+                const steps = window.fetchAgentPlan
+                    ? await fetchAgentPlan(val, await ensureDeviceId())
+                    : null;
+                if (agentHistory && steps?.length && window.AgentPlanUI?.mount) {
                     AgentPlanUI.mount(agentHistory, steps, () => {
-                        AgentPlanUI.destroy();
+                        AgentPlanUI.destroy?.();
                         runAgentMission(val, false, null);
                     });
                     setAgentStatus("idle", "계획을 확인한 뒤 실행하세요");
@@ -14644,26 +14664,11 @@
             await handleDebateContinue(userInput);
         }
 
-        (function initNasaroFeatures() {
-            const NF = window.NasaroFeatures;
-            if (!NF) return;
-            rebuildMainToolbar();
-            rebuildWorkspaceTopBar();
-            rebuildAgentToolbar();
-            const langSel = document.getElementById("settingsLangSelect");
-            const themeSel = document.getElementById("settingsThemeSelect");
-            if (langSel) {
-                langSel.value = NF.lang;
-                langSel.addEventListener("change", e => { NF.lang = e.target.value; refreshAppLang(); });
-            }
-            if (themeSel) { themeSel.value = NF.theme; themeSel.addEventListener("change", e => { NF.theme = e.target.value; }); }
-            NF.startAgentScheduleChecker(mission => {
-                showToast((NF.t("scheduled_done") || "예약 임무 실행") + ": " + mission, "success", 5000);
-                executeScheduledAgentMission(mission);
-            });
-            document.getElementById("collabIntakeSkipBtn")?.addEventListener("click", () => skipCollabIntakeToRecommend());
-            window.addEventListener("nasaroai:lang", refreshAppLang);
-            NF.loadShareFromUrl(apiFetch, showToast);
+        (function coreBootstrap() {
+            try { rebuildMainToolbar(); } catch (e) { console.error("rebuildMainToolbar 실패", e); }
+            try { rebuildWorkspaceTopBar(); } catch (e) { console.error("rebuildWorkspaceTopBar 실패", e); }
+            try { rebuildAgentToolbar(); } catch (e) { console.error("rebuildAgentToolbar 실패", e); }
+
             wirePreviewModals();
             renderActiveCollabSidebar();
             loadSavedResults();
@@ -14676,20 +14681,39 @@
             bootstrapApiCheck();
             loadPricingCatalog().catch(() => {});
             maybeShowSitePopup();
+
             if (window.StudioApp) {
-                StudioApp.init(document.getElementById("studioResult"));
-                StudioApp.bindUploadZone(
-                    document.getElementById("studioUploadZone"),
-                    document.getElementById("studioUploadInput"),
-                    (url) => {
-                        const ref = document.getElementById("studioImageUrl");
-                        if (ref) ref.value = url.startsWith("http") ? url : (getApiBase() + url);
-                    }
-                );
-                StudioApp.setModality("chat");
+                try {
+                    StudioApp.init(document.getElementById("studioResult"));
+                    StudioApp.bindUploadZone(
+                        document.getElementById("studioUploadZone"),
+                        document.getElementById("studioUploadInput"),
+                        (url) => {
+                            const ref = document.getElementById("studioImageUrl");
+                            if (ref) ref.value = url.startsWith("http") ? url : (getApiBase() + url);
+                        }
+                    );
+                    StudioApp.setModality("chat");
+                } catch (e) {
+                    console.error("StudioApp 초기화 실패", e);
+                }
+            } else {
+                console.warn("StudioApp 모듈이 로드되지 않았습니다. /static/studio-renderers.js, studio-code.js 확인 필요.");
             }
+
             window.ensureDeviceId = ensureDeviceId;
             window.showToast = showToast;
+
+            bindWorksFeedTabs();
+            initNotifications();
+            loadAgentTemplates();
+            ensureDeviceId().finally(() => {
+                startPresencePing();
+                refreshSideQuota();
+            });
+
+            document.getElementById("collabIntakeSkipBtn")?.addEventListener("click", () => skipCollabIntakeToRecommend());
+
             window.addEventListener("studio:history-select", (e) => {
                 const h = e.detail;
                 if (!h) return;
@@ -14707,13 +14731,32 @@
                 }
             });
             window.addEventListener("studio:video-retry", () => runStudioGenerate());
-            bindWorksFeedTabs();
-            initNotifications();
-            loadAgentTemplates();
-            ensureDeviceId().finally(() => {
-                startPresencePing();
-                refreshSideQuota();
-            });
+
+            const NF = window.NasaroFeatures;
+            if (NF) {
+                try {
+                    const langSel = document.getElementById("settingsLangSelect");
+                    const themeSel = document.getElementById("settingsThemeSelect");
+                    if (langSel) {
+                        langSel.value = NF.lang;
+                        langSel.addEventListener("change", e => { NF.lang = e.target.value; refreshAppLang(); });
+                    }
+                    if (themeSel) {
+                        themeSel.value = NF.theme;
+                        themeSel.addEventListener("change", e => { NF.theme = e.target.value; });
+                    }
+                    NF.startAgentScheduleChecker(mission => {
+                        showToast((NF.t("scheduled_done") || "예약 임무 실행") + ": " + mission, "success", 5000);
+                        executeScheduledAgentMission(mission);
+                    });
+                    NF.loadShareFromUrl(apiFetch, showToast);
+                    window.addEventListener("nasaroai:lang", refreshAppLang);
+                } catch (e) {
+                    console.error("NasaroFeatures 부가 초기화 실패", e);
+                }
+            } else {
+                console.warn("NasaroFeatures 모듈이 로드되지 않았습니다. 언어/테마/예약 임무 등 부가 기능이 비활성화됩니다.");
+            }
         })();
 
         try { if (window.lucide?.createIcons) window.lucide.createIcons(); } catch {}
