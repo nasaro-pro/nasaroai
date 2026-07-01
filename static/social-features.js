@@ -90,7 +90,7 @@
     },
 
     async promptCreateStory(apiFetch) {
-      if (!global.currentUser) {
+      if (!window.currentUser) {
         if (global.showToast) global.showToast("로그인 후 스토리를 올릴 수 있습니다.", "warn");
         return;
       }

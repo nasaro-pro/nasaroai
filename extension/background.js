@@ -5,7 +5,7 @@
 //  - 임무 상태는 chrome.storage.local(agentTasks)에 저장 → 모든 탭이 storage.onChanged로 공유한다.
 //  - PAUSE_TASK / RESUME_TASK / CANCEL_TASK 메시지로 임무를 제어한다.
 
-const DEFAULT_SERVER    = "https://nasaroai.onrender.com";
+const DEFAULT_SERVER    = "";
 const DEBUGGER_VERSION  = "1.3";
 const MAX_ROUNDS        = 20;
 const INTERNAL_URL_RE   = /^(chrome|edge|brave|about|chrome-extension|devtools|view-source|chrome-search):/i;
@@ -26,8 +26,49 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 async function getServerUrl() {
   try {
     const { serverUrl } = await chrome.storage.local.get("serverUrl");
-    return (serverUrl || DEFAULT_SERVER).trim().replace(/\/+$/, "") || DEFAULT_SERVER;
+    const stored = (serverUrl || "").trim().replace(/\/+$/, "");
+    if (stored) return stored;
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (!tab.url || INTERNAL_URL_RE.test(tab.url)) continue;
+      try {
+        const u = new URL(tab.url);
+        if (u.protocol === "http:" || u.protocol === "https:") {
+          const base = u.origin;
+          await chrome.storage.local.set({ serverUrl: base });
+          return base;
+        }
+      } catch {}
+    }
+    return DEFAULT_SERVER;
   } catch { return DEFAULT_SERVER; }
+}
+
+async function showElementHighlight(tabId, rect) {
+  if (!rect || !tabId) return;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (r) => {
+        const id = "__nasaro_highlight__";
+        let el = document.getElementById(id);
+        if (!el) {
+          el = document.createElement("div");
+          el.id = id;
+          el.style.cssText = "position:fixed;pointer-events:none;z-index:2147483646;border:3px solid #7c3aed;border-radius:6px;box-shadow:0 0 0 4px rgba(124,58,237,.25);transition:opacity .3s;";
+          document.documentElement.appendChild(el);
+        }
+        el.style.top = (r.top - 3) + "px";
+        el.style.left = (r.left - 3) + "px";
+        el.style.width = (r.width + 6) + "px";
+        el.style.height = (r.height + 6) + "px";
+        el.style.opacity = "1";
+        clearTimeout(el._hideTimer);
+        el._hideTimer = setTimeout(() => { el.style.opacity = "0"; }, 1600);
+      },
+      args: [rect],
+    });
+  } catch {}
 }
 
 function sendToTab(tabId, msg) {
@@ -227,7 +268,8 @@ function buildResolveExpression(agentId) {
     if (!el) return { found: false };
     el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
-    return { found: true, x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    return { found: true, x: r.left + r.width / 2, y: r.top + r.height / 2,
+      rect: { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width), height: Math.round(r.height) } };
   })()`;
 }
 
@@ -308,12 +350,14 @@ async function executeAction(tabId, action) {
       if (!safe) return { success: false, error: "잘못된 요소 ID: " + action.target_id };
       const c = await resolveElementCenter(tabId, safe);
       if (!c.found) return { success: false, error: "요소 없음(클릭): " + safe };
+      if (c.rect) await showElementHighlight(tabId, c.rect);
       await dispatchClickAt(tabId, c.x, c.y);
     } else if (type === "type") {
       const safe = safeAgentId(action.target_id);
       if (!safe) return { success: false, error: "잘못된 요소 ID: " + action.target_id };
       const c = await resolveElementCenter(tabId, safe);
       if (!c.found) return { success: false, error: "요소 없음(입력): " + safe };
+      if (c.rect) await showElementHighlight(tabId, c.rect);
       await dispatchClickAt(tabId, c.x, c.y);
       await sendCommand(tabId, "Runtime.evaluate", {
         expression: `(() => { const el = document.querySelector('[data-agent-id="${safe}"]'); if (el) { el.focus(); if (el.select) el.select(); } })()`,
@@ -665,9 +709,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       } else if (message.type === "SET_SERVER_URL") {
         const raw = String(message.serverUrl || "").trim().replace(/\/+$/, "");
-        const url = raw ? (raw.startsWith("http") ? raw : "https://" + raw) : DEFAULT_SERVER;
-        await chrome.storage.local.set({ serverUrl: url });
-        sendResponse({ ok: true, serverUrl: url });
+        const url = raw ? (raw.startsWith("http") ? raw : "https://" + raw) : "";
+        if (url) await chrome.storage.local.set({ serverUrl: url });
+        sendResponse({ ok: true, serverUrl: url || (await getServerUrl()) });
 
       } else if (message.type === "AX_REQUEST_SYNC") {
         const tabId = sender.tab?.id;

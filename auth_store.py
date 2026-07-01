@@ -407,6 +407,20 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE work_comments ADD COLUMN commenter_type TEXT NOT NULL DEFAULT 'user'")
             if "model_label" not in wc_cols:
                 conn.execute("ALTER TABLE work_comments ADD COLUMN model_label TEXT NOT NULL DEFAULT ''")
+            if "parent_id" not in wc_cols:
+                conn.execute("ALTER TABLE work_comments ADD COLUMN parent_id INTEGER NOT NULL DEFAULT 0")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS work_comment_likes (
+                    comment_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at REAL NOT NULL,
+                    PRIMARY KEY (comment_id, user_id),
+                    FOREIGN KEY (comment_id) REFERENCES work_comments(id),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+                """
+            )
             pw_cols = {r[1] for r in conn.execute("PRAGMA table_info(public_works)").fetchall()}
             if "media_type" not in pw_cols:
                 conn.execute("ALTER TABLE public_works ADD COLUMN media_type TEXT NOT NULL DEFAULT ''")
@@ -468,6 +482,8 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE user_chat_messages ADD COLUMN attachment_url TEXT NOT NULL DEFAULT ''")
             if "reply_to_id" not in ucm_cols:
                 conn.execute("ALTER TABLE user_chat_messages ADD COLUMN reply_to_id INTEGER NOT NULL DEFAULT 0")
+            if "reactions" not in ucm_cols:
+                conn.execute("ALTER TABLE user_chat_messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '{}'")
             from pricing_store import ensure_pricing_tables, seed_model_pricing, process_due_coin_grants
 
             ensure_pricing_tables(conn)
@@ -2698,22 +2714,28 @@ def create_public_work(
     })
 
 
-def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
+def list_work_comments(work_id: int, limit: int = 80, viewer_id: int = 0) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit or 80), 200))
     with _lock:
         conn = _connect()
         try:
             rows = conn.execute(
                 """
-                SELECT id, work_id, user_id, author_name, body, created_at,
-                       COALESCE(commenter_type, 'user') AS commenter_type,
-                       COALESCE(model_label, '') AS model_label
-                FROM work_comments
-                WHERE work_id = ?
-                ORDER BY created_at ASC
+                SELECT wc.id, wc.work_id, wc.user_id, wc.author_name, wc.body, wc.created_at,
+                       COALESCE(wc.commenter_type, 'user') AS commenter_type,
+                       COALESCE(wc.model_label, '') AS model_label,
+                       COALESCE(wc.parent_id, 0) AS parent_id,
+                       (SELECT COUNT(*) FROM work_comment_likes wcl WHERE wcl.comment_id = wc.id) AS like_count,
+                       EXISTS(
+                           SELECT 1 FROM work_comment_likes wcl2
+                           WHERE wcl2.comment_id = wc.id AND wcl2.user_id = ?
+                       ) AS liked_by_me
+                FROM work_comments wc
+                WHERE wc.work_id = ?
+                ORDER BY wc.created_at ASC
                 LIMIT ?
                 """,
-                (work_id, limit),
+                (int(viewer_id or 0), work_id, limit),
             ).fetchall()
         finally:
             conn.close()
@@ -2725,8 +2747,9 @@ def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
         "body": r["body"],
         "commenter_type": r["commenter_type"],
         "model_label": r["model_label"],
-        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
-        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
+        "parent_id": int(r["parent_id"] or 0),
+        "like_count": int(r["like_count"] or 0),
+        "liked_by_me": bool(r["liked_by_me"]),
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
     } for r in rows]
@@ -2740,6 +2763,7 @@ def add_work_comment(
     *,
     commenter_type: str = "user",
     model_label: str = "",
+    parent_id: int = 0,
 ) -> dict[str, Any]:
     body = (body or "").strip()[:2000]
     if not body:
@@ -2747,6 +2771,7 @@ def add_work_comment(
     now = time.time()
     ctype = (commenter_type or "user").strip()[:16] or "user"
     mlabel = (model_label or "").strip()[:64]
+    pid = max(0, int(parent_id or 0))
     with _lock:
         conn = _connect()
         try:
@@ -2757,12 +2782,19 @@ def add_work_comment(
             if not row:
                 raise ValueError("작업을 찾을 수 없습니다.")
             owner_id = int(row["user_id"])
+            if pid:
+                parent = conn.execute(
+                    "SELECT id FROM work_comments WHERE id = ? AND work_id = ?",
+                    (pid, work_id),
+                ).fetchone()
+                if not parent:
+                    raise ValueError("원 댓글을 찾을 수 없습니다.")
             cur = conn.execute(
                 """
-                INSERT INTO work_comments (work_id, user_id, author_name, body, created_at, commenter_type, model_label)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO work_comments (work_id, user_id, author_name, body, created_at, commenter_type, model_label, parent_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (work_id, user_id, (author_name or "").strip()[:64], body, now, ctype, mlabel),
+                (work_id, user_id, (author_name or "").strip()[:64], body, now, ctype, mlabel, pid),
             )
             conn.commit()
             comment_id = int(cur.lastrowid)
@@ -2787,9 +2819,112 @@ def add_work_comment(
         "body": body,
         "commenter_type": ctype,
         "model_label": mlabel,
+        "parent_id": pid,
+        "like_count": 0,
+        "liked_by_me": False,
         "created_at": now,
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(now)),
     }
+
+
+def toggle_work_comment_like(comment_id: int, user_id: int) -> dict[str, Any]:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute("SELECT id FROM work_comments WHERE id = ?", (comment_id,)).fetchone()
+            if not row:
+                raise ValueError("댓글을 찾을 수 없습니다.")
+            existing = conn.execute(
+                "SELECT 1 FROM work_comment_likes WHERE comment_id = ? AND user_id = ?",
+                (comment_id, user_id),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "DELETE FROM work_comment_likes WHERE comment_id = ? AND user_id = ?",
+                    (comment_id, user_id),
+                )
+                liked = False
+            else:
+                conn.execute(
+                    "INSERT INTO work_comment_likes (comment_id, user_id, created_at) VALUES (?, ?, ?)",
+                    (comment_id, user_id, now),
+                )
+                liked = True
+            count = conn.execute(
+                "SELECT COUNT(*) AS c FROM work_comment_likes WHERE comment_id = ?",
+                (comment_id,),
+            ).fetchone()["c"]
+            conn.commit()
+        finally:
+            conn.close()
+    return {"comment_id": comment_id, "liked": liked, "like_count": int(count or 0)}
+
+
+def _parse_reactions(raw: str) -> dict[str, list[int]]:
+    try:
+        data = json.loads(raw or "{}")
+        if not isinstance(data, dict):
+            return {}
+        out: dict[str, list[int]] = {}
+        for emoji, uids in data.items():
+            if isinstance(uids, list):
+                out[str(emoji)[:8]] = [int(u) for u in uids if isinstance(u, (int, float))]
+        return out
+    except Exception:
+        return {}
+
+
+def _format_chat_message(r, user_id: int) -> dict[str, Any]:
+    reactions = _parse_reactions(r["reactions"] if "reactions" in r.keys() else "{}")
+    return {
+        "id": r["id"],
+        "room_id": r["room_id"],
+        "sender_id": r["sender_id"],
+        "sender_name": r["sender_name"],
+        "body": r["body"],
+        "sender_type": r["sender_type"],
+        "model_label": r["model_label"],
+        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
+        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
+        "reactions": reactions,
+        "created_at": r["created_at"],
+        "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
+        "is_mine": r["sender_id"] == user_id,
+    }
+
+
+def toggle_message_reaction(message_id: int, user_id: int, emoji: str) -> dict[str, Any]:
+    emoji = (emoji or "").strip()[:8]
+    if not emoji:
+        raise ValueError("이모지를 선택하세요.")
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT id, reactions FROM user_chat_messages WHERE id = ?",
+                (message_id,),
+            ).fetchone()
+            if not row:
+                raise ValueError("메시지를 찾을 수 없습니다.")
+            reactions = _parse_reactions(row["reactions"])
+            users = reactions.get(emoji, [])
+            if user_id in users:
+                users = [u for u in users if u != user_id]
+            else:
+                users = users + [user_id]
+            if users:
+                reactions[emoji] = users
+            elif emoji in reactions:
+                del reactions[emoji]
+            conn.execute(
+                "UPDATE user_chat_messages SET reactions = ? WHERE id = ?",
+                (json.dumps(reactions, ensure_ascii=False), message_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"message_id": message_id, "emoji": emoji, "reactions": reactions}
 
 
 def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict[str, Any]]:
@@ -2809,7 +2944,8 @@ def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict
                        COALESCE(sender_type, 'user') AS sender_type,
                        COALESCE(model_label, '') AS model_label,
                        COALESCE(attachment_url, '') AS attachment_url,
-                       COALESCE(reply_to_id, 0) AS reply_to_id
+                       COALESCE(reply_to_id, 0) AS reply_to_id,
+                       COALESCE(reactions, '{}') AS reactions
                 FROM user_chat_messages
                 WHERE room_id = ?
                 ORDER BY created_at ASC
@@ -2819,20 +2955,7 @@ def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict
             ).fetchall()
         finally:
             conn.close()
-    return [{
-        "id": r["id"],
-        "room_id": r["room_id"],
-        "sender_id": r["sender_id"],
-        "sender_name": r["sender_name"],
-        "body": r["body"],
-        "sender_type": r["sender_type"],
-        "model_label": r["model_label"],
-        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
-        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
-        "created_at": r["created_at"],
-        "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
-        "is_mine": r["sender_id"] == user_id,
-    } for r in rows]
+    return [_format_chat_message(r, user_id) for r in rows]
 
 
 def send_chat_message(
@@ -3378,7 +3501,8 @@ def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict
                            COALESCE(sender_type, 'user') AS sender_type,
                            COALESCE(model_label, '') AS model_label,
                            COALESCE(attachment_url, '') AS attachment_url,
-                           COALESCE(reply_to_id, 0) AS reply_to_id
+                           COALESCE(reply_to_id, 0) AS reply_to_id,
+                           COALESCE(reactions, '{}') AS reactions
                     FROM user_chat_messages WHERE room_id = ? ORDER BY created_at ASC LIMIT ?
                     """,
                     (room_id, limit),
@@ -3393,20 +3517,7 @@ def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict
         if not _are_friends(user_id, peer_id):
             raise ValueError("친구만 1:1 채팅할 수 있습니다.")
         return get_chat_messages(user_id, peer_id, limit=limit)
-    return [{
-        "id": r["id"],
-        "room_id": r["room_id"],
-        "sender_id": r["sender_id"],
-        "sender_name": r["sender_name"],
-        "body": r["body"],
-        "sender_type": r["sender_type"],
-        "model_label": r["model_label"],
-        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
-        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
-        "created_at": r["created_at"],
-        "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
-        "is_mine": r["sender_id"] == user_id,
-    } for r in rows]
+    return [_format_chat_message(r, user_id) for r in rows]
 
 
 def send_room_message(

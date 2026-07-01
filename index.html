@@ -5053,6 +5053,62 @@
             display: none;
         }
         .chat-typing-indicator.visible { display: block; }
+        .chat-reply-bar {
+            display: none;
+            padding: 6px 12px;
+            background: #f3f4f6;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #4b5563;
+            align-items: center;
+            gap: 8px;
+        }
+        .chat-reply-bar.visible { display: flex; }
+        .chat-reply-bar button {
+            margin-left: auto;
+            border: 0;
+            background: none;
+            cursor: pointer;
+            color: #9ca3af;
+        }
+        .chat-bubble-reply {
+            font-size: 11px;
+            color: #6b7280;
+            border-left: 3px solid #c4b5fd;
+            padding-left: 8px;
+            margin-bottom: 6px;
+        }
+        .chat-reactions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        .chat-reaction-btn {
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .chat-react-picker {
+            display: inline-flex;
+            gap: 2px;
+            margin-left: 4px;
+        }
+        .chat-react-picker button {
+            border: 0;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+        }
+        .app-rail-btn .rail-icon {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+        }
         .discord-msg-row {
             display: flex;
             gap: 12px;
@@ -5818,6 +5874,34 @@
             padding: 6px 0;
             border-bottom: 1px solid #f9fafb;
         }
+        .works-comment-item.nested {
+            margin-left: 18px;
+            padding-left: 10px;
+            border-left: 2px solid #e5e7eb;
+        }
+        .works-comment-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+            align-items: center;
+        }
+        .works-comment-like {
+            border: 0;
+            background: none;
+            cursor: pointer;
+            font-size: 11px;
+            color: #6b7280;
+            padding: 0;
+        }
+        .works-comment-like.liked { color: #dc2626; font-weight: 700; }
+        .works-comment-reply {
+            border: 0;
+            background: none;
+            cursor: pointer;
+            font-size: 11px;
+            color: #7c3aed;
+            padding: 0;
+        }
         .works-comment-form {
             display: flex;
             gap: 6px;
@@ -6193,12 +6277,12 @@
         <div id="sideMenuOverlay" class="side-menu-overlay"></div>
         <div id="desktopChrome" class="desktop-chrome">
         <nav id="appRailDesktop" class="app-rail app-rail--desktop" aria-label="앱 메뉴">
-            <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문">🤖</button>
-            <button type="button" class="app-rail-btn" data-workspace="studio" title="AI 스튜디오">🎨</button>
-            <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅">💬</button>
-            <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유">📋</button>
-            <button type="button" class="app-rail-btn" data-workspace="home" title="홈">🏠</button>
-            <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtn" title="메뉴" aria-label="메뉴">☰</button>
+            <button type="button" class="app-rail-btn active" data-workspace="ai" title="AI 질문"><i data-lucide="bot" class="rail-icon"></i></button>
+            <button type="button" class="app-rail-btn" data-workspace="studio" title="AI 스튜디오"><i data-lucide="palette" class="rail-icon"></i></button>
+            <button type="button" class="app-rail-btn" data-workspace="chat" title="계정 채팅"><i data-lucide="message-circle" class="rail-icon"></i></button>
+            <button type="button" class="app-rail-btn" data-workspace="works" title="작업 공유"><i data-lucide="layout-grid" class="rail-icon"></i></button>
+            <button type="button" class="app-rail-btn" data-workspace="home" title="홈"><i data-lucide="home" class="rail-icon"></i></button>
+            <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtn" title="메뉴" aria-label="메뉴"><i data-lucide="menu" class="rail-icon"></i></button>
         </nav>
         <aside id="sideMenu" class="side-menu" aria-label="메뉴">
             <div class="side-menu-header">
@@ -6687,6 +6771,10 @@
                         </div>
                         <div id="chatMessages" class="discord-messages"></div>
                         <div id="chatTypingIndicator" class="chat-typing-indicator" aria-hidden="true">전송 중…</div>
+                        <div id="chatReplyBar" class="chat-reply-bar" aria-hidden="true">
+                            <span id="chatReplyPreview">답장</span>
+                            <button type="button" id="chatReplyCancel" aria-label="답장 취소">✕</button>
+                        </div>
                         <div class="discord-compose">
                             <button id="chatAttachBtn" type="button" class="chat-ai-btn" title="이미지 첨부">📎</button>
                             <input type="file" id="chatAttachInput" accept="image/*" hidden>
@@ -6996,12 +7084,12 @@
                     </div>
                 </div>
                 <nav id="appRailMobile" class="app-rail app-rail--mobile" aria-label="앱 메뉴">
-                    <button type="button" class="app-rail-btn active" data-workspace="ai"><span>🤖</span><span class="rail-label">AI</span></button>
-                    <button type="button" class="app-rail-btn" data-workspace="studio"><span>🎨</span><span class="rail-label">스튜디오</span></button>
-                    <button type="button" class="app-rail-btn" data-workspace="chat"><span>💬</span><span class="rail-label">채팅</span></button>
-                    <button type="button" class="app-rail-btn" data-workspace="works"><span>📋</span><span class="rail-label">작업</span></button>
-                    <button type="button" class="app-rail-btn" data-workspace="home"><span>🏠</span><span class="rail-label">홈</span></button>
-                    <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtnMobile" aria-label="메뉴"><span>☰</span><span class="rail-label">메뉴</span></button>
+                    <button type="button" class="app-rail-btn active" data-workspace="ai"><span><i data-lucide="bot" class="rail-icon"></i></span><span class="rail-label">AI</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="studio"><span><i data-lucide="palette" class="rail-icon"></i></span><span class="rail-label">스튜디오</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="chat"><span><i data-lucide="message-circle" class="rail-icon"></i></span><span class="rail-label">채팅</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="works"><span><i data-lucide="layout-grid" class="rail-icon"></i></span><span class="rail-label">작업</span></button>
+                    <button type="button" class="app-rail-btn" data-workspace="home"><span><i data-lucide="home" class="rail-icon"></i></span><span class="rail-label">홈</span></button>
+                    <button type="button" class="app-rail-btn app-rail-menu-open" id="menuRailOpenBtnMobile" aria-label="메뉴"><span><i data-lucide="menu" class="rail-icon"></i></span><span class="rail-label">메뉴</span></button>
                 </nav>
             </footer>
         </div>
@@ -7052,13 +7140,23 @@
     <script src="/static/studio-code.js?v=20260701d"></script>
     <script src="/static/agent-plan.js?v=20260701d"></script>
     <script src="/static/social-features.js?v=20260701d"></script>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <script src="/static/deploy-hint.js"></script>
     <script src="/static/nasaro-features.js?v=20260701b"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
             if (API_URL) return API_URL.replace(/\/$/, "");
-            if (window.location.protocol === "file:") return "https://nasaroai.onrender.com";
-            return window.location.origin;
+            if (window.location.protocol !== "file:") {
+                try { localStorage.setItem("nasaro_api_base", window.location.origin); } catch {}
+                return window.location.origin;
+            }
+            try {
+                const stored = localStorage.getItem("nasaro_api_base");
+                if (stored) return stored.replace(/\/$/, "");
+            } catch {}
+            if (window.__NASARO_PUBLIC_URL__) return String(window.__NASARO_PUBLIC_URL__).replace(/\/$/, "");
+            return "";
         }
         function resolveApiUrl(path) {
             const normalized = path.startsWith("/") ? path : `/${path}`;
@@ -8681,6 +8779,13 @@
             } catch {}
         }
 
+        function notifyExtensionServer() {
+            if (window.location.protocol === "file:") return;
+            try {
+                window.postMessage({ type: "NASAROAI_SERVER", url: window.location.origin }, "*");
+            } catch {}
+        }
+
         function saveAiPresetsLocal() {
             localStorage.setItem(AI_PRESETS_KEY, JSON.stringify(aiPresets));
             localStorage.setItem("nasaroai_active_preset", activePresetId);
@@ -9898,6 +10003,7 @@
             const isAi = (m.sender_type || "") === "ai";
             const row = document.createElement("div");
             row.className = "chat-bubble-row" + (mine ? " mine" : " theirs") + (isAi ? " msg-ai" : "");
+            row.dataset.messageId = m.id ? String(m.id) : "";
             const time = formatChatTime(m.created_at_iso);
             const name = m.sender_name || (mine ? "나" : "상대");
             const badge = m.model_label ? ` · ${escapeHtml(m.model_label)}` : "";
@@ -9906,17 +10012,87 @@
             if (m.attachment_url) {
                 attachHtml = `<img src="${escapeHtml(m.attachment_url)}" class="chat-attach-preview" alt="첨부">`;
             }
+            let replyHtml = "";
+            if (m.reply_to_id && m.reply_preview) {
+                replyHtml = `<div class="chat-bubble-reply">${escapeHtml(m.reply_preview)}</div>`;
+            }
+            const reactions = m.reactions || {};
+            const reactionHtml = Object.keys(reactions).length
+                ? `<div class="chat-reactions">${Object.entries(reactions).map(([em, uids]) =>
+                    `<button type="button" class="chat-reaction-btn" data-react="${escapeHtml(em)}" data-msg="${m.id || ""}">${escapeHtml(em)} ${(uids || []).length}</button>`
+                ).join("")}</div>`
+                : "";
+            const reactPicker = m.id ? `<span class="chat-react-picker">${["👍","❤️","😂","🔥"].map(e =>
+                `<button type="button" data-react="${e}" data-msg="${m.id}" title="반응"> ${e}</button>`).join("")}</span>` : "";
             row.innerHTML = `
                 <div class="chat-bubble-meta">
                     <span class="chat-bubble-name">${escapeHtml(name)}${badge}${readMark}</span>
                     <span class="chat-bubble-time">${escapeHtml(time)}</span>
+                    ${reactPicker}
+                    <button type="button" class="chat-reply-btn" data-msg-id="${m.id || ""}" data-msg-body="${escapeHtml((m.body || "").slice(0, 80))}" style="border:0;background:none;cursor:pointer;font-size:11px;color:#7c3aed;">↩</button>
                 </div>
-                <div class="chat-bubble">${escapeHtml(m.body || "")}${attachHtml}</div>`;
+                ${replyHtml}
+                <div class="chat-bubble">${escapeHtml(m.body || "")}${attachHtml}</div>
+                ${reactionHtml}`;
+            row.querySelectorAll("[data-react]").forEach(btn => {
+                btn.addEventListener("click", () => reactToChatMessage(btn.dataset.msg, btn.dataset.react));
+            });
+            row.querySelector(".chat-reply-btn")?.addEventListener("click", () => {
+                setChatReply(Number(row.querySelector(".chat-reply-btn")?.dataset.msgId || 0), m.body || "");
+            });
             box.appendChild(row);
             return row;
         }
 
         let chatPendingAttachment = "";
+        let chatReplyToId = 0;
+        let chatReplyPreviewText = "";
+        let chatEventSource = null;
+        const chatMessageIndex = {};
+
+        function setChatReply(msgId, preview) {
+            chatReplyToId = Number(msgId) || 0;
+            chatReplyPreviewText = (preview || "").slice(0, 120);
+            const bar = document.getElementById("chatReplyBar");
+            const prev = document.getElementById("chatReplyPreview");
+            if (bar && prev) {
+                prev.textContent = chatReplyToId ? `↩ ${chatReplyPreviewText}` : "";
+                bar.classList.toggle("visible", !!chatReplyToId);
+                bar.setAttribute("aria-hidden", chatReplyToId ? "false" : "true");
+            }
+        }
+
+        async function reactToChatMessage(msgId, emoji) {
+            if (!msgId || !currentUser) return;
+            try {
+                await apiFetch("/social/chat/messages/" + msgId + "/react", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ emoji }),
+                });
+                await loadChatMessages();
+            } catch {}
+        }
+
+        function stopChatEventSource() {
+            if (chatEventSource) { chatEventSource.close(); chatEventSource = null; }
+        }
+
+        function startChatEventSource() {
+            stopChatEventSource();
+            if (!chatRoomId || !currentUser || !authToken) return;
+            let url = resolveApiUrl("/social/chat/room/" + encodeURIComponent(chatRoomId) + "/stream");
+            url += (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(authToken);
+            try {
+                chatEventSource = new EventSource(url);
+                chatEventSource.onmessage = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.data || "{}");
+                        if (data.type === "message") loadChatMessages();
+                    } catch {}
+                };
+            } catch {}
+        }
 
         function navigateToChat(roomId, name, roomType) {
             if (!requireLogin() || !roomId) return;
@@ -10035,7 +10211,9 @@
             const chatInput = document.getElementById("chatInput");
             if (chatInput) chatInput.placeholder = (name || "채팅") + " 에 메시지…";
             updateChatMobileLayout();
+            setChatReply(0, "");
             loadChatMessages();
+            startChatEventSource();
         }
 
         async function loadChatMessages() {
@@ -10052,12 +10230,18 @@
                 const data = await res.json();
                 box.innerHTML = "";
                 const messages = data.messages || [];
+                Object.keys(chatMessageIndex).forEach(k => delete chatMessageIndex[k]);
+                messages.forEach(m => { if (m.id) chatMessageIndex[m.id] = m; });
                 if (!messages.length) {
                     box.innerHTML = `<div class="chat-empty-state"><span style="font-size:28px;">👋</span><strong>첫 메시지를 보내보세요</strong><span>Enter로 빠르게 전송할 수 있습니다.</span></div>`;
                     return;
                 }
                 let lastDate = "";
                 messages.forEach(m => {
+                    if (m.reply_to_id && chatMessageIndex[m.reply_to_id]) {
+                        const ref = chatMessageIndex[m.reply_to_id];
+                        m.reply_preview = (ref.sender_name || "") + ": " + (ref.body || "").slice(0, 60);
+                    }
                     const dateKey = chatMessageDateKey(m);
                     if (dateKey && dateKey !== lastDate) {
                         lastDate = dateKey;
@@ -10108,9 +10292,14 @@
                 const res = await apiFetch("/social/chat/room/" + encodeURIComponent(chatRoomId), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ body, attachment_url: chatPendingAttachment }),
+                    body: JSON.stringify({
+                        body,
+                        attachment_url: chatPendingAttachment,
+                        reply_to_id: chatReplyToId || 0,
+                    }),
                 });
                 chatPendingAttachment = "";
+                setChatReply(0, "");
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
                     showToast(typeof data.detail === "string" ? data.detail : "전송 실패");
@@ -10147,6 +10336,7 @@
         }
         function stopChatPoll() {
             if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+            stopChatEventSource();
         }
 
         document.getElementById("chatRefreshBtn")?.addEventListener("click", () => {
@@ -10154,6 +10344,7 @@
             else loadChatRooms();
         });
         document.getElementById("chatSendBtn")?.addEventListener("click", sendChatMessage);
+        document.getElementById("chatReplyCancel")?.addEventListener("click", () => setChatReply(0, ""));
         document.getElementById("chatAiBtn")?.addEventListener("click", () => {
             const input = document.getElementById("chatInput");
             const text = (input?.value || "").trim();
@@ -10954,9 +11145,32 @@
                 const res = await apiFetch("/social/works/" + workId + "/comments");
                 const data = await res.json();
                 const comments = data.comments || [];
-                box.innerHTML = comments.map(c =>
-                    `<div class="works-comment-item"><strong>${escapeHtml(c.author_name)}</strong> ${escapeHtml(c.body)}<br><span style="color:#9ca3af;font-size:10px;">${escapeHtml(c.created_at_iso || "")}</span></div>`
-                ).join("") || "<div style='font-size:11px;color:#9ca3af;'>댓글이 없습니다.</div>";
+                const roots = comments.filter(c => !c.parent_id);
+                const childrenOf = (pid) => comments.filter(c => c.parent_id === pid);
+                const renderOne = (c, nested) => {
+                    const likeCls = c.liked_by_me ? " liked" : "";
+                    return `<div class="works-comment-item${nested ? " nested" : ""}" data-comment-id="${c.id}">
+                        <strong>${escapeHtml(c.author_name)}</strong> ${escapeHtml(c.body)}
+                        <div class="works-comment-actions">
+                            <button type="button" class="works-comment-like${likeCls}" data-like="${c.id}">♥ ${c.like_count || 0}</button>
+                            <button type="button" class="works-comment-reply" data-reply="${c.id}">답글</button>
+                            <span style="color:#9ca3af;font-size:10px;">${escapeHtml(c.created_at_iso || "")}</span>
+                        </div>
+                        ${childrenOf(c.id).map(ch => renderOne(ch, true)).join("")}
+                    </div>`;
+                };
+                box.innerHTML = roots.map(c => renderOne(c, false)).join("")
+                    || "<div style='font-size:11px;color:#9ca3af;'>댓글이 없습니다.</div>";
+                box.querySelectorAll("[data-like]").forEach(btn => {
+                    btn.addEventListener("click", () => likeWorkComment(workId, Number(btn.dataset.like)));
+                });
+                box.querySelectorAll("[data-reply]").forEach(btn => {
+                    btn.addEventListener("click", () => {
+                        box.dataset.replyParent = btn.dataset.reply;
+                        const inp = box.querySelector("input");
+                        if (inp) { inp.placeholder = "답글 입력…"; inp.focus(); }
+                    });
+                });
                 if (currentUser) {
                     const form = document.createElement("div");
                     form.className = "works-comment-form";
@@ -10972,18 +11186,30 @@
             }
         }
 
+        async function likeWorkComment(workId, commentId) {
+            if (!currentUser) return;
+            try {
+                await apiFetch("/social/works/" + workId + "/comments/" + commentId + "/like", { method: "POST" });
+                toggleWorkComments(workId);
+                toggleWorkComments(workId);
+            } catch {}
+        }
+
         async function postWorkComment(workId) {
             const input = document.getElementById("commentInput" + workId);
+            const box = document.getElementById("worksComments" + workId);
             const body = (input?.value || "").trim();
             if (!body || !currentUser) return;
+            const parentId = Number(box?.dataset.replyParent || 0);
             try {
                 const res = await apiFetch("/social/works/" + workId + "/comments", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ body }),
+                    body: JSON.stringify({ body, parent_id: parentId }),
                 });
                 if (res.ok) {
                     if (input) input.value = "";
+                    if (box) delete box.dataset.replyParent;
                     toggleWorkComments(workId);
                     toggleWorkComments(workId);
                     loadWorksFeed();
@@ -14472,6 +14698,8 @@
             });
         })();
 
+        try { if (window.lucide?.createIcons) window.lucide.createIcons(); } catch {}
+        notifyExtensionServer();
         updateDockUI();
     </script>
 </body>

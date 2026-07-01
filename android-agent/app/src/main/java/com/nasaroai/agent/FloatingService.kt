@@ -36,7 +36,14 @@ class FloatingService : Service() {
 
     private val CHANNEL_ID = "nasaroai_float"
     private val NOTIF_ID   = 1001
-    private val NASAROAI_URL  = "https://nasaroai.onrender.com/?source=app"
+
+    private fun nasaroBaseUrl(): String {
+        var url = getSharedPreferences("nasaro_app", MODE_PRIVATE)
+            .getString("server_url", null)?.trim().orEmpty()
+        if (url.isEmpty()) return ""
+        if (!url.startsWith("http")) url = "https://$url"
+        return url.trimEnd('/')
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -209,7 +216,8 @@ class FloatingService : Service() {
             settings.userAgentString = settings.userAgentString + " NasaroAIApp"
             webChromeClient = WebChromeClient()
             addJavascriptInterface(OverlayBridge(), "NasaroAndroidAgent")
-            loadUrl("$NASAROAI_URL&agent_overlay=1")
+            val base = nasaroBaseUrl()
+            if (base.isNotEmpty()) loadUrl("$base/?source=app&agent_overlay=1")
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
 

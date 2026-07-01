@@ -26,6 +26,8 @@ from db_cloud_sync import cloud_backup_enabled, restore_db_from_cloud, upload_db
 from auth_store import (
     add_support_reply,
     add_work_comment,
+    toggle_work_comment_like,
+    toggle_message_reaction,
     admin_adjust_quota,
     admin_set_quota_limit,
     admin_logout,
@@ -260,8 +262,8 @@ async def _start_self_ping_loop() -> None:
         pass
 
 
-def public_app_url() -> str:
-    """Public site URL (Railway, Render, or PUBLIC_APP_URL)."""
+def public_app_url(request: Request | None = None) -> str:
+    """Public site URL — Railway (RAILWAY_PUBLIC_DOMAIN / PUBLIC_APP_URL) preferred."""
     explicit = (os.environ.get("PUBLIC_APP_URL") or "").strip().rstrip("/")
     if explicit:
         return explicit if explicit.startswith("http") else f"https://{explicit}"
@@ -271,7 +273,12 @@ def public_app_url() -> str:
     render = (os.environ.get("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
     if render:
         return render
-    return "https://nasaroai.onrender.com"
+    if request is not None:
+        host = (request.headers.get("host") or "").strip()
+        if host and not host.startswith("localhost") and not host.startswith("127.0.0.1"):
+            scheme = request.url.scheme or "https"
+            return f"{scheme}://{host}".rstrip("/")
+    return ""
 
 
 def deploy_git_ref() -> str:
@@ -281,6 +288,17 @@ def deploy_git_ref() -> str:
         or os.environ.get("GIT_COMMIT")
         or "local"
     )
+
+
+_chat_subscribers: dict[str, list[asyncio.Queue]] = {}
+
+
+def _notify_chat_room(room_id: str, event: dict) -> None:
+    for q in _chat_subscribers.get(room_id, []):
+        try:
+            q.put_nowait(event)
+        except Exception:
+            pass
 
 
 async def _self_ping_loop() -> None:
@@ -957,6 +975,7 @@ class NotificationsReadRequest(BaseModel):
 
 class WorkCommentRequest(BaseModel):
     body: str = ""
+    parent_id: int = 0
 
 
 class ChatMessageRequest(BaseModel):
@@ -4605,14 +4624,32 @@ async def debate_round_summary(data: DebateRoundSummaryRequest, request: Request
     }
 
 
+@app.get("/api/config")
+def api_config(request: Request) -> dict:
+    return {
+        "public_url": public_app_url(request),
+        "hosting": "railway" if os.environ.get("RAILWAY_PUBLIC_DOMAIN") else (
+            "render" if os.environ.get("RENDER_EXTERNAL_URL") else "unknown"
+        ),
+        "git_ref": deploy_git_ref(),
+    }
+
+
+@app.get("/static/deploy-hint.js")
+def deploy_hint_js(request: Request):
+    url = public_app_url(request)
+    body = f'window.__NASARO_PUBLIC_URL__="{url}";'
+    return StreamingResponse(iter([body]), media_type="application/javascript")
+
+
 @app.get("/health")
-async def health(verify: bool = False) -> dict:
+async def health(request: Request, verify: bool = False) -> dict:
     api_key = get_openrouter_api_key()
     payload: dict = {
         "status": "ok",
         "admin_password_configured": is_admin_password_configured(),
         "openrouter_configured": bool(api_key),
-        "public_url": public_app_url(),
+        "public_url": public_app_url(request),
         "hosting": "railway" if os.environ.get("RAILWAY_PUBLIC_DOMAIN") else (
             "render" if os.environ.get("RENDER_EXTERNAL_URL") else "unknown"
         ),
@@ -5272,8 +5309,10 @@ def social_works_tip_cancel(work_id: int, request: Request) -> dict:
 
 
 @app.get("/social/works/{work_id}/comments")
-def social_works_comments(work_id: int) -> dict:
-    return {"comments": list_work_comments(work_id)}
+def social_works_comments(work_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    viewer_id = user["id"] if user else 0
+    return {"comments": list_work_comments(work_id, viewer_id=viewer_id)}
 
 
 @app.post("/social/works/{work_id}/comments")
@@ -5287,10 +5326,22 @@ def social_works_comment_add(work_id: int, body: WorkCommentRequest, request: Re
             user["id"],
             user.get("display_name") or user.get("username") or "사용자",
             body.body,
+            parent_id=body.parent_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"success": True, "comment": comment}
+
+
+@app.post("/social/works/{work_id}/comments/{comment_id}/like")
+def social_works_comment_like(work_id: int, comment_id: int, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        return toggle_work_comment_like(comment_id, user["id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/social/users")
@@ -5434,6 +5485,10 @@ class RoomMessageBody(BaseModel):
     reply_to_id: int = 0
 
 
+class ChatReactionBody(BaseModel):
+    emoji: str = "👍"
+
+
 @app.post("/social/chat/room/{room_id:path}")
 def social_chat_room_send(room_id: str, body: RoomMessageBody, request: Request) -> dict:
     user = get_user_by_token(_bearer_token(request))
@@ -5450,7 +5505,52 @@ def social_chat_room_send(room_id: str, body: RoomMessageBody, request: Request)
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _notify_chat_room(room_id, {"type": "message", "message": msg})
     return {"success": True, "message": msg}
+
+
+@app.get("/social/chat/room/{room_id:path}/stream")
+async def social_chat_room_stream(room_id: str, request: Request, token: str = ""):
+    bearer = _bearer_token(request) or (token or "").strip()
+    user = get_user_by_token(bearer)
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        get_room_messages(user["id"], room_id, limit=1)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async def event_gen() -> AsyncIterator[str]:
+        q: asyncio.Queue = asyncio.Queue()
+        _chat_subscribers.setdefault(room_id, []).append(q)
+        try:
+            yield f"data: {json.dumps({'type': 'connected'})}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    evt = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            subs = _chat_subscribers.get(room_id, [])
+            if q in subs:
+                subs.remove(q)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+@app.post("/social/chat/messages/{message_id}/react")
+def social_chat_message_react(message_id: int, body: ChatReactionBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        result = toggle_message_reaction(message_id, user["id"], body.emoji)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, **result}
 
 
 @app.get("/social/chat/{peer_id}")
@@ -6320,7 +6420,7 @@ def extension_update(request: Request):
         " status='ok'"
         f" version='{ext_ver}'"
         " prodversionmin='88.0'"
-        f" codebase='{public_app_url()}/static/nasaroai-extension.zip'"
+        f" codebase='{public_app_url(request)}/static/nasaroai-extension.zip'"
         "/>"
         "</app>"
         "</gupdate>"

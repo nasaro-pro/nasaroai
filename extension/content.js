@@ -1449,9 +1449,9 @@
   async function serverBase() {
     try {
       const r = await chrome.runtime.sendMessage({ type: "GET_SERVER_URL" });
-      return (r?.serverUrl || "https://nasaroai.onrender.com").replace(/\/+$/, "");
+      return (r?.serverUrl || "").replace(/\/+$/, "");
     } catch {
-      return "https://nasaroai.onrender.com";
+      return "";
     }
   }
 
@@ -1505,12 +1505,27 @@
   });
 
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.data?.type !== "NASAROAI_AUTH") return;
-    extAuthToken = event.data.token || "";
-    if (extAuthToken) {
-      pullPrefs().then(pushPrefs);
+    if (event.source !== window) return;
+    if (event.data?.type === "NASAROAI_AUTH") {
+      extAuthToken = event.data.token || "";
+      if (extAuthToken) {
+        pullPrefs().then(pushPrefs);
+      }
+      return;
+    }
+    if (event.data?.type === "NASAROAI_SERVER") {
+      const url = String(event.data.url || "").trim().replace(/\/+$/, "");
+      if (url) {
+        try { chrome.runtime.sendMessage({ type: "SET_SERVER_URL", serverUrl: url }, () => void chrome.runtime.lastError); } catch {}
+      }
     }
   });
+
+  try {
+    if (location.protocol === "http:" || location.protocol === "https:") {
+      chrome.runtime.sendMessage({ type: "SET_SERVER_URL", serverUrl: location.origin }, () => void chrome.runtime.lastError);
+    }
+  } catch {}
 
   window.addEventListener("pageshow", () => {
     try {

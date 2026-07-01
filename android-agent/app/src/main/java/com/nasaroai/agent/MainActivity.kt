@@ -21,6 +21,64 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var pendingOpenAgent = false
 
+    companion object {
+        private const val PREFS = "nasaro_app"
+        private const val KEY_SERVER = "server_url"
+    }
+
+    private fun resolveServerUrl(): String {
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        var url = prefs.getString(KEY_SERVER, null)?.trim().orEmpty()
+        if (url.isEmpty()) {
+            url = intent?.getStringExtra("server_url")?.trim().orEmpty()
+        }
+        if (url.isEmpty()) return ""
+        if (!url.startsWith("http")) url = "https://$url"
+        return url.trimEnd('/')
+    }
+
+    private fun saveServerUrl(url: String) {
+        getSharedPreferences(PREFS, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_SERVER, url.trimEnd('/'))
+            .apply()
+    }
+
+    private fun loadAppOrConfig() {
+        val base = resolveServerUrl()
+        if (base.isEmpty()) {
+            webView.loadDataWithBaseURL(
+                null,
+                """
+                <!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">
+                <meta name="viewport" content="width=device-width,initial-scale=1">
+                <style>body{font-family:sans-serif;background:#0f0a1a;color:#f3f4f6;padding:24px;line-height:1.6}
+                input,button{font-size:16px;padding:10px;border-radius:8px;border:1px solid #4c1d95}
+                button{background:#7c3aed;color:#fff;border:0;margin-top:8px;width:100%}</style></head>
+                <body>
+                <h2>Nasaro AI 서버 주소</h2>
+                <p>Railway 배포 URL을 입력하세요.<br>(Variables의 <code>PUBLIC_APP_URL</code> 또는 <code>*.up.railway.app</code> 도메인)</p>
+                <input id="url" type="url" placeholder="https://your-app.up.railway.app" style="width:100%;box-sizing:border-box">
+                <button onclick="save()">연결</button>
+                <script>
+                function save(){
+                  var u=document.getElementById('url').value.trim();
+                  if(!u)return;
+                  if(!u.startsWith('http')) u='https://'+u;
+                  NasaroAndroidAgent.setServerUrl(u);
+                }
+                </script>
+                </body></html>
+                """.trimIndent(),
+                "text/html",
+                "UTF-8",
+                null
+            )
+            return
+        }
+        webView.loadUrl("$base/?source=app")
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,11 +99,7 @@ class MainActivity : AppCompatActivity() {
         }
         webView.addJavascriptInterface(AndroidAgentBridge(this), "NasaroAndroidAgent")
 
-        // 앱에서는 설치 팝업이 뜨지 않도록 source=app 전달
-        webView.loadUrl("https://nasaroai.onrender.com/?source=app")
-
-        // 앱 시작만으로는 떠 있는 런처를 만들지 않는다.
-        // 사용자가 웹의 "에이전트" 버튼을 눌렀을 때만 네이티브 오버레이를 연다.
+        loadAppOrConfig()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -89,6 +143,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class AndroidAgentBridge(private val context: Context) {
+        @JavascriptInterface
+        fun setServerUrl(url: String) {
+            runOnUiThread {
+                saveServerUrl(url)
+                loadAppOrConfig()
+            }
+        }
+
         @JavascriptInterface
         fun openAgent() {
             runOnUiThread {

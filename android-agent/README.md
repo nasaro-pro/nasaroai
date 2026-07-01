@@ -60,6 +60,6 @@ android-agent/
 
 `FloatingService.kt` 12번째 줄:
 ```kotlin
-private val NASAROAI_URL = "https://nasaroai.onrender.com"
+private val NASAROAI_URL = "(Railway PUBLIC_APP_URL — 앱 첫 실행 시 설정)"
 ```
 원하는 URL로 바꾸고 다시 빌드하면 됩니다.
