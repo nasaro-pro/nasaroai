@@ -123,6 +123,7 @@ from pricing_store import (
     admin_upsert_popup,
     create_media_job,
     create_studio_project,
+    update_studio_project,
     delete_studio_project,
     dismiss_popup,
     execute_coin_grant,
@@ -974,6 +975,15 @@ class PublicWorkCreateRequest(BaseModel):
 class StudioProjectCreateRequest(BaseModel):
     user_id: str = ""
     name: str = "project"
+    project_type: str = "code"
+    files: dict[str, str] = Field(default_factory=dict)
+    thumbnail: str = ""
+
+
+class StudioProjectUpdateRequest(BaseModel):
+    user_id: str = ""
+    name: str = "project"
+    project_type: str = ""
     files: dict[str, str] = Field(default_factory=dict)
     thumbnail: str = ""
 
@@ -5848,7 +5858,20 @@ def studio_projects_create(body: StudioProjectCreateRequest, request: Request) -
     subject = _subject_for_device(request, body.user_id)
     if not body.files:
         raise HTTPException(status_code=400, detail="파일이 비어 있습니다.")
-    project = create_studio_project(subject, body.name, body.files, body.thumbnail)
+    project = create_studio_project(subject, body.name, body.files, body.thumbnail, body.project_type)
+    return {"success": True, "project": project}
+
+
+@app.put("/studio/projects/{project_id}")
+def studio_projects_update(project_id: int, body: StudioProjectUpdateRequest, request: Request) -> dict:
+    subject = _subject_for_device(request, body.user_id)
+    if not body.files:
+        raise HTTPException(status_code=400, detail="파일이 비어 있습니다.")
+    existing = get_studio_project(project_id, subject)
+    if not existing:
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    ptype = body.project_type or existing.get("project_type") or "code"
+    project = update_studio_project(project_id, subject, body.name, body.files, body.thumbnail, ptype)
     return {"success": True, "project": project}
 
 

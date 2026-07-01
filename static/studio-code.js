@@ -351,7 +351,7 @@
         const r = await fetch("/studio/projects", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: uid, name, files }),
+          body: JSON.stringify({ user_id: uid, name, files, project_type: "code" }),
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || "저장 실패");

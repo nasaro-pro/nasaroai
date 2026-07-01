@@ -437,18 +437,27 @@
 
     function buildPrivacyButton(textarea, opts = {}) {
         const privBtn = document.createElement("button");
+        const compact = opts.compact !== false && !opts.header;
         const loggedIn = () => (typeof opts.isLoggedIn === "function" ? opts.isLoggedIn() : !!opts.isLoggedIn);
         const syncBtn = () => {
             const on = privacyMode && loggedIn();
             privBtn.classList.toggle("active", on);
             privBtn.classList.toggle("disabled", !loggedIn());
+            privBtn.setAttribute("aria-pressed", on ? "true" : "false");
             const pt = privBtn.querySelector(".priv-text");
+            const pl = privBtn.querySelector(".priv-label");
             if (pt) pt.textContent = on ? "🔒" : "🔓";
+            if (pl) pl.textContent = on ? (lang === "en" ? "Private" : "프라이버시") : (lang === "en" ? "Normal" : "일반");
         };
         privBtn.type = "button";
-        privBtn.className = "input-tool-btn privacy-btn privacy-btn-compact" + (privacyMode && loggedIn() ? " active" : "");
+        privBtn.className = "input-tool-btn privacy-btn" + (compact ? " privacy-btn-compact" : "") + (opts.header ? " privacy-btn-header" : "") + (privacyMode && loggedIn() ? " active" : "");
         privBtn.title = t("privacy_tip");
-        privBtn.innerHTML = `<span class="priv-text">${privacyMode && loggedIn() ? "🔒" : "🔓"}</span>`;
+        privBtn.setAttribute("aria-label", lang === "en" ? "Privacy mode" : "프라이버시 모드");
+        if (opts.header) {
+            privBtn.innerHTML = `<span class="priv-text">${privacyMode && loggedIn() ? "🔒" : "🔓"}</span><span class="priv-label">${privacyMode && loggedIn() ? (lang === "en" ? "Private" : "프라이버시") : (lang === "en" ? "Normal" : "일반")}</span>`;
+        } else {
+            privBtn.innerHTML = `<span class="priv-text">${privacyMode && loggedIn() ? "🔒" : "🔓"}</span>`;
+        }
         privBtn.addEventListener("click", () => {
             if (!loggedIn()) {
                 opts.showToast?.(t("privacy_login"), "warn", 4000);
@@ -863,7 +872,7 @@
         isPrivacyMode, setPrivacyMode, isE2eActive, e2eEncrypt, e2eDecrypt, clearE2eSession,
         getSelectedModels, getPrimaryModel, getModelsForMode, isAllModels,
         exportAiSettings, importAiSettings,
-        applyTheme, applyLang, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
+        applyTheme, applyLang, buildPrivacyButton, buildInputToolbar, buildDockToolbarParts, buildAgentModelToolbar,
         startVoiceInput,
         createShareLink, exportMarkdown, addResultActions, hideFloatingResultActions,
         showExportFormatMenu, loadShareFromUrl,

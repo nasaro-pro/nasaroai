@@ -121,6 +121,7 @@ def ensure_pricing_tables(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             subject TEXT NOT NULL,
             name TEXT NOT NULL DEFAULT '',
+            project_type TEXT NOT NULL DEFAULT 'code',
             files_json TEXT NOT NULL DEFAULT '{}',
             thumbnail TEXT NOT NULL DEFAULT '',
             created_at REAL NOT NULL,
@@ -134,6 +135,9 @@ def ensure_pricing_tables(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE media_jobs ADD COLUMN progress_stage TEXT NOT NULL DEFAULT 'queued'")
     if "feature" not in mj_cols:
         conn.execute("ALTER TABLE media_jobs ADD COLUMN feature TEXT NOT NULL DEFAULT 'studio'")
+    sp_cols = {r[1] for r in conn.execute("PRAGMA table_info(studio_projects)").fetchall()}
+    if "project_type" not in sp_cols:
+        conn.execute("ALTER TABLE studio_projects ADD COLUMN project_type TEXT NOT NULL DEFAULT 'code'")
     cols = {r[1] for r in conn.execute("PRAGMA table_info(model_pricing)").fetchall()}
     migrations = [
         ("coin_cost", "INTEGER NOT NULL DEFAULT 1"),
@@ -546,8 +550,9 @@ def get_media_job(job_id: str) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
-def create_studio_project(subject: str, name: str, files: dict[str, str], thumbnail: str = "") -> dict[str, Any]:
+def create_studio_project(subject: str, name: str, files: dict[str, str], thumbnail: str = "", project_type: str = "code") -> dict[str, Any]:
     name = (name or "project").strip()[:120] or "project"
+    ptype = (project_type or "code").strip().lower()[:32] or "code"
     now = time.time()
     payload = json.dumps(files or {}, ensure_ascii=False)
     with _lock:
@@ -555,16 +560,46 @@ def create_studio_project(subject: str, name: str, files: dict[str, str], thumbn
         try:
             cur = conn.execute(
                 """
-                INSERT INTO studio_projects (subject, name, files_json, thumbnail, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO studio_projects (subject, name, project_type, files_json, thumbnail, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (subject, name, payload, (thumbnail or "")[:2000], now, now),
+                (subject, name, ptype, payload, (thumbnail or "")[:2000], now, now),
             )
             conn.commit()
             pid = int(cur.lastrowid)
         finally:
             conn.close()
-    return {"id": pid, "subject": subject, "name": name, "files": files, "thumbnail": thumbnail, "updated_at": now}
+    return {"id": pid, "subject": subject, "name": name, "project_type": ptype, "files": files, "thumbnail": thumbnail, "updated_at": now}
+
+
+def update_studio_project(project_id: int, subject: str, name: str, files: dict[str, str], thumbnail: str = "", project_type: str = "") -> dict[str, Any] | None:
+    now = time.time()
+    payload = json.dumps(files or {}, ensure_ascii=False)
+    name = (name or "project").strip()[:120] or "project"
+    ptype = (project_type or "").strip().lower()[:32]
+    with _lock:
+        conn = _connect()
+        try:
+            if ptype:
+                conn.execute(
+                    """
+                    UPDATE studio_projects SET name = ?, project_type = ?, files_json = ?, thumbnail = ?, updated_at = ?
+                    WHERE id = ? AND subject = ?
+                    """,
+                    (name, ptype, payload, (thumbnail or "")[:2000], now, project_id, subject),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE studio_projects SET name = ?, files_json = ?, thumbnail = ?, updated_at = ?
+                    WHERE id = ? AND subject = ?
+                    """,
+                    (name, payload, (thumbnail or "")[:2000], now, project_id, subject),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+    return get_studio_project(project_id, subject)
 
 
 def list_studio_projects(subject: str, limit: int = 50) -> list[dict[str, Any]]:
@@ -574,7 +609,7 @@ def list_studio_projects(subject: str, limit: int = 50) -> list[dict[str, Any]]:
         try:
             rows = conn.execute(
                 """
-                SELECT id, subject, name, files_json, thumbnail, created_at, updated_at
+                SELECT id, subject, name, project_type, files_json, thumbnail, created_at, updated_at
                 FROM studio_projects WHERE subject = ?
                 ORDER BY updated_at DESC LIMIT ?
                 """,
@@ -592,6 +627,7 @@ def list_studio_projects(subject: str, limit: int = 50) -> list[dict[str, Any]]:
             "id": r["id"],
             "subject": r["subject"],
             "name": r["name"],
+            "project_type": r["project_type"] if "project_type" in r.keys() else "code",
             "files": files,
             "thumbnail": r["thumbnail"],
             "created_at": r["created_at"],
@@ -620,6 +656,7 @@ def get_studio_project(project_id: int, subject: str) -> dict[str, Any] | None:
         "id": row["id"],
         "subject": row["subject"],
         "name": row["name"],
+        "project_type": row["project_type"] if "project_type" in row.keys() else "code",
         "files": files,
         "thumbnail": row["thumbnail"],
         "created_at": row["created_at"],
