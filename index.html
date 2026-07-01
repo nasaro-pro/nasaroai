@@ -2,6 +2,30 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <script>
+    (function () {
+        var NASARO_DEFAULT = "https://web-production-acc66.up.railway.app";
+        function bootOrigin() {
+            if (location.protocol !== "file:") {
+                try { localStorage.setItem("nasaro_api_base", location.origin); } catch (e) {}
+                return location.origin;
+            }
+            try {
+                var stored = localStorage.getItem("nasaro_api_base");
+                if (stored) return stored.replace(/\/+$/, "");
+            } catch (e) {}
+            return NASARO_DEFAULT;
+        }
+        var origin = bootOrigin();
+        window.__NASARO_PUBLIC_URL__ = origin;
+        window.__NASARO_API_ORIGIN__ = origin;
+        if (location.protocol === "file:") {
+            var base = document.createElement("base");
+            base.href = origin.replace(/\/+$/, "") + "/";
+            document.head.appendChild(base);
+        }
+    })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nasaro AI</title>
     <link rel="stylesheet" href="/static/design-tokens.css?v=20260701d">
@@ -7140,23 +7164,17 @@
     <script src="/static/studio-code.js?v=20260701d"></script>
     <script src="/static/agent-plan.js?v=20260701d"></script>
     <script src="/static/social-features.js?v=20260701d"></script>
-    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <script src="/static/deploy-hint.js"></script>
     <script src="/static/nasaro-features.js?v=20260701b"></script>
     <script>
         const API_URL = "";
         function getApiBase() {
             if (API_URL) return API_URL.replace(/\/$/, "");
-            if (window.location.protocol !== "file:") {
-                try { localStorage.setItem("nasaro_api_base", window.location.origin); } catch {}
-                return window.location.origin;
-            }
-            try {
-                const stored = localStorage.getItem("nasaro_api_base");
-                if (stored) return stored.replace(/\/$/, "");
-            } catch {}
-            if (window.__NASARO_PUBLIC_URL__) return String(window.__NASARO_PUBLIC_URL__).replace(/\/$/, "");
-            return "";
+            const o = window.__NASARO_API_ORIGIN__ || window.__NASARO_PUBLIC_URL__ || "";
+            if (o) return String(o).replace(/\/$/, "");
+            if (window.location.protocol !== "file:") return window.location.origin;
+            return "https://web-production-acc66.up.railway.app";
         }
         function resolveApiUrl(path) {
             const normalized = path.startsWith("/") ? path : `/${path}`;

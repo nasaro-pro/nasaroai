@@ -2,6 +2,26 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <script>
+  (function () {
+    var NASARO_DEFAULT = "https://web-production-acc66.up.railway.app";
+    function bootOrigin() {
+      if (location.protocol !== "file:") return location.origin;
+      try {
+        var stored = localStorage.getItem("nasaro_api_base");
+        if (stored) return stored.replace(/\/+$/, "");
+      } catch (e) {}
+      return NASARO_DEFAULT;
+    }
+    var origin = bootOrigin();
+    window.__NASARO_API_ORIGIN__ = origin;
+    if (location.protocol === "file:") {
+      var base = document.createElement("base");
+      base.href = origin.replace(/\/+$/, "") + "/";
+      document.head.appendChild(base);
+    }
+  })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nasaro AI 관리자</title>
   <style>

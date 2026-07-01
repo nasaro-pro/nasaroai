@@ -278,6 +278,15 @@ def public_app_url(request: Request | None = None) -> str:
         if host and not host.startswith("localhost") and not host.startswith("127.0.0.1"):
             scheme = request.url.scheme or "https"
             return f"{scheme}://{host}".rstrip("/")
+    try:
+        origin_path = os.path.join(BASE_DIR, "static", "default-origin.txt")
+        if os.path.isfile(origin_path):
+            with open(origin_path, encoding="utf-8") as f:
+                fallback = f.read().strip().rstrip("/")
+                if fallback:
+                    return fallback if fallback.startswith("http") else f"https://{fallback}"
+    except Exception:
+        pass
     return ""
 
 
