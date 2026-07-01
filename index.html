@@ -8820,17 +8820,6 @@
                 payload: { query: q, model, answer: body },
             });
         }
-            return new Promise(resolve => {
-                const folder = window.prompt("폴더 (기본/업무/학습/개인)", "기본");
-                if (folder === null) return resolve(null);
-                const tagsRaw = window.prompt("태그 (쉼표 구분, 선택)", "") || "";
-                const tags = tagsRaw.split(/[,，]/).map(t => t.trim()).filter(Boolean);
-                resolve({
-                    folder: RESULT_FOLDERS.includes(folder) ? folder : "기본",
-                    tags,
-                });
-            });
-        }
 
         function renderResultFileViewer(record, idx) {
             const modal = document.getElementById("savedResultModal");
