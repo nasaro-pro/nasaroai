@@ -128,6 +128,15 @@ def ensure_pricing_tables(conn: sqlite3.Connection) -> None:
             updated_at REAL NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_studio_projects_subject ON studio_projects(subject, updated_at DESC);
+        CREATE TABLE IF NOT EXISTS studio_project_members (
+            project_id INTEGER NOT NULL,
+            member_subject TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            invited_by TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            PRIMARY KEY (project_id, member_subject)
+        );
+        CREATE INDEX IF NOT EXISTS idx_studio_members_subject ON studio_project_members(member_subject);
         """
     )
     mj_cols = {r[1] for r in conn.execute("PRAGMA table_info(media_jobs)").fetchall()}
@@ -668,6 +677,7 @@ def delete_studio_project(project_id: int, subject: str) -> bool:
     with _lock:
         conn = _connect()
         try:
+            conn.execute("DELETE FROM studio_project_members WHERE project_id = ?", (project_id,))
             cur = conn.execute(
                 "DELETE FROM studio_projects WHERE id = ? AND subject = ?",
                 (project_id, subject),
@@ -676,3 +686,153 @@ def delete_studio_project(project_id: int, subject: str) -> bool:
             return cur.rowcount > 0
         finally:
             conn.close()
+
+
+def _row_to_project(row) -> dict[str, Any]:
+    try:
+        files = json.loads(row["files_json"] or "{}")
+    except Exception:
+        files = {}
+    return {
+        "id": row["id"],
+        "subject": row["subject"],
+        "name": row["name"],
+        "project_type": row["project_type"] if "project_type" in row.keys() else "code",
+        "files": files,
+        "thumbnail": row["thumbnail"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def get_studio_project_by_id(project_id: int) -> dict[str, Any] | None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute("SELECT * FROM studio_projects WHERE id = ?", (project_id,)).fetchone()
+        finally:
+            conn.close()
+    return _row_to_project(row) if row else None
+
+
+def get_studio_project_member_role(project_id: int, subject: str) -> str | None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT role FROM studio_project_members WHERE project_id = ? AND member_subject = ?",
+                (project_id, subject),
+            ).fetchone()
+        finally:
+            conn.close()
+    return str(row["role"]) if row else None
+
+
+def get_studio_project_for_subject(project_id: int, subject: str) -> dict[str, Any] | None:
+    proj = get_studio_project_by_id(project_id)
+    if not proj:
+        return None
+    if proj["subject"] == subject:
+        proj["access_role"] = "owner"
+        return proj
+    role = get_studio_project_member_role(project_id, subject)
+    if role:
+        proj["access_role"] = role
+        proj["shared"] = True
+        return proj
+    return None
+
+
+def can_edit_studio_project(project_id: int, subject: str) -> bool:
+    proj = get_studio_project_by_id(project_id)
+    if not proj:
+        return False
+    if proj["subject"] == subject:
+        return True
+    role = get_studio_project_member_role(project_id, subject)
+    return role in ("editor", "owner")
+
+
+def add_studio_project_member(
+    project_id: int,
+    owner_subject: str,
+    member_subject: str,
+    role: str = "viewer",
+    invited_by: str = "",
+) -> dict[str, Any]:
+    proj = get_studio_project_by_id(project_id)
+    if not proj or proj["subject"] != owner_subject:
+        raise ValueError("프로젝트를 찾을 수 없거나 초대 권한이 없습니다.")
+    if member_subject == owner_subject:
+        raise ValueError("본인은 초대할 수 없습니다.")
+    role = (role or "viewer").strip()[:16] or "viewer"
+    if role not in ("viewer", "editor"):
+        role = "viewer"
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                """
+                INSERT INTO studio_project_members (project_id, member_subject, role, invited_by, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, member_subject) DO UPDATE SET role = excluded.role
+                """,
+                (project_id, member_subject, role, invited_by or owner_subject, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return {"project_id": project_id, "member_subject": member_subject, "role": role}
+
+
+def list_studio_project_members(project_id: int, owner_subject: str) -> list[dict[str, Any]]:
+    proj = get_studio_project_by_id(project_id)
+    if not proj or proj["subject"] != owner_subject:
+        return []
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT member_subject, role, invited_by, created_at FROM studio_project_members WHERE project_id = ?",
+                (project_id,),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [
+        {"member_subject": r["member_subject"], "role": r["role"], "invited_by": r["invited_by"], "created_at": r["created_at"]}
+        for r in rows
+    ]
+
+
+def list_studio_projects_with_shared(subject: str, limit: int = 50) -> list[dict[str, Any]]:
+    owned = list_studio_projects(subject, limit)
+    for p in owned:
+        p["access_role"] = "owner"
+        p["shared"] = False
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT p.*, m.role AS member_role
+                FROM studio_project_members m
+                JOIN studio_projects p ON p.id = m.project_id
+                WHERE m.member_subject = ? AND p.subject != ?
+                ORDER BY p.updated_at DESC LIMIT ?
+                """,
+                (subject, subject, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    shared: list[dict[str, Any]] = []
+    seen = {p["id"] for p in owned}
+    for r in rows:
+        if r["id"] in seen:
+            continue
+        item = _row_to_project(r)
+        item["access_role"] = r["member_role"]
+        item["shared"] = True
+        shared.append(item)
+        seen.add(r["id"])
+    return owned + shared

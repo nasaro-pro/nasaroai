@@ -40,6 +40,10 @@
     return hit ? hit.coin_cost : 1;
   }
 
+  function toolIdFromProject(p) {
+    return p?.project_type || "doc";
+  }
+
   function showHub() {
     activeTool = null;
     if (activeDestroy) { try { activeDestroy(); } catch (_) {} activeDestroy = null; }
@@ -48,6 +52,7 @@
       global.StudioHub?.render(root, {
         projects,
         onSelect: (toolId) => openTool(toolId),
+        onOpenProject: (p) => openTool(p.project_type || toolIdFromProject(p), p),
       });
     });
   }
@@ -81,11 +86,65 @@
     } else {
       showHub();
     }
+    mountCollaborationPanel(shell, project);
   }
 
   function defaultTitle(id) {
     const m = { image: "이미지", video: "영상", audio: "오디오", code: "코드", doc: "문서", slide: "슬라이드" };
     return "새 " + (m[id] || "프로젝트");
+  }
+
+  let currentProjectId = null;
+  let currentProjectRole = "owner";
+
+  function mountCollaborationPanel(shell, project) {
+    if (!deps.currentUser?.() || !shell?.right) return;
+    currentProjectId = project?.id || null;
+    currentProjectRole = project?.access_role || "owner";
+    const box = document.createElement("div");
+    box.className = "studio-collab-panel";
+    box.style.cssText = "margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e5e7eb;";
+    if (project?.shared) {
+      box.innerHTML = `<div class="studio-panel-label">공유 프로젝트</div><p class="studio-panel-hint">역할: ${project.access_role || "viewer"} · 읽기${project.access_role === "editor" ? "/편집" : ""}</p>`;
+      shell.right.prepend(box);
+      return;
+    }
+    if (!currentProjectId) {
+      box.innerHTML = `<div class="studio-panel-label">공동작업</div><p class="studio-panel-hint">저장 후 친구를 초대할 수 있습니다.</p>`;
+      shell.right.prepend(box);
+      return;
+    }
+    box.innerHTML = `
+      <div class="studio-panel-label">친구 초대</div>
+      <input id="studioInviteInput" placeholder="친구 아이디…" style="width:100%;margin-bottom:6px;padding:6px;border-radius:6px;border:1px solid #e5e7eb;">
+      <select id="studioInviteRole" style="width:100%;margin-bottom:6px;padding:6px;border-radius:6px;">
+        <option value="viewer">보기</option>
+        <option value="editor">편집</option>
+      </select>
+      <button type="button" id="studioInviteBtn" style="width:100%;padding:8px;border-radius:8px;border:none;background:#5865f2;color:#fff;font-weight:700;cursor:pointer;">초대 보내기</button>
+      <div id="studioInviteStatus" class="studio-panel-hint"></div>`;
+    shell.right.prepend(box);
+    box.querySelector("#studioInviteBtn")?.addEventListener("click", async () => {
+      const username = box.querySelector("#studioInviteInput")?.value?.trim();
+      const role = box.querySelector("#studioInviteRole")?.value || "viewer";
+      if (!username) { deps.showToast?.("친구 아이디를 입력하세요.", "warn"); return; }
+      const status = box.querySelector("#studioInviteStatus");
+      try {
+        const uid = await deps.ensureDeviceId();
+        const res = await deps.apiFetch(`/studio/projects/${currentProjectId}/invite`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: uid, username, role }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "초대 실패");
+        if (status) status.textContent = "초대 알림을 보냈습니다.";
+        deps.showToast?.("친구에게 초대 알림을 보냈습니다.", "success");
+      } catch (e) {
+        if (status) status.textContent = e.message || "실패";
+        deps.showToast?.(e.message || "초대 실패", "error");
+      }
+    });
   }
 
   async function mountCodeTool(shell, project) {
@@ -370,6 +429,20 @@
 
     showHub,
     openTool,
+
+    async openProjectById(projectId) {
+      if (!projectId) return;
+      try {
+        const uid = await deps.ensureDeviceId();
+        const res = await deps.apiFetch(`/studio/projects/${projectId}?user_id=${encodeURIComponent(uid)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "불러오기 실패");
+        const p = data.project;
+        openTool(p.project_type || toolIdFromProject(p), p);
+      } catch (e) {
+        deps.showToast?.(e.message || "프로젝트를 열 수 없습니다.", "error");
+      }
+    },
 
     openFromWork(work) {
       if (!work) return;

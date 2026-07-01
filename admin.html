@@ -366,6 +366,7 @@
             <button type="button" id="popupSaveBtn">팝업 등록</button>
           </div>
           <div id="popupAdminHint" style="font-size:11px;color:#94a3b8;margin-top:8px;"></div>
+          <div id="popupListBox" style="margin-top:10px;font-size:11px;color:#cbd5e1;max-height:160px;overflow:auto;"></div>
         </section>
         <section class="panel">
           <h2>코인 이벤트 지급</h2>
@@ -727,6 +728,8 @@
         return `<div class="quota-row" data-feature="${f}">
           <span class="quota-feat">${FEATURE_LABELS[f] || f}</span>
           <span class="quota-val" data-qval="${f}">오늘 AI 호출 🪙${used}</span>
+          <input type="number" class="q-limit-inp" data-limit-feature="${f}" value="${Math.round(v.limit ?? limits?.[f] ?? "")}" placeholder="일한도" min="0" style="width:64px">
+          <button type="button" class="secondary q-limit-save" data-feature="${f}">한도</button>
         </div>`;
       }).join("");
       return `<div class="detail-box" id="quotaAdminBox" data-subject="${subject}" data-banned="${banned ? "1" : "0"}">
@@ -808,8 +811,60 @@
             await refreshQuotaAdminPanel(subject);
             if (selectedUserId) selectUser(selectedUserId);
           } catch (err) { alert(err.message); }
+          return;
+        }
+        if (e.target.classList.contains("q-limit-save")) {
+          const feat = e.target.dataset.feature;
+          const inp = document.getElementById("quotaAdminBox")?.querySelector(`input[data-limit-feature="${feat}"]`);
+          const daily_limit = parseFloat(inp?.value || "0");
+          if (!Number.isFinite(daily_limit) || daily_limit < 0) { alert("유효한 한도를 입력하세요."); return; }
+          try {
+            await api("/admin/quota/limit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subject, feature: feat, daily_limit }),
+            });
+            await refreshQuotaAdminPanel(subject);
+            if (selectedUserId) selectUser(selectedUserId);
+          } catch (err) { alert(err.message); }
         }
       });
+    }
+
+    let adminSearchResults = null;
+
+    async function refreshAdminUserSearch() {
+      const q = document.getElementById("sidebarSearch")?.value.trim() || "";
+      if (q.length < 2 || sidebarMode !== "members") {
+        adminSearchResults = null;
+        return;
+      }
+      try {
+        const data = await api("/admin/users/search?q=" + encodeURIComponent(q));
+        adminSearchResults = data.users || [];
+      } catch {
+        adminSearchResults = null;
+      }
+    }
+
+    async function loadPopupListAdmin() {
+      const box = document.getElementById("popupListBox");
+      if (!box) return;
+      try {
+        const data = await api("/admin/popups?limit=20");
+        const items = data.popups || [];
+        if (!items.length) {
+          box.innerHTML = "<div style='color:#64748b;'>등록된 팝업 없음</div>";
+          return;
+        }
+        box.innerHTML = items.map(p => `
+          <div style="padding:6px 0;border-bottom:1px solid #334155;">
+            <strong>#${p.id}</strong> · ${escapeHtml(p.title || "(제목 없음)")}
+            <span style="color:#64748b;"> · ${escapeHtml(p.day_key || "")} · ${escapeHtml(p.kind || "")}</span>
+          </div>`).join("");
+      } catch (e) {
+        box.textContent = "팝업 목록 불러오기 실패";
+      }
     }
 
     let quotaLiveTimer = null;
@@ -972,6 +1027,10 @@
       collab: "#c084fc",
       agent: "#34d399",
     };
+    function escapeHtml(s) {
+      return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
     const FEATURE_LABELS = {
       compare: "비교",
       debate: "토론",
@@ -1298,6 +1357,7 @@
 
     function filteredMembers() {
       const q = document.getElementById("sidebarSearch").value.trim().toLowerCase();
+      if (adminSearchResults && q.length >= 2) return adminSearchResults;
       let users = dashData?.users || [];
       if (q) users = users.filter(u => `${u.username} ${u.email}`.toLowerCase().includes(q));
       return users;
@@ -1869,7 +1929,8 @@
     });
     document.getElementById("sidebarSearch").addEventListener("input", () => {
       clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => {
+      searchTimer = setTimeout(async () => {
+        await refreshAdminUserSearch();
         renderSidebar();
         if (sidebarMode === "members") renderMembersListPanel();
         if (sidebarMode === "guests") renderGuestsListPanel();
@@ -1902,6 +1963,7 @@
     });
 
     function wirePopupAndGrantAdmin() {
+      loadPopupListAdmin();
       const modeSel = document.getElementById("grantMode");
       modeSel?.addEventListener("change", () => {
         const mb = document.getElementById("grantMinBalance");
@@ -1919,6 +1981,7 @@
             body: JSON.stringify({ title, body, kind, day_key: dayKey }),
           });
           document.getElementById("popupAdminHint").textContent = `등록됨 · id ${data.id} · ${data.day_key}`;
+          loadPopupListAdmin();
         } catch (e) { alert(e.message); }
       });
       document.getElementById("grantRunBtn")?.addEventListener("click", async () => {
@@ -1933,13 +1996,24 @@
         if (target_mode === "conditional" && min_balance !== "") payload.min_balance = parseFloat(min_balance);
         if (scheduled_at) payload.scheduled_at = scheduled_at;
         if (!confirm(`🪙${amount} 코인을 ${target_mode} 대상에 지급할까요?`)) return;
+        const hint = document.getElementById("grantResultHint");
         try {
           const data = await api("/admin/coins/grant", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
-          document.getElementById("grantResultHint").textContent = data.summary || data.status || JSON.stringify(data);
+          if (data.status === "scheduled" && data.id) {
+            hint.innerHTML = `예약됨 (id ${data.id}) · <button type="button" id="grantExecuteNowBtn" style="margin-left:6px;">지금 실행</button>`;
+            document.getElementById("grantExecuteNowBtn")?.addEventListener("click", async () => {
+              try {
+                const ex = await api("/admin/coins/grant/" + data.id + "/execute", { method: "POST" });
+                hint.textContent = ex.summary || ex.status || JSON.stringify(ex);
+              } catch (err) { alert(err.message); }
+            });
+          } else {
+            hint.textContent = data.summary || data.status || JSON.stringify(data);
+          }
         } catch (e) { alert(e.message); }
       });
     }

@@ -49,10 +49,23 @@
             <div class="studio-hub-card-title">${tool.title}</div>
             <div class="studio-hub-card-desc">${tool.desc}</div>
             <div class="studio-hub-recent">${recent.length
-              ? recent.map((p) => `<span class="studio-hub-thumb" title="${(p.name || "").replace(/"/g, "&quot;")}">${typeof thumbFor(p) === "string" && thumbFor(p).length <= 2 ? thumbFor(p) : `<img src="${thumbFor(p)}" alt="">`}</span>`).join("")
+              ? recent.map((p) => {
+                  const thumb = thumbFor(p);
+                  const shared = p.shared ? " 🤝" : "";
+                  const inner = typeof thumb === "string" && thumb.length <= 2 ? thumb + shared : `<img src="${thumb}" alt="">`;
+                  return `<span class="studio-hub-thumb" title="${(p.name || "").replace(/"/g, "&quot;")}${shared}">${inner}</span>`;
+                }).join("")
               : "<span class='studio-hub-no-recent'>최근 작업 없음</span>"}</div>
           </div>`;
         card.addEventListener("click", () => opts.onSelect?.(tool.id));
+        if (recent.length && opts.onOpenProject) {
+          card.querySelectorAll(".studio-hub-thumb").forEach((el, i) => {
+            el.addEventListener("click", (e) => {
+              e.stopPropagation();
+              opts.onOpenProject(recent[i]);
+            });
+          });
+        }
         grid.appendChild(card);
       });
 

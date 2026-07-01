@@ -7277,7 +7277,8 @@
     <script src="/static/studio-document.js?v=20260701e"></script>
     <script src="/static/studio-slides.js?v=20260701e"></script>
     <script src="/static/studio-video-editor.js?v=20260701e"></script>
-    <script src="/static/studio-app.js?v=20260701f"></script>
+    <script src="/static/ai-hub-session.js?v=20260701g"></script>
+    <script src="/static/studio-app.js?v=20260701g"></script>
     <script src="/static/agent-plan.js?v=20260701e"></script>
     <script src="/static/social-features.js?v=20260701e"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
@@ -7832,6 +7833,10 @@
                     cards: cards.map(c => ({ ...c })),
                 },
             });
+            window.AiHubSession?.recordDebate?.({
+                topic: debateTopic,
+                cards: cards.map(c => ({ model: c.model, role: c.role, content: c.content })),
+            });
         }
 
         async function deleteSessionHistoryItem(id) {
@@ -7956,6 +7961,12 @@
                     reasonEl.textContent = bits.join(" · ");
                 }
                 refreshSideQuota();
+                window.AiHubSession?.recordCompare?.({
+                    query: message,
+                    responses: filtered,
+                    pick: data.pick,
+                    line: data.line,
+                });
             } catch (err) {
                 const first = Object.entries(filtered)[0];
                 if (first) {
@@ -7965,6 +7976,7 @@
                     if (diffEl) diffEl.textContent = "—";
                     if (reasonEl) reasonEl.textContent = String(err.message || "").slice(0, 120);
                     bar.style.display = "block";
+                    window.AiHubSession?.recordCompare?.({ query: message, responses: filtered });
                 } else {
                     pickEl.innerHTML = "";
                     lineEl.textContent = "";
@@ -7988,8 +8000,6 @@
                 .filter(([, v]) => v && v !== COMPARE_FAILURE_MSG)
                 .map(([m, v]) => `[${m}]\n${String(v).slice(0, 800)}`);
             startCollabFromContext(`${q}\n\n${parts.join("\n\n")}`);
-        });
-
         });
 
         let nasaroNotifyAsked = false;
@@ -9341,19 +9351,25 @@
                 return;
             }
             drop.innerHTML = items.map(n => `
-                <div class="notif-item${n.is_read ? "" : " unread"}" data-id="${n.id}">
+                <div class="notif-item${n.is_read ? "" : " unread"}" data-id="${n.id}" data-kind="${escapeHtml(n.kind || "")}" data-project-id="${Number(n.payload?.project_id || 0)}">
                     <strong>${escapeHtml(n.title)}</strong>
                     <div>${escapeHtml(n.body || "")}</div>
                     <div style="font-size:10px;color:#9ca3af;margin-top:4px;">${escapeHtml(n.created_at_iso || "")}</div>
                 </div>`).join("");
-            drop.querySelectorAll(".notif-item").forEach(el => {
+            drop.querySelectorAll(".notif-item").forEach((el, idx) => {
                 el.addEventListener("click", async () => {
+                    const item = items[idx];
                     await apiFetch("/notifications/read", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ ids: [Number(el.dataset.id)] }),
                     });
                     loadNotifications();
+                    if (item?.kind === "studio_invite" && item.payload?.project_id) {
+                        setAppWorkspace("studio");
+                        window.StudioHubApp?.openProjectById?.(Number(item.payload.project_id));
+                        drop.classList.remove("open");
+                    }
                 });
             });
         }
@@ -11396,19 +11412,26 @@
         }
 
         async function likeWorkComment(workId, commentId) {
-            if (!currentUser) return;
+            if (!currentUser) { showToast("로그인 후 이용할 수 있습니다.", "warn"); return; }
             try {
-                await apiFetch("/social/works/" + workId + "/comments/" + commentId + "/like", { method: "POST" });
+                const res = await apiFetch("/social/works/" + workId + "/comments/" + commentId + "/like", { method: "POST" });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.detail || "좋아요 실패");
+                }
                 toggleWorkComments(workId);
                 toggleWorkComments(workId);
-            } catch {}
+            } catch (e) {
+                showToast(e.message || "좋아요 실패", "error");
+            }
         }
 
         async function postWorkComment(workId) {
             const input = document.getElementById("commentInput" + workId);
             const box = document.getElementById("worksComments" + workId);
             const body = (input?.value || "").trim();
-            if (!body || !currentUser) return;
+            if (!body) return;
+            if (!currentUser) { showToast("로그인 후 댓글을 작성할 수 있습니다.", "warn"); return; }
             const parentId = Number(box?.dataset.replyParent || 0);
             try {
                 const res = await apiFetch("/social/works/" + workId + "/comments", {
@@ -11422,8 +11445,13 @@
                     toggleWorkComments(workId);
                     toggleWorkComments(workId);
                     loadWorksFeed();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.detail || "댓글 등록 실패");
                 }
-            } catch {}
+            } catch (e) {
+                showToast(e.message || "댓글 등록 실패", "error");
+            }
         }
 
         document.getElementById("worksPostBtn")?.addEventListener("click", async () => {
@@ -12184,6 +12212,12 @@
             }
             showToast("협업 작업이 완료되었습니다.", "success");
             notifyJobComplete("Nasaro AI · 협업 완료", collabSession.task || "협업 작업");
+            window.AiHubSession?.recordCollab?.({
+                task: collabSession?.task,
+                work_type: collabSession?.plan?.work_type,
+                tool: collabFinalMeta?.suggested_studio_tool,
+                guidance: collabFinalProduct,
+            });
             updateCollabActionBar();
             renderCollabRunner(document.getElementById("collabRecommendResult"));
         }
@@ -14367,6 +14401,7 @@
             syncCompareSessionHistory();
             const answerText = activeModels.map(m => `[${m}]\n${responses[m] || ""}`).join("\n\n");
             logUserActivity("compare", message, answerText, "compare");
+            window.AiHubSession?.recordCompare?.({ query: message, responses: { ...responses } });
         }
 
         function appendLoadingCard(roundNumber, speakerIndex) {

@@ -124,6 +124,11 @@ from pricing_store import (
     create_media_job,
     create_studio_project,
     update_studio_project,
+    add_studio_project_member,
+    list_studio_project_members,
+    list_studio_projects_with_shared,
+    get_studio_project_for_subject,
+    can_edit_studio_project,
     delete_studio_project,
     dismiss_popup,
     execute_coin_grant,
@@ -986,6 +991,13 @@ class StudioProjectUpdateRequest(BaseModel):
     project_type: str = ""
     files: dict[str, str] = Field(default_factory=dict)
     thumbnail: str = ""
+
+
+class StudioProjectInviteRequest(BaseModel):
+    user_id: str = ""
+    friend_id: int = 0
+    username: str = ""
+    role: str = "viewer"
 
 
 class NotificationsReadRequest(BaseModel):
@@ -5937,7 +5949,7 @@ def serve_upload(filename: str):
 @app.get("/studio/projects")
 def studio_projects_list(request: Request, user_id: str = "") -> dict:
     subject = _subject_for_device(request, user_id)
-    return {"projects": list_studio_projects(subject)}
+    return {"projects": list_studio_projects_with_shared(subject)}
 
 
 @app.post("/studio/projects")
@@ -5954,18 +5966,21 @@ def studio_projects_update(project_id: int, body: StudioProjectUpdateRequest, re
     subject = _subject_for_device(request, body.user_id)
     if not body.files:
         raise HTTPException(status_code=400, detail="파일이 비어 있습니다.")
-    existing = get_studio_project(project_id, subject)
+    if not can_edit_studio_project(project_id, subject):
+        raise HTTPException(status_code=403, detail="편집 권한이 없습니다.")
+    existing = get_studio_project_for_subject(project_id, subject)
     if not existing:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    owner_subject = existing["subject"]
     ptype = body.project_type or existing.get("project_type") or "code"
-    project = update_studio_project(project_id, subject, body.name, body.files, body.thumbnail, ptype)
+    project = update_studio_project(project_id, owner_subject, body.name, body.files, body.thumbnail, ptype)
     return {"success": True, "project": project}
 
 
 @app.get("/studio/projects/{project_id}")
 def studio_projects_get(project_id: int, request: Request, user_id: str = "") -> dict:
     subject = _subject_for_device(request, user_id)
-    project = get_studio_project(project_id, subject)
+    project = get_studio_project_for_subject(project_id, subject)
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
     return {"project": project}
@@ -5974,9 +5989,63 @@ def studio_projects_get(project_id: int, request: Request, user_id: str = "") ->
 @app.delete("/studio/projects/{project_id}")
 def studio_projects_delete(project_id: int, request: Request, user_id: str = "") -> dict:
     subject = _subject_for_device(request, user_id)
-    if not delete_studio_project(project_id, subject):
+    proj = get_studio_project_for_subject(project_id, subject)
+    if not proj or proj.get("access_role") != "owner":
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    if not delete_studio_project(project_id, proj["subject"]):
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
     return {"success": True}
+
+
+@app.post("/studio/projects/{project_id}/invite")
+def studio_projects_invite(project_id: int, body: StudioProjectInviteRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    owner_subject = f"user:{user['id']}"
+    proj = get_studio_project_for_subject(project_id, owner_subject)
+    if not proj or proj.get("access_role") != "owner":
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    friend_id = int(body.friend_id or 0)
+    if not friend_id and body.username.strip():
+        hits = search_users(body.username.strip(), user["id"], limit=5)
+        for h in hits:
+            if h.get("username", "").lower() == body.username.strip().lower():
+                friend_id = int(h["id"])
+                break
+        if not friend_id and hits:
+            friend_id = int(hits[0]["id"])
+    if not friend_id:
+        raise HTTPException(status_code=400, detail="초대할 친구를 지정하세요.")
+    friends = {int(f["id"]) for f in list_friends(user["id"])}
+    if friend_id not in friends:
+        raise HTTPException(status_code=400, detail="친구만 초대할 수 있습니다.")
+    member_subject = f"user:{friend_id}"
+    try:
+        member = add_studio_project_member(
+            project_id, owner_subject, member_subject, body.role or "viewer", owner_subject
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    create_notification(
+        friend_id,
+        "studio_invite",
+        "스튜디오 공동작업 초대",
+        f"「{proj.get('name') or '프로젝트'}」에 초대되었습니다.",
+        {"project_id": project_id, "project_type": proj.get("project_type")},
+    )
+    return {"success": True, "member": member}
+
+
+@app.get("/studio/projects/{project_id}/members")
+def studio_projects_members(project_id: int, request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    proj = get_studio_project_for_subject(project_id, subject)
+    if not proj:
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    if proj.get("access_role") != "owner":
+        return {"members": [], "access_role": proj.get("access_role")}
+    return {"members": list_studio_project_members(project_id, proj["subject"])}
 
 
 @app.get("/social/explore")
