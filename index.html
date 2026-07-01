@@ -29,7 +29,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nasaro AI</title>
     <link rel="stylesheet" href="/static/design-tokens.css?v=20260702a">
-    <link rel="stylesheet" href="/static/nasaro-components.css?v=20260702a">
+    <link rel="stylesheet" href="/static/nasaro-components.css?v=20260702c">
     <!-- PWA: 홈화면 추가 지원 -->
     <meta name="theme-color" content="#7c3aed">
     <meta name="mobile-web-app-capable" content="yes">
@@ -7290,7 +7290,11 @@
     <script src="/static/deploy-hint.js"></script>
     <script src="/static/work-files.js?v=20260702a"></script>
     <script src="/static/ai-ask-mode.js?v=20260702a"></script>
-    <script src="/static/nasaro-ui.js?v=20260702a"></script>
+    <script src="/static/nasaro-ui.js?v=20260702c"></script>
+    <script src="/static/collab-flow-v2.js?v=20260702c"></script>
+    <script src="/static/chat-sns.js?v=20260702c"></script>
+    <script src="/static/works-feed-v2.js?v=20260702c"></script>
+    <script src="/static/icon-bridge.js?v=20260702c"></script>
     <script src="/static/nasaro-features.js?v=20260701e"></script>
     <script>
         const API_URL = "";
@@ -10430,6 +10434,7 @@
 
         function selectChatRoom(roomId, name, roomType) {
             chatRoomId = roomId;
+            window.chatRoomId = roomId;
             document.querySelectorAll(".chat-user-btn, .discord-member-btn, .chat-room-list-item").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.roomId === roomId);
             });
@@ -11227,6 +11232,7 @@
             const card = document.createElement("article");
             card.className = "insta-card works-card";
             card.dataset.workId = w.id;
+            card.dataset.mediaType = (w.media_type || (w.media_url ? "image" : "text")).toLowerCase();
             const initial = (w.author_name || "?").charAt(0).toUpperCase();
             const coinTotal = w.coin_total ?? w.like_count ?? 0;
             const tipPending = w.tip_pending;
@@ -14516,7 +14522,7 @@
                     ${isActive && !isFailed && !card.loading && !isSummary ? `<button class="debug-toggle" type="button" aria-label="디버그 정보">···</button>` : ""}
                     <span class="debate-badge">${isSummary ? "라운드 요약" : (card.role || "발언")}</span>
                 </div>
-                <div class="${(listMode || isActive) ? "debate-card-body" : "debate-preview-body"}"></div>
+                <div class="${(listMode || isActive) ? "debate-card-body debate-chat-bubble" : "debate-preview-body"}"></div>
                 ${isActive && isFailed ? `<div class="debate-retry"><button class="retry-button" type="button">다시 시도</button></div>` : ""}
                 ${isActive && !isFailed && !card.loading && !isSummary ? `
                     <div class="debate-debug" id="${debugId}">
@@ -14988,6 +14994,19 @@
         }
 
         (function coreBootstrap() {
+            window.appendCollabIntakeMessage = appendCollabIntakeMessage;
+            window.renderCollabRunner = renderCollabRunner;
+            window.buildWorkCard = buildWorkCard;
+            window.loadWorksFeed = loadWorksFeed;
+            window.loadChatMessages = loadChatMessages;
+            window.toggleWorkComments = toggleWorkComments;
+            window.selectChatRoom = selectChatRoom;
+            window.appendChatBubble = appendChatBubble;
+            Object.defineProperty(window, "currentUser", {
+                get: () => currentUser,
+                configurable: true,
+            });
+
             try { rebuildMainToolbar(); } catch (e) { console.error("rebuildMainToolbar 실패", e); }
             try { rebuildWorkspaceTopBar(); } catch (e) { console.error("rebuildWorkspaceTopBar 실패", e); }
             try { rebuildAgentToolbar(); } catch (e) { console.error("rebuildAgentToolbar 실패", e); }
@@ -15023,6 +15042,10 @@
             try { window.WorkFiles?.init?.(nxDeps); } catch (e) { console.error("WorkFiles init", e); }
             try { window.AiAskMode?.init?.(nxDeps); } catch (e) { console.error("AiAskMode init", e); }
             try { window.NasaroUI?.init?.(); switchMode("ask"); } catch (e) { console.error("NasaroUI init", e); }
+            try { window.CollabFlowV2?.init?.(); } catch (e) { console.error("CollabFlowV2 init", e); }
+            try { window.ChatSNS?.init?.(nxDeps); } catch (e) { console.error("ChatSNS init", e); }
+            try { window.WorksFeedV2?.init?.(nxDeps); } catch (e) { console.error("WorksFeedV2 init", e); }
+            try { window.IconBridge?.init?.(); } catch (e) { console.error("IconBridge init", e); }
 
             if (!window.StudioHubApp) {
                 console.warn("StudioHubApp 모듈이 로드되지 않았습니다.");

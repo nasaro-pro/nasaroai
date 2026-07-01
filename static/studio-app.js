@@ -87,6 +87,42 @@
       showHub();
     }
     mountCollaborationPanel(shell, project);
+    mountShellFileHandlers(shell, toolId);
+  }
+
+  function mountShellFileHandlers(shell, toolId) {
+    const typeMap = { slide: "ppt", doc: "doc", code: "code", image: "image", video: "video", audio: "audio" };
+    shell.setSaveHandler?.(async () => {
+      const title = shell.getTitle();
+      const promptEl = shell.center?.querySelector("#mediaPrompt, textarea, .ql-editor");
+      const text = promptEl?.value || promptEl?.innerText || shell.center?.innerText || "";
+      const url = mediaState.lastResult?.media_url || mediaState.lastResult?.url || "";
+      await global.WorkFiles?.saveFile?.({
+        type: typeMap[toolId] || "doc",
+        title,
+        text_content: String(text).slice(0, 50000),
+        content_url_or_path: url,
+        thumbnail_url: url,
+        source_tool: "studio-" + toolId,
+        project_id: currentProjectId,
+      });
+    });
+    shell.setLoadHandler?.(() => {
+      global.WorkFiles?.openPicker?.({
+        type: typeMap[toolId] || "",
+        onPick: (f) => {
+          const promptEl = shell.center?.querySelector("#mediaPrompt, textarea, .ql-editor");
+          if (f.text_content && promptEl) {
+            if ("value" in promptEl) promptEl.value = f.text_content.slice(0, 8000);
+            else promptEl.innerHTML = f.text_content.replace(/\n/g, "<br>");
+          } else if (f.content_url_or_path) {
+            const ref = shell.center?.querySelector("#mediaRefUrl");
+            if (ref) ref.value = f.content_url_or_path;
+          }
+          deps.showToast?.("작업물을 불러왔습니다.", "success");
+        },
+      });
+    });
   }
 
   function defaultTitle(id) {

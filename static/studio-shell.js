@@ -22,6 +22,8 @@
           <input type="text" class="studio-shell-title" value="" maxlength="120" placeholder="프로젝트 이름">
           <span class="studio-shell-save-status" data-state="idle">—</span>
           <div class="studio-shell-toolbar-actions">
+            <button type="button" class="studio-shell-load" title="작업물 불러오기">불러오기</button>
+            <button type="button" class="studio-shell-save-lib" title="내 작업물에 저장">💾 저장</button>
             <button type="button" class="studio-shell-export">내보내기 ▾</button>
           </div>
         </header>
@@ -36,6 +38,8 @@
       const titleInput = wrap.querySelector(".studio-shell-title");
       const saveStatus = wrap.querySelector(".studio-shell-save-status");
       const exportBtn = wrap.querySelector(".studio-shell-export");
+      const saveLibBtn = wrap.querySelector(".studio-shell-save-lib");
+      const loadBtn = wrap.querySelector(".studio-shell-load");
       const backBtn = wrap.querySelector(".studio-shell-back");
       const bottom = wrap.querySelector(".studio-shell-bottom");
 
@@ -57,6 +61,12 @@
         showBottom(show) { bottom.style.display = show ? "" : "none"; },
         setExportHandler(fn) {
           exportBtn.onclick = (e) => { e.stopPropagation(); fn?.(exportBtn); };
+        },
+        setSaveHandler(fn) {
+          if (saveLibBtn) saveLibBtn.onclick = (e) => { e.stopPropagation(); fn?.(api); };
+        },
+        setLoadHandler(fn) {
+          if (loadBtn) loadBtn.onclick = (e) => { e.stopPropagation(); fn?.(api); };
         },
         destroy() { root.innerHTML = ""; },
       };

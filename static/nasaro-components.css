@@ -130,3 +130,69 @@ body { background: var(--bg-canvas); color: var(--text-primary); }
 .compare-grid.cols-scroll .compare-card { flex: 0 0 min(340px, 85vw); max-height: 70vh; overflow-y: auto; }
 
 .works-type-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+
+/* Collab fullscreen modal */
+body.collab-modal-open #collabPanel {
+  position: fixed; inset: 0; z-index: 8400; background: var(--bg-canvas);
+  overflow-y: auto; padding: var(--space-4); margin: 0;
+}
+body.collab-modal-open #collabPanel .collab-modal-close {
+  position: sticky; top: 8px; z-index: 2; margin-bottom: 12px;
+}
+.collab-intake-progress { padding: 8px 12px 0; }
+.collab-intake-progress-track { height: 6px; background: var(--border-subtle); border-radius: 999px; overflow: hidden; }
+.collab-intake-progress-fill { height: 100%; background: linear-gradient(90deg, var(--brand-600), #a855f7); width: 0; transition: width 0.3s; }
+.collab-intake-progress-label { font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px; }
+.collab-intake-chat .collab-intake-msg.user {
+  align-self: flex-end; max-width: 85%; background: #fee500; color: #111;
+  padding: 10px 14px; border-radius: 16px 16px 4px 16px; margin: 6px 0;
+}
+.collab-intake-chat .collab-intake-msg.assistant {
+  align-self: flex-start; max-width: 90%; background: var(--bg-surface);
+  border: 1px solid var(--border-subtle); padding: 10px 14px;
+  border-radius: 16px 16px 16px 4px; margin: 6px 0;
+}
+.collab-intake-chat { display: flex; flex-direction: column; }
+.collab-pipeline-v2 { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0; }
+.collab-pipeline-v2 .collab-rail-step-wrap { flex: 0 0 140px; }
+.collab-pipeline-v2 .collab-rail-step-wrap.state-done .collab-rail-step { border-color: var(--accent-success); }
+.collab-pipeline-v2 .collab-rail-step-wrap.state-running .collab-rail-step { border-color: var(--brand-600); animation: nxSk 1s infinite; }
+
+/* Chat SNS */
+.chat-bubble-v2 .chat-bubble { border-radius: 18px; padding: 10px 14px; line-height: 1.5; }
+.chat-bubble-row.mine .chat-bubble { background: linear-gradient(135deg, var(--brand-600), var(--brand-700)); color: #fff; }
+.chat-bubble-row.theirs .chat-bubble { background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); }
+.chat-bubble-ai .chat-bubble { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.chat-bubble-reply { font-size: 11px; padding: 6px 10px; border-left: 3px solid var(--brand-600); background: rgba(124,58,237,0.08); border-radius: 8px; margin-bottom: 4px; }
+.chat-work-card img { max-width: 100%; border-radius: 12px; display: block; }
+.chat-work-card span { font-size: 11px; display: block; margin-top: 4px; opacity: 0.85; }
+#chatLayout.chat-slide-in .discord-main { animation: chatSlideIn 0.32s var(--ease-out, ease-out); }
+@keyframes chatSlideIn { from { transform: translateX(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+#chatTypingIndicator { font-size: 12px; color: var(--text-muted); padding: 4px 12px; }
+
+/* Works feed v2 */
+.works-card-v2 { border-radius: var(--radius-card); overflow: hidden; box-shadow: var(--shadow-sm); margin-bottom: 20px; }
+.works-card-v2 .insta-card-head { padding: 12px 14px; }
+.works-card-v2 .insta-actions { padding: 8px 14px 12px; gap: 10px; display: flex; align-items: center; flex-wrap: wrap; }
+.works-ai-comment-btn { margin-left: auto; }
+
+.studio-shell-save-lib, .studio-shell-load {
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-subtle);
+  background: var(--bg-surface); font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.icon-label { font-size: 10px; margin-left: 2px; }
+
+/* Debate chat-log bubbles */
+.debate-card-body.debate-chat-bubble {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px 16px 16px 4px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  line-height: 1.55;
+}
+.debate-card.summary-card .debate-card-body.debate-chat-bubble {
+  border-radius: 16px;
+  border-color: rgba(124, 58, 237, 0.35);
+  background: rgba(124, 58, 237, 0.06);
+}

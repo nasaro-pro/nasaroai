@@ -276,7 +276,9 @@
     .sidebar-foot .secondary { flex-shrink: 0; }
     .login-form { margin: 0; }
     .login-form input { margin-bottom: 0; }
+    .hour-chart canvas, .chart-panel canvas { width: 100% !important; max-height: 180px; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div id="loginView" class="login-wrap">
@@ -546,6 +548,8 @@
     let selectedGuestId = null;
     let selectedSupportId = null;
     let chartStatsRange = "today";
+    let hourChartInstance = null;
+    const featureChartInstances = {};
     let searchTimer = null;
 
     function saveAdminUiState() {
@@ -1115,57 +1119,139 @@
         <div class="hour-chart-legend">${label} ${total}회 (KST)</div>`;
     }
 
+    function destroyChartInstance(inst) {
+      if (inst) try { inst.destroy(); } catch (_) {}
+    }
+
     function renderHourChart(byHour, elId, legendText) {
       const el = document.getElementById(elId || "hourChart");
+      if (!el) return;
       const hourTotals = Array.from({ length: 24 }, () => 0);
       Object.entries(byHour || {}).forEach(([k, v]) => {
         const parts = String(k).split(":");
         const hr = parseInt(parts[parts.length - 1], 10);
         if (!isNaN(hr) && hr >= 0 && hr < 24) hourTotals[hr] += Number(v) || 0;
       });
-      const max = Math.max(...hourTotals, 1);
       const total = hourTotals.reduce((a, b) => a + b, 0);
       if (!total) {
+        destroyChartInstance(hourChartInstance);
+        hourChartInstance = null;
         el.innerHTML = "<span class='empty'>아직 기록 없음</span>";
         return;
       }
-      const bars = hourTotals.map((v, hr) => {
-        const pct = Math.max(2, Math.round((v / max) * 100));
-        const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
-        return `<div class="hour-chart-bar-wrap" title="${hr}시: ${v}회">
-          ${countLabel}
-          <div class="hour-chart-bar" style="height:${pct}%"></div>
-          <span class="bar-hour-label">${hr % 3 === 0 ? hr : ""}</span>
-        </div>`;
-      }).join("");
-      el.innerHTML = `<div class="hour-chart-graph">${bars}</div>
+      if (typeof Chart === "undefined") {
+        const max = Math.max(...hourTotals, 1);
+        const bars = hourTotals.map((v, hr) => {
+          const pct = Math.max(2, Math.round((v / max) * 100));
+          const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
+          return `<div class="hour-chart-bar-wrap" title="${hr}시: ${v}회">
+            ${countLabel}
+            <div class="hour-chart-bar" style="height:${pct}%"></div>
+            <span class="bar-hour-label">${hr % 3 === 0 ? hr : ""}</span>
+          </div>`;
+        }).join("");
+        el.innerHTML = `<div class="hour-chart-graph">${bars}</div>
+          <div class="hour-chart-legend">${legendText || "오늘 KST"} ${total}회</div>`;
+        return;
+      }
+      destroyChartInstance(hourChartInstance);
+      el.innerHTML = `<div style="position:relative;height:180px;"><canvas></canvas></div>
         <div class="hour-chart-legend">${legendText || "오늘 KST"} ${total}회</div>`;
+      const ctx = el.querySelector("canvas").getContext("2d");
+      hourChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: hourTotals.map((_, hr) => hr + "시"),
+          datasets: [{
+            label: "활동",
+            data: hourTotals,
+            backgroundColor: "rgba(124, 58, 237, 0.65)",
+            borderColor: "#7c3aed",
+            borderWidth: 1,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { precision: 0 } },
+          },
+        },
+      });
     }
 
     function renderFeatureHourCharts(byFeature, limits, rangeMode) {
       const el = document.getElementById("featureHourCharts");
       if (!el) return;
+      Object.values(featureChartInstances).forEach(destroyChartInstance);
+      Object.keys(featureChartInstances).forEach((k) => delete featureChartInstances[k]);
       const rangeLabel = rangeMode === "all" ? "전체" : "오늘";
       const features = Object.keys(FEATURE_LABELS);
-      el.innerHTML = features.map(feat => {
-        const map = byFeature[feat] || {};
-        const hours = hourArrayFromMap(map);
-        const max = Math.max(...hours, 1);
-        const total = hours.reduce((a, b) => a + b, 0);
-        const bars = hours.map((v, hr) => {
-          const pct = Math.max(1, Math.round((v / max) * 100));
-          const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
-          return `<div class="stacked-col" title="${hr}시 ${v}회">
-            ${countLabel}
-            <div class="stacked-seg" style="height:${pct}%;background:${FEATURE_COLORS[feat]}"></div>
+      if (typeof Chart === "undefined") {
+        el.innerHTML = features.map(feat => {
+          const map = byFeature[feat] || {};
+          const hours = hourArrayFromMap(map);
+          const max = Math.max(...hours, 1);
+          const total = hours.reduce((a, b) => a + b, 0);
+          const bars = hours.map((v, hr) => {
+            const pct = Math.max(1, Math.round((v / max) * 100));
+            const countLabel = v > 0 ? `<span class="bar-count-label">${v}</span>` : "";
+            return `<div class="stacked-col" title="${hr}시 ${v}회">
+              ${countLabel}
+              <div class="stacked-seg" style="height:${pct}%;background:${FEATURE_COLORS[feat]}"></div>
+            </div>`;
+          }).join("");
+          return `<div class="chart-panel">
+            <h3>${FEATURE_LABELS[feat]} · ${rangeLabel} AI 🪙${total}</h3>
+            <div class="stacked-chart">${bars}</div>
+            <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별 호출 (${rangeLabel})</span></div>
           </div>`;
         }).join("");
+        return;
+      }
+      el.innerHTML = features.map((feat, idx) => {
+        const map = byFeature[feat] || {};
+        const hours = hourArrayFromMap(map);
+        const total = hours.reduce((a, b) => a + b, 0);
         return `<div class="chart-panel">
           <h3>${FEATURE_LABELS[feat]} · ${rangeLabel} AI 🪙${total}</h3>
-          <div class="stacked-chart">${bars}</div>
+          <div style="position:relative;height:140px;"><canvas id="featChart${idx}"></canvas></div>
           <div class="chart-legend"><span><i style="background:${FEATURE_COLORS[feat]}"></i>시간대별 호출 (${rangeLabel})</span></div>
         </div>`;
       }).join("");
+      features.forEach((feat, idx) => {
+        const map = byFeature[feat] || {};
+        const hours = hourArrayFromMap(map);
+        const canvas = document.getElementById("featChart" + idx);
+        if (!canvas) return;
+        const color = FEATURE_COLORS[feat];
+        featureChartInstances[feat] = new Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: {
+            labels: hours.map((_, hr) => hr + "시"),
+            datasets: [{
+              label: FEATURE_LABELS[feat],
+              data: hours,
+              backgroundColor: color + "aa",
+              borderColor: color,
+              borderWidth: 1,
+              borderRadius: 3,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }, grid: { display: false } },
+              y: { beginAtZero: true, ticks: { precision: 0 } },
+            },
+          },
+        });
+      });
     }
 
     let activityQuery = { q: "", feature: "" };
