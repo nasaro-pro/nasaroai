@@ -28,7 +28,8 @@
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nasaro AI</title>
-    <link rel="stylesheet" href="/static/design-tokens.css?v=20260701d">
+    <link rel="stylesheet" href="/static/design-tokens.css?v=20260702a">
+    <link rel="stylesheet" href="/static/nasaro-components.css?v=20260702a">
     <!-- PWA: 홈화면 추가 지원 -->
     <meta name="theme-color" content="#7c3aed">
     <meta name="mobile-web-app-capable" content="yes">
@@ -6496,6 +6497,7 @@
                     <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
                     <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
                 </div>
+                <div class="side-menu-section" id="sideMenuWorkFiles"></div>
             </div>
             <div id="sideMenuPanelChat" class="side-menu-panel">
                 <div class="side-menu-section">
@@ -6698,7 +6700,8 @@
 
         <main id="mainContent">
             <div id="shareViewBanner"></div>
-            <section id="comparePanel" class="panel active">
+            <section id="askPanel" class="panel active"></section>
+            <section id="comparePanel" class="panel">
                 <div id="compareEmptyHint" class="collab-intro" style="display:none;padding:24px;">
                     <div class="collab-intro-icon">💡</div>
                     <h2 class="collab-intro-title">무엇을 비교해 볼까요?</h2>
@@ -7196,9 +7199,9 @@
                         <div class="dock-btn-left" id="dockBtnToolsLeft"></div>
                         <div class="dock-btn-center">
                             <div class="dock-mode-group">
-                                <button class="mode-btn active" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
+                                <button class="mode-btn active" type="button" data-mode="ask">질문</button>
+                                <button class="mode-btn" type="button" data-mode="compare" data-i18n="mode_compare">비교</button>
                                 <button class="mode-btn" type="button" data-mode="debate" data-i18n="mode_debate">토론</button>
-                                <button class="mode-btn" type="button" data-mode="collab" data-i18n="mode_collab">협업</button>
                             </div>
                             <div class="dock-extra-btns" id="dockExtraBtns">
                                 <span id="dockMobileTools" class="dock-mobile-tools"></span>
@@ -7209,7 +7212,9 @@
                     </div>
                     <div id="dockResultActionsSlot" class="dock-result-actions-slot"></div>
                     <div class="dock-compose-row">
-                        <div class="dock-compose-tools-left" id="mainInputToolsLeft"></div>
+                        <div class="dock-compose-tools-left" id="mainInputToolsLeft">
+                            <button type="button" id="dockAttachFileBtn" class="input-tool-btn" title="참고 파일 첨부">📎</button>
+                        </div>
                         <div class="dock-input-wrap" id="dockInputWrap">
                             <textarea id="mainInput" rows="1" placeholder="비교할 질문을 입력하세요…"></textarea>
                             <button type="button" id="dockMicBtn" class="dock-mic-btn" title="음성 입력" aria-label="음성 입력">🎤</button>
@@ -7283,6 +7288,9 @@
     <script src="/static/social-features.js?v=20260701e"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <script src="/static/deploy-hint.js"></script>
+    <script src="/static/work-files.js?v=20260702a"></script>
+    <script src="/static/ai-ask-mode.js?v=20260702a"></script>
+    <script src="/static/nasaro-ui.js?v=20260702a"></script>
     <script src="/static/nasaro-features.js?v=20260701e"></script>
     <script>
         const API_URL = "";
@@ -8521,7 +8529,7 @@
         const COMPARE_FAILURE_MSG = "이번 응답 생성에 실패했습니다. 다시 시도해주세요.";
         const DEBATE_FAILURE_MSG = "이번 발언 생성에 실패했습니다. 다시 시도해주세요.";
 
-        let currentMode = "compare";
+        let currentMode = "ask";
         let debateSessionId = createUUID();
         let debateTopic = "";
         let debateStarted = false;
@@ -9950,7 +9958,7 @@
         let currentMission = "";
         let agentAbortCtrl = null;
 
-        const AI_PANEL_IDS = ["comparePanel", "debatePanel", "collabPanel"];
+        const AI_PANEL_IDS = ["askPanel", "comparePanel", "debatePanel", "collabPanel"];
 
         function updateSideMenuForWorkspace(ws) {
             document.getElementById("sideMenuPanelAi")?.classList.toggle("active", ws === "ai");
@@ -11837,6 +11845,17 @@
                 newChatBtn.textContent = mob ? "새 질문" : label;
                 newChatBtn.title = mob ? "새 질문" : (NF?.t?.("new_chat") || "새 질문");
             }
+            if (currentMode === "ask") {
+                mainInput.placeholder = "AI에게 질문…";
+                dockPrimaryBtn.textContent = dockBtnLabel("질문 ▶", getModeCoinCost("agent") || 1);
+                dockPrimaryBtn.title = "AI에게 질문";
+                dockPrimaryBtn.className = "dock-btn primary dock-submit-btn";
+                dockPrimaryBtn.disabled = false;
+                mainInput.disabled = false;
+                autoResizeInput();
+                updateDockCoinHint();
+                return;
+            }
             if (currentMode === "compare") {
                 mainInput.placeholder = NF?.t?.("ph_compare") || "비교할 질문…";
                 const cmpLabel = mob ? "비교 ▶" : (NF?.t?.("btn_compare") || "비교 ▶");
@@ -13163,6 +13182,14 @@
         });
 
         dockPrimaryBtn.addEventListener("click", () => {
+            if (currentMode === "ask") {
+                const q = mainInput.value.trim();
+                if (!q) return;
+                window.AiAskMode?.send?.(q);
+                mainInput.value = "";
+                autoResizeInput();
+                return;
+            }
             if (currentMode === "compare") handleCompare();
             else if (currentMode === "debate") {
                 if (!debateStarted) handleDebateStart();
@@ -14990,7 +15017,14 @@
                 } catch (e) {
                     console.error("StudioHubApp 초기화 실패", e);
                 }
-            } else {
+            }
+
+            const nxDeps = { apiFetch, showToast, ensureDeviceId, refreshSideQuota };
+            try { window.WorkFiles?.init?.(nxDeps); } catch (e) { console.error("WorkFiles init", e); }
+            try { window.AiAskMode?.init?.(nxDeps); } catch (e) { console.error("AiAskMode init", e); }
+            try { window.NasaroUI?.init?.(); switchMode("ask"); } catch (e) { console.error("NasaroUI init", e); }
+
+            if (!window.StudioHubApp) {
                 console.warn("StudioHubApp 모듈이 로드되지 않았습니다.");
             }
 

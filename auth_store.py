@@ -485,8 +485,10 @@ def init_db() -> None:
             if "reactions" not in ucm_cols:
                 conn.execute("ALTER TABLE user_chat_messages ADD COLUMN reactions TEXT NOT NULL DEFAULT '{}'")
             from pricing_store import ensure_pricing_tables, seed_model_pricing, process_due_coin_grants
+            from work_files_store import ensure_work_files_table
 
             ensure_pricing_tables(conn)
+            ensure_work_files_table(conn)
             seed_model_pricing(conn)
             conn.commit()
         finally:

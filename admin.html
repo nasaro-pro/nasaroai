@@ -301,6 +301,7 @@
         <button type="button" id="tabMembers">회원</button>
         <button type="button" id="tabGuests">비회원</button>
         <button type="button" id="tabSupport">문의</button>
+        <button type="button" id="tabWorkFiles">작업물</button>
       </div>
       <div class="sidebar-search" id="sidebarSearchWrap">
         <input id="sidebarSearch" type="search" placeholder="아이디·이메일 검색…">
@@ -500,6 +501,16 @@
             </div>
           </div>
         </section>
+        <section class="panel full" id="workFilesAdminPanel" style="display:none;">
+          <h2>작업물 관리</h2>
+          <div id="workFilesAdminStats" class="entity-summary" style="margin-bottom:12px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="entity-list-table">
+              <thead><tr><th>ID</th><th>소유자</th><th>타입</th><th>제목</th><th>출처</th><th>생성</th><th></th></tr></thead>
+              <tbody id="workFilesAdminBody"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -642,6 +653,7 @@
       overview.classList.remove("visible");
       detailPanels.classList.add("visible");
       supportPanel.style.display = sidebarMode === "support" ? "" : "none";
+      document.getElementById("workFilesAdminPanel").style.display = sidebarMode === "workfiles" ? "" : "none";
       membersListPanel.style.display = sidebarMode === "members" && !selectedUserId ? "" : "none";
       guestsListPanel.style.display = sidebarMode === "guests" && !selectedGuestId ? "" : "none";
       userDetailPanel.style.display =
@@ -656,9 +668,41 @@
     }
 
     function setActiveTab(id) {
-      ["tabStats", "tabMembers", "tabGuests", "tabSupport"].forEach(tid => {
+      ["tabStats", "tabMembers", "tabGuests", "tabSupport", "tabWorkFiles"].forEach(tid => {
         document.getElementById(tid)?.classList.toggle("active", tid === id);
       });
+    }
+
+    async function loadWorkFilesAdmin() {
+      const statsEl = document.getElementById("workFilesAdminStats");
+      const body = document.getElementById("workFilesAdminBody");
+      if (!body) return;
+      body.innerHTML = "<tr><td colspan='7'>불러오는 중…</td></tr>";
+      try {
+        const data = await api("/admin/work-files?limit=100");
+        const st = data.stats || {};
+        if (statsEl) {
+          const byType = Object.entries(st.by_type || {}).map(([k, v]) => `${k}:${v}`).join(" · ");
+          statsEl.innerHTML = `<div class="stat"><b>${st.total || 0}</b><span>전체</span></div><div class="stat"><span>${byType || "—"}</span></div>`;
+        }
+        const files = data.files || [];
+        if (!files.length) { body.innerHTML = "<tr><td colspan='7'>없음</td></tr>"; return; }
+        body.innerHTML = files.map(f => `<tr>
+          <td>${f.id}</td><td>${escapeHtml(f.owner_subject)}</td><td>${escapeHtml(f.type)}</td>
+          <td>${escapeHtml(f.title)}</td><td>${escapeHtml(f.source_tool)}</td>
+          <td>${new Date((f.created_at || 0) * 1000).toLocaleString("ko-KR")}</td>
+          <td><button type="button" class="secondary" data-del-wf="${f.id}">삭제</button></td>
+        </tr>`).join("");
+        body.querySelectorAll("[data-del-wf]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            if (!confirm("삭제할까요?")) return;
+            await api("/admin/work-files/" + btn.dataset.delWf, { method: "DELETE" });
+            loadWorkFilesAdmin();
+          });
+        });
+      } catch (e) {
+        body.innerHTML = `<tr><td colspan='7'>${escapeHtml(e.message)}</td></tr>`;
+      }
     }
 
     function showDetailView(mode) {
@@ -1925,6 +1969,19 @@
       document.getElementById("mainTitle").textContent = "관리자 문의";
       document.getElementById("mainSub").textContent = "답변 대기 · 완료";
       document.getElementById("supportDetail").style.display = "none";
+      saveAdminUiState();
+    });
+    document.getElementById("tabWorkFiles")?.addEventListener("click", () => {
+      selectedUserId = null;
+      selectedGuestId = null;
+      selectedSupportId = null;
+      sidebarMode = "workfiles";
+      setActiveTab("tabWorkFiles");
+      document.getElementById("sidebarSearchWrap").classList.add("hidden");
+      document.getElementById("mainTitle").textContent = "작업물 관리";
+      document.getElementById("mainSub").textContent = "work_files 라이브러리";
+      updateMainPanels();
+      loadWorkFilesAdmin();
       saveAdminUiState();
     });
     document.getElementById("sidebarSearch").addEventListener("input", () => {

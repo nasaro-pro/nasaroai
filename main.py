@@ -141,6 +141,18 @@ from pricing_store import (
     process_due_coin_grants,
     update_media_job,
 )
+from work_files_store import (
+    admin_delete_work_file,
+    admin_list_work_files,
+    admin_work_files_stats,
+    count_work_files,
+    delete_work_file,
+    duplicate_work_file,
+    get_work_file,
+    list_work_files,
+    save_work_file,
+    update_work_file,
+)
 
 load_dotenv()
 
@@ -363,6 +375,42 @@ def _resolve_subject(request: Request, device_id: str | None = None) -> tuple[st
         return f"user:{user['id']}", user
     dev = (device_id or request.headers.get("X-Device-Id") or "anonymous").strip()
     return f"device:{dev}", None
+
+
+def _map_studio_tool_to_file_type(tool: str) -> str:
+    m = {"slide": "ppt", "doc": "doc", "code": "code", "image": "image", "video": "video", "audio": "audio"}
+    return m.get((tool or "").strip().lower(), "doc")
+
+
+def _auto_save_work_file(
+    subject: str,
+    *,
+    file_type: str,
+    title: str,
+    content_url: str = "",
+    text_content: str = "",
+    thumbnail_url: str = "",
+    source_tool: str = "",
+    project_id: int | None = None,
+    is_pinned: bool = False,
+) -> dict[str, Any] | None:
+    if not subject:
+        return None
+    try:
+        return save_work_file(
+            subject,
+            file_type=file_type,
+            title=title,
+            content_url=content_url,
+            text_content=text_content,
+            thumbnail_url=thumbnail_url or content_url,
+            source_tool=source_tool,
+            project_id=project_id,
+            is_pinned=is_pinned,
+        )
+    except Exception as exc:
+        logger.warning("work_file auto-save failed: %s", exc)
+        return None
 
 
 def _platform(request: Request) -> str:
@@ -998,6 +1046,26 @@ class StudioProjectInviteRequest(BaseModel):
     friend_id: int = 0
     username: str = ""
     role: str = "viewer"
+
+
+class WorkFileSaveRequest(BaseModel):
+    user_id: str = ""
+    type: str = "doc"
+    title: str = ""
+    content_url_or_path: str = ""
+    text_content: str = ""
+    thumbnail_url: str = ""
+    source_tool: str = ""
+    project_id: int | None = None
+    is_pinned: bool = False
+
+
+class WorkFileUpdateRequest(BaseModel):
+    user_id: str = ""
+    title: str | None = None
+    is_pinned: bool | None = None
+    project_id: int | None = None
+    text_content: str | None = None
 
 
 class NotificationsReadRequest(BaseModel):
@@ -2219,6 +2287,16 @@ async def _run_media_job_background(
         update_media_job(job_id, progress_stage="rendering")
         url = await run_media_generation(label, prompt, openrouter_headers=headers)
         update_media_job(job_id, status="completed", progress_stage="done", result_url=url)
+        if subject:
+            await asyncio.to_thread(
+                _auto_save_work_file,
+                subject,
+                file_type="video",
+                title=(prompt or "영상")[:200],
+                content_url=url,
+                thumbnail_url=url,
+                source_tool="studio-video",
+            )
     except FalServiceUnavailableError:
         update_media_job(job_id, status="failed", progress_stage="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
         if subject and coin_cost:
@@ -4183,6 +4261,14 @@ async def collab_finalize(data: CollabFinalizeRequest, request: Request) -> dict
         guidance = "\n\n".join(f"### {fn}\n```\n{body[:2000]}\n```" for fn, body in list(files.items())[:6])
     else:
         guidance = raw or (data.stage_outputs[2] if len(data.stage_outputs) > 2 else "")
+    subject, _ = _resolve_subject(request, data.user_id)
+    saved = _auto_save_work_file(
+        subject,
+        file_type=_map_studio_tool_to_file_type(suggested_tool),
+        title=(data.task or data.work_type or "협업 결과")[:200],
+        text_content=guidance,
+        source_tool="collab/finalize",
+    )
     return {
         "guidance": guidance,
         "model_label": result.requested_label if result.success else model,
@@ -4192,6 +4278,7 @@ async def collab_finalize(data: CollabFinalizeRequest, request: Request) -> dict
         "suggested_studio_tool": suggested_tool,
         "structured_payload": structured_payload,
         "raw_content": raw if structured_payload else "",
+        "file_id": saved["id"] if saved else None,
     }
 
 
@@ -5784,7 +5871,22 @@ async def generate_image(data: MediaGenerateRequest, request: Request) -> dict:
             image_url=(data.image_url or "").strip(),
             aspect_ratio=(data.aspect_ratio or "1:1").strip() or "1:1",
         )
-        return {"success": True, "label": label, "modality": "image", "media_url": url, "coin_cost": coin_cost}
+        saved = _auto_save_work_file(
+            subject,
+            file_type="image",
+            title=(data.prompt or "이미지")[:200],
+            content_url=url,
+            thumbnail_url=url,
+            source_tool="studio-image",
+        )
+        return {
+            "success": True,
+            "label": label,
+            "modality": "image",
+            "media_url": url,
+            "coin_cost": coin_cost,
+            "file_id": saved["id"] if saved else None,
+        }
     except FalServiceUnavailableError:
         await asyncio.to_thread(refund_coins, subject, float(coin_cost), "studio")
         _raise_fal_unavailable()
@@ -5813,7 +5915,21 @@ async def generate_audio(data: MediaGenerateRequest, request: Request) -> dict:
         url = await run_media_generation(
             label, data.prompt, openrouter_headers=headers,
         )
-        return {"success": True, "label": label, "modality": "audio", "media_url": url, "coin_cost": coin_cost}
+        saved = _auto_save_work_file(
+            subject,
+            file_type="audio",
+            title=(data.prompt or "오디오")[:200],
+            content_url=url,
+            source_tool="studio-audio",
+        )
+        return {
+            "success": True,
+            "label": label,
+            "modality": "audio",
+            "media_url": url,
+            "coin_cost": coin_cost,
+            "file_id": saved["id"] if saved else None,
+        }
     except HTTPException:
         raise
     except Exception as exc:
@@ -6046,6 +6162,82 @@ def studio_projects_members(project_id: int, request: Request, user_id: str = ""
     if proj.get("access_role") != "owner":
         return {"members": [], "access_role": proj.get("access_role")}
     return {"members": list_studio_project_members(project_id, proj["subject"])}
+
+
+@app.post("/files/save")
+def files_save(body: WorkFileSaveRequest, request: Request) -> dict:
+    subject = _subject_for_device(request, body.user_id)
+    row = save_work_file(
+        subject,
+        file_type=body.type,
+        title=body.title,
+        content_url=body.content_url_or_path,
+        text_content=body.text_content,
+        thumbnail_url=body.thumbnail_url,
+        source_tool=body.source_tool,
+        project_id=body.project_id,
+        is_pinned=body.is_pinned,
+    )
+    return {"success": True, "file": row}
+
+
+@app.get("/files")
+def files_list(
+    request: Request,
+    user_id: str = "",
+    type: str = "",
+    project_id: int | None = None,
+    q: str = "",
+    limit: int = 50,
+    offset: int = 0,
+) -> dict:
+    subject = _subject_for_device(request, user_id)
+    files = list_work_files(
+        subject, file_type=type, project_id=project_id, q=q, limit=limit, offset=offset
+    )
+    return {"files": files, "total": count_work_files(subject)}
+
+
+@app.get("/files/{file_id}")
+def files_get(file_id: int, request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    row = get_work_file(file_id, subject)
+    if not row:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return {"file": row}
+
+
+@app.put("/files/{file_id}")
+def files_update(file_id: int, body: WorkFileUpdateRequest, request: Request) -> dict:
+    subject = _subject_for_device(request, body.user_id)
+    row = update_work_file(
+        file_id,
+        subject,
+        title=body.title,
+        is_pinned=body.is_pinned,
+        project_id=body.project_id,
+        text_content=body.text_content,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return {"success": True, "file": row}
+
+
+@app.delete("/files/{file_id}")
+def files_delete(file_id: int, request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    if not delete_work_file(file_id, subject):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return {"success": True}
+
+
+@app.post("/files/{file_id}/duplicate")
+def files_duplicate(file_id: int, request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    row = duplicate_work_file(file_id, subject)
+    if not row:
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return {"success": True, "file": row}
 
 
 @app.get("/social/explore")
@@ -6465,6 +6657,23 @@ def admin_quota_set_limit(body: AdminQuotaLimitRequest, request: Request) -> dic
 def admin_popups_list(request: Request, limit: int = 30) -> dict:
     _require_admin(request)
     return {"popups": admin_list_popups(limit=limit)}
+
+
+@app.get("/admin/work-files")
+def admin_work_files(request: Request, limit: int = 100, offset: int = 0) -> dict:
+    _require_admin(request)
+    return {
+        "files": admin_list_work_files(limit=limit, offset=offset),
+        "stats": admin_work_files_stats(),
+    }
+
+
+@app.delete("/admin/work-files/{file_id}")
+def admin_work_files_delete(file_id: int, request: Request) -> dict:
+    _require_admin(request)
+    if not admin_delete_work_file(file_id):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return {"success": True}
 
 
 @app.post("/admin/popup")
