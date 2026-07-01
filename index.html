@@ -9765,6 +9765,22 @@
         let chatPollTimer = null;
         let workTipTimers = {};
 
+        // Agent panel state (must init before workspace tab handlers)
+        const agentPanel         = document.getElementById("agentPanel");
+        const agentHistory       = document.getElementById("agentHistory");
+        const agentStatusBar     = document.getElementById("agentStatusBar");
+        const agentInputEl       = document.getElementById("agentInput");
+        const agentSendBtn       = document.getElementById("agentSendBtn");
+        const agentPanelEndBtn   = document.getElementById("agentPanelEndBtn");
+        const agentMinBtn        = document.getElementById("agentMinBtn");
+        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
+        let agentActive    = false;
+        let agentInFlight  = false;
+        let agentPanelUserMoved = false;
+        let agentPanelResizeTimer = null;
+        let currentMission = "";
+        let agentAbortCtrl = null;
+
         const AI_PANEL_IDS = ["comparePanel", "debatePanel", "collabPanel"];
 
         function updateSideMenuForWorkspace(ws) {
@@ -10621,7 +10637,7 @@
         async function refreshWorksStories() {
             loadSideMenuFriends();
         }
-        global.refreshWorksStories = refreshWorksStories;
+        window.refreshWorksStories = refreshWorksStories;
 
         let homeViewUserId = null;
 
@@ -12103,22 +12119,6 @@
         }
 
         // ── 에이전트 패널 (임무 카드형) ─────────────────────────────────────
-        const agentPanel         = document.getElementById("agentPanel");
-        const agentHistory       = document.getElementById("agentHistory");
-        const agentStatusBar     = document.getElementById("agentStatusBar");
-        const agentInputEl       = document.getElementById("agentInput");
-        const agentSendBtn       = document.getElementById("agentSendBtn");
-        const agentPanelEndBtn   = document.getElementById("agentPanelEndBtn");
-        const agentMinBtn        = document.getElementById("agentMinBtn");
-        const agentFloatLauncher = document.getElementById("agentFloatLauncher");
-
-        let agentActive    = false;
-        let agentInFlight  = false;
-        let agentPanelUserMoved = false;
-        let agentPanelResizeTimer = null;
-        let currentMission = "";
-        let agentAbortCtrl = null; // AbortController for current task
-
         // ── 상태바 ────────────────────────────────────────────────────────────
         function setAgentStatus(type, text) {
             if (!agentStatusBar) return;
