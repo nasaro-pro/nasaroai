@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nasaro AI</title>
+    <link rel="stylesheet" href="/static/design-tokens.css?v=20260701c">
     <!-- PWA: 홈화면 추가 지원 -->
     <meta name="theme-color" content="#7c3aed">
     <meta name="mobile-web-app-capable" content="yes">
@@ -6375,6 +6376,11 @@
                     <p>AI 모델 비교·토론·협업 실험실</p>
                 </div>
                 <div id="headerWorkspaceTools" class="header-workspace-tools">
+                    <div class="notif-bell-wrap" id="notifBellWrap" style="display:none;">
+                        <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="알림">🔔</button>
+                        <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
+                        <div class="notif-dropdown" id="notifDropdown"></div>
+                    </div>
                     <div id="workspacePrivacySlot"></div>
                     <button id="workspaceAgentFab" class="workspace-agent-fab" type="button" title="에이전트">🌐 에이전트</button>
                 </div>
@@ -6600,7 +6606,7 @@
                 </div>
             </section>
 
-            <section id="studioWorkspace" class="app-workspace-panel studio-workspace" aria-label="AI 스튜디오">
+            <section id="studioWorkspace" class="app-workspace-panel studio-workspace" aria-label="AI 스튜디오" data-mod="chat">
                 <div class="studio-layout">
                     <aside class="studio-models">
                         <h2 class="studio-panel-title">🎨 AI 스튜디오</h2>
@@ -6630,12 +6636,22 @@
                             </select>
                             <input id="studioNegative" type="text" placeholder="제외할 요소 (선택)">
                         </div>
+                        <div class="studio-options-row" id="studioVideoOptionsRow" style="display:none;gap:8px;flex-wrap:wrap;margin-top:8px;">
+                            <label class="studio-label">길이(초)</label>
+                            <select id="studioVideoDuration">
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="15">15</option>
+                            </select>
+                        </div>
+                        <div id="studioUploadZone" class="studio-upload-zone" style="display:none;">드래그 또는 클릭하여 이미지 업로드</div>
+                        <input type="file" id="studioUploadInput" accept="image/*" hidden>
                         <input id="studioImageUrl" type="url" class="studio-ref-url" placeholder="참조 이미지 URL (선택)">
                         <button type="button" id="studioRunBtn">생성하기 <span id="studioRunCost">🪙1</span></button>
                     </div>
                     <div class="studio-result-panel">
                         <div class="studio-label">결과 미리보기</div>
-                        <div id="studioResult" class="studio-result-body">모델을 선택하고 생성하기를 누르세요.</div>
+                        <div id="studioResult" class="studio-result-body studio-result-mount">모델을 선택하고 생성하기를 누르세요.</div>
                         <div class="studio-result-actions">
                             <button type="button" id="studioCopyBtn" disabled>복사</button>
                             <button type="button" id="studioDownloadBtn" disabled>다운로드</button>
@@ -6691,6 +6707,10 @@
                     </div>
                     <div id="worksFriendRequests" class="chat-friend-requests" style="display:none;"></div>
                     <div id="worksUserSearchResults" class="chat-search-results" style="display:none;"></div>
+                    <div class="works-feed-tabs" style="display:flex;gap:8px;margin:12px 0;">
+                        <button type="button" class="works-feed-tab active" data-feed="friends" style="padding:8px 16px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;font-weight:700;cursor:pointer;">친구</button>
+                        <button type="button" class="works-feed-tab" data-feed="explore" style="padding:8px 16px;border-radius:999px;border:1px solid #e5e7eb;background:#fff;font-weight:700;cursor:pointer;">탐색</button>
+                    </div>
                 </div>
                 <div id="worksCompose" class="insta-compose-card" style="display:none;">
                     <div class="insta-compose-row">
@@ -7023,6 +7043,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    <script src="/static/studio-renderers.js?v=20260701c"></script>
+    <script src="/static/studio-code.js?v=20260701c"></script>
+    <script src="/static/agent-plan.js?v=20260701c"></script>
     <script src="/static/nasaro-features.js?v=20260701b"></script>
     <script>
         const API_URL = "";
@@ -7096,41 +7120,38 @@
 
         function updateStudioOptionsUI() {
             const optRow = document.getElementById("studioOptionsRow");
+            const videoRow = document.getElementById("studioVideoOptionsRow");
             const refUrl = document.getElementById("studioImageUrl");
+            const uploadZone = document.getElementById("studioUploadZone");
             const isImage = studioModality === "image";
             const isVideo = studioModality === "video";
-            optRow?.classList.toggle("visible", isImage);
+            optRow?.classList.toggle("visible", isImage || isVideo);
+            if (videoRow) videoRow.style.display = isVideo ? "flex" : "none";
             refUrl?.classList.toggle("visible", isImage || isVideo);
+            if (uploadZone) uploadZone.style.display = isImage ? "block" : "none";
+            StudioApp?.setModality?.(studioModality);
+        }
+
+        function enableStudioActionButtons() {
+            ["studioSaveWorkBtn", "studioRegenBtn", "studioCopyBtn", "studioDownloadBtn"].forEach(id =>
+                document.getElementById(id)?.removeAttribute("disabled"));
         }
 
         function renderStudioHistory() {
             const box = document.getElementById("studioHistoryList");
             if (!box) return;
             if (!studioHistory.length) {
+                box.className = "studio-history-list";
                 box.innerHTML = "<div style='font-size:11px;color:#9ca3af;'>아직 기록 없음</div>";
                 return;
             }
-            box.innerHTML = studioHistory.slice(0, 12).map((h, i) =>
-                `<button type="button" class="studio-history-item" data-idx="${i}">
-                    <div class="sh-meta">${escapeHtml(h.label)} · ${escapeHtml(h.modality)} · ${new Date(h.time).toLocaleString()}</div>
-                    <div>${escapeHtml((h.prompt || "").slice(0, 60))}</div>
-                </button>`
-            ).join("");
-            box.querySelectorAll(".studio-history-item").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    const h = studioHistory[Number(btn.dataset.idx)];
-                    if (!h) return;
-                    const ta = document.getElementById("studioPrompt");
-                    if (ta) ta.value = h.prompt || "";
-                    studioSelectedLabel = h.label || studioSelectedLabel;
-                    studioModality = h.modality || studioModality;
-                    document.querySelectorAll("#studioModTabs button").forEach(b =>
-                        b.classList.toggle("active", b.dataset.mod === studioModality));
-                    renderStudioModelList();
-                    updateStudioOptionsUI();
-                    if (h.result) displayStudioResult(h.result, document.getElementById("studioResult"));
-                });
-            });
+            StudioApp.renderHistoryGrid(box, studioHistory.map(h => ({
+                mod: h.modality,
+                prompt: h.prompt,
+                label: h.label,
+                url: h.url || h.result?.media_url,
+                thumb: h.thumb || h.result?.media_url,
+            })));
         }
 
         function pushStudioHistory(entry) {
@@ -7141,20 +7162,31 @@
 
         function displayStudioResult(data, resultEl) {
             if (!resultEl) return;
-            resultEl.className = "studio-result-body";
-            if (data.modality === "image" && data.media_url) {
-                resultEl.innerHTML = `<img src="${data.media_url}" alt="result" style="max-width:100%;border-radius:10px;">`;
-            } else if (data.modality === "video" && data.media_url) {
-                resultEl.innerHTML = `<video src="${data.media_url}" controls style="max-width:100%;border-radius:10px;"></video>`;
-            } else if (data.modality === "audio" && data.media_url) {
-                resultEl.innerHTML = `<audio src="${data.media_url}" controls style="width:100%;"></audio>`;
-            } else if (data.modality === "code" && data.text) {
-                resultEl.innerHTML = `<pre><code>${escapeHtml(data.text)}</code></pre>`;
-            } else {
-                resultEl.textContent = data.text || "";
+            resultEl.className = "studio-result-body studio-result-mount";
+            studioLastResult = data;
+            const mod = data.modality || studioModality;
+            if (mod === "video" && data.job_id && !data.media_url) {
+                StudioApp.mount({
+                    polling: true,
+                    jobId: data.job_id,
+                    apiFetch,
+                    onUpdate: (u) => {
+                        if (u.done && u.job?.result_url) {
+                            studioLastResult = { ...studioLastResult, media_url: u.job.result_url };
+                            enableStudioActionButtons();
+                        }
+                        if (u.failed) enableStudioActionButtons();
+                    },
+                });
+                return;
             }
-            ["studioSaveWorkBtn", "studioRegenBtn", "studioCopyBtn", "studioDownloadBtn"].forEach(id =>
-                document.getElementById(id)?.removeAttribute("disabled"));
+            const payload = { text: data.text, modality: mod };
+            if (mod === "image" && data.media_url) payload.url = data.media_url;
+            if (mod === "audio" && data.media_url) payload.url = data.media_url;
+            if (mod === "video" && data.media_url) payload.url = data.media_url;
+            if (mod === "code" && data.text) payload.text = data.text;
+            StudioApp.mount(payload);
+            enableStudioActionButtons();
         }
 
         function renderStudioModelList() {
@@ -7202,12 +7234,17 @@
             const btn = document.getElementById("studioRunBtn");
             const resultEl = document.getElementById("studioResult");
             if (btn) btn.disabled = true;
-            if (resultEl) { resultEl.className = "studio-result-body"; resultEl.textContent = "생성 중…"; }
+            StudioApp.showSkeleton();
             try {
                 const deviceId = await ensureDeviceId();
+                let promptForApi = prompt;
+                if (studioModality === "video") {
+                    const dur = document.getElementById("studioVideoDuration")?.value || "5";
+                    promptForApi += `\n\n[영상 설정] 길이: ${dur}초, 비율: ${(document.getElementById("studioAspect")?.value || "16:9")}`;
+                }
                 const body = {
                     label: studioSelectedLabel,
-                    prompt,
+                    prompt: promptForApi,
                     image_url: (document.getElementById("studioImageUrl")?.value || "").trim(),
                     user_id: deviceId,
                     aspect_ratio: (document.getElementById("studioAspect")?.value || "1:1").trim(),
@@ -7227,24 +7264,21 @@
                     throw new Error(msg);
                 }
                 studioLastResult = data;
-                if (data.modality === "video" && data.job_id) {
-                    if (resultEl) resultEl.textContent = "동영상 생성 중… (폴링)";
-                    await pollStudioVideoJob(data.job_id, resultEl);
-                } else {
-                    displayStudioResult(data, resultEl);
-                }
+                displayStudioResult(data, resultEl);
                 pushStudioHistory({
                     label: studioSelectedLabel,
                     modality: data.modality || studioModality,
                     prompt: (promptEl?.value || "").trim(),
                     result: studioLastResult,
+                    url: data.media_url,
+                    thumb: data.media_url,
                 });
                 fetchQuotaRemaining?.();
             } catch (e) {
                 if (isServicePrepMessage(e.message)) {
                     showServicePrepNotice(e.message, resultEl);
                 } else {
-                    if (resultEl) resultEl.textContent = e.message || "생성 실패";
+                    if (resultEl) { resultEl.className = "studio-result-body studio-result-mount"; resultEl.textContent = e.message || "생성 실패"; }
                     showToast(e.message || "생성 실패", "error");
                 }
             } finally {
@@ -7252,39 +7286,18 @@
             }
         }
 
-        async function pollStudioVideoJob(jobId, resultEl) {
-            for (let i = 0; i < 120; i++) {
-                await new Promise(r => setTimeout(r, 3000));
-                const res = await apiFetch("/media/job/" + encodeURIComponent(jobId));
-                if (!res.ok) continue;
-                const data = await res.json();
-                const job = data.job || {};
-                if (job.status === "completed" && job.result_url) {
-                    studioLastResult = { ...studioLastResult, media_url: job.result_url, modality: "video" };
-                    displayStudioResult(studioLastResult, resultEl);
-                    return;
-                }
-                if (job.status === "failed") {
-                    const errMsg = job.error || "동영상 생성 실패";
-                    if (isServicePrepMessage(errMsg)) {
-                        showServicePrepNotice(errMsg, resultEl);
-                        return;
-                    }
-                    throw new Error(errMsg);
-                }
-            }
-            throw new Error("동영상 생성 시간 초과");
-        }
-
         async function saveStudioAsWork() {
             if (!studioLastResult || !currentUser) { showToast("로그인 후 저장할 수 있습니다.", "warn"); return; }
+            const exp = StudioApp.getExportData();
             const title = (studioSelectedLabel + " · " + studioModality).slice(0, 80);
-            const body = studioLastResult.text || studioLastResult.media_url || "";
+            const bodyText = exp.text || studioLastResult.text || title;
+            const mediaUrl = exp.url || studioLastResult.media_url || "";
+            const mediaType = exp.type !== "text" ? exp.type : (mediaUrl ? studioModality : "");
             try {
                 const res = await apiFetch("/social/works", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ title, body }),
+                    body: JSON.stringify({ title, body: bodyText, media_type: mediaType, media_url: mediaUrl }),
                 });
                 if (!res.ok) throw new Error("저장 실패");
                 showToast("작업물로 저장했습니다.", "success");
@@ -8999,6 +9012,66 @@
             loadSessionHistoryFromStore();
         }
 
+        let notifPollTimer = null;
+
+        async function loadNotifications() {
+            if (!currentUser) return;
+            try {
+                const res = await apiFetch("/notifications?limit=30");
+                if (!res.ok) return;
+                const data = await res.json();
+                renderNotifDropdown(data.notifications || [], data.unread_count || 0);
+            } catch {}
+        }
+
+        function renderNotifDropdown(items, unread) {
+            const badge = document.getElementById("notifBadge");
+            const drop = document.getElementById("notifDropdown");
+            if (badge) {
+                badge.style.display = unread > 0 ? "flex" : "none";
+                badge.textContent = unread > 99 ? "99+" : String(unread);
+            }
+            if (!drop) return;
+            if (!items.length) {
+                drop.innerHTML = "<div style='padding:12px;font-size:12px;color:#9ca3af;text-align:center;'>알림 없음</div>";
+                return;
+            }
+            drop.innerHTML = items.map(n => `
+                <div class="notif-item${n.is_read ? "" : " unread"}" data-id="${n.id}">
+                    <strong>${escapeHtml(n.title)}</strong>
+                    <div>${escapeHtml(n.body || "")}</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:4px;">${escapeHtml(n.created_at_iso || "")}</div>
+                </div>`).join("");
+            drop.querySelectorAll(".notif-item").forEach(el => {
+                el.addEventListener("click", async () => {
+                    await apiFetch("/notifications/read", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ids: [Number(el.dataset.id)] }),
+                    });
+                    loadNotifications();
+                });
+            });
+        }
+
+        function startNotifPoll() {
+            stopNotifPoll();
+            notifPollTimer = setInterval(() => loadNotifications(), 30000);
+        }
+        function stopNotifPoll() {
+            if (notifPollTimer) { clearInterval(notifPollTimer); notifPollTimer = null; }
+        }
+
+        function initNotifications() {
+            document.getElementById("notifBellBtn")?.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const drop = document.getElementById("notifDropdown");
+                drop?.classList.toggle("open");
+                if (drop?.classList.contains("open")) loadNotifications();
+            });
+            document.addEventListener("click", () => document.getElementById("notifDropdown")?.classList.remove("open"));
+        }
+
         function updateAuthUI() {
             const NF = window.NasaroFeatures;
             const meta = document.getElementById("settingsAccountMeta");
@@ -9008,8 +9081,12 @@
             const sideAccount = document.getElementById("sideAccountBox");
             const sideMenuBrand = document.getElementById("sideMenuBrand");
             const sideAccountName = document.getElementById("sideAccountName");
+            const notifWrap = document.getElementById("notifBellWrap");
             loadSavedResults();
             if (currentUser) {
+                if (notifWrap) notifWrap.style.display = "";
+                loadNotifications();
+                startNotifPoll();
                 loadSessionHistoryFromStore();
                 const id = currentUser.display_name || currentUser.username || currentUser.email || "";
                 if (meta) meta.textContent = `${NF?.t?.("login") || "로그인"} — ${id}`;
@@ -9022,6 +9099,8 @@
                 refreshSideQuota();
                 loadMyProfileBrief();
             } else {
+                stopNotifPoll();
+                if (notifWrap) notifWrap.style.display = "none";
                 sessionHistory.length = 0;
                 if (meta) meta.textContent = NF?.lang === "en"
                     ? "Not signed in — results stay in this tab only."
@@ -10058,9 +10137,11 @@
             studioModality = btn.dataset.mod || "chat";
             document.querySelectorAll("#studioModTabs button").forEach(b => b.classList.toggle("active", b === btn));
             renderStudioModelList();
+            updateStudioOptionsUI();
         });
         document.getElementById("studioCopyBtn")?.addEventListener("click", async () => {
-            const text = studioLastResult?.text || studioLastResult?.media_url || "";
+            const exp = StudioApp.getExportData();
+            const text = exp.text || exp.url || studioLastResult?.text || studioLastResult?.media_url || "";
             if (!text) return;
             try {
                 await navigator.clipboard.writeText(text);
@@ -10068,8 +10149,9 @@
             } catch { showToast("복사 실패", "error"); }
         });
         document.getElementById("studioDownloadBtn")?.addEventListener("click", () => {
-            const url = studioLastResult?.media_url;
-            const text = studioLastResult?.text;
+            const exp = StudioApp.getExportData();
+            const url = exp.url || studioLastResult?.media_url;
+            const text = exp.text || studioLastResult?.text;
             if (url) {
                 const a = document.createElement("a");
                 a.href = url;
@@ -10560,19 +10642,116 @@
             showToast("AI 협업 모드로 이동했습니다. 협업 탭에서 진행하세요.");
         }
 
-        async function loadWorksFeed() {
+        let worksFeedMode = "friends";
+        let worksFeedOffset = 0;
+        let worksFeedLoading = false;
+        let worksFeedHasMore = true;
+
+        async function loadWorksFeed(append = false) {
             const feed = document.getElementById("worksFeed");
             if (!feed) return;
-            loadSideMenuFriends();
-            feed.innerHTML = "<div class='works-empty' style='text-align:center;color:#9ca3af;padding:20px;'>불러오는 중…</div>";
+            if (worksFeedLoading) return;
+            worksFeedLoading = true;
+            if (!append) {
+                worksFeedOffset = 0;
+                worksFeedHasMore = true;
+                loadSideMenuFriends();
+                feed.innerHTML = "<div class='works-empty' style='text-align:center;color:#9ca3af;padding:20px;'>불러오는 중…</div>";
+            }
             try {
-                const res = await apiFetch("/social/works?friends_only=1");
+                const path = worksFeedMode === "explore"
+                    ? `/social/explore?limit=20&offset=${worksFeedOffset}`
+                    : "/social/works?friends_only=1&limit=30";
+                const res = await apiFetch(path);
                 if (!res.ok) throw new Error("fail");
                 const data = await res.json();
-                renderWorksFeed(data.works || []);
+                const works = data.works || [];
+                if (worksFeedMode === "explore") {
+                    worksFeedHasMore = works.length >= 20;
+                    worksFeedOffset += works.length;
+                }
+                if (append) appendWorksFeed(works);
+                else renderWorksFeed(works);
             } catch {
-                feed.innerHTML = "<div style='text-align:center;color:#dc2626;padding:20px;'>피드를 불러오지 못했습니다.</div>";
+                if (!append) feed.innerHTML = "<div style='text-align:center;color:#dc2626;padding:20px;'>피드를 불러오지 못했습니다.</div>";
+            } finally {
+                worksFeedLoading = false;
             }
+        }
+
+        function worksFeedMediaHtml(w) {
+            const url = w.media_url || "";
+            const type = (w.media_type || "").toLowerCase();
+            if (url && type === "image") {
+                return `<img src="${escapeHtml(url)}" alt="" style="width:100%;max-height:420px;object-fit:cover;border-radius:12px;">`;
+            }
+            if (url && type === "video") {
+                return `<video src="${escapeHtml(url)}" controls playsinline style="width:100%;max-height:420px;border-radius:12px;background:#000;"></video>`;
+            }
+            if (url && type === "audio") {
+                return `<audio src="${escapeHtml(url)}" controls style="width:100%;margin-top:8px;"></audio>`;
+            }
+            const bodyPreview = (w.body || "").slice(0, 180) + ((w.body || "").length > 180 ? "…" : "");
+            return `<h3 class="insta-media-title">${escapeHtml(w.title || "제목 없음")}</h3><p class="insta-media-body">${escapeHtml(bodyPreview)}</p>`;
+        }
+
+        function appendWorksFeed(works) {
+            if (!works.length) return;
+            const feed = document.getElementById("worksFeed");
+            works.forEach(w => feed?.appendChild(buildWorkCard(w)));
+        }
+
+        function buildWorkCard(w) {
+            const card = document.createElement("article");
+            card.className = "insta-card works-card";
+            card.dataset.workId = w.id;
+            const initial = (w.author_name || "?").charAt(0).toUpperCase();
+            const coinTotal = w.coin_total ?? w.like_count ?? 0;
+            const tipPending = w.tip_pending;
+            const tipped = w.tipped_by_me && !tipPending;
+            let coinBtnHtml = "";
+            if (tipped) {
+                coinBtnHtml = `<button type="button" class="works-coin-btn tipped" disabled>🪙 보냄</button>`;
+            } else if (tipPending) {
+                coinBtnHtml = `<button type="button" class="works-coin-btn pending" data-tip="${w.id}" data-cancel="1">취소 ${w.tip_seconds_left || 5}s</button>`;
+            } else {
+                coinBtnHtml = `<button type="button" class="works-coin-btn" data-tip="${w.id}">🪙 1코인</button>`;
+            }
+            card.innerHTML = `
+                <div class="insta-card-head">
+                    <div class="insta-avatar" style="cursor:pointer;" data-author-id="${w.user_id || ""}">${escapeHtml(initial)}</div>
+                    <div>
+                        <div class="insta-author" style="cursor:pointer;" data-author-id="${w.user_id || ""}">${escapeHtml(w.author_name || "사용자")}</div>
+                        <div class="insta-time">${escapeHtml(w.created_at_iso || "")}</div>
+                    </div>
+                </div>
+                <div class="insta-media">
+                    <div class="insta-media-inner">${worksFeedMediaHtml(w)}</div>
+                </div>
+                <div class="insta-actions">
+                    ${coinBtnHtml}
+                    <span class="insta-like-count">🪙 ${coinTotal}</span>
+                    <button type="button" class="works-cowork-btn" data-cowork="${w.id}">🤝 공동작업</button>
+                    <button type="button" class="works-comment-toggle" data-comments="${w.id}" aria-label="댓글">💬</button>
+                    <span class="insta-comment-count">${w.comment_count || 0}</span>
+                </div>
+                <div class="insta-caption"><strong>${escapeHtml(w.author_name || "사용자")}</strong> ${escapeHtml(w.body || "")}</div>
+                <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
+            card.querySelectorAll("[data-author-id]").forEach(el => {
+                el.addEventListener("click", () => {
+                    const uid = parseInt(el.dataset.authorId, 10);
+                    if (uid) openHomeProfile(uid);
+                });
+            });
+            card.querySelector(".works-coin-btn[data-tip]")?.addEventListener("click", (e) => {
+                const btn = e.currentTarget;
+                if (btn.dataset.cancel === "1") cancelWorkCoinTip(btn.dataset.tip, btn);
+                else sendWorkCoinTip(btn.dataset.tip, btn);
+            });
+            card.querySelector(".works-cowork-btn")?.addEventListener("click", () => startWorkCowork(w));
+            card.querySelector(".works-comment-toggle")?.addEventListener("click", () => toggleWorkComments(String(w.id)));
+            if (tipPending) scheduleWorkTipCountdown(w.id, w.tip_seconds_left || 5);
+            return card;
         }
 
         function renderWorksFeed(works) {
@@ -10583,65 +10762,25 @@
                 return;
             }
             feed.innerHTML = "";
-            works.forEach(w => {
-                const card = document.createElement("article");
-                card.className = "insta-card works-card";
-                card.dataset.workId = w.id;
-                const initial = (w.author_name || "?").charAt(0).toUpperCase();
-                const title = w.title || "제목 없음";
-                const bodyPreview = (w.body || "").slice(0, 180) + ((w.body || "").length > 180 ? "…" : "");
-                const coinTotal = w.coin_total ?? w.like_count ?? 0;
-                const tipPending = w.tip_pending;
-                const tipped = w.tipped_by_me && !tipPending;
-                let coinBtnHtml = "";
-                if (tipped) {
-                    coinBtnHtml = `<button type="button" class="works-coin-btn tipped" disabled>🪙 보냄</button>`;
-                } else if (tipPending) {
-                    coinBtnHtml = `<button type="button" class="works-coin-btn pending" data-tip="${w.id}" data-cancel="1">취소 ${w.tip_seconds_left || 5}s</button>`;
-                } else {
-                    coinBtnHtml = `<button type="button" class="works-coin-btn" data-tip="${w.id}">🪙 1코인</button>`;
-                }
-                card.innerHTML = `
-                    <div class="insta-card-head">
-                        <div class="insta-avatar" style="cursor:pointer;" data-author-id="${w.user_id || ""}">${escapeHtml(initial)}</div>
-                        <div>
-                            <div class="insta-author" style="cursor:pointer;" data-author-id="${w.user_id || ""}">${escapeHtml(w.author_name || "사용자")}</div>
-                            <div class="insta-time">${escapeHtml(w.created_at_iso || "")}</div>
-                        </div>
-                    </div>
-                    <div class="insta-media">
-                        <div class="insta-media-inner">
-                            <h3 class="insta-media-title">${escapeHtml(title)}</h3>
-                            <p class="insta-media-body">${escapeHtml(bodyPreview)}</p>
-                        </div>
-                    </div>
-                    <div class="insta-actions">
-                        ${coinBtnHtml}
-                        <span class="insta-like-count">🪙 ${coinTotal}</span>
-                        <button type="button" class="works-cowork-btn" data-cowork="${w.id}">🤝 공동작업</button>
-                        <button type="button" class="works-comment-toggle" data-comments="${w.id}" aria-label="댓글">💬</button>
-                        <span class="insta-comment-count">${w.comment_count || 0}</span>
-                    </div>
-                    <div class="insta-caption"><strong>${escapeHtml(w.author_name || "사용자")}</strong>${escapeHtml(w.body || "")}</div>
-                    <div class="works-comments" id="worksComments${w.id}" style="display:none;"></div>`;
-                feed.appendChild(card);
-                card.querySelectorAll("[data-author-id]").forEach(el => {
-                    el.addEventListener("click", () => {
-                        const uid = parseInt(el.dataset.authorId, 10);
-                        if (uid) openHomeProfile(uid);
+            works.forEach(w => feed.appendChild(buildWorkCard(w)));
+        }
+
+        function bindWorksFeedTabs() {
+            document.querySelectorAll(".works-feed-tab").forEach(tab => {
+                tab.addEventListener("click", () => {
+                    worksFeedMode = tab.dataset.feed || "friends";
+                    document.querySelectorAll(".works-feed-tab").forEach(t => {
+                        t.classList.toggle("active", t === tab);
+                        t.style.background = t === tab ? "#7c3aed" : "#fff";
+                        t.style.color = t === tab ? "#fff" : "#111";
                     });
-                });
-                card.querySelector(".works-cowork-btn")?.addEventListener("click", () => startWorkCowork(w));
-                if (tipPending) scheduleWorkTipCountdown(w.id, w.tip_seconds_left || 5);
-            });
-            feed.querySelectorAll(".works-coin-btn[data-tip]").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    if (btn.dataset.cancel === "1") cancelWorkCoinTip(btn.dataset.tip, btn);
-                    else sendWorkCoinTip(btn.dataset.tip, btn);
+                    loadWorksFeed(false);
                 });
             });
-            feed.querySelectorAll(".works-comment-toggle").forEach(btn => {
-                btn.addEventListener("click", () => toggleWorkComments(btn.dataset.comments));
+            document.getElementById("worksFeed")?.addEventListener("scroll", () => {
+                const feed = document.getElementById("worksFeed");
+                if (!feed || worksFeedMode !== "explore" || !worksFeedHasMore || worksFeedLoading) return;
+                if (feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 120) loadWorksFeed(true);
             });
         }
 
@@ -12191,8 +12330,28 @@
                 scheduleAgentMission(scheduled.mission, scheduled);
                 return;
             }
-            runAgentMission(val, isModify, appendTo);
+            startAgentWithPlan(val, isModify, appendTo);
         });
+
+        async function startAgentWithPlan(val, isModify, appendTo) {
+            if (isModify || appendTo || useExtensionAgent()) {
+                runAgentMission(val, isModify, appendTo);
+                return;
+            }
+            try {
+                setAgentStatus("loading", "실행 계획 작성 중…");
+                const steps = await fetchAgentPlan(val, await ensureDeviceId());
+                if (agentHistory && steps?.length) {
+                    AgentPlanUI.mount(agentHistory, steps, () => {
+                        AgentPlanUI.destroy();
+                        runAgentMission(val, false, null);
+                    });
+                    setAgentStatus("idle", "계획을 확인한 뒤 실행하세요");
+                    return;
+                }
+            } catch (_) {}
+            runAgentMission(val, false, appendTo);
+        }
 
         agentInputEl?.addEventListener("input",   () => autoResizeTA(agentInputEl));
         agentInputEl?.addEventListener("keydown",  e => {
@@ -14105,6 +14264,39 @@
             bootstrapApiCheck();
             loadPricingCatalog().catch(() => {});
             maybeShowSitePopup();
+            if (window.StudioApp) {
+                StudioApp.init(document.getElementById("studioResult"));
+                StudioApp.bindUploadZone(
+                    document.getElementById("studioUploadZone"),
+                    document.getElementById("studioUploadInput"),
+                    (url) => {
+                        const ref = document.getElementById("studioImageUrl");
+                        if (ref) ref.value = url.startsWith("http") ? url : (getApiBase() + url);
+                    }
+                );
+                StudioApp.setModality("chat");
+            }
+            window.ensureDeviceId = ensureDeviceId;
+            window.showToast = showToast;
+            window.addEventListener("studio:history-select", (e) => {
+                const h = e.detail;
+                if (!h) return;
+                const idx = studioHistory.findIndex(x => x.prompt === h.prompt && x.modality === h.mod);
+                const item = idx >= 0 ? studioHistory[idx] : null;
+                if (item) {
+                    document.getElementById("studioPrompt").value = item.prompt || "";
+                    studioSelectedLabel = item.label || studioSelectedLabel;
+                    studioModality = item.modality || studioModality;
+                    document.querySelectorAll("#studioModTabs button").forEach(b =>
+                        b.classList.toggle("active", b.dataset.mod === studioModality));
+                    renderStudioModelList();
+                    updateStudioOptionsUI();
+                    if (item.result) displayStudioResult(item.result, document.getElementById("studioResult"));
+                }
+            });
+            window.addEventListener("studio:video-retry", () => runStudioGenerate());
+            bindWorksFeedTabs();
+            initNotifications();
             ensureDeviceId().finally(() => {
                 startPresencePing();
                 refreshSideQuota();

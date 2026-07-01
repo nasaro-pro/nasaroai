@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from playwright.async_api import async_playwright
@@ -31,6 +31,11 @@ from auth_store import (
     admin_logout,
     check_and_consume_quota,
     count_activity_log,
+    count_unread_notifications,
+    create_notification,
+    list_explore_works,
+    list_notifications,
+    mark_notifications_read,
     create_admin_session,
     create_public_share,
     create_public_work,
@@ -111,12 +116,16 @@ from pricing_store import (
     admin_list_popups,
     admin_upsert_popup,
     create_media_job,
+    create_studio_project,
+    delete_studio_project,
     dismiss_popup,
     execute_coin_grant,
     get_active_popup_for_subject,
     get_media_job,
     get_model_coin_cost,
+    get_studio_project,
     list_pricing_catalog,
+    list_studio_projects,
     process_due_coin_grants,
     update_media_job,
 )
@@ -127,6 +136,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("nasaroai")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
@@ -925,6 +936,19 @@ class ShareCreateRequest(BaseModel):
 class PublicWorkCreateRequest(BaseModel):
     title: str = ""
     body: str = ""
+    media_type: str = ""
+    media_url: str = ""
+
+
+class StudioProjectCreateRequest(BaseModel):
+    user_id: str = ""
+    name: str = "project"
+    files: dict[str, str] = Field(default_factory=dict)
+    thumbnail: str = ""
+
+
+class NotificationsReadRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list)
 
 
 class WorkCommentRequest(BaseModel):
@@ -2129,21 +2153,23 @@ async def _run_media_job_background(
     coin_cost = int((job or {}).get("coin_cost") or 0)
     feature = (job or {}).get("feature") or "studio"
     if is_fal_media_label(label):
-        update_media_job(job_id, status="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
+        update_media_job(job_id, status="failed", progress_stage="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
         if subject and coin_cost:
             await asyncio.to_thread(refund_coins, subject, float(coin_cost), feature)
         return
     try:
-        update_media_job(job_id, status="running")
+        update_media_job(job_id, status="running", progress_stage="processing")
+        await asyncio.sleep(0.3)
+        update_media_job(job_id, progress_stage="rendering")
         url = await run_media_generation(label, prompt, openrouter_headers=headers)
-        update_media_job(job_id, status="completed", result_url=url)
+        update_media_job(job_id, status="completed", progress_stage="done", result_url=url)
     except FalServiceUnavailableError:
-        update_media_job(job_id, status="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
+        update_media_job(job_id, status="failed", progress_stage="failed", error=FAL_SERVICE_UNAVAILABLE_MSG)
         if subject and coin_cost:
             await asyncio.to_thread(refund_coins, subject, float(coin_cost), feature)
     except Exception as exc:
         logger.exception("media job failed job_id=%s label=%s", job_id, label)
-        update_media_job(job_id, status="failed", error=str(exc)[:500])
+        update_media_job(job_id, status="failed", progress_stage="failed", error=str(exc)[:500])
         if subject and coin_cost:
             await asyncio.to_thread(refund_coins, subject, float(coin_cost), feature)
 
@@ -5199,6 +5225,8 @@ def social_works_create(body: PublicWorkCreateRequest, request: Request) -> dict
             user.get("display_name") or user.get("username") or "사용자",
             body.title,
             body.body,
+            media_type=body.media_type,
+            media_url=body.media_url,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -5581,7 +5609,19 @@ def media_job_status(job_id: str, request: Request) -> dict:
     job = get_media_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {"job": job}
+    stage = job.get("progress_stage") or job.get("status") or "queued"
+    failed = job.get("status") == "failed"
+    return {
+        "job": job,
+        "status": job.get("status"),
+        "progress_stage": stage,
+        "result_url": job.get("result_url") or "",
+        "url": job.get("result_url") or "",
+        "error": job.get("error") or "",
+        "message": job.get("error") or "",
+        "refunded": failed and bool(job.get("coin_cost")),
+        "coins_refunded": failed and bool(job.get("coin_cost")),
+    }
 
 
 @app.post("/studio/run")
@@ -5632,6 +5672,128 @@ async def studio_run(data: StudioRunRequest, request: Request) -> dict:
             request,
         )
     raise HTTPException(status_code=400, detail="지원하지 않는 모델입니다.")
+
+
+def _subject_for_device(request: Request, device_id: str = "") -> str:
+    user = get_user_by_token(_bearer_token(request))
+    if user:
+        return f"user:{user['id']}"
+    resolved = resolve_device_id("", device_id or "")
+    return resolved or (device_id or "").strip() or "guest"
+
+
+@app.post("/media/upload")
+async def media_upload(request: Request, file: UploadFile = File(...)) -> dict:
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="이미지 파일만 업로드할 수 있습니다.")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="파일 크기는 10MB 이하여야 합니다.")
+    ext = os.path.splitext(file.filename or "upload")[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        ext = ".png" if "png" in (file.content_type or "") else ".jpg"
+    fname = f"{uuid.uuid4().hex}{ext}"
+    path = os.path.join(UPLOAD_DIR, fname)
+    with open(path, "wb") as f:
+        f.write(data)
+    url = f"/uploads/{fname}"
+    return {"success": True, "url": url, "media_url": url, "filename": fname}
+
+
+@app.get("/uploads/{filename}")
+def serve_upload(filename: str):
+    safe = os.path.basename(filename)
+    path = os.path.join(UPLOAD_DIR, safe)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+    return FileResponse(path)
+
+
+@app.get("/studio/projects")
+def studio_projects_list(request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    return {"projects": list_studio_projects(subject)}
+
+
+@app.post("/studio/projects")
+def studio_projects_create(body: StudioProjectCreateRequest, request: Request) -> dict:
+    subject = _subject_for_device(request, body.user_id)
+    if not body.files:
+        raise HTTPException(status_code=400, detail="파일이 비어 있습니다.")
+    project = create_studio_project(subject, body.name, body.files, body.thumbnail)
+    return {"success": True, "project": project}
+
+
+@app.get("/studio/projects/{project_id}")
+def studio_projects_get(project_id: int, request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    project = get_studio_project(project_id, subject)
+    if not project:
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    return {"project": project}
+
+
+@app.delete("/studio/projects/{project_id}")
+def studio_projects_delete(project_id: int, request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    if not delete_studio_project(project_id, subject):
+        raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+    return {"success": True}
+
+
+@app.get("/social/explore")
+def social_explore(request: Request, limit: int = 30, offset: int = 0) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    viewer_id = user["id"] if user else None
+    works = list_explore_works(viewer_id=viewer_id, limit=limit, offset=offset)
+    return {"works": works, "offset": offset, "limit": limit}
+
+
+@app.get("/notifications")
+def notifications_list(request: Request, limit: int = 50) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    items = list_notifications(user["id"], limit=limit)
+    unread = count_unread_notifications(user["id"])
+    return {"notifications": items, "unread_count": unread}
+
+
+@app.post("/notifications/read")
+def notifications_mark_read(body: NotificationsReadRequest, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    n = mark_notifications_read(user["id"], body.ids or None)
+    return {"success": True, "marked": n, "unread_count": count_unread_notifications(user["id"])}
+
+
+@app.post("/agent/plan")
+async def agent_plan(body: AgentRequest, http_request: Request) -> dict:
+    query = (body.query or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="임무를 입력하세요.")
+    await _require_agent_coin(http_request, body.user_id, action="plan", detail=query[:200])
+    plan_prompt = (
+        "다음 임무를 실행하기 위한 단계별 계획을 3~8개 항목으로 작성하세요. "
+        "각 항목은 한 줄로, 번호만 붙여 주세요. 다른 설명은 하지 마세요.\n\n"
+        f"임무: {query}"
+    )
+    result = await call_ai_best(plan_prompt, max_tokens=600)
+    if not result.success:
+        raise HTTPException(status_code=502, detail=result.error or "계획 생성 실패")
+    text = (result.content or "").strip()
+    steps: list[str] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        line = re.sub(r"^\d+[\.\)\-]\s*", "", line)
+        if line:
+            steps.append(line[:200])
+    if not steps:
+        steps = [text[:200]] if text else ["임무 분석", "실행", "결과 정리"]
+    return {"success": True, "steps": steps, "plan_text": text}
 
 
 @app.post("/social/chat/{room_id}/ai")

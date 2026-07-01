@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from typing import Any
@@ -116,8 +117,23 @@ def ensure_pricing_tables(conn: sqlite3.Connection) -> None:
             created_at REAL NOT NULL,
             updated_at REAL NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS studio_projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            files_json TEXT NOT NULL DEFAULT '{}',
+            thumbnail TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_studio_projects_subject ON studio_projects(subject, updated_at DESC);
         """
     )
+    mj_cols = {r[1] for r in conn.execute("PRAGMA table_info(media_jobs)").fetchall()}
+    if "progress_stage" not in mj_cols:
+        conn.execute("ALTER TABLE media_jobs ADD COLUMN progress_stage TEXT NOT NULL DEFAULT 'queued'")
+    if "feature" not in mj_cols:
+        conn.execute("ALTER TABLE media_jobs ADD COLUMN feature TEXT NOT NULL DEFAULT 'studio'")
     cols = {r[1] for r in conn.execute("PRAGMA table_info(model_pricing)").fetchall()}
     migrations = [
         ("coin_cost", "INTEGER NOT NULL DEFAULT 1"),
@@ -477,8 +493,8 @@ def create_media_job(
                 conn.execute("ALTER TABLE media_jobs ADD COLUMN feature TEXT NOT NULL DEFAULT 'studio'")
             conn.execute(
                 """
-                INSERT INTO media_jobs (job_id, subject, label, modality, status, prompt, coin_cost, created_at, updated_at, feature)
-                VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+                INSERT INTO media_jobs (job_id, subject, label, modality, status, progress_stage, prompt, coin_cost, created_at, updated_at, feature)
+                VALUES (?, ?, ?, ?, 'pending', 'queued', ?, ?, ?, ?, ?)
                 """,
                 (job_id, subject, label, modality, prompt[:4000], int(coin_cost), now, now, feature),
             )
@@ -487,13 +503,23 @@ def create_media_job(
             conn.close()
 
 
-def update_media_job(job_id: str, *, status: str | None = None, result_url: str | None = None, error: str | None = None) -> None:
+def update_media_job(
+    job_id: str,
+    *,
+    status: str | None = None,
+    progress_stage: str | None = None,
+    result_url: str | None = None,
+    error: str | None = None,
+) -> None:
     now = time.time()
     fields = ["updated_at = ?"]
     params: list[Any] = [now]
     if status is not None:
         fields.append("status = ?")
         params.append(status)
+    if progress_stage is not None:
+        fields.append("progress_stage = ?")
+        params.append(progress_stage)
     if result_url is not None:
         fields.append("result_url = ?")
         params.append(result_url)
@@ -518,3 +544,98 @@ def get_media_job(job_id: str) -> dict[str, Any] | None:
         finally:
             conn.close()
     return dict(row) if row else None
+
+
+def create_studio_project(subject: str, name: str, files: dict[str, str], thumbnail: str = "") -> dict[str, Any]:
+    name = (name or "project").strip()[:120] or "project"
+    now = time.time()
+    payload = json.dumps(files or {}, ensure_ascii=False)
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO studio_projects (subject, name, files_json, thumbnail, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (subject, name, payload, (thumbnail or "")[:2000], now, now),
+            )
+            conn.commit()
+            pid = int(cur.lastrowid)
+        finally:
+            conn.close()
+    return {"id": pid, "subject": subject, "name": name, "files": files, "thumbnail": thumbnail, "updated_at": now}
+
+
+def list_studio_projects(subject: str, limit: int = 50) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 50), 100))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT id, subject, name, files_json, thumbnail, created_at, updated_at
+                FROM studio_projects WHERE subject = ?
+                ORDER BY updated_at DESC LIMIT ?
+                """,
+                (subject, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        try:
+            files = json.loads(r["files_json"] or "{}")
+        except Exception:
+            files = {}
+        out.append({
+            "id": r["id"],
+            "subject": r["subject"],
+            "name": r["name"],
+            "files": files,
+            "thumbnail": r["thumbnail"],
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+        })
+    return out
+
+
+def get_studio_project(project_id: int, subject: str) -> dict[str, Any] | None:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM studio_projects WHERE id = ? AND subject = ?",
+                (project_id, subject),
+            ).fetchone()
+        finally:
+            conn.close()
+    if not row:
+        return None
+    try:
+        files = json.loads(row["files_json"] or "{}")
+    except Exception:
+        files = {}
+    return {
+        "id": row["id"],
+        "subject": row["subject"],
+        "name": row["name"],
+        "files": files,
+        "thumbnail": row["thumbnail"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def delete_studio_project(project_id: int, subject: str) -> bool:
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                "DELETE FROM studio_projects WHERE id = ? AND subject = ?",
+                (project_id, subject),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()

@@ -407,6 +407,29 @@ def init_db() -> None:
                 conn.execute("ALTER TABLE work_comments ADD COLUMN commenter_type TEXT NOT NULL DEFAULT 'user'")
             if "model_label" not in wc_cols:
                 conn.execute("ALTER TABLE work_comments ADD COLUMN model_label TEXT NOT NULL DEFAULT ''")
+            pw_cols = {r[1] for r in conn.execute("PRAGMA table_info(public_works)").fetchall()}
+            if "media_type" not in pw_cols:
+                conn.execute("ALTER TABLE public_works ADD COLUMN media_type TEXT NOT NULL DEFAULT ''")
+            if "media_url" not in pw_cols:
+                conn.execute("ALTER TABLE public_works ADD COLUMN media_url TEXT NOT NULL DEFAULT ''")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    kind TEXT NOT NULL DEFAULT 'info',
+                    title TEXT NOT NULL DEFAULT '',
+                    body TEXT NOT NULL DEFAULT '',
+                    payload TEXT NOT NULL DEFAULT '{}',
+                    is_read INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_notifications_user ON user_notifications(user_id, created_at DESC)"
+            )
             from pricing_store import ensure_pricing_tables, seed_model_pricing, process_due_coin_grants
 
             ensure_pricing_tables(conn)
@@ -2465,6 +2488,8 @@ def list_public_works(
                 rows = conn.execute(
                     """
                     SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           COALESCE(w.media_type, '') AS media_type,
+                           COALESCE(w.media_url, '') AS media_url,
                            (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
                             WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
                            (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
@@ -2479,6 +2504,8 @@ def list_public_works(
                 rows = conn.execute(
                     """
                     SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           COALESCE(w.media_type, '') AS media_type,
+                           COALESCE(w.media_url, '') AS media_url,
                            (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
                             WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
                            (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
@@ -2493,6 +2520,8 @@ def list_public_works(
                 rows = conn.execute(
                     """
                     SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           COALESCE(w.media_type, '') AS media_type,
+                           COALESCE(w.media_url, '') AS media_url,
                            (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
                             WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
                            (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
@@ -2508,6 +2537,8 @@ def list_public_works(
                 rows = conn.execute(
                     """
                     SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                           COALESCE(w.media_type, '') AS media_type,
+                           COALESCE(w.media_url, '') AS media_url,
                            (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
                             WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
                            (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
@@ -2546,6 +2577,8 @@ def list_public_works(
             "author_name": r["author_name"],
             "title": r["title"],
             "body": r["body"],
+            "media_type": r["media_type"],
+            "media_url": r["media_url"],
             "created_at": r["created_at"],
             "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
             "coin_total": float(r["coin_total"] or 0),
@@ -2560,13 +2593,24 @@ def list_public_works(
     return out
 
 
-def create_public_work(user_id: int, author_name: str, title: str, body: str) -> dict[str, Any]:
+def create_public_work(
+    user_id: int,
+    author_name: str,
+    title: str,
+    body: str,
+    media_type: str = "",
+    media_url: str = "",
+) -> dict[str, Any]:
     title = (title or "").strip()[:120]
     body = (body or "").strip()[:8000]
-    if not body:
+    if not body and not (media_url or "").strip():
         raise ValueError("작업 내용을 입력하세요.")
+    if not body:
+        body = (media_url or "").strip()[:8000] or title
     if not title:
         title = body[:40] + ("…" if len(body) > 40 else "")
+    media_type = (media_type or "").strip()[:32]
+    media_url = (media_url or "").strip()[:2000]
     try:
         u = get_user_by_id(user_id)
         author_name = u.get("display_name") or author_name or u.get("username") or "사용자"
@@ -2578,10 +2622,10 @@ def create_public_work(user_id: int, author_name: str, title: str, body: str) ->
         try:
             cur = conn.execute(
                 """
-                INSERT INTO public_works (user_id, author_name, title, body, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO public_works (user_id, author_name, title, body, created_at, media_type, media_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (user_id, (author_name or "").strip()[:64], title, body, now),
+                (user_id, (author_name or "").strip()[:64], title, body, now, media_type, media_url),
             )
             conn.commit()
             work_id = int(cur.lastrowid)
@@ -2652,12 +2696,13 @@ def add_work_comment(
     with _lock:
         conn = _connect()
         try:
-            exists = conn.execute(
-                "SELECT 1 FROM public_works WHERE id = ?",
+            row = conn.execute(
+                "SELECT user_id, title FROM public_works WHERE id = ?",
                 (work_id,),
             ).fetchone()
-            if not exists:
+            if not row:
                 raise ValueError("작업을 찾을 수 없습니다.")
+            owner_id = int(row["user_id"])
             cur = conn.execute(
                 """
                 INSERT INTO work_comments (work_id, user_id, author_name, body, created_at, commenter_type, model_label)
@@ -2669,6 +2714,17 @@ def add_work_comment(
             comment_id = int(cur.lastrowid)
         finally:
             conn.close()
+    if owner_id != user_id:
+        try:
+            create_notification(
+                owner_id,
+                "comment",
+                "새 댓글",
+                f"{author_name}: {body[:80]}",
+                {"work_id": work_id},
+            )
+        except Exception:
+            pass
     return {
         "id": comment_id,
         "work_id": work_id,
@@ -2980,6 +3036,12 @@ def send_friend_request(from_user_id: int, to_user_id: int) -> dict[str, Any]:
             conn.commit()
         finally:
             conn.close()
+    try:
+        from_user = get_user_by_id(from_user_id)
+        fname = from_user.get("display_name") or from_user.get("username") or "사용자"
+        create_notification(to_user_id, "friend_request", "친구 요청", f"{fname}님이 친구 요청을 보냈습니다.", {"from_user_id": from_user_id})
+    except Exception:
+        pass
     return {"success": True, "status": "pending"}
 
 
@@ -3107,8 +3169,13 @@ def send_work_coin_tip(work_id: int, from_user_id: int, amount: float = WORK_COI
                 (work_id, from_user_id, amt, now, confirm_after),
             )
             conn.commit()
+            owner_id = int(work["user_id"])
         finally:
             conn.close()
+    try:
+        create_notification(owner_id, "coin_tip", "코인 응원", f"작업물에 코인 {int(amt)}개가 도착했습니다.", {"work_id": work_id})
+    except Exception:
+        pass
     return {
         "work_id": work_id,
         "amount": amt,
@@ -3334,3 +3401,158 @@ def list_chat_users(exclude_user_id: int, limit: int = 50, friends_only: bool = 
     if friends_only:
         return list_friends(exclude_user_id)
     return search_users("", exclude_user_id, limit=limit)
+
+
+def create_notification(
+    user_id: int,
+    kind: str,
+    title: str,
+    body: str = "",
+    payload: dict[str, Any] | None = None,
+) -> None:
+    now = time.time()
+    payload_json = json.dumps(payload or {}, ensure_ascii=False)
+    with _lock:
+        conn = _connect()
+        try:
+            conn.execute(
+                """
+                INSERT INTO user_notifications (user_id, kind, title, body, payload, is_read, created_at)
+                VALUES (?, ?, ?, ?, ?, 0, ?)
+                """,
+                (int(user_id), (kind or "info")[:32], (title or "")[:200], (body or "")[:1000], payload_json, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def list_notifications(user_id: int, limit: int = 50) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 50), 100))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT id, kind, title, body, payload, is_read, created_at
+                FROM user_notifications WHERE user_id = ?
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (int(user_id), limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        try:
+            payload = json.loads(r["payload"] or "{}")
+        except Exception:
+            payload = {}
+        out.append({
+            "id": r["id"],
+            "kind": r["kind"],
+            "title": r["title"],
+            "body": r["body"],
+            "payload": payload,
+            "is_read": bool(r["is_read"]),
+            "created_at": r["created_at"],
+            "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
+        })
+    return out
+
+
+def count_unread_notifications(user_id: int) -> int:
+    with _lock:
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM user_notifications WHERE user_id = ? AND is_read = 0",
+                (int(user_id),),
+            ).fetchone()
+        finally:
+            conn.close()
+    return int(row["c"] or 0) if row else 0
+
+
+def mark_notifications_read(user_id: int, notification_ids: list[int] | None = None) -> int:
+    with _lock:
+        conn = _connect()
+        try:
+            if notification_ids:
+                placeholders = ",".join("?" * len(notification_ids))
+                cur = conn.execute(
+                    f"UPDATE user_notifications SET is_read = 1 WHERE user_id = ? AND id IN ({placeholders})",
+                    [int(user_id), *[int(i) for i in notification_ids]],
+                )
+            else:
+                cur = conn.execute(
+                    "UPDATE user_notifications SET is_read = 1 WHERE user_id = ?",
+                    (int(user_id),),
+                )
+            conn.commit()
+            return int(cur.rowcount or 0)
+        finally:
+            conn.close()
+
+
+def list_explore_works(viewer_id: int | None = None, limit: int = 30, offset: int = 0) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 30), 50))
+    offset = max(0, int(offset or 0))
+    confirm_pending_work_tips()
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT w.id, w.user_id, w.author_name, w.title, w.body, w.created_at,
+                       COALESCE(w.media_type, '') AS media_type,
+                       COALESCE(w.media_url, '') AS media_url,
+                       (SELECT COALESCE(SUM(t.amount), 0) FROM work_coin_tips t
+                        WHERE t.work_id = w.id AND t.status = 'confirmed') AS coin_total,
+                       (SELECT COUNT(*) FROM work_comments wc WHERE wc.work_id = w.id) AS comment_count
+                FROM public_works w
+                ORDER BY coin_total DESC, comment_count DESC, w.created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
+            ).fetchall()
+            tip_map: dict[int, dict] = {}
+            if viewer_id is not None:
+                tip_rows = conn.execute(
+                    "SELECT work_id, status, confirm_after, amount FROM work_coin_tips WHERE from_user_id = ?",
+                    (viewer_id,),
+                ).fetchall()
+                for tr in tip_rows:
+                    tip_map[int(tr["work_id"])] = {
+                        "status": tr["status"],
+                        "confirm_after": tr["confirm_after"],
+                        "amount": tr["amount"],
+                    }
+        finally:
+            conn.close()
+    out: list[dict[str, Any]] = []
+    now = time.time()
+    for r in rows:
+        wid = int(r["id"])
+        tip = tip_map.get(wid) if viewer_id is not None else None
+        pending = tip and tip["status"] == "pending" and now < float(tip["confirm_after"])
+        out.append({
+            "id": wid,
+            "user_id": r["user_id"],
+            "author_name": r["author_name"],
+            "title": r["title"],
+            "body": r["body"],
+            "media_type": r["media_type"],
+            "media_url": r["media_url"],
+            "created_at": r["created_at"],
+            "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
+            "coin_total": float(r["coin_total"] or 0),
+            "like_count": int(r["coin_total"] or 0),
+            "comment_count": int(r["comment_count"] or 0),
+            "tipped_by_me": tip is not None and tip["status"] in ("pending", "confirmed"),
+            "liked_by_me": tip is not None and tip["status"] in ("pending", "confirmed"),
+            "tip_pending": bool(pending),
+            "tip_confirm_after": float(tip["confirm_after"]) if tip else None,
+            "tip_seconds_left": max(0, int(float(tip["confirm_after"]) - now)) if pending else 0,
+        })
+    return out
