@@ -6213,6 +6213,63 @@
         html[data-theme="dark"] .studio-hub-desc,
         html[data-theme="dark"] .studio-panel-hint { color: var(--dm-text-muted); }
 
+        /* Compare / Debate / Collab v2 enhancements */
+        .compare-summary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .compare-action-btn { padding: 8px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; font-weight: 700; font-size: 13px; cursor: pointer; min-height: 44px; }
+        .compare-action-btn.primary { background: #7c3aed; color: #fff; border-color: #6d28d9; }
+        .compare-qa-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; }
+        .compare-qa-actions button { padding: 6px 10px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f9fafb; font-size: 11px; font-weight: 700; cursor: pointer; min-height: 36px; }
+        .debate-round-stepper {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            padding: 10px 12px; margin-bottom: 10px; background: #f5f3ff;
+            border-radius: 12px; border: 1px solid #ddd6fe; font-size: 12px; font-weight: 700;
+        }
+        .debate-round-stepper .round-pill {
+            padding: 4px 10px; border-radius: 999px; background: #ede9fe; color: #5b21b6;
+        }
+        .debate-round-stepper .round-pill.active { background: #7c3aed; color: #fff; }
+        .debate-round-stepper .round-pill.done { background: #d1fae5; color: #065f46; }
+        .collab-rework-banner {
+            margin: 10px 0; padding: 10px 12px; border-radius: 10px;
+            background: #fff7ed; border: 1px solid #fdba74; font-size: 12px; line-height: 1.45;
+        }
+        .collab-studio-cta { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: #fff !important; border: none !important; font-weight: 800 !important; }
+        .collab-final-studio-row { margin-top: 12px; }
+        .collab-final-studio-row button {
+            width: 100%; padding: 14px; border-radius: 12px; border: none;
+            background: linear-gradient(135deg, #7c3aed, #6d28d9); color: #fff;
+            font-weight: 800; font-size: 15px; cursor: pointer; min-height: 48px;
+        }
+        .mobile-bottom-nav {
+            display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 380;
+            background: #fff; border-top: 1px solid #e5e7eb;
+            padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+            grid-template-columns: repeat(5, 1fr); gap: 4px;
+            box-shadow: 0 -4px 20px rgba(15,23,42,0.08);
+        }
+        .mobile-bottom-nav button {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 2px; padding: 6px 4px; border: none; background: transparent;
+            color: #6b7280; font-size: 10px; font-weight: 700; cursor: pointer; min-height: 48px;
+            border-radius: 10px;
+        }
+        .mobile-bottom-nav button.active { color: #7c3aed; background: #f5f3ff; }
+        .mobile-bottom-nav .mob-nav-icon { font-size: 20px; line-height: 1; }
+        @media (max-width: 767px) {
+            .mobile-bottom-nav { display: grid; }
+            .app-rail--mobile { display: none !important; }
+            body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+            .header-workspace-tools {
+                bottom: calc(62px + var(--input-dock-height, 70px) + 10px);
+            }
+            .studio-shell-body { grid-template-columns: 1fr; }
+            .studio-shell-left, .studio-shell-right {
+                max-height: 140px;
+            }
+        }
+        html[data-theme="dark"] .mobile-bottom-nav { background: var(--dm-surface); border-color: var(--dm-border); }
+        html[data-theme="dark"] .mobile-bottom-nav button.active { background: #2e1065; color: #e9d5ff; }
+
         .site-popup-overlay {
             position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
             background: rgba(0,0,0,0.55); padding: 16px;
@@ -6667,6 +6724,10 @@
                         </div>
                     </div>
                     <div class="compare-summary-reason" id="compareSummaryReason"></div>
+                    <div class="compare-summary-actions">
+                        <button type="button" id="compareDiffSummaryBtn" class="compare-action-btn">📊 차이점 요약</button>
+                        <button type="button" id="compareStartCollabBtn" class="compare-action-btn primary">🤝 이 내용으로 협업 시작</button>
+                    </div>
                 </div>
             </section>
 
@@ -6680,6 +6741,7 @@
                 <div id="debateError" class="notice error"></div>
                 <div id="debateLoading" class="notice info"></div>
                 <div id="debateContent">
+                    <div id="debateRoundStepper" class="debate-round-stepper" style="display:none;" aria-label="토론 진행"></div>
                     <div id="debateStage" class="debate-stage" style="display:none;">
                         <span id="newArrival" class="new-arrival">새 답변 도착</span>
                     </div>
@@ -6726,6 +6788,7 @@
                     <div id="collabActionBar" class="collab-action-bar" style="display:none;">
                         <button type="button" id="collabStartBtn" class="collab-stage-btn primary-start">▶ 작업 시작</button>
                         <button type="button" id="collabViewBtn" class="collab-stage-btn">👁 결과물 보기</button>
+                        <button type="button" id="collabStudioBtn" class="collab-stage-btn studio-cta" style="display:none;">🎨 스튜디오에서 편집·내보내기</button>
                         <button type="button" id="collabDownloadBtn" class="collab-stage-btn done">📄 결과물 다운로드</button>
                         <button type="button" id="collabCompleteBtn" class="collab-stage-btn run">작업 완료</button>
                     </div>
@@ -7214,7 +7277,7 @@
     <script src="/static/studio-document.js?v=20260701e"></script>
     <script src="/static/studio-slides.js?v=20260701e"></script>
     <script src="/static/studio-video-editor.js?v=20260701e"></script>
-    <script src="/static/studio-app.js?v=20260701e"></script>
+    <script src="/static/studio-app.js?v=20260701f"></script>
     <script src="/static/agent-plan.js?v=20260701e"></script>
     <script src="/static/social-features.js?v=20260701e"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
@@ -7911,6 +7974,24 @@
             }
         }
 
+        document.getElementById("compareDiffSummaryBtn")?.addEventListener("click", async () => {
+            const turn = compareTurns[compareCurrentTurnIndex];
+            const filtered = filterCompareSummaryResponses(turn?.responses || compareResponses);
+            if (!Object.keys(filtered).length) { showToast("요약할 답변이 없습니다.", "warn"); return; }
+            await refreshCompareSummary(turn?.query || lastCompareMessage, filtered);
+            showToast("차이점 요약을 갱신했습니다.", "success");
+        });
+        document.getElementById("compareStartCollabBtn")?.addEventListener("click", () => {
+            const turn = compareTurns[compareCurrentTurnIndex];
+            const q = turn?.query || lastCompareMessage || "";
+            const parts = Object.entries(turn?.responses || compareResponses || {})
+                .filter(([, v]) => v && v !== COMPARE_FAILURE_MSG)
+                .map(([m, v]) => `[${m}]\n${String(v).slice(0, 800)}`);
+            startCollabFromContext(`${q}\n\n${parts.join("\n\n")}`);
+        });
+
+        });
+
         let nasaroNotifyAsked = false;
         async function notifyJobComplete(title, body) {
             if (!("Notification" in window)) return;
@@ -7928,6 +8009,19 @@
                     tag: "nasaro-" + Date.now(),
                 });
             } catch {}
+        }
+
+        function promptResultMetaOnSave() {
+            return new Promise(resolve => {
+                const folder = window.prompt("폴더 (기본/업무/학습/개인)", "기본");
+                if (folder === null) return resolve(null);
+                const tagsRaw = window.prompt("태그 (쉼표 구분, 선택)", "") || "";
+                const tags = tagsRaw.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+                resolve({
+                    folder: RESULT_FOLDERS.includes(folder) ? folder : "기본",
+                    tags,
+                });
+            });
         }
 
         const RESULT_FOLDERS = ["기본", "업무", "학습", "개인"];
@@ -8113,6 +8207,7 @@
             pair.innerHTML = `
                 <div class="compare-q-bubble">${escapeHtml(question)}</div>
                 <div id="content-${slug}" class="compare-content"></div>
+                <div id="actions-${slug}" class="compare-qa-actions" style="display:none;"></div>
                 <div id="retry-${slug}" class="retry-row"></div>`;
             stack.appendChild(pair);
             ensureCompareStackScrollGuard(stack);
@@ -8451,6 +8546,8 @@
         let collabSelectedStage = 0;
         let collabPipelineRunning = false;
         let collabFinalProduct = "";
+        let collabFinalMeta = null;
+        let collabLastRework = null;
         let COLLAB_API_MODELS = MODELS.slice();
         const COLLAB_STAGE_META_FALLBACK = [
             { short: "조사", role: "조사·트렌드", default_model: "Perplexity", options: ["Perplexity", "xAI", "OpenAI", "Google"], hint: "최신 정보·출처 조사" },
@@ -8698,7 +8795,21 @@
             showToast(NF?.t?.("save_result_done") || "결과물에 저장했습니다.", "success");
         }
 
-        function promptResultMetaOnSave() {
+        async function saveCompareResultForModel(model, turnIndex) {
+            const turn = compareTurns[turnIndex];
+            const body = turn?.responses?.[model] || compareResponses?.[model] || "";
+            if (!body || body === COMPARE_FAILURE_MSG) {
+                showToast("저장할 답변이 없습니다.", "warn");
+                return;
+            }
+            const q = turn?.query || lastCompareMessage || "비교";
+            await saveResultRecord({
+                title: `${model} · ${q.slice(0, 40)}`,
+                sections: [{ heading: model, body }],
+                kind: "compare",
+                payload: { query: q, model, answer: body },
+            });
+        }
             return new Promise(resolve => {
                 const folder = window.prompt("폴더 (기본/업무/학습/개인)", "기본");
                 if (folder === null) return resolve(null);
@@ -9880,6 +9991,9 @@
             document.querySelectorAll(".app-rail-btn[data-workspace]").forEach(btn => {
                 btn.classList.toggle("active", btn.dataset.workspace === currentAppWorkspace);
             });
+            document.querySelectorAll("#mobileBottomNav button[data-workspace]").forEach(btn => {
+                btn.classList.toggle("active", btn.dataset.workspace === currentAppWorkspace);
+            });
             updateSideMenuForWorkspace(currentAppWorkspace);
             updateWorkspaceAgentFab(currentAppWorkspace);
             const dockInner = document.querySelector(".dock-inner");
@@ -9929,6 +10043,9 @@
         }
 
         document.querySelectorAll(".app-rail-btn[data-workspace]").forEach(btn => {
+            btn.addEventListener("click", () => setAppWorkspace(btn.dataset.workspace));
+        });
+        document.querySelectorAll("#mobileBottomNav button[data-workspace]").forEach(btn => {
             btn.addEventListener("click", () => setAppWorkspace(btn.dataset.workspace));
         });
 
@@ -12052,14 +12169,57 @@
             appendCollabLog(reason || "현재 작업물로 완료", "info");
             try {
                 const finalData = await runCollabFinalize();
+                collabFinalMeta = finalData;
                 collabFinalProduct = finalData?.guidance || collabSession.stageOutputs[2] || collabSession.stageOutputs[3];
                 appendCollabLog("최종 작업물 완성", "ok");
             } catch (finErr) {
                 collabFinalProduct = collabSession.stageOutputs[2] || collabSession.stageOutputs[3] || "";
+                collabFinalMeta = {
+                    guidance: collabFinalProduct,
+                    suggested_studio_tool: studioToolForWorkType(collabSession?.plan?.work_type),
+                    work_type: collabSession?.plan?.work_type,
+                    task: collabSession?.task,
+                };
                 appendCollabLog(`최종 통합 실패 — 제작본 사용: ${finErr.message}`, "warn");
             }
             showToast("협업 작업이 완료되었습니다.", "success");
             notifyJobComplete("Nasaro AI · 협업 완료", collabSession.task || "협업 작업");
+            updateCollabActionBar();
+            renderCollabRunner(document.getElementById("collabRecommendResult"));
+        }
+
+        function studioToolForWorkType(workType) {
+            const m = {
+                "자기소개서·취업": "doc", "문서 제작": "doc", "PPT·발표자료": "slide",
+                "앱·웹 개발": "code", "동영상 제작": "video", "이미지·디자인": "image",
+            };
+            return m[workType] || "doc";
+        }
+
+        function openCollabInStudio() {
+            const meta = collabFinalMeta || {
+                guidance: getCollabResultText(),
+                suggested_studio_tool: studioToolForWorkType(collabSession?.plan?.work_type),
+                work_type: collabSession?.plan?.work_type,
+                task: collabSession?.task,
+                structured_payload: null,
+            };
+            if (!String(meta.guidance || "").trim()) {
+                showToast("열 수 있는 결과물이 없습니다.", "warn");
+                return;
+            }
+            setAppWorkspace("studio");
+            window.StudioHubApp?.openWithCollabResult?.(meta);
+        }
+
+        function startCollabFromContext(taskText) {
+            if (!taskText) return;
+            switchMode("collab");
+            if (mainInput) {
+                mainInput.value = taskText;
+                autoResizeInput();
+            }
+            runCollabRecommend(taskText);
         }
 
         // ── Android 설치 안내 모달 ────────────────────────────────────────────
@@ -13555,6 +13715,7 @@
                     for (const s of reworkStages) {
                         const prevS = collabSession.stageOutputs[s] || "";
                         const fb = verify.instructions[s] || reason;
+                        collabLastRework = { stages: reworkStages, reason, summary: verify.summary, at: Date.now() };
                         appendCollabLog(`${s + 1}단계 재작업 — ${fb.slice(0, 120)}`, "warn");
                         await runCollabStageInternal(s, true, fb, { previousArtifact: prevS });
                         for (let j = s + 1; j < 3; j++) {
@@ -13629,6 +13790,7 @@
             const viewBtn = document.getElementById("collabViewBtn");
             const downloadBtn = document.getElementById("collabDownloadBtn");
             const completeBtn = document.getElementById("collabCompleteBtn");
+            const studioBtn = document.getElementById("collabStudioBtn");
             const mob = isMobileCompact();
             const NF = window.NasaroFeatures;
             if (startBtn) {
@@ -13649,6 +13811,12 @@
                 completeBtn.disabled = !collabSession?.plan;
                 completeBtn.textContent = mob ? "완료" : (NF?.t?.("work_complete") || "작업 완료");
             }
+            if (studioBtn) {
+                const hasFinal = !!String(collabFinalProduct || "").trim();
+                studioBtn.style.display = hasFinal ? "" : "none";
+                studioBtn.disabled = !hasFinal;
+                studioBtn.textContent = mob ? "🎨 스튜디오" : "🎨 스튜디오에서 편집·내보내기";
+            }
             const bar = document.getElementById("collabActionBar");
             if (bar) bar.style.display = collabSession?.plan ? "flex" : "none";
             const act = document.getElementById("collabActivitySection");
@@ -13660,6 +13828,7 @@
             wireCollabActionBar._done = true;
             document.getElementById("collabStartBtn")?.addEventListener("click", startCollabWork);
             document.getElementById("collabViewBtn")?.addEventListener("click", openCollabResultModal);
+            document.getElementById("collabStudioBtn")?.addEventListener("click", openCollabInStudio);
             document.getElementById("collabDownloadBtn")?.addEventListener("click", e => downloadCollabResult(e.currentTarget));
             document.getElementById("collabCompleteBtn")?.addEventListener("click", completeCollabWork);
         }
@@ -13742,7 +13911,17 @@
                     <div class="collab-final-inline">
                         <h4>✅ 최종 작업물</h4>
                         <div class="collab-final-output"></div>
+                        <div class="collab-final-studio-row">
+                            <button type="button" id="collabFinalStudioBtn">🎨 스튜디오에서 열어서 편집·내보내기</button>
+                        </div>
                     </div>`;
+                }
+                if (collabLastRework) {
+                    workBody = `
+                    <div class="collab-rework-banner">
+                        <strong>🔄 검증 AI가 ${collabLastRework.stages.map(s => s + 1).join(", ")}단계 재작업을 요청했습니다</strong><br>
+                        ${escapeHtml(collabLastRework.summary || collabLastRework.reason || "")}
+                    </div>` + workBody;
                 }
 
                 bodyEl.innerHTML = `
@@ -13771,6 +13950,7 @@
                 if (workOutEl && output) renderAiAnswer(workOutEl, output);
                 const finalOutEl = bodyEl.querySelector(".collab-final-output");
                 if (finalOutEl && collabFinalProduct) renderAiAnswer(finalOutEl, collabFinalProduct);
+                bodyEl.querySelector("#collabFinalStudioBtn")?.addEventListener("click", openCollabInStudio);
 
                 railEl.querySelectorAll("[data-rail-step]").forEach(btn => {
                     btn.addEventListener("click", () => {
@@ -13915,6 +14095,40 @@
                 }
             } else if (retry) {
                 retry.innerHTML = "";
+            }
+
+            if (opts.final === true && !isError) {
+                const actionsEl = document.getElementById(`actions-${slug}`);
+                if (actionsEl) {
+                    actionsEl.style.display = "flex";
+                    actionsEl.innerHTML = "";
+                    const text = content || "";
+                    const mk = (label, fn) => {
+                        const b = document.createElement("button");
+                        b.type = "button";
+                        b.textContent = label;
+                        b.addEventListener("click", fn);
+                        actionsEl.appendChild(b);
+                    };
+                    mk("💬 이 답변으로 계속", () => {
+                        if (mainInput) {
+                            mainInput.value = `【${model} 답변 기반】\n${text.slice(0, 1500)}\n\n추가 질문: `;
+                            autoResizeInput();
+                            mainInput.focus();
+                        }
+                    });
+                    mk("📋 복사", async () => {
+                        const ok = await copyTextToClipboard(text);
+                        showToast(ok ? "복사됨" : "복사 실패", ok ? "success" : "error");
+                    });
+                    mk("💾 저장", () => {
+                        saveCompareResultForModel(model, turnIndex);
+                    });
+                    mk("🤝 협업", () => {
+                        const q = compareTurns[turnIndex]?.query || lastCompareMessage || "";
+                        startCollabFromContext(`${q}\n\n[${model} 답변 참고]\n${text.slice(0, 2000)}`);
+                    });
+                }
             }
 
             if (turnIndex === compareCurrentTurnIndex) {
@@ -14289,11 +14503,29 @@
 
         function renderDebateDeck() {
             const stage = document.getElementById("debateStage");
+            const stepper = document.getElementById("debateRoundStepper");
             const indicator = document.getElementById("deckIndicators");
             const listMode = isMobileCompact();
             stage.classList.toggle("debate-list-mode", listMode);
             stage.style.display = debateCards.length ? "block" : "none";
             if (indicator) indicator.style.display = listMode ? "none" : "";
+
+            const maxRound = debateCards.reduce((m, c) => Math.max(m, c.round_number || 0), 0);
+            const currentRound = debateCards[activeCardIndex]?.round_number || maxRound || 1;
+            if (stepper) {
+                if (debateStarted && maxRound > 0) {
+                    stepper.style.display = "flex";
+                    stepper.innerHTML = `<span style="color:#6b7280;margin-right:4px;">라운드</span>`
+                        + Array.from({ length: maxRound }, (_, i) => {
+                            const r = i + 1;
+                            const cls = r === currentRound ? "active" : (r < currentRound ? "done" : "");
+                            return `<span class="round-pill ${cls}">R${r}</span>`;
+                        }).join("")
+                        + `<span style="margin-left:auto;color:#6b7280;font-weight:600;">${activeCardIndex + 1}/${debateCards.length}</span>`;
+                } else {
+                    stepper.style.display = "none";
+                }
+            }
 
             const existing = new Map();
             stage.querySelectorAll(".debate-card").forEach(el => existing.set(el.dataset.id, el));
@@ -14787,5 +15019,12 @@
         notifyExtensionServer();
         updateDockUI();
     </script>
+    <nav id="mobileBottomNav" class="mobile-bottom-nav" aria-label="하단 메뉴">
+        <button type="button" data-workspace="home" aria-label="홈"><span class="mob-nav-icon">🏠</span><span>홈</span></button>
+        <button type="button" data-workspace="ai" class="active" aria-label="AI 허브"><span class="mob-nav-icon">🤖</span><span>AI</span></button>
+        <button type="button" data-workspace="studio" aria-label="스튜디오"><span class="mob-nav-icon">🎨</span><span>스튜디오</span></button>
+        <button type="button" data-workspace="chat" aria-label="채팅"><span class="mob-nav-icon">💬</span><span>채팅</span></button>
+        <button type="button" data-workspace="works" aria-label="작업"><span class="mob-nav-icon">📋</span><span>작업</span></button>
+    </nav>
 </body>
 </html>

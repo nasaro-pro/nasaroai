@@ -385,6 +385,47 @@
       }, 400);
     },
 
+    openWithCollabResult(meta) {
+      if (!meta) return;
+      const toolId = meta.suggested_studio_tool || "doc";
+      const title = (meta.task || meta.work_type || "협업 결과").slice(0, 80);
+      openTool(toolId);
+      setTimeout(() => {
+        if (!shell) return;
+        shell.setTitle(title);
+        const payload = meta.structured_payload;
+        if (toolId === "doc") {
+          const html = meta.guidance || "";
+          const mount = shell.center?.querySelector("#docEditorMount .ql-editor")
+            || shell.center?.querySelector(".ql-editor");
+          if (mount) {
+            mount.innerHTML = html.replace(/\n/g, "<br>").replace(/^## (.+)$/gm, "<h2>$1</h2>").replace(/^- (.+)$/gm, "<li>$1</li>");
+          } else if (global.DocumentEditor && shell.center) {
+            global.DocumentEditor.mount(shell, {
+              deps,
+              project: { name: title, files: { "content.html": html.replace(/\n/g, "<br>") } },
+            });
+          }
+        } else if (toolId === "slide" && payload?.slides) {
+          global.SlideEditor?.mount(shell, {
+            deps,
+            project: {
+              name: title,
+              files: { "slides.json": JSON.stringify({ slides: payload.slides.map((s) => ({ plain: { title: s.title || "", bullets: s.bullets || [] }, objects: [], bg: "#1e1b4b" })), themeId: "violet" }) },
+            },
+          });
+        } else if (toolId === "code" && payload?.files) {
+          const text = Object.entries(payload.files).map(([k, v]) => "```" + k + "\n" + v + "\n```").join("\n\n");
+          const mount = shell.center?.firstChild;
+          if (mount && global.CodeStudio) global.CodeStudio.mount(mount, { text });
+        } else if (toolId === "video" || toolId === "image") {
+          const promptEl = shell.center?.querySelector("#mediaPrompt");
+          if (promptEl) promptEl.value = meta.guidance || meta.raw_content || "";
+        }
+        deps.showToast?.("스튜디오에서 결과를 편집할 수 있습니다.", "success", 4000);
+      }, 500);
+    },
+
     get mediaState() { return mediaState; },
   };
 

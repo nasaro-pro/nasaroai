@@ -4052,12 +4052,30 @@ async def collab_run_stage(data: CollabStageRequest, request: Request) -> dict:
     }
 
 
+def studio_tool_for_work_type(work_type: str) -> str:
+    """Map collab work_type to studio editor tool id."""
+    wt = (work_type or "").strip()
+    mapping = {
+        "자기소개서·취업": "doc",
+        "문서 제작": "doc",
+        "PPT·발표자료": "slide",
+        "앱·웹 개발": "code",
+        "동영상 제작": "video",
+        "이미지·디자인": "image",
+        "리서치·분석": "doc",
+        "데이터 분석": "doc",
+        "마케팅·SNS": "doc",
+    }
+    return mapping.get(wt, "doc")
+
+
 def _collab_finalize_prompt(data: CollabFinalizeRequest) -> str:
     outputs = data.stage_outputs or ["", "", "", ""]
     while len(outputs) < 4:
         outputs.append("")
     acceptance_lines = "\n".join(f"- {item}" for item in data.acceptance) or "- 작업 목표 달성"
-    return (
+    tool = studio_tool_for_work_type(data.work_type)
+    base_ctx = (
         f"{COLLAB_QUALITY_BAR}\n"
         f"작업: {data.task}\n"
         f"작업 유형: {data.work_type}\n\n"
@@ -4066,9 +4084,39 @@ def _collab_finalize_prompt(data: CollabFinalizeRequest) -> str:
         f"【3단계 제작 초안】\n{outputs[2][:8000] or '없음'}\n\n"
         f"【4단계 검증 피드백】\n{outputs[3][:4000] or '없음'}\n\n"
         f"통과 기준:\n{acceptance_lines}\n\n"
-        "당신은 수석 편집자·최종 통합 AI입니다.\n"
+    )
+    if tool == "slide":
+        return (
+            base_ctx
+            + "당신은 수석 편집자입니다. 위 4단계 산출물을 반영해 **발표 슬라이드**를 완성하세요.\n"
+            "반드시 아래 JSON 형식만 출력 (다른 텍스트·마크다운 금지):\n"
+            '{"title":"발표 제목","slides":[{"title":"슬라이드 제목","bullets":["항목1","항목2"]}]}\n'
+            "슬라이드 5~10장, 각 슬라이드 bullets 2~5개, 한국어."
+        )
+    if tool == "code":
+        return (
+            base_ctx
+            + "당신은 수석 개발자입니다. 위 산출물을 반영해 **실행 가능한 코드 프로젝트**를 완성하세요.\n"
+            "반드시 아래 JSON 형식만 출력:\n"
+            '{"files":{"index.html":"...","style.css":"...","script.js":"..."}}\n'
+            "HTML/CSS/JS 웹 프로젝트 우선. 파일명은 경로 없이. 한국어 UI."
+        )
+    if tool == "video":
+        return (
+            base_ctx
+            + "당신은 영상 PD입니다. 최종 **영상 기획안**(대본·장면별 스토리보드·자막·CTA)을 작성하세요.\n"
+            "장면별로 구분하고, 각 장면에 나레이션·화면 설명·길이(초)를 포함. 한국어 완성본만."
+        )
+    if tool == "image":
+        return (
+            base_ctx
+            + "당신은 아트 디렉터입니다. 최종 **이미지 생성용 프롬프트**와 디자인 브리프를 작성하세요.\n"
+            "구도·색상·스타일·텍스트 오버레이를 구체적으로. 한국어."
+        )
+    return (
+        base_ctx
+        + "당신은 수석 편집자·최종 통합 AI입니다.\n"
         "위 4단계 협업 산출물과 검증 피드백을 모두 반영해 **최종 완성 작업물** 하나만 작성하세요.\n"
-        "단일 AI 1회 답변과 비교해 확실히 더 깊고, 구체적이고, 실행 가능해야 합니다.\n"
         "요구사항:\n"
         "1) 조사 근거·구조·검증 지적을 실제 본문에 반영 (메타 설명·과정 회고 금지)\n"
         "2) 작업 유형에 맞는 형식·분량·톤·독자 준수\n"
@@ -4077,22 +4125,61 @@ def _collab_finalize_prompt(data: CollabFinalizeRequest) -> str:
     )
 
 
+def _parse_collab_structured(raw: str, tool: str) -> dict | None:
+    import re
+
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if tool in ("slide", "code"):
+        m = re.search(r"\{[\s\S]*\}", text)
+        if not m:
+            return None
+        try:
+            parsed = json.loads(m.group(0))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+        if tool == "slide" and isinstance(parsed.get("slides"), list):
+            return parsed
+        if tool == "code" and isinstance(parsed.get("files"), dict):
+            return parsed
+    return None
+
+
 @app.post("/collab/finalize")
 async def collab_finalize(data: CollabFinalizeRequest, request: Request) -> dict:
     """4단계 협업 산출물을 통합·윤색해 최종 작업물을 만든다."""
     await ensure_model_cache_fresh()
     _require_quota(request, "collab", data.user_id, action="finalize")
     model = (data.finalize_model or "").strip() or "Anthropic"
+    suggested_tool = studio_tool_for_work_type(data.work_type)
     prompt = _collab_finalize_prompt(data)
     result = await call_ai_best(prompt, max_tokens=4500, preferred_labels=[model, "OpenAI", "Google"])
-    guidance = result.content if result.success else (
-        (data.stage_outputs[2] if len(data.stage_outputs) > 2 else "") or "최종 통합에 실패했습니다."
-    )
+    raw = result.content if result.success else ""
+    structured_payload = _parse_collab_structured(raw, suggested_tool)
+    if not result.success:
+        guidance = (data.stage_outputs[2] if len(data.stage_outputs) > 2 else "") or "최종 통합에 실패했습니다."
+    elif structured_payload and suggested_tool == "slide":
+        slides = structured_payload.get("slides") or []
+        guidance = structured_payload.get("title") or data.task
+        guidance += "\n\n" + "\n\n".join(
+            f"## {s.get('title', '')}\n" + "\n".join(f"- {b}" for b in (s.get("bullets") or []))
+            for s in slides
+        )
+    elif structured_payload and suggested_tool == "code":
+        files = structured_payload.get("files") or {}
+        guidance = "\n\n".join(f"### {fn}\n```\n{body[:2000]}\n```" for fn, body in list(files.items())[:6])
+    else:
+        guidance = raw or (data.stage_outputs[2] if len(data.stage_outputs) > 2 else "")
     return {
         "guidance": guidance,
         "model_label": result.requested_label if result.success else model,
         "success": True,
         "ai_success": result.success,
+        "work_type": data.work_type,
+        "suggested_studio_tool": suggested_tool,
+        "structured_payload": structured_payload,
+        "raw_content": raw if structured_payload else "",
     }
 
 
