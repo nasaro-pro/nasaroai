@@ -6,12 +6,14 @@
 
   const MAX_INTAKE = 5;
 
-  function openModal() {
-    global.setAppWorkspace?.("ai");
-    global.switchMode?.("collab");
+  function show() {
     document.body.classList.add("collab-modal-open");
     const intro = document.getElementById("collabIntro");
     if (intro) intro.style.display = "flex";
+  }
+
+  function openModal() {
+    global.switchMode?.("collab");
   }
 
   function closeModal() {
@@ -65,7 +67,6 @@
 
   function init() {
     mountIntakeProgress();
-    global.addEventListener("studio:open-collab", openModal);
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && document.body.classList.contains("collab-modal-open")) closeModal();
     });
@@ -80,5 +81,5 @@
     setTimeout(patchCollabHooks, 600);
   }
 
-  global.CollabFlowV2 = { init, openModal, closeModal };
+  global.CollabFlowV2 = { init, openModal, closeModal, show };
 })(typeof window !== "undefined" ? window : global);

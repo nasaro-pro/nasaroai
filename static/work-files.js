@@ -183,6 +183,9 @@
       updateBadge();
       mountSidePanel(document.getElementById("sideMenuWorkFiles"));
     },
+    refreshStudioPanel() {
+      refreshSidePanel(document.getElementById("sideMenuWorkFiles"));
+    },
     loadFiles,
     saveFile,
     deleteFile,

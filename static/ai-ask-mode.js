@@ -16,15 +16,7 @@
     if (!panel || panel.dataset.mounted) return;
     panel.dataset.mounted = "1";
     panel.innerHTML = `
-      <div id="askMessages" class="ask-messages"></div>
-      <button type="button" class="ask-collab-cta" id="askCollabCta">
-        <strong>🤝 스튜디오에서 협업 시작</strong>
-        <span>여러 AI가 역할을 나눠 결과물을 완성합니다 →</span>
-      </button>`;
-    document.getElementById("askCollabCta")?.addEventListener("click", () => {
-      global.setAppWorkspace?.("studio");
-      global.dispatchEvent(new CustomEvent("studio:open-collab"));
-    });
+      <div id="askMessages" class="ask-messages"></div>`;
   }
 
   function appendMsg(role, text, withActions) {

@@ -1,5 +1,5 @@
 /**
- * Nasaro UI upgrades — mode tabs, home widgets, studio banner, theme
+ * Nasaro UI upgrades — home widgets, studio banner, theme (no duplicate mode tabs)
  */
 (function (global) {
   "use strict";
@@ -19,28 +19,8 @@
     }
   }
 
-  function initAiModeSegment() {
-    const main = document.getElementById("mainContent");
-    if (!main || document.getElementById("aiModeSegment")) return;
-    const seg = document.createElement("div");
-    seg.id = "aiModeSegment";
-    seg.className = "ai-mode-segment";
-    seg.innerHTML = `
-      <button type="button" data-ai-mode="ask" class="active">AI 질문</button>
-      <button type="button" data-ai-mode="compare">AI 비교</button>
-      <button type="button" data-ai-mode="debate">AI 토론</button>`;
-    const firstPanel = main.querySelector("section.panel, #shareViewBanner");
-    if (firstPanel) main.insertBefore(seg, firstPanel);
-    else main.prepend(seg);
-    seg.querySelectorAll("button").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        seg.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
-        global.switchMode?.(btn.dataset.aiMode);
-        document.querySelectorAll(".mode-btn").forEach((mb) => {
-          mb.classList.toggle("active", mb.dataset.mode === btn.dataset.aiMode);
-        });
-      });
-    });
+  function removeAiModeSegment() {
+    document.getElementById("aiModeSegment")?.remove();
   }
 
   function patchSwitchMode() {
@@ -49,17 +29,16 @@
     global.switchMode = function (mode) {
       if (mode === "agent") mode = "compare";
       if (mode === "collab") {
-        global.setAppWorkspace?.("studio");
-        global.dispatchEvent(new CustomEvent("studio:open-collab"));
+        global.setAppWorkspace?.("ai");
+        orig("collab");
+        global.CollabFlowV2?.show?.();
         return;
       }
       orig(mode);
-      document.querySelectorAll("#aiModeSegment button").forEach((b) => {
-        b.classList.toggle("active", b.dataset.aiMode === mode);
-      });
       document.getElementById("askPanel")?.classList.toggle("active", mode === "ask");
     };
     global.switchMode._nxPatched = true;
+    global.switchMode._orig = orig;
   }
 
   function mountHomeWidgets() {
@@ -112,7 +91,7 @@
     banner.id = "studioCollabBanner";
     banner.className = "studio-collab-banner";
     banner.innerHTML = "<h3>🤝 협업 시작</h3><p>여러 AI가 역할을 나눠 함께 결과물을 완성합니다</p>";
-    banner.addEventListener("click", () => global.dispatchEvent(new CustomEvent("studio:open-collab")));
+    banner.addEventListener("click", () => global.switchMode?.("collab"));
     root.parentElement.insertBefore(banner, root);
   }
 
@@ -126,17 +105,13 @@
         },
       });
     });
-    global.addEventListener("studio:open-collab", () => {
-      global.setAppWorkspace?.("ai");
-      global.switchMode?.("collab");
-    });
     document.getElementById("compareResponses")?.classList.add("cols-scroll");
   }
 
   global.NasaroUI = {
     init() {
       initTheme();
-      initAiModeSegment();
+      removeAiModeSegment();
       patchSwitchMode();
       mountHomeWidgets();
       mountStudioCollabBanner();

@@ -92,20 +92,24 @@
 
   function mountShellFileHandlers(shell, toolId) {
     const typeMap = { slide: "ppt", doc: "doc", code: "code", image: "image", video: "video", audio: "audio" };
-    shell.setSaveHandler?.(async () => {
+    const saveCurrent = async () => {
       const title = shell.getTitle();
       const promptEl = shell.center?.querySelector("#mediaPrompt, textarea, .ql-editor");
       const text = promptEl?.value || promptEl?.innerText || shell.center?.innerText || "";
       const url = mediaState.lastResult?.media_url || mediaState.lastResult?.url || "";
-      await global.WorkFiles?.saveFile?.({
+      const pid = global.WorkBundlePanel?.getProjectId?.() || currentProjectId || null;
+      return global.WorkFiles?.saveFile?.({
         type: typeMap[toolId] || "doc",
         title,
         text_content: String(text).slice(0, 50000),
         content_url_or_path: url,
         thumbnail_url: url,
         source_tool: "studio-" + toolId,
-        project_id: currentProjectId,
+        project_id: pid,
       });
+    };
+    shell.setSaveHandler?.(async () => {
+      await saveCurrent();
     });
     shell.setLoadHandler?.(() => {
       global.WorkFiles?.openPicker?.({
@@ -123,6 +127,14 @@
         },
       });
     });
+    global.WorkBundlePanel?.init?.(deps);
+    global.WorkBundlePanel?.setProjectId?.(currentProjectId);
+    global.WorkBundlePanel?.mount?.(shell, {
+      deps,
+      projectId: currentProjectId,
+      toolId,
+      onSaveCurrent: saveCurrent,
+    });
   }
 
   function defaultTitle(id) {
@@ -137,6 +149,7 @@
     if (!deps.currentUser?.() || !shell?.right) return;
     currentProjectId = project?.id || null;
     currentProjectRole = project?.access_role || "owner";
+    global.WorkBundlePanel?.setProjectId?.(currentProjectId);
     const box = document.createElement("div");
     box.className = "studio-collab-panel";
     box.style.cssText = "margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e5e7eb;";

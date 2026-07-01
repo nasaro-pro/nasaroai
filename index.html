@@ -29,7 +29,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nasaro AI</title>
     <link rel="stylesheet" href="/static/design-tokens.css?v=20260702a">
-    <link rel="stylesheet" href="/static/nasaro-components.css?v=20260702c">
+    <link rel="stylesheet" href="/static/nasaro-components.css?v=20260703a">
     <!-- PWA: 홈화면 추가 지원 -->
     <meta name="theme-color" content="#7c3aed">
     <meta name="mobile-web-app-capable" content="yes">
@@ -6497,6 +6497,8 @@
                     <div class="works-section-title" data-i18n="works_in_progress">협업 작업 중</div>
                     <div id="activeCollabList"><div class="works-empty">진행 중인 협업이 없습니다.</div></div>
                 </div>
+            </div>
+            <div id="sideMenuPanelStudio" class="side-menu-panel">
                 <div class="side-menu-section" id="sideMenuWorkFiles"></div>
             </div>
             <div id="sideMenuPanelChat" class="side-menu-panel">
@@ -7283,15 +7285,16 @@
     <script src="/static/studio-slides.js?v=20260701e"></script>
     <script src="/static/studio-video-editor.js?v=20260701e"></script>
     <script src="/static/ai-hub-session.js?v=20260701g"></script>
-    <script src="/static/studio-app.js?v=20260701g"></script>
+    <script src="/static/studio-app.js?v=20260703a"></script>
     <script src="/static/agent-plan.js?v=20260701e"></script>
     <script src="/static/social-features.js?v=20260701e"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <script src="/static/deploy-hint.js"></script>
-    <script src="/static/work-files.js?v=20260702a"></script>
-    <script src="/static/ai-ask-mode.js?v=20260702a"></script>
-    <script src="/static/nasaro-ui.js?v=20260702c"></script>
-    <script src="/static/collab-flow-v2.js?v=20260702c"></script>
+    <script src="/static/work-files.js?v=20260703a"></script>
+    <script src="/static/work-bundle-panel.js?v=20260703a"></script>
+    <script src="/static/ai-ask-mode.js?v=20260703a"></script>
+    <script src="/static/nasaro-ui.js?v=20260703a"></script>
+    <script src="/static/collab-flow-v2.js?v=20260703a"></script>
     <script src="/static/chat-sns.js?v=20260702c"></script>
     <script src="/static/works-feed-v2.js?v=20260702c"></script>
     <script src="/static/icon-bridge.js?v=20260702c"></script>
@@ -9966,6 +9969,7 @@
 
         function updateSideMenuForWorkspace(ws) {
             document.getElementById("sideMenuPanelAi")?.classList.toggle("active", ws === "ai");
+            document.getElementById("sideMenuPanelStudio")?.classList.toggle("active", ws === "studio");
             document.getElementById("sideMenuPanelChat")?.classList.toggle("active", ws === "chat");
             document.getElementById("sideMenuPanelWorks")?.classList.toggle("active", ws === "works" || ws === "home");
             const brand = document.getElementById("sideMenuBrand");
@@ -10044,6 +10048,7 @@
 
             if (isStudio) {
                 window.StudioHubApp?.showHub?.();
+                window.WorkFiles?.refreshStudioPanel?.();
             }
 
             if (isChat) {

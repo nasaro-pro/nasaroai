@@ -90,12 +90,54 @@ body { background: var(--bg-canvas); color: var(--text-primary); }
 }
 
 .studio-collab-banner {
-  margin: 0 0 var(--space-3); padding: var(--space-4) var(--space-5); border-radius: var(--radius-card);
-  border: none; width: 100%; cursor: pointer; text-align: left;
-  background: linear-gradient(135deg, #4338ca, #7c3aed); color: #fff; box-shadow: var(--shadow-lg);
+  margin: 0 auto var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  border: none;
+  width: 100%;
+  max-width: min(640px, calc(100% - 24px));
+  box-sizing: border-box;
+  cursor: pointer;
+  text-align: left;
+  display: block;
+  background: linear-gradient(135deg, #4338ca, #7c3aed);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
 }
-.studio-collab-banner h3 { margin: 0 0 4px; font-size: var(--text-lg); }
-.studio-collab-banner p { margin: 0; font-size: var(--text-sm); opacity: 0.9; }
+.studio-collab-banner h3 { margin: 0 0 4px; font-size: var(--text-base); font-weight: 800; }
+.studio-collab-banner p { margin: 0; font-size: var(--text-xs); opacity: 0.9; line-height: 1.4; }
+
+#aiModeSegment { display: none !important; }
+
+.studio-bundle-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.bundle-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 8px 0;
+}
+.bundle-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  cursor: pointer;
+  font-size: 11px;
+}
+.bundle-file-item:hover { border-color: var(--brand-600); }
+.bundle-file-icon { flex-shrink: 0; font-size: 16px; }
+.bundle-file-title { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bundle-file-type { color: var(--text-muted); font-size: 10px; text-transform: uppercase; }
+.bundle-file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .work-files-panel { padding: 0 var(--space-2) var(--space-3); }
 .work-files-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
