@@ -1283,6 +1283,9 @@
       showBar(true);
       runTaskMessage(String(d.task || "").trim());
     }
+    else if (d.type === "RESUME_TASK") {
+      try { chrome.runtime.sendMessage({ type: "RESUME_TASK" }); } catch (_) {}
+    }
     else if (d.type === "SCHEDULE") {
       try {
         chrome.runtime.sendMessage({

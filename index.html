@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Nasaro AI</title>
-    <link rel="stylesheet" href="/static/design-tokens.css?v=20260701c">
+    <link rel="stylesheet" href="/static/design-tokens.css?v=20260701d">
     <!-- PWA: 홈화면 추가 지원 -->
     <meta name="theme-color" content="#7c3aed">
     <meta name="mobile-web-app-capable" content="yes">
@@ -6688,8 +6688,10 @@
                         <div id="chatMessages" class="discord-messages"></div>
                         <div id="chatTypingIndicator" class="chat-typing-indicator" aria-hidden="true">전송 중…</div>
                         <div class="discord-compose">
+                            <button id="chatAttachBtn" type="button" class="chat-ai-btn" title="이미지 첨부">📎</button>
+                            <input type="file" id="chatAttachInput" accept="image/*" hidden>
                             <button id="chatAiBtn" type="button" class="chat-ai-btn" title="AI 호출">🤖 AI</button>
-                            <input id="chatInput" type="text" placeholder="메시지 입력… (/ai 질문)" autocomplete="off">
+                            <input id="chatInput" type="text" placeholder="메시지 입력… (@ai 질문)" autocomplete="off">
                             <button id="chatSendBtn" type="button" aria-label="전송">➤</button>
                         </div>
                     </div>
@@ -6727,7 +6729,8 @@
                 <div id="homeLayout" style="display:none;">
                     <button type="button" id="homeBackBtn" class="home-back-btn" style="display:none;">← 내 프로필</button>
                     <div class="home-profile-card">
-                        <div class="home-avatar" id="homeAvatar">?</div>
+                        <div class="home-avatar" id="homeAvatar" title="클릭하여 프로필 사진 변경" style="cursor:pointer;overflow:hidden;">?</div>
+                        <input type="file" id="homeAvatarInput" accept="image/*" hidden>
                         <div class="home-profile-meta">
                             <h2 id="homeUsername">내 계정</h2>
                             <p id="homeBio"></p>
@@ -6948,6 +6951,7 @@
                 </div>
             </div>
             <div class="agent-status-bar" id="agentStatusBar" data-type="idle">대기 중 — 아래에 임무를 입력하세요.</div>
+            <div class="agent-template-row" id="agentTemplateRow"></div>
             <div class="agent-history" id="agentHistory">
                 <div class="agent-empty" id="agentEmptyMsg">임무를 입력하면 에이전트가 실행됩니다.</div>
             </div>
@@ -7044,9 +7048,10 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
-    <script src="/static/studio-renderers.js?v=20260701c"></script>
-    <script src="/static/studio-code.js?v=20260701c"></script>
-    <script src="/static/agent-plan.js?v=20260701c"></script>
+    <script src="/static/studio-renderers.js?v=20260701d"></script>
+    <script src="/static/studio-code.js?v=20260701d"></script>
+    <script src="/static/agent-plan.js?v=20260701d"></script>
+    <script src="/static/social-features.js?v=20260701d"></script>
     <script src="/static/nasaro-features.js?v=20260701b"></script>
     <script>
         const API_URL = "";
@@ -9118,6 +9123,7 @@
             notifyExtensionAuth();
             updateSupportUI();
             refreshSocialWorkspace();
+            window.currentUser = currentUser || null;
         }
 
         async function refreshSideQuota() {
@@ -9895,15 +9901,22 @@
             const time = formatChatTime(m.created_at_iso);
             const name = m.sender_name || (mine ? "나" : "상대");
             const badge = m.model_label ? ` · ${escapeHtml(m.model_label)}` : "";
+            const readMark = mine ? `<span class="chat-read-mark" style="font-size:10px;color:#9ca3af;margin-left:4px;">✓</span>` : "";
+            let attachHtml = "";
+            if (m.attachment_url) {
+                attachHtml = `<img src="${escapeHtml(m.attachment_url)}" class="chat-attach-preview" alt="첨부">`;
+            }
             row.innerHTML = `
                 <div class="chat-bubble-meta">
-                    <span class="chat-bubble-name">${escapeHtml(name)}${badge}</span>
+                    <span class="chat-bubble-name">${escapeHtml(name)}${badge}${readMark}</span>
                     <span class="chat-bubble-time">${escapeHtml(time)}</span>
                 </div>
-                <div class="chat-bubble">${escapeHtml(m.body || "")}</div>`;
+                <div class="chat-bubble">${escapeHtml(m.body || "")}${attachHtml}</div>`;
             box.appendChild(row);
             return row;
         }
+
+        let chatPendingAttachment = "";
 
         function navigateToChat(roomId, name, roomType) {
             if (!requireLogin() || !roomId) return;
@@ -10065,7 +10078,7 @@
             const sendBtn = document.getElementById("chatSendBtn");
             const typing = document.getElementById("chatTypingIndicator");
             const body = (input?.value || "").trim();
-            if (!body) return;
+            if (!body && !chatPendingAttachment) return;
             if (/^\/ai\s+/i.test(body) || /^@ai\s+/i.test(body)) {
                 const promptText = body.replace(/^\/ai\s+/i, "").replace(/^@ai\s+/i, "").trim();
                 if (input) input.value = "";
@@ -10087,11 +10100,17 @@
             if (sendBtn) sendBtn.disabled = true;
             if (typing) typing.classList.add("visible");
             try {
+                apiFetch("/social/chat/typing", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ room_id: chatRoomId }),
+                }).catch(() => {});
                 const res = await apiFetch("/social/chat/room/" + encodeURIComponent(chatRoomId), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ body }),
+                    body: JSON.stringify({ body, attachment_url: chatPendingAttachment }),
                 });
+                chatPendingAttachment = "";
                 if (!res.ok) {
                     const data = await res.json().catch(() => ({}));
                     showToast(typeof data.detail === "string" ? data.detail : "전송 실패");
@@ -10112,7 +10131,18 @@
             stopChatPoll();
             if (!currentUser) return;
             chatPollTimer = setInterval(() => {
-                if (currentAppWorkspace === "chat" && chatRoomId) loadChatMessages();
+                if (currentAppWorkspace === "chat" && chatRoomId) {
+                    loadChatMessages();
+                    apiFetch("/social/chat/typing/" + encodeURIComponent(chatRoomId)).then(async r => {
+                        if (!r.ok) return;
+                        const d = await r.json();
+                        const el = document.getElementById("chatTypingIndicator");
+                        if (el && d.typing) {
+                            el.textContent = (d.user || "상대") + " 입력 중…";
+                            el.classList.add("visible");
+                        } else if (el) el.classList.remove("visible");
+                    }).catch(() => {});
+                }
             }, 3000);
         }
         function stopChatPoll() {
@@ -10182,6 +10212,21 @@
         document.getElementById("studioRunBtn")?.addEventListener("click", runStudioGenerate);
         document.getElementById("studioRegenBtn")?.addEventListener("click", runStudioGenerate);
         document.getElementById("studioSaveWorkBtn")?.addEventListener("click", saveStudioAsWork);
+        document.getElementById("chatAttachBtn")?.addEventListener("click", () => document.getElementById("chatAttachInput")?.click());
+        document.getElementById("chatAttachInput")?.addEventListener("change", async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            try {
+                const fd = new FormData();
+                fd.append("file", f);
+                const r = await apiFetch("/media/upload", { method: "POST", body: fd });
+                const data = await r.json();
+                if (!r.ok) throw new Error("업로드 실패");
+                chatPendingAttachment = data.url || data.media_url || "";
+                showToast("이미지가 첨부되었습니다. 메시지를 입력하고 전송하세요.", "success");
+            } catch { showToast("첨부 실패", "error"); }
+            e.target.value = "";
+        });
         document.getElementById("chatInput")?.addEventListener("keydown", e => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
         });
@@ -10326,19 +10371,32 @@
         function renderWorksStories(friends) {
             const bar = document.getElementById("worksStoriesBar");
             if (!bar) return;
-            if (!friends?.length) { bar.innerHTML = ""; return; }
-            bar.innerHTML = friends.slice(0, 12).map(f => {
-                const initial = (f.display_name || "?").charAt(0).toUpperCase();
-                return `<div class="insta-story" data-friend-id="${f.id}"><div class="insta-story-ring"><span>${escapeHtml(initial)}</span></div>${escapeHtml((f.display_name || "").slice(0, 6))}</div>`;
-            }).join("");
-            bar.querySelectorAll(".insta-story").forEach(el => {
-                el.addEventListener("click", () => {
-                    const fid = parseInt(el.dataset.friendId, 10);
-                    const f = friends.find(x => x.id === fid);
-                    if (f) navigateToChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
-                });
+            SocialFeatures.loadStories(apiFetch).then(groups => {
+                if (groups.length) {
+                    SocialFeatures.renderStoryBar(bar, groups, (g, idx) => SocialFeatures.openViewer(groups, idx));
+                } else if (friends?.length) {
+                    bar.innerHTML = friends.slice(0, 12).map(f => {
+                        const initial = (f.display_name || "?").charAt(0).toUpperCase();
+                        return `<div class="insta-story" data-friend-id="${f.id}"><div class="insta-story-ring"><span>${escapeHtml(initial)}</span></div>${escapeHtml((f.display_name || "").slice(0, 6))}</div>`;
+                    }).join("") + `<button type="button" class="insta-story-add" id="storyAddBtn">＋</button>`;
+                    bar.querySelectorAll(".insta-story[data-friend-id]").forEach(el => {
+                        el.addEventListener("click", () => {
+                            const fid = parseInt(el.dataset.friendId, 10);
+                            const f = friends.find(x => x.id === fid);
+                            if (f) navigateToChat(dmRoomIdForFriend(f.id), f.display_name, "dm");
+                        });
+                    });
+                    bar.querySelector("#storyAddBtn")?.addEventListener("click", () => SocialFeatures.promptCreateStory(apiFetch));
+                } else {
+                    SocialFeatures.renderStoryBar(bar, [], null);
+                }
             });
         }
+
+        async function refreshWorksStories() {
+            loadSideMenuFriends();
+        }
+        global.refreshWorksStories = refreshWorksStories;
 
         let homeViewUserId = null;
 
@@ -10467,7 +10525,13 @@
                 const userEl = document.getElementById("homeUsername");
                 const bioEl = document.getElementById("homeBio");
                 const metaEl = document.getElementById("homeMeta");
-                if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+                if (avatar) {
+                    if (p.avatar_url) {
+                        avatar.innerHTML = `<img src="${escapeHtml(p.avatar_url)}" alt="">`;
+                    } else {
+                        avatar.textContent = name.charAt(0).toUpperCase();
+                    }
+                }
                 if (userEl) userEl.textContent = name;
                 if (bioEl) bioEl.textContent = p.bio || "";
                 if (isSelf) {
@@ -10591,6 +10655,31 @@
         });
 
         document.getElementById("homeBackBtn")?.addEventListener("click", () => openHomeProfile(null));
+        document.getElementById("homeAvatar")?.addEventListener("click", () => {
+            if (!requireLogin() || homeViewUserId && homeViewUserId !== currentUser?.id) return;
+            document.getElementById("homeAvatarInput")?.click();
+        });
+        document.getElementById("homeAvatarInput")?.addEventListener("change", async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            try {
+                const fd = new FormData();
+                fd.append("file", f);
+                const up = await apiFetch("/media/upload", { method: "POST", body: fd });
+                const ud = await up.json();
+                if (!up.ok) throw new Error("업로드 실패");
+                const url = ud.url || ud.media_url;
+                const res = await apiFetch("/social/profile", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ avatar_url: url }),
+                });
+                if (!res.ok) throw new Error("프로필 저장 실패");
+                showToast("프로필 사진이 변경되었습니다.", "success");
+                refreshHomeWorkspace();
+            } catch (err) { showToast(err.message || "업로드 실패", "error"); }
+            e.target.value = "";
+        });
         document.getElementById("homeProfileSaveBtn")?.addEventListener("click", async () => {
             if (!requireLogin()) return;
             const display_name = document.getElementById("homeDisplayNameInput")?.value?.trim();
@@ -10622,6 +10711,30 @@
 
         async function startWorkCowork(work) {
             if (!requireLogin()) return;
+            const hasMedia = !!(work.media_url && work.media_type);
+            const choice = hasMedia
+                ? confirm("스튜디오에서 미디어 작업물을 열까요?\n(취소 = 채팅/AI 협업)")
+                : false;
+            if (hasMedia && choice) {
+                setAppWorkspace("studio");
+                if (work.media_type === "code" || work.media_type === "text") {
+                    studioModality = work.media_type === "code" ? "code" : "chat";
+                } else {
+                    studioModality = work.media_type || "image";
+                }
+                document.querySelectorAll("#studioModTabs button").forEach(b =>
+                    b.classList.toggle("active", b.dataset.mod === studioModality));
+                renderStudioModelList();
+                updateStudioOptionsUI();
+                const ta = document.getElementById("studioPrompt");
+                if (ta) ta.value = `다음 작업물을 함께 발전시켜 주세요:\n${work.title || ""}\n${work.body || ""}`;
+                if (work.media_url && studioModality === "image") {
+                    const ref = document.getElementById("studioImageUrl");
+                    if (ref) ref.value = work.media_url;
+                }
+                showToast("스튜디오에서 공동작업을 시작합니다.", "success");
+                return;
+            }
             const msg = `「${work.title || "작업"}」 공동작업 하실래요?\n${(work.body || "").slice(0, 200)}`;
             if (work.user_id && work.user_id !== currentUser.id) {
                 navigateToChat(dmRoomIdForFriend(work.user_id), work.author_name || "친구", "dm");
@@ -10661,15 +10774,13 @@
             try {
                 const path = worksFeedMode === "explore"
                     ? `/social/explore?limit=20&offset=${worksFeedOffset}`
-                    : "/social/works?friends_only=1&limit=30";
+                    : `/social/works?friends_only=1&limit=20&offset=${worksFeedOffset}`;
                 const res = await apiFetch(path);
                 if (!res.ok) throw new Error("fail");
                 const data = await res.json();
                 const works = data.works || [];
-                if (worksFeedMode === "explore") {
-                    worksFeedHasMore = works.length >= 20;
-                    worksFeedOffset += works.length;
-                }
+                worksFeedHasMore = works.length >= 20;
+                worksFeedOffset += works.length;
                 if (append) appendWorksFeed(works);
                 else renderWorksFeed(works);
             } catch {
@@ -10779,8 +10890,12 @@
             });
             document.getElementById("worksFeed")?.addEventListener("scroll", () => {
                 const feed = document.getElementById("worksFeed");
-                if (!feed || worksFeedMode !== "explore" || !worksFeedHasMore || worksFeedLoading) return;
+                if (!feed || worksFeedLoading || !worksFeedHasMore) return;
                 if (feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 120) loadWorksFeed(true);
+            });
+            SocialFeatures.bindDoubleTapLike(document.getElementById("worksFeed"), (workId) => {
+                const btn = document.querySelector(`.works-coin-btn[data-tip="${workId}"]:not([disabled])`);
+                if (btn && btn.dataset.cancel !== "1") sendWorkCoinTip(workId, btn);
             });
         }
 
@@ -11704,6 +11819,11 @@
                 const d = e.data;
                 if (!d || d.__nasaroai !== "agent") return;
                 if (d.type === "READY") setExtReady(true);
+                if (d.type === "HANDOFF" && agentHistory) {
+                    AgentPlanUI.showHandoff(agentHistory, d.reason || "민감 단계입니다. 직접 진행 후 계속하기를 눌러주세요.", () => {
+                        window.postMessage({ __nasaroai: "agent", type: "RESUME_TASK" }, "*");
+                    });
+                }
                 if (d.type === "STATE") {
                     setExtReady(true);
                     const on = !!d.enabled;
@@ -12039,7 +12159,8 @@
             bodyEl.style.display = "";
             renderAiAnswer(bodyEl, content);
             metaEl.style.display = "flex";
-            metaEl.textContent = `소요: ${(elapsed / 1000).toFixed(1)}초`;
+            const modeLabel = state === "ok" && content.includes("LLM으로 실행") ? " · LLM 폴백" : "";
+            metaEl.textContent = `소요: ${(elapsed / 1000).toFixed(1)}초${modeLabel}`;
             const cardRefsForContinue = { card, badge, progressEl, logEl, bodyEl, metaEl, actionsEl, stepInterval: null };
 
             if (state === "ok") {
@@ -12055,6 +12176,11 @@
                     preview: "완료",
                     data: { result: content },
                 });
+                apiFetch("/agent/history/save", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: mission, result: content.slice(0, 2000), user_id: getDeviceId(), mode: "task" }),
+                }).catch(() => {});
                 actionsEl.innerHTML = `
                     <button class="agent-card-action-btn save-result" type="button">💾 결과물 저장</button>
                     <button class="agent-card-action-btn modify" type="button">✏️ 수정</button>
@@ -12205,14 +12331,18 @@
             }
 
             try {
+                let planStep = 0;
+                AgentPlanUI.markDone?.(planStep - 1);
                 // 1차: 브라우저 자동화 시도
                 let res = await doFetch("/agent/task", { query: mission });
+                AgentPlanUI.markDone?.(planStep++);
 
                 // 브라우저 오류(503) → LLM 폴백
                 if (res.status === 503) {
                     usedFallback = true;
                     const recentHistory = agentMissionHistory.slice(-3);
                     res = await doFetch("/agent/ask", { query: mission, history: recentHistory });
+                    AgentPlanUI.markDone?.(planStep++);
                 }
 
                 if (res.status === 429) {
@@ -12220,14 +12350,33 @@
                 }
 
                 const data = await res.json();
+                if (data.handoff_required) {
+                    AgentPlanUI.showHandoff(agentHistory, data.reason || data.message || "사용자 개입이 필요합니다.", async () => {
+                        runAgentMission(mission, false, appendToCard);
+                    });
+                    finalizeCard(cardRefs, "ok", data.reason || "핸드오프 대기 중", mission, Date.now() - startTime);
+                    return;
+                }
                 if (!res.ok || data.status === "error") throw new Error(data.message || `서버 오류 (${res.status})`);
 
                 const content = data.result || data.response || data.message || "(결과 없음)";
                 const suffix  = usedFallback ? "\n\n⚠️ [브라우저 없이 LLM으로 실행됨]" : "";
+                if (data.model) appendCardLog(cardRefs.logEl, "모델: " + data.model);
                 finalizeCard(cardRefs, "ok", content + suffix, mission, Date.now() - startTime);
+                AgentPlanUI.markDone?.(99);
 
                 // 기록 추가
                 agentMissionHistory.push({ mission, result: content.slice(0, 300) });
+                apiFetch("/agent/history/save", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        query: mission,
+                        result: content.slice(0, 2000),
+                        user_id: getDeviceId(),
+                        mode: usedFallback ? "ask" : "task",
+                    }),
+                }).catch(() => {});
 
             } catch (err) {
                 const elapsed = Date.now() - startTime;
@@ -12332,6 +12481,25 @@
             }
             startAgentWithPlan(val, isModify, appendTo);
         });
+
+        async function loadAgentTemplates() {
+            const row = document.getElementById("agentTemplateRow");
+            if (!row) return;
+            try {
+                const res = await apiFetch("/agent/templates");
+                const data = res.ok ? await res.json() : { templates: [] };
+                (data.templates || []).forEach(t => {
+                    const chip = document.createElement("button");
+                    chip.type = "button";
+                    chip.className = "agent-template-chip";
+                    chip.textContent = t.label;
+                    chip.addEventListener("click", () => {
+                        if (agentInputEl) { agentInputEl.value = t.query || ""; autoResizeTA(agentInputEl); }
+                    });
+                    row.appendChild(chip);
+                });
+            } catch {}
+        }
 
         async function startAgentWithPlan(val, isModify, appendTo) {
             if (isModify || appendTo || useExtensionAgent()) {
@@ -14297,6 +14465,7 @@
             window.addEventListener("studio:video-retry", () => runStudioGenerate());
             bindWorksFeedTabs();
             initNotifications();
+            loadAgentTemplates();
             ensureDeviceId().finally(() => {
                 startPresencePing();
                 refreshSideQuota();

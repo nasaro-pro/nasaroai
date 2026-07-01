@@ -39,6 +39,7 @@ from auth_store import (
     create_admin_session,
     create_public_share,
     create_public_work,
+    create_story,
     create_support_inquiry,
     db_connection,
     delete_support_inquiry,
@@ -61,6 +62,8 @@ from auth_store import (
     is_guest_subject,
     is_subject_banned,
     list_public_works,
+    list_active_stories,
+    list_agent_missions,
     list_chat_users,
     list_work_comments,
     list_guest_devices,
@@ -77,6 +80,7 @@ from auth_store import (
     set_subject_ban,
     set_admin_setting,
     touch_device_presence,
+    save_agent_mission,
     send_chat_message,
     signup as auth_signup_fn,
     cancel_work_coin_tip,
@@ -957,6 +961,8 @@ class WorkCommentRequest(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     body: str = ""
+    attachment_url: str = ""
+    reply_to_id: int = 0
 
 
 class AdminLoginRequest(BaseModel):
@@ -5196,6 +5202,7 @@ def user_data_sync(body: UserSyncRequest, request: Request) -> dict:
 def social_works_list(
     request: Request,
     limit: int = 50,
+    offset: int = 0,
     friends_only: int = 0,
     mine: int = 0,
     user_id: int = 0,
@@ -5206,6 +5213,7 @@ def social_works_list(
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
     works = list_public_works(
         limit=limit,
+        offset=offset,
         viewer_id=viewer_id,
         friends_only=bool(friends_only),
         mine=bool(mine),
@@ -5351,6 +5359,13 @@ def social_friend_remove(friend_id: int, request: Request) -> dict:
 class ProfileUpdateBody(BaseModel):
     display_name: str | None = None
     bio: str | None = None
+    avatar_url: str | None = None
+
+
+class StoryCreateBody(BaseModel):
+    body: str = ""
+    media_url: str = ""
+    media_type: str = "text"
 
 
 @app.patch("/social/profile")
@@ -5359,7 +5374,7 @@ def social_profile_update(body: ProfileUpdateBody, request: Request) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
     try:
-        profile = update_user_profile(user["id"], body.display_name, body.bio)
+        profile = update_user_profile(user["id"], body.display_name, body.bio, body.avatar_url)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"success": True, "profile": profile}
@@ -5415,6 +5430,8 @@ def social_chat_room_get(room_id: str, request: Request) -> dict:
 
 class RoomMessageBody(BaseModel):
     body: str = ""
+    attachment_url: str = ""
+    reply_to_id: int = 0
 
 
 @app.post("/social/chat/room/{room_id:path}")
@@ -5428,6 +5445,8 @@ def social_chat_room_send(room_id: str, body: RoomMessageBody, request: Request)
             user.get("display_name") or user.get("username") or "사용자",
             room_id,
             body.body,
+            attachment_url=body.attachment_url,
+            reply_to_id=body.reply_to_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -5794,6 +5813,90 @@ async def agent_plan(body: AgentRequest, http_request: Request) -> dict:
     if not steps:
         steps = [text[:200]] if text else ["임무 분석", "실행", "결과 정리"]
     return {"success": True, "steps": steps, "plan_text": text}
+
+
+AGENT_TEMPLATES: list[dict[str, str]] = [
+    {"id": "news", "label": "뉴스 요약", "query": "오늘 주요 IT 뉴스 5건을 검색해서 요약해줘"},
+    {"id": "price", "label": "시세 확인", "query": "비트코인 현재 시세와 24시간 변동률을 확인해줘"},
+    {"id": "shop", "label": "쇼핑 비교", "query": "무선 이어폰 베스트셀러 3개 가격과 특징을 비교해줘"},
+    {"id": "form", "label": "폼 작성", "query": "연락처 문의 폼에 테스트 정보를 입력하고 제출 가능한지 확인해줘"},
+]
+
+_typing_rooms: dict[str, tuple[str, float]] = {}
+
+
+@app.get("/agent/templates")
+def agent_templates() -> dict:
+    return {"templates": AGENT_TEMPLATES}
+
+
+@app.get("/agent/history")
+def agent_history_list(request: Request, user_id: str = "") -> dict:
+    subject = _subject_for_device(request, user_id)
+    return {"missions": list_agent_missions(subject)}
+
+
+class AgentHistorySaveBody(BaseModel):
+    query: str = ""
+    result: str = ""
+    user_id: str = ""
+    step_count: int = 0
+    mode: str = "task"
+
+
+@app.post("/agent/history/save")
+def agent_history_save_full(body: AgentHistorySaveBody, request: Request) -> dict:
+    subject = _subject_for_device(request, body.user_id)
+    item = save_agent_mission(subject, body.query, body.result, body.step_count, body.mode)
+    return {"success": True, "item": item}
+
+
+@app.get("/social/stories")
+def social_stories_list(request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    return {"stories": list_active_stories(user["id"])}
+
+
+@app.post("/social/stories")
+def social_stories_create(body: StoryCreateBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    try:
+        story = create_story(user["id"], body.body, body.media_url, body.media_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"success": True, "story": story}
+
+
+class ChatTypingBody(BaseModel):
+    room_id: str = ""
+
+
+@app.post("/social/chat/typing")
+def social_chat_typing(body: ChatTypingBody, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    room = (body.room_id or "").strip()
+    if room:
+        name = user.get("display_name") or user.get("username") or "사용자"
+        _typing_rooms[room] = (name, time.time() + 5)
+    return {"success": True}
+
+
+@app.get("/social/chat/typing/{room_id:path}")
+def social_chat_typing_get(room_id: str, request: Request) -> dict:
+    user = get_user_by_token(_bearer_token(request))
+    if not user:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+    now = time.time()
+    entry = _typing_rooms.get(room_id)
+    if entry and entry[1] > now and entry[0] != (user.get("display_name") or user.get("username")):
+        return {"typing": True, "user": entry[0]}
+    return {"typing": False}
 
 
 @app.post("/social/chat/{room_id}/ai")

@@ -430,6 +430,44 @@ def init_db() -> None:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_notifications_user ON user_notifications(user_id, created_at DESC)"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_stories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    media_type TEXT NOT NULL DEFAULT 'text',
+                    media_url TEXT NOT NULL DEFAULT '',
+                    body TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL,
+                    expires_at REAL NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_stories_user ON user_stories(user_id, expires_at DESC)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS agent_missions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    subject TEXT NOT NULL,
+                    mission TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '',
+                    step_count INTEGER NOT NULL DEFAULT 0,
+                    mode TEXT NOT NULL DEFAULT 'task',
+                    created_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_agent_missions_subject ON agent_missions(subject, created_at DESC)"
+            )
+            ucm_cols = {r[1] for r in conn.execute("PRAGMA table_info(user_chat_messages)").fetchall()}
+            if "attachment_url" not in ucm_cols:
+                conn.execute("ALTER TABLE user_chat_messages ADD COLUMN attachment_url TEXT NOT NULL DEFAULT ''")
+            if "reply_to_id" not in ucm_cols:
+                conn.execute("ALTER TABLE user_chat_messages ADD COLUMN reply_to_id INTEGER NOT NULL DEFAULT 0")
             from pricing_store import ensure_pricing_tables, seed_model_pricing, process_due_coin_grants
 
             ensure_pricing_tables(conn)
@@ -2409,9 +2447,15 @@ def _chat_room_id(user_a: int, user_b: int) -> str:
     return f"{lo}:{hi}"
 
 
-def update_user_profile(user_id: int, display_name: str | None = None, bio: str | None = None) -> dict[str, Any]:
+def update_user_profile(
+    user_id: int,
+    display_name: str | None = None,
+    bio: str | None = None,
+    avatar_url: str | None = None,
+) -> dict[str, Any]:
     name = (display_name or "").strip()[:64] if display_name is not None else None
     bio_text = (bio or "").strip()[:500] if bio is not None else None
+    avatar = (avatar_url or "").strip()[:2000] if avatar_url is not None else None
     with _lock:
         conn = _connect()
         try:
@@ -2422,6 +2466,8 @@ def update_user_profile(user_id: int, display_name: str | None = None, bio: str 
             conn.close()
     if bio_text is not None:
         set_user_data(user_id, "profile_bio", bio_text)
+    if avatar is not None:
+        set_user_data(user_id, "avatar_url", avatar)
     return get_user_public_profile(user_id, viewer_id=user_id)
 
 
@@ -2448,8 +2494,11 @@ def remove_friend(user_id: int, friend_id: int) -> dict[str, Any]:
 def get_user_public_profile(user_id: int, viewer_id: int | None = None) -> dict[str, Any]:
     user = get_user_by_id(user_id)
     bio = ""
+    avatar_url = ""
     try:
-        bio = str(get_user_data(user_id).get("profile_bio") or "").strip()
+        ud = get_user_data(user_id)
+        bio = str(ud.get("profile_bio") or "").strip()
+        avatar_url = str(ud.get("avatar_url") or "").strip()
     except Exception:
         bio = ""
     is_self = viewer_id is not None and int(viewer_id) == int(user_id)
@@ -2464,6 +2513,7 @@ def get_user_public_profile(user_id: int, viewer_id: int | None = None) -> dict[
         "username": user["username"],
         "display_name": user.get("display_name") or user["username"],
         "bio": bio[:500],
+        "avatar_url": avatar_url[:2000],
         "created_at": user.get("created_at"),
         "is_self": is_self,
         "is_friend": is_friend,
@@ -2478,9 +2528,11 @@ def list_public_works(
     friends_only: bool = False,
     mine: bool = False,
     author_id: int | None = None,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     confirm_pending_work_tips()
     limit = max(1, min(int(limit or 50), 100))
+    offset = max(0, int(offset or 0))
     with _lock:
         conn = _connect()
         try:
@@ -2529,9 +2581,9 @@ def list_public_works(
                     LEFT JOIN friendships f ON f.friend_id = w.user_id AND f.user_id = ?
                     WHERE w.user_id = ? OR f.friend_id IS NOT NULL
                     ORDER BY w.created_at DESC
-                    LIMIT ?
+                    LIMIT ? OFFSET ?
                     """,
-                    (viewer_id, viewer_id, limit),
+                    (viewer_id, viewer_id, limit, offset),
                 ).fetchall()
             else:
                 rows = conn.execute(
@@ -2673,6 +2725,8 @@ def list_work_comments(work_id: int, limit: int = 80) -> list[dict[str, Any]]:
         "body": r["body"],
         "commenter_type": r["commenter_type"],
         "model_label": r["model_label"],
+        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
+        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
     } for r in rows]
@@ -2753,7 +2807,9 @@ def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict
                 """
                 SELECT id, room_id, sender_id, sender_name, body, created_at,
                        COALESCE(sender_type, 'user') AS sender_type,
-                       COALESCE(model_label, '') AS model_label
+                       COALESCE(model_label, '') AS model_label,
+                       COALESCE(attachment_url, '') AS attachment_url,
+                       COALESCE(reply_to_id, 0) AS reply_to_id
                 FROM user_chat_messages
                 WHERE room_id = ?
                 ORDER BY created_at ASC
@@ -2771,6 +2827,8 @@ def get_chat_messages(user_id: int, peer_id: int, limit: int = 120) -> list[dict
         "body": r["body"],
         "sender_type": r["sender_type"],
         "model_label": r["model_label"],
+        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
+        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
         "is_mine": r["sender_id"] == user_id,
@@ -2785,9 +2843,12 @@ def send_chat_message(
     *,
     sender_type: str = "user",
     model_label: str = "",
+    attachment_url: str = "",
+    reply_to_id: int = 0,
 ) -> dict[str, Any]:
     body = (body or "").strip()[:4000]
-    if not body:
+    attach = (attachment_url or "").strip()[:2000]
+    if not body and not attach:
         raise ValueError("메시지를 입력하세요.")
     if user_id == peer_id:
         raise ValueError("자기 자신에게는 보낼 수 없습니다.")
@@ -2805,10 +2866,10 @@ def send_chat_message(
                 raise ValueError("상대 계정을 찾을 수 없습니다.")
             cur = conn.execute(
                 """
-                INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at, sender_type, model_label)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at, sender_type, model_label, attachment_url, reply_to_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (room, user_id, (sender_name or "").strip()[:64], body, now, stype, mlabel),
+                (room, user_id, (sender_name or "").strip()[:64], body, now, stype, mlabel, attach, int(reply_to_id or 0)),
             )
             conn.commit()
             msg_id = int(cur.lastrowid)
@@ -2822,6 +2883,8 @@ def send_chat_message(
         "body": body,
         "sender_type": stype,
         "model_label": mlabel,
+        "attachment_url": attach,
+        "reply_to_id": int(reply_to_id or 0),
         "created_at": now,
         "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
         "is_mine": True,
@@ -3313,7 +3376,9 @@ def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict
                     """
                     SELECT id, room_id, sender_id, sender_name, body, created_at,
                            COALESCE(sender_type, 'user') AS sender_type,
-                           COALESCE(model_label, '') AS model_label
+                           COALESCE(model_label, '') AS model_label,
+                           COALESCE(attachment_url, '') AS attachment_url,
+                           COALESCE(reply_to_id, 0) AS reply_to_id
                     FROM user_chat_messages WHERE room_id = ? ORDER BY created_at ASC LIMIT ?
                     """,
                     (room_id, limit),
@@ -3336,6 +3401,8 @@ def get_room_messages(user_id: int, room_id: str, limit: int = 120) -> list[dict
         "body": r["body"],
         "sender_type": r["sender_type"],
         "model_label": r["model_label"],
+        "attachment_url": r["attachment_url"] if "attachment_url" in r.keys() else "",
+        "reply_to_id": int(r["reply_to_id"] or 0) if "reply_to_id" in r.keys() else 0,
         "created_at": r["created_at"],
         "created_at_iso": time.strftime("%H:%M", time.localtime(r["created_at"])),
         "is_mine": r["sender_id"] == user_id,
@@ -3350,14 +3417,17 @@ def send_room_message(
     *,
     sender_type: str = "user",
     model_label: str = "",
+    attachment_url: str = "",
+    reply_to_id: int = 0,
 ) -> dict[str, Any]:
     room_id = (room_id or "").strip()
     stype = (sender_type or "user").strip()[:16] or "user"
     mlabel = (model_label or "").strip()[:64]
+    attach = (attachment_url or "").strip()[:2000]
     if room_id.startswith("g:"):
         group_id = int(room_id.split(":", 1)[1])
         body = (body or "").strip()[:4000]
-        if not body:
+        if not body and not attach:
             raise ValueError("메시지를 입력하세요.")
         now = time.time()
         with _lock:
@@ -3367,10 +3437,10 @@ def send_room_message(
                     raise ValueError("이 방에 참여하지 않았습니다.")
                 cur = conn.execute(
                     """
-                    INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at, sender_type, model_label)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO user_chat_messages (room_id, sender_id, sender_name, body, created_at, sender_type, model_label, attachment_url, reply_to_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (room_id, user_id, (sender_name or "").strip()[:64], body, now, stype, mlabel),
+                    (room_id, user_id, (sender_name or "").strip()[:64], body, now, stype, mlabel, attach, int(reply_to_id or 0)),
                 )
                 conn.commit()
                 msg_id = int(cur.lastrowid)
@@ -3384,6 +3454,8 @@ def send_room_message(
             "body": body,
             "sender_type": stype,
             "model_label": mlabel,
+            "attachment_url": attach,
+            "reply_to_id": int(reply_to_id or 0),
             "created_at": now,
             "created_at_iso": time.strftime("%H:%M", time.localtime(now)),
             "is_mine": True,
@@ -3394,7 +3466,11 @@ def send_room_message(
     peer_id = int(parts[0]) if int(parts[0]) != user_id else int(parts[1])
     if not _are_friends(user_id, peer_id):
         raise ValueError("친구만 1:1 채팅할 수 있습니다.")
-    return send_chat_message(user_id, sender_name, peer_id, body, sender_type=stype, model_label=mlabel)
+    return send_chat_message(
+        user_id, sender_name, peer_id, body,
+        sender_type=stype, model_label=mlabel,
+        attachment_url=attach, reply_to_id=reply_to_id,
+    )
 
 
 def list_chat_users(exclude_user_id: int, limit: int = 50, friends_only: bool = True) -> list[dict[str, Any]]:
@@ -3556,3 +3632,133 @@ def list_explore_works(viewer_id: int | None = None, limit: int = 30, offset: in
             "tip_seconds_left": max(0, int(float(tip["confirm_after"]) - now)) if pending else 0,
         })
     return out
+
+
+STORY_TTL_SECONDS = 86400
+
+
+def _purge_expired_stories(conn: sqlite3.Connection) -> None:
+    conn.execute("DELETE FROM user_stories WHERE expires_at <= ?", (time.time(),))
+
+
+def create_story(user_id: int, body: str = "", media_url: str = "", media_type: str = "text") -> dict[str, Any]:
+    body = (body or "").strip()[:500]
+    media_url = (media_url or "").strip()[:2000]
+    media_type = (media_type or "text").strip()[:32] or "text"
+    if not body and not media_url:
+        raise ValueError("스토리 내용 또는 이미지를 입력하세요.")
+    now = time.time()
+    expires = now + STORY_TTL_SECONDS
+    with _lock:
+        conn = _connect()
+        try:
+            _purge_expired_stories(conn)
+            cur = conn.execute(
+                """
+                INSERT INTO user_stories (user_id, media_type, media_url, body, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (user_id, media_type, media_url, body, now, expires),
+            )
+            conn.commit()
+            sid = int(cur.lastrowid)
+        finally:
+            conn.close()
+    user = get_user_by_id(user_id)
+    return {
+        "id": sid,
+        "user_id": user_id,
+        "author_name": user.get("display_name") or user.get("username") or "사용자",
+        "media_type": media_type,
+        "media_url": media_url,
+        "body": body,
+        "created_at": now,
+        "expires_at": expires,
+    }
+
+
+def list_active_stories(viewer_id: int) -> list[dict[str, Any]]:
+    now = time.time()
+    friend_ids = {f["id"] for f in list_friends(viewer_id)}
+    friend_ids.add(int(viewer_id))
+    with _lock:
+        conn = _connect()
+        try:
+            _purge_expired_stories(conn)
+            placeholders = ",".join("?" * len(friend_ids))
+            rows = conn.execute(
+                f"""
+                SELECT s.id, s.user_id, s.media_type, s.media_url, s.body, s.created_at, s.expires_at,
+                       COALESCE(u.display_name, u.email, '') AS display_name
+                FROM user_stories s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.expires_at > ? AND s.user_id IN ({placeholders})
+                ORDER BY s.created_at DESC
+                """,
+                [now, *friend_ids],
+            ).fetchall()
+        finally:
+            conn.close()
+    by_user: dict[int, dict[str, Any]] = {}
+    for r in rows:
+        uid = int(r["user_id"])
+        if uid not in by_user:
+            by_user[uid] = {
+                "user_id": uid,
+                "author_name": (r["display_name"] or f"user{uid}").split("@")[0],
+                "items": [],
+            }
+        by_user[uid]["items"].append({
+            "id": r["id"],
+            "media_type": r["media_type"],
+            "media_url": r["media_url"],
+            "body": r["body"],
+            "created_at": r["created_at"],
+            "expires_at": r["expires_at"],
+        })
+    return list(by_user.values())
+
+
+def save_agent_mission(subject: str, mission: str, result: str, step_count: int = 0, mode: str = "task") -> dict[str, Any]:
+    now = time.time()
+    with _lock:
+        conn = _connect()
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO agent_missions (subject, mission, result, step_count, mode, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (subject, (mission or "")[:2000], (result or "")[:8000], int(step_count or 0), (mode or "task")[:16], now),
+            )
+            conn.commit()
+            mid = int(cur.lastrowid)
+        finally:
+            conn.close()
+    return {"id": mid, "mission": mission, "result": result[:500], "created_at": now}
+
+
+def list_agent_missions(subject: str, limit: int = 30) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit or 30), 100))
+    with _lock:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT id, mission, result, step_count, mode, created_at
+                FROM agent_missions WHERE subject = ?
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (subject, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [{
+        "id": r["id"],
+        "mission": r["mission"],
+        "result": r["result"],
+        "step_count": r["step_count"],
+        "mode": r["mode"],
+        "created_at": r["created_at"],
+        "created_at_iso": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["created_at"])),
+    } for r in rows]

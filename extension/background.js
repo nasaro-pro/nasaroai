@@ -88,11 +88,11 @@ function tsCreate(taskId, text, tabId, pageUrl) {
   });
 }
 
-function tsStep(taskId, text, kind) {
+function tsStep(taskId, text, kind, image) {
   return _withTasks(async (ts) => {
     const t = ts.find(x => x.id === taskId);
     if (!t) return;
-    t.steps.push({ text, kind: kind || "step", t: Date.now() });
+    t.steps.push({ text, kind: kind || "step", t: Date.now(), image: image || null });
     if (t.steps.length > 40) t.steps.splice(0, t.steps.length - 40);
     t.updatedAt = Date.now();
   });
@@ -499,6 +499,15 @@ async function runTask(tabId, text, taskId, pageUrl) {
           finalText = data.reasoning || "보안상 사용자가 직접 처리해야 합니다.";
           kind = "handoff";
           await tsStep(taskId, "⏸ " + finalText, "info");
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              func: (reason) => {
+                window.postMessage({ __nasaroai: "agent", type: "HANDOFF", reason }, "*");
+              },
+              args: [finalText],
+            });
+          } catch (_) {}
           break;
         }
         if (data.done) {
@@ -530,6 +539,13 @@ async function runTask(tabId, text, taskId, pageUrl) {
           }
         }
         actionHistory.push({ step: round, action: data.action, target: data.target_id, value: data.value, error: execResult.success ? null : execResult.error });
+        if (execResult.success && data.action !== "wait") {
+          try {
+            const tabInfo = await chrome.tabs.get(tabId);
+            const dataUrl = await chrome.tabs.captureVisibleTab(tabInfo.windowId, { format: "jpeg", quality: 50 });
+            await tsStep(taskId, `📸 ${scan.url || data.action}`, "screenshot", dataUrl);
+          } catch (_) {}
+        }
         if (data.action === "scroll_down" || data.action === "scroll_up") await sleep(700);
         else await sleep(400);
       }
